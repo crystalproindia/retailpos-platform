@@ -1,6 +1,6 @@
-# RetailPOS Platform - Phase 1 Project Structure
+# RetailPOS Platform - Phase 1 / 1.5 Project Structure
 
-This document describes the Command Center foundation built in Phase 1. It is documentation only and reflects the current Laravel application structure after commit `c27cb4f`.
+This document describes the Command Center foundation built in Phase 1 and the dynamic Module Registry foundation added in Phase 1.5.
 
 ## Folder Structure
 
@@ -43,9 +43,15 @@ app/
     SettingsRepository.php
   Services/
     AuditLogger.php
+  Support/
+    Modules/
+      Module.php
+      ModuleRegistry.php
+      ModuleServiceProvider.php
 
 config/
   command-center.php
+  modules.php
 
 database/
   factories/
@@ -90,6 +96,7 @@ routes/
 tests/
   Feature/
     ExampleTest.php
+    ModuleRegistryTest.php
   TestCase.php
 ```
 
@@ -103,6 +110,7 @@ tests/
 - `AuditLog`: Stores login, logout, CRUD-style, and settings-change audit entries.
 - `UserRole`: Enum for `administrator`, `manager`, and `staff`.
 - `Auditable`: Model concern that records created, updated, and deleted events through `AuditLogger`.
+- `Module`: Immutable value object for one registered Command Center module.
 
 ## Controllers
 
@@ -126,7 +134,9 @@ Command Center controllers:
   - Loads dashboard metrics through `DashboardRepository`.
   - Loads recent audit log activity for the user's company.
 - `ModuleController`
-  - Serves configured sidebar modules from `config/command-center.php`.
+  - Serves registered modules from `ModuleRegistry`.
+  - Rejects disabled modules with HTTP 404.
+  - Rejects modules that do not allow the authenticated user's role with HTTP 403.
   - Provides the audit-log table view for the `audit-logs` module.
 - `SettingsController`
   - Shows settings sections.
@@ -260,6 +270,103 @@ Roles are represented by `App\Enums\UserRole`.
   - Cannot access settings in Phase 1.
 
 Role checks are handled through `User::hasAnyRole()` and the `role` middleware.
+
+Module visibility and module page access also use the role metadata exposed by `config/modules.php`.
+
+## Module Registry
+
+Phase 1.5 adds a centralized module registry under `app/Support/Modules`.
+
+Files:
+
+- `app/Support/Modules/Module.php`
+  - Immutable module value object.
+  - Exposes route metadata, role checks, active-state checks, badge metadata, and future child-module support.
+- `app/Support/Modules/ModuleRegistry.php`
+  - Loads modules from `config/modules.php`.
+  - Provides filtered and grouped module collections for controllers and views.
+- `app/Support/Modules/ModuleServiceProvider.php`
+  - Registers `ModuleRegistry` as a singleton.
+  - Added to `bootstrap/providers.php`.
+- `config/modules.php`
+  - Single source of truth for module metadata.
+
+Module metadata fields:
+
+- `id`
+- `name`
+- `description`
+- `icon`
+- `route`
+- `route_params`
+- `sort_order`
+- `category`
+- `enabled`
+- `visible_in_sidebar`
+- `roles`
+- `badge`
+- `license_key`
+- `parent_id`
+
+Registry methods:
+
+- `all()`
+  - Returns every configured module, including disabled and hidden modules.
+- `enabled()`
+  - Returns enabled modules ordered by `sort_order`.
+- `sidebar()`
+  - Returns enabled, visible modules, optionally filtered by role.
+  - Attaches future child modules to their parent modules.
+- `find()`
+  - Finds a module by id.
+- `grouped()`
+  - Returns sidebar modules grouped by category.
+- `forRole()`
+  - Returns enabled modules allowed for a role.
+
+## Module Architecture
+
+The Command Center now treats modules as registered metadata instead of hardcoded sidebar rows.
+
+Current consumers:
+
+- `resources/views/layouts/admin.blade.php`
+  - Calls `ModuleRegistry::grouped()` for the authenticated user's role.
+  - Renders sidebar category groups dynamically.
+  - Renders icons, badges, active states, collapsed menu labels, and future child links.
+- `app/Http/Controllers/CommandCenter/ModuleController.php`
+  - Calls `ModuleRegistry::find()`.
+  - Uses registry metadata for module titles and module access decisions.
+- `config/modules.php`
+  - Owns all sidebar/module metadata.
+
+No controller should manually add sidebar items. Future modules should register metadata through the module registry configuration or through a future module provider, then expose their own routes and domain logic independently.
+
+## Adding New Modules
+
+To add a future module:
+
+1. Add a new entry to `config/modules.php`.
+2. Choose a stable module id, for example `loyalty`.
+3. Set the display metadata:
+   - `name`
+   - `description`
+   - `icon`
+   - `category`
+   - `sort_order`
+4. Set route metadata:
+   - Use `route => 'modules.show'` and `route_params => ['module' => 'loyalty']` for foundation pages.
+   - Use a dedicated route name when the module has its own controller.
+5. Set access metadata:
+   - `enabled`
+   - `visible_in_sidebar`
+   - `roles`
+6. Add optional metadata:
+   - `badge`
+   - `license_key`
+   - `parent_id` for future nested modules.
+7. Add module-specific controllers, requests, repositories, services, models, migrations, and tests as needed.
+8. Do not edit the admin sidebar manually.
 
 ## Settings
 
@@ -426,8 +533,10 @@ Reset password:
 - Used first-party Laravel authentication primitives.
   - No starter kit or unnecessary package was added.
   - Login, logout, remember-me, forgot password, and reset password are implemented directly with Laravel guards and password broker APIs.
-- Centralized navigation and settings definitions in `config/command-center.php`.
-  - The sidebar and settings UI read from config instead of duplicating labels and keys across views.
+- Centralized module metadata in `config/modules.php`.
+  - The sidebar and module controller read from `ModuleRegistry` instead of duplicating labels and route metadata.
+- Kept settings field definitions in `config/command-center.php`.
+  - The settings UI reads section and field definitions from config instead of duplicating labels and keys across views.
 - Used enum-backed roles.
   - `UserRole` gives type-safe role values while keeping the database simple.
 - Added repository classes where they reduce controller responsibility.

@@ -4,20 +4,22 @@ namespace App\Http\Controllers\CommandCenter;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Support\Modules\ModuleRegistry;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ModuleController extends Controller
 {
-    public function __invoke(Request $request, string $module): View
+    public function __invoke(Request $request, ModuleRegistry $moduleRegistry, string $module): View
     {
-        abort_unless($this->moduleExists($module), 404);
+        $registeredModule = $moduleRegistry->find($module);
+
+        abort_unless($registeredModule?->enabled, 404);
+        abort_unless($registeredModule->allowedFor($request->user()->role), 403);
 
         return view('command-center.modules.show', [
             'module' => $module,
-            'title' => $this->title($module),
+            'title' => $registeredModule->name,
             'auditLogs' => $module === 'audit-logs'
                 ? AuditLog::query()
                     ->with('user')
@@ -26,17 +28,5 @@ class ModuleController extends Controller
                     ->paginate(12)
                 : null,
         ]);
-    }
-
-    private function moduleExists(string $module): bool
-    {
-        return collect(config('command-center.navigation'))
-            ->contains(fn (array $item) => Arr::get($item, 'params.module') === $module);
-    }
-
-    private function title(string $module): string
-    {
-        return collect(config('command-center.navigation'))
-            ->firstWhere('params.module', $module)['label'] ?? Str::of($module)->replace('-', ' ')->headline()->toString();
     }
 }

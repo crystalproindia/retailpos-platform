@@ -11,8 +11,8 @@
     </head>
     <body class="min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100">
         @php
-            $navigation = config('command-center.navigation');
             $user = auth()->user();
+            $moduleGroups = app(\App\Support\Modules\ModuleRegistry::class)->grouped($user?->role);
         @endphp
 
         <div class="min-h-screen lg:grid lg:grid-cols-[auto_1fr]">
@@ -32,23 +32,47 @@
                     </button>
                 </div>
 
-                <nav class="flex-1 space-y-1 overflow-y-auto p-3">
-                    @foreach ($navigation as $item)
-                        @php
-                            $params = $item['params'] ?? [];
-                            $isActive = request()->routeIs($item['route'])
-                                && collect($params)->every(fn ($value, $key) => request()->route($key) === $value);
+                <nav class="flex-1 space-y-5 overflow-y-auto p-3">
+                    @foreach ($moduleGroups as $category => $modules)
+                        <div class="space-y-1">
+                            <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>{{ $category }}</p>
 
-                            if ($item['route'] === 'settings.show') {
-                                $isActive = request()->routeIs('settings.*');
-                            }
-                        @endphp
-                        <a href="{{ route($item['route'], $params) }}"
-                            class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
-                            title="{{ $item['label'] }}">
-                            <x-icon :name="$item['icon']" class="size-5 shrink-0" />
-                            <span class="truncate" data-sidebar-label>{{ $item['label'] }}</span>
-                        </a>
+                            @foreach ($modules as $module)
+                                @php
+                                    $isActive = $module->isActive()
+                                        || collect($module->children)->contains(fn ($child) => $child->isActive());
+
+                                    $badgeTone = $module->badge['tone'] ?? 'neutral';
+                                    $badgeClass = match ($badgeTone) {
+                                        'success' => 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-200',
+                                        'warning' => 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200',
+                                        'info' => 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-200',
+                                        default => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+                                    };
+                                @endphp
+
+                                <a href="{{ $module->url() }}"
+                                    class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
+                                    title="{{ $module->name }}">
+                                    <x-icon :name="$module->icon" class="size-5 shrink-0" />
+                                    <span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $module->name }}</span>
+                                    @if ($module->badge)
+                                        <span class="rounded-full px-2 py-0.5 text-[0.65rem] font-semibold {{ $badgeClass }}" data-sidebar-label>{{ $module->badge['label'] }}</span>
+                                    @endif
+                                </a>
+
+                                @if ($module->children)
+                                    <div class="ml-8 space-y-1" data-sidebar-label>
+                                        @foreach ($module->children as $child)
+                                            <a href="{{ $child->url() }}"
+                                                class="block rounded-md px-3 py-2 text-sm transition {{ $child->isActive() ? 'bg-slate-100 font-medium text-slate-950 dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white' }}">
+                                                {{ $child->name }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
                     @endforeach
                 </nav>
 

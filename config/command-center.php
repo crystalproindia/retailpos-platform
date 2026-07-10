@@ -1,32 +1,6 @@
 <?php
 
 return [
-    'navigation' => [
-        ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard'],
-        ['label' => 'CRM', 'route' => 'modules.show', 'params' => ['module' => 'crm'], 'icon' => 'crm'],
-        ['label' => 'POS', 'route' => 'modules.show', 'params' => ['module' => 'pos'], 'icon' => 'pos'],
-        ['label' => 'Inventory', 'route' => 'modules.show', 'params' => ['module' => 'inventory'], 'icon' => 'inventory'],
-        ['label' => 'Orders', 'route' => 'modules.show', 'params' => ['module' => 'orders'], 'icon' => 'orders'],
-        ['label' => 'Customers', 'route' => 'modules.show', 'params' => ['module' => 'customers'], 'icon' => 'customers'],
-        ['label' => 'Products', 'route' => 'modules.show', 'params' => ['module' => 'products'], 'icon' => 'products'],
-        ['label' => 'Purchases', 'route' => 'modules.show', 'params' => ['module' => 'purchases'], 'icon' => 'purchases'],
-        ['label' => 'Suppliers', 'route' => 'modules.show', 'params' => ['module' => 'suppliers'], 'icon' => 'suppliers'],
-        ['label' => 'Finance', 'route' => 'modules.show', 'params' => ['module' => 'finance'], 'icon' => 'finance'],
-        ['label' => 'Marketing', 'route' => 'modules.show', 'params' => ['module' => 'marketing'], 'icon' => 'marketing'],
-        ['label' => 'Website CMS', 'route' => 'modules.show', 'params' => ['module' => 'website-cms'], 'icon' => 'cms'],
-        ['label' => 'Blog', 'route' => 'modules.show', 'params' => ['module' => 'blog'], 'icon' => 'blog'],
-        ['label' => 'SEO', 'route' => 'modules.show', 'params' => ['module' => 'seo'], 'icon' => 'seo'],
-        ['label' => 'WhatsApp', 'route' => 'modules.show', 'params' => ['module' => 'whatsapp'], 'icon' => 'whatsapp'],
-        ['label' => 'Analytics', 'route' => 'modules.show', 'params' => ['module' => 'analytics'], 'icon' => 'analytics'],
-        ['label' => 'Reports', 'route' => 'modules.show', 'params' => ['module' => 'reports'], 'icon' => 'reports'],
-        ['label' => 'Settings', 'route' => 'settings.show', 'params' => ['section' => 'general'], 'icon' => 'settings'],
-        ['label' => 'AI Assistant', 'route' => 'modules.show', 'params' => ['module' => 'ai-assistant'], 'icon' => 'ai'],
-        ['label' => 'Users', 'route' => 'modules.show', 'params' => ['module' => 'users'], 'icon' => 'users'],
-        ['label' => 'Branches', 'route' => 'modules.show', 'params' => ['module' => 'branches'], 'icon' => 'branches'],
-        ['label' => 'Company', 'route' => 'modules.show', 'params' => ['module' => 'company'], 'icon' => 'company'],
-        ['label' => 'Audit Logs', 'route' => 'modules.show', 'params' => ['module' => 'audit-logs'], 'icon' => 'audit'],
-    ],
-
     'settings_sections' => [
         'general' => [
             'label' => 'General',

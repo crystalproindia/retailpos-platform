@@ -368,6 +368,249 @@ To add a future module:
 7. Add module-specific controllers, requests, repositories, services, models, migrations, and tests as needed.
 8. Do not edit the admin sidebar manually.
 
+## Enterprise CMS Architecture
+
+Phase 1.6 adds the Enterprise CMS Foundation for RetailPOS.biz and future CrystalPro web properties. The CMS is administrator/manager managed, company-scoped, auditable, and prepared for future API consumption.
+
+CMS module registration:
+
+- Module id: `cms`
+- Menu label: `CMS`
+- Category: `Content Management`
+- Icon: `layout`
+- Route: `cms.dashboard`
+- Roles: `administrator`, `manager`
+- Staff access: blocked by existing role middleware
+
+### CMS Folder Structure
+
+```text
+app/
+  Http/
+    Controllers/
+      CommandCenter/
+        Cms/
+          CmsDashboardController.php
+          CmsHomepageController.php
+          CmsMediaController.php
+          CmsMenuController.php
+          CmsPageController.php
+          CmsSeoController.php
+          CmsSettingsController.php
+    Requests/
+      Cms/
+        StoreCmsMediaFolderRequest.php
+        StoreCmsMediaRequest.php
+        StoreCmsMenuItemRequest.php
+        StoreCmsMenuRequest.php
+        StoreCmsPageRequest.php
+        StoreCmsRedirectRequest.php
+        UpdateCmsFooterRequest.php
+        UpdateCmsPageRequest.php
+        UpdateCmsSeoRequest.php
+        UpdateCmsSettingsRequest.php
+        UpdateHomepageSectionRequest.php
+  Models/
+    Cms/
+      CmsBrokenLink.php
+      CmsFooterProfile.php
+      CmsHomepageSection.php
+      CmsHomepageSectionItem.php
+      CmsMedia.php
+      CmsMediaFolder.php
+      CmsMenu.php
+      CmsMenuItem.php
+      CmsPage.php
+      CmsPageRevision.php
+      CmsPageSeo.php
+      CmsRedirect.php
+      CmsSeoSetting.php
+      CmsSetting.php
+      CmsSocialLink.php
+  Repositories/
+    Cms/
+      CmsHomepageRepository.php
+      CmsMediaRepository.php
+      CmsMenuRepository.php
+      CmsPageRepository.php
+      CmsSeoRepository.php
+      CmsSettingsRepository.php
+  Services/
+    Cms/
+      CmsHomepageService.php
+      CmsMediaService.php
+      CmsMenuService.php
+      CmsPageService.php
+      CmsSeoService.php
+      CmsSettingsService.php
+
+config/
+  cms.php
+
+resources/
+  views/
+    command-center/
+      cms/
+        dashboard.blade.php
+        homepage/index.blade.php
+        media/index.blade.php
+        menus/index.blade.php
+        pages/_form.blade.php
+        pages/create.blade.php
+        pages/edit.blade.php
+        pages/index.blade.php
+        partials/nav.blade.php
+        seo/index.blade.php
+        settings/index.blade.php
+
+tests/
+  Feature/
+    CmsFoundationTest.php
+```
+
+### CMS Database Design
+
+Phase 1.6 adds normalized CMS tables:
+
+- `cms_pages`
+  - Company-scoped dynamic pages with slug, title, subtitle, hero content, body content, featured image, draft/published/scheduled status, publish timestamp, scheduled timestamp, and soft deletes.
+- `cms_page_seo`
+  - Page-level meta title, meta description, meta keywords, canonical URL, Open Graph fields, Twitter Card fields, and media references.
+- `cms_page_revisions`
+  - Revision history for page content and status, tied to the editing user.
+- `cms_homepage_sections`
+  - Independent homepage sections for Hero, Features, Benefits, Modules, Industries, Solutions, Pricing CTA, Testimonials, Partners, Statistics, FAQ, Final CTA, and Footer CTA.
+- `cms_homepage_section_items`
+  - Repeatable section items for future feature cards, module cards, testimonials, partner cards, statistics, FAQ entries, and similar content.
+- `cms_menus`
+  - Header, footer, mega, and legal menus with enable/disable support and soft deletes.
+- `cms_menu_items`
+  - Nested-menu-ready menu items with parent item, icon, URL, target behavior, enable/disable, and ordering.
+- `cms_media_folders`
+  - Folder tree foundation for the media library.
+- `cms_media`
+  - Media library records for images, SVGs, PDFs, videos, and files with folder, uploader, disk/path, MIME type, extension, file type, size, alt text, optimization flag, and soft deletes.
+- `cms_footer_profiles`
+  - Footer company information, contact fields, business hours, map URL, and copyright.
+- `cms_settings`
+  - Website name, tagline, default meta, logos, favicon, contact, business hours, address, and map settings without JSON blobs.
+- `cms_social_links`
+  - Social link records with platform, URL, icon, enable/disable, and ordering.
+- `cms_seo_settings`
+  - Global SEO defaults, robots.txt, Schema.org markup, sitemap flag, Search Console verification, Google Analytics, Google Tag Manager, Facebook Pixel, LinkedIn Insight, and Microsoft Clarity.
+- `cms_redirects`
+  - Redirect manager foundation with source URL, target URL, status code, enable/disable, hit count, and soft deletes.
+- `cms_broken_links`
+  - Broken-link monitor foundation for future crawler checks.
+
+### CMS Admin Routes
+
+All CMS admin routes are protected by:
+
+- `auth`
+- `role:administrator,manager`
+
+Route group:
+
+- Prefix: `/cms`
+- Name prefix: `cms.`
+
+Routes:
+
+- `GET /cms` named `cms.dashboard`
+- `GET /cms/pages` named `cms.pages.index`
+- `GET /cms/pages/create` named `cms.pages.create`
+- `POST /cms/pages` named `cms.pages.store`
+- `POST /cms/pages/bulk` named `cms.pages.bulk`
+- `GET /cms/pages/{page}/edit` named `cms.pages.edit`
+- `PUT /cms/pages/{page}` named `cms.pages.update`
+- `DELETE /cms/pages/{page}` named `cms.pages.destroy`
+- `POST /cms/pages/{page}/restore` named `cms.pages.restore`
+- `POST /cms/pages/{page}/publish` named `cms.pages.publish`
+- `POST /cms/pages/{page}/unpublish` named `cms.pages.unpublish`
+- `GET /cms/homepage` named `cms.homepage.index`
+- `PUT /cms/homepage/{section}` named `cms.homepage.update`
+- `GET /cms/menus` named `cms.menus.index`
+- `POST /cms/menus` named `cms.menus.store`
+- `PUT /cms/menus/{menu}` named `cms.menus.update`
+- `DELETE /cms/menus/{menu}` named `cms.menus.destroy`
+- `POST /cms/menus/{menu}/restore` named `cms.menus.restore`
+- `POST /cms/menus/{menu}/items` named `cms.menus.items.store`
+- `GET /cms/media` named `cms.media.index`
+- `POST /cms/media` named `cms.media.store`
+- `POST /cms/media/folders` named `cms.media.folders.store`
+- `DELETE /cms/media/{media}` named `cms.media.destroy`
+- `GET /cms/settings` named `cms.settings.index`
+- `PUT /cms/settings` named `cms.settings.update`
+- `PUT /cms/settings/footer` named `cms.settings.footer.update`
+- `GET /cms/seo` named `cms.seo.index`
+- `PUT /cms/seo` named `cms.seo.update`
+- `POST /cms/seo/redirects` named `cms.seo.redirects.store`
+
+### CMS Services and Repositories
+
+CMS repositories:
+
+- `CmsPageRepository`
+- `CmsHomepageRepository`
+- `CmsMenuRepository`
+- `CmsMediaRepository`
+- `CmsSeoRepository`
+- `CmsSettingsRepository`
+
+CMS services:
+
+- `CmsPageService`
+  - Creates pages, updates pages, writes SEO records, creates revisions, publishes, unpublishes, soft deletes, restores, and logs explicit page actions.
+- `CmsHomepageService`
+  - Ensures default homepage sections and updates each section independently.
+- `CmsMenuService`
+  - Creates menus, updates menus, adds menu items, and restores menus.
+- `CmsMediaService`
+  - Creates folders, uploads files, classifies media type, and records upload audit activity.
+- `CmsSeoService`
+  - Updates SEO settings and creates redirects.
+- `CmsSettingsService`
+  - Ensures default CMS settings, updates global settings, updates footer data, and replaces social links.
+
+### CMS Audit Coverage
+
+CMS models use the existing `Auditable` concern where CRUD activity should be recorded.
+
+Explicit CMS audit events include:
+
+- `cms.page.published`
+- `cms.page.unpublished`
+- `cms.page.restored`
+- `cms.homepage.updated`
+- `cms.menu.restored`
+- `cms.media.uploaded`
+- `cms.seo.updated`
+- `cms.settings.updated`
+- `cms.footer.updated`
+- `cms.social_links.updated`
+
+### CMS Future Extensions
+
+The CMS foundation is prepared for:
+
+- Blogs
+- News
+- Knowledge Base
+- Documentation
+- Landing Pages
+- Case Studies
+- Testimonials
+- Career Pages
+- FAQ
+- Dynamic Forms
+- Public website APIs
+- Sitemap generation jobs
+- Broken-link crawler jobs
+- Media optimization queues
+- Search Console reporting
+- Public-site cache invalidation
+
 ## Settings
 
 Settings are defined centrally in `config/command-center.php` under `settings_sections`.

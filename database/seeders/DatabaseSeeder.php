@@ -4,6 +4,12 @@ namespace Database\Seeders;
 
 use App\Enums\UserRole;
 use App\Models\Branch;
+use App\Models\Cms\CmsFooterProfile;
+use App\Models\Cms\CmsHomepageSection;
+use App\Models\Cms\CmsMenu;
+use App\Models\Cms\CmsMenuItem;
+use App\Models\Cms\CmsSeoSetting;
+use App\Models\Cms\CmsSetting;
 use App\Models\Company;
 use App\Models\DashboardStatistic;
 use App\Models\Setting;
@@ -130,5 +136,92 @@ class DatabaseSeeder extends Seeder
                 ],
             ));
         });
+
+        collect(config('cms.homepage_sections'))->each(function (array $section, string $key) use ($company): void {
+            CmsHomepageSection::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'key' => $key,
+                ],
+                [
+                    'name' => $section['name'],
+                    'heading' => $section['name'],
+                    'subheading' => 'Managed content for '.$section['name'],
+                    'content' => 'Editable website content managed from the RetailPOS CMS.',
+                    'is_enabled' => true,
+                    'sort_order' => $section['sort_order'],
+                ],
+            );
+        });
+
+        collect(config('cms.settings'))->each(function (array $definition, string $key) use ($company): void {
+            CmsSetting::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'key' => $key,
+                ],
+                [
+                    'label' => $definition['label'],
+                    'value' => match ($key) {
+                        'website_name' => 'RetailPOS',
+                        'tagline' => 'Enterprise retail operations platform',
+                        'email' => 'hello@retailpos.biz',
+                        'phone' => '+91 98765 43210',
+                        'whatsapp' => '+91 98765 43210',
+                        'address' => 'MG Road, Bengaluru, Karnataka',
+                        default => null,
+                    },
+                    'value_type' => $definition['type'],
+                ],
+            );
+        });
+
+        CmsFooterProfile::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'company_name' => 'RetailPOS',
+                'address' => $company->address,
+                'phone' => $company->phone,
+                'email' => 'hello@retailpos.biz',
+                'whatsapp' => '+91 98765 43210',
+                'business_hours' => 'Monday to Saturday, 10:00 AM to 7:00 PM',
+                'copyright_text' => 'Copyright '.now()->year.' RetailPOS. All rights reserved.',
+            ],
+        );
+
+        CmsSeoSetting::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'default_meta_title' => 'RetailPOS - Enterprise Retail Platform',
+                'default_meta_description' => 'RetailPOS helps retail teams manage sales, inventory, branches, customers, and operations from one command center.',
+                'default_meta_keywords' => 'retail POS, inventory, CRM, retail platform',
+                'robots_txt' => "User-agent: *\nAllow: /",
+                'sitemap_enabled' => true,
+            ],
+        );
+
+        $headerMenu = CmsMenu::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'location' => 'header',
+                'name' => 'Primary Header',
+            ],
+            ['is_enabled' => true],
+        );
+
+        collect([
+            ['label' => 'Home', 'url' => '/', 'sort_order' => 1],
+            ['label' => 'Products', 'url' => '/products', 'sort_order' => 2],
+            ['label' => 'Pricing', 'url' => '/pricing', 'sort_order' => 3],
+            ['label' => 'Contact', 'url' => '/contact', 'sort_order' => 4],
+        ])->each(fn (array $item) => CmsMenuItem::updateOrCreate(
+            [
+                'menu_id' => $headerMenu->id,
+                'label' => $item['label'],
+            ],
+            $item + [
+                'is_enabled' => true,
+            ],
+        ));
     }
 }

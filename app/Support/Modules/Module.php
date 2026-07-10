@@ -77,6 +77,10 @@ class Module
             return request()->routeIs('settings.*');
         }
 
+        if (str_starts_with($this->route, 'cms.')) {
+            return request()->routeIs('cms.*');
+        }
+
         return request()->routeIs($this->route)
             && collect($this->routeParameters)
                 ->every(fn (mixed $value, string $key): bool => request()->route($key) === $value);

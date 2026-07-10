@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Models\Crm\CrmActivity;
+use App\Models\Crm\CrmCompany;
+use App\Models\Crm\CrmContact;
+use App\Models\Crm\CrmLead;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,5 +44,25 @@ class Company extends Model
     public function dashboardStatistics(): HasMany
     {
         return $this->hasMany(DashboardStatistic::class);
+    }
+
+    public function crmCompanies(): HasMany
+    {
+        return $this->hasMany(CrmCompany::class);
+    }
+
+    public function crmContacts(): HasMany
+    {
+        return $this->hasMany(CrmContact::class);
+    }
+
+    public function crmLeads(): HasMany
+    {
+        return $this->hasMany(CrmLead::class);
+    }
+
+    public function crmActivities(): HasMany
+    {
+        return $this->hasMany(CrmActivity::class);
     }
 }

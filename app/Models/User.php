@@ -4,11 +4,16 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use App\Models\Crm\CrmActivity;
+use App\Models\Crm\CrmCompany;
+use App\Models\Crm\CrmContact;
+use App\Models\Crm\CrmLead;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -60,5 +65,35 @@ class User extends Authenticatable
     public function isAdministrator(): bool
     {
         return $this->hasAnyRole([UserRole::Administrator]);
+    }
+
+    public function assignedCrmLeads(): HasMany
+    {
+        return $this->hasMany(CrmLead::class, 'assigned_user_id');
+    }
+
+    public function createdCrmLeads(): HasMany
+    {
+        return $this->hasMany(CrmLead::class, 'created_by');
+    }
+
+    public function assignedCrmCompanies(): HasMany
+    {
+        return $this->hasMany(CrmCompany::class, 'assigned_user_id');
+    }
+
+    public function assignedCrmContacts(): HasMany
+    {
+        return $this->hasMany(CrmContact::class, 'assigned_user_id');
+    }
+
+    public function assignedCrmActivities(): HasMany
+    {
+        return $this->hasMany(CrmActivity::class, 'assigned_user_id');
+    }
+
+    public function createdCrmActivities(): HasMany
+    {
+        return $this->hasMany(CrmActivity::class, 'created_by');
     }
 }

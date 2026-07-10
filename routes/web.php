@@ -10,6 +10,13 @@ use App\Http\Controllers\CommandCenter\Cms\CmsMenuController;
 use App\Http\Controllers\CommandCenter\Cms\CmsPageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsSeoController;
 use App\Http\Controllers\CommandCenter\Cms\CmsSettingsController as CmsAdminSettingsController;
+use App\Http\Controllers\CommandCenter\Crm\ActivityController;
+use App\Http\Controllers\CommandCenter\Crm\ContactController;
+use App\Http\Controllers\CommandCenter\Crm\CrmCompanyController;
+use App\Http\Controllers\CommandCenter\Crm\CrmDashboardController;
+use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
+use App\Http\Controllers\CommandCenter\Crm\LeadController;
+use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\DashboardController;
 use App\Http\Controllers\CommandCenter\ModuleController;
 use App\Http\Controllers\CommandCenter\SettingsController;
@@ -37,6 +44,50 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
+
+    Route::middleware(['role:administrator,manager,sales', 'can:crm.view'])->prefix('crm')->name('crm.')->group(function (): void {
+        Route::get('/', CrmDashboardController::class)->name('dashboard');
+
+        Route::get('leads', [LeadController::class, 'index'])->middleware('can:crm.leads.view')->name('leads.index');
+        Route::get('leads/create', [LeadController::class, 'create'])->middleware('can:crm.leads.create')->name('leads.create');
+        Route::post('leads', [LeadController::class, 'store'])->middleware('can:crm.leads.create')->name('leads.store');
+        Route::post('leads/bulk', [LeadController::class, 'bulk'])->middleware('can:crm.leads.update')->name('leads.bulk');
+        Route::get('leads/{lead}', [LeadController::class, 'show'])->middleware('can:crm.leads.view')->name('leads.show');
+        Route::get('leads/{lead}/edit', [LeadController::class, 'edit'])->middleware('can:crm.leads.update')->name('leads.edit');
+        Route::put('leads/{lead}', [LeadController::class, 'update'])->middleware('can:crm.leads.update')->name('leads.update');
+        Route::delete('leads/{lead}', [LeadController::class, 'destroy'])->middleware('can:crm.leads.delete')->name('leads.destroy');
+        Route::post('leads/{lead}/restore', [LeadController::class, 'restore'])->middleware('can:crm.leads.delete')->name('leads.restore');
+        Route::post('leads/{lead}/notes', [LeadController::class, 'note'])->middleware('can:crm.leads.update')->name('leads.notes.store');
+        Route::post('leads/{lead}/convert', [LeadController::class, 'convert'])->middleware('can:crm.leads.convert')->name('leads.convert');
+
+        Route::get('companies', [CrmCompanyController::class, 'index'])->middleware('can:crm.companies.manage')->name('companies.index');
+        Route::get('companies/create', [CrmCompanyController::class, 'create'])->middleware('can:crm.companies.manage')->name('companies.create');
+        Route::post('companies', [CrmCompanyController::class, 'store'])->middleware('can:crm.companies.manage')->name('companies.store');
+        Route::get('companies/{company}', [CrmCompanyController::class, 'show'])->middleware('can:crm.companies.manage')->name('companies.show');
+        Route::get('companies/{company}/edit', [CrmCompanyController::class, 'edit'])->middleware('can:crm.companies.manage')->name('companies.edit');
+        Route::put('companies/{company}', [CrmCompanyController::class, 'update'])->middleware('can:crm.companies.manage')->name('companies.update');
+        Route::delete('companies/{company}', [CrmCompanyController::class, 'destroy'])->middleware('can:crm.companies.manage')->name('companies.destroy');
+        Route::post('companies/{company}/restore', [CrmCompanyController::class, 'restore'])->middleware('can:crm.companies.manage')->name('companies.restore');
+
+        Route::get('contacts', [ContactController::class, 'index'])->middleware('can:crm.contacts.manage')->name('contacts.index');
+        Route::get('contacts/create', [ContactController::class, 'create'])->middleware('can:crm.contacts.manage')->name('contacts.create');
+        Route::post('contacts', [ContactController::class, 'store'])->middleware('can:crm.contacts.manage')->name('contacts.store');
+        Route::get('contacts/{contact}', [ContactController::class, 'show'])->middleware('can:crm.contacts.manage')->name('contacts.show');
+        Route::get('contacts/{contact}/edit', [ContactController::class, 'edit'])->middleware('can:crm.contacts.manage')->name('contacts.edit');
+        Route::put('contacts/{contact}', [ContactController::class, 'update'])->middleware('can:crm.contacts.manage')->name('contacts.update');
+        Route::delete('contacts/{contact}', [ContactController::class, 'destroy'])->middleware('can:crm.contacts.manage')->name('contacts.destroy');
+        Route::post('contacts/{contact}/restore', [ContactController::class, 'restore'])->middleware('can:crm.contacts.manage')->name('contacts.restore');
+
+        Route::get('pipeline', [PipelineController::class, 'index'])->middleware('can:crm.pipeline.manage')->name('pipeline.index');
+        Route::patch('pipeline/{lead}', [PipelineController::class, 'transition'])->middleware('can:crm.pipeline.manage')->name('pipeline.transition');
+
+        Route::get('activities', [ActivityController::class, 'index'])->middleware('can:crm.activities.manage')->name('activities.index');
+        Route::post('activities', [ActivityController::class, 'store'])->middleware('can:crm.activities.manage')->name('activities.store');
+        Route::post('activities/{activity}/complete', [ActivityController::class, 'complete'])->middleware('can:crm.activities.manage')->name('activities.complete');
+        Route::patch('activities/{activity}/reschedule', [ActivityController::class, 'reschedule'])->middleware('can:crm.activities.manage')->name('activities.reschedule');
+
+        Route::get('follow-ups', FollowUpController::class)->middleware('can:crm.activities.manage')->name('followups.index');
+    });
 
     Route::middleware('role:administrator,manager')->prefix('cms')->name('cms.')->group(function (): void {
         Route::get('/', CmsDashboardController::class)->name('dashboard');

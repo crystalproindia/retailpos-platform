@@ -14,8 +14,8 @@ class ModuleRegistryTest extends TestCase
 
         $this->assertNotNull($registry->find('dashboard'));
         $this->assertSame('Dashboard', $registry->find('dashboard')->name);
-        $this->assertSame('modules.show', $registry->find('crm')->route);
-        $this->assertSame(['module' => 'crm'], $registry->find('crm')->routeParameters);
+        $this->assertSame('crm.dashboard', $registry->find('crm')->route);
+        $this->assertSame([], $registry->find('crm')->routeParameters);
     }
 
     public function test_sidebar_generation_groups_visible_modules(): void
@@ -39,6 +39,7 @@ class ModuleRegistryTest extends TestCase
         $adminModules = $registry->forRole(UserRole::Administrator);
 
         $this->assertTrue($staffModules->contains('id', 'dashboard'));
+        $this->assertFalse($staffModules->contains('id', 'crm'));
         $this->assertFalse($staffModules->contains('id', 'settings'));
         $this->assertFalse($staffModules->contains('id', 'audit-logs'));
         $this->assertTrue($adminModules->contains('id', 'settings'));

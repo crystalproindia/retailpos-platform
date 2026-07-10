@@ -2,6 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Crm\ActivityType;
+use App\Enums\Crm\LeadPriority;
+use App\Enums\Crm\LeadStageType;
+use App\Enums\Crm\PreferredContactMethod;
 use App\Enums\UserRole;
 use App\Models\Branch;
 use App\Models\Cms\CmsFooterProfile;
@@ -11,11 +15,19 @@ use App\Models\Cms\CmsMenuItem;
 use App\Models\Cms\CmsSeoSetting;
 use App\Models\Cms\CmsSetting;
 use App\Models\Company;
+use App\Models\Crm\CrmActivity;
+use App\Models\Crm\CrmCompany;
+use App\Models\Crm\CrmContact;
+use App\Models\Crm\CrmLead;
+use App\Models\Crm\CrmLeadSource;
+use App\Models\Crm\CrmLeadStatus;
+use App\Models\Crm\CrmTag;
 use App\Models\DashboardStatistic;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -58,13 +70,39 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        User::updateOrCreate(
+        $admin = User::updateOrCreate(
             ['email' => 'admin@retailpos.test'],
             [
                 'company_id' => $company->id,
                 'branch_id' => $branch->id,
                 'name' => 'RetailPOS Administrator',
                 'role' => UserRole::Administrator,
+                'is_active' => true,
+                'email_verified_at' => now(),
+                'password' => 'password',
+            ],
+        );
+
+        $manager = User::updateOrCreate(
+            ['email' => 'manager@retailpos.test'],
+            [
+                'company_id' => $company->id,
+                'branch_id' => $branch->id,
+                'name' => 'RetailPOS Manager',
+                'role' => UserRole::Manager,
+                'is_active' => true,
+                'email_verified_at' => now(),
+                'password' => 'password',
+            ],
+        );
+
+        $sales = User::updateOrCreate(
+            ['email' => 'sales@retailpos.test'],
+            [
+                'company_id' => $company->id,
+                'branch_id' => $branch->id,
+                'name' => 'RetailPOS Sales',
+                'role' => UserRole::Sales,
                 'is_active' => true,
                 'email_verified_at' => now(),
                 'password' => 'password',
@@ -223,5 +261,190 @@ class DatabaseSeeder extends Seeder
                 'is_enabled' => true,
             ],
         ));
+
+        $sources = collect([
+            ['name' => 'Website Demo', 'description' => 'Inbound website demo request.', 'tone' => 'success', 'sort_order' => 1],
+            ['name' => 'WhatsApp', 'description' => 'WhatsApp enquiry.', 'tone' => 'info', 'sort_order' => 2],
+            ['name' => 'Referral', 'description' => 'Partner or customer referral.', 'tone' => 'neutral', 'sort_order' => 3],
+            ['name' => 'Retail Expo', 'description' => 'Event and booth conversations.', 'tone' => 'warning', 'sort_order' => 4],
+        ])->mapWithKeys(fn (array $source): array => [
+            Str::slug($source['name']) => CrmLeadSource::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'slug' => Str::slug($source['name']),
+                ],
+                $source + [
+                    'company_id' => $company->id,
+                    'slug' => Str::slug($source['name']),
+                    'is_active' => true,
+                ],
+            ),
+        ]);
+
+        $statuses = collect([
+            ['name' => 'New', 'stage_type' => LeadStageType::New, 'tone' => 'neutral', 'probability' => 10, 'sort_order' => 1],
+            ['name' => 'Contacted', 'stage_type' => LeadStageType::Contacted, 'tone' => 'info', 'probability' => 25, 'sort_order' => 2],
+            ['name' => 'Qualified', 'stage_type' => LeadStageType::Qualified, 'tone' => 'success', 'probability' => 45, 'sort_order' => 3],
+            ['name' => 'Demo Scheduled', 'stage_type' => LeadStageType::DemoScheduled, 'tone' => 'warning', 'probability' => 60, 'sort_order' => 4],
+            ['name' => 'Proposal', 'stage_type' => LeadStageType::Proposal, 'tone' => 'info', 'probability' => 75, 'sort_order' => 5],
+            ['name' => 'Won', 'stage_type' => LeadStageType::Won, 'tone' => 'success', 'probability' => 100, 'is_won' => true, 'sort_order' => 6],
+            ['name' => 'Lost', 'stage_type' => LeadStageType::Lost, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 7],
+        ])->mapWithKeys(fn (array $status): array => [
+            Str::slug($status['name']) => CrmLeadStatus::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'slug' => Str::slug($status['name']),
+                ],
+                [
+                    'company_id' => $company->id,
+                    'name' => $status['name'],
+                    'slug' => Str::slug($status['name']),
+                    'stage_type' => $status['stage_type']->value,
+                    'tone' => $status['tone'],
+                    'probability' => $status['probability'],
+                    'is_won' => $status['is_won'] ?? false,
+                    'is_lost' => $status['is_lost'] ?? false,
+                    'is_active' => true,
+                    'sort_order' => $status['sort_order'],
+                ],
+            ),
+        ]);
+
+        $tags = collect(['Hot Lead', 'Multi Branch', 'Fashion', 'Grocery', 'Implementation Ready'])
+            ->mapWithKeys(fn (string $tag): array => [
+                Str::slug($tag) => CrmTag::updateOrCreate(
+                    [
+                        'company_id' => $company->id,
+                        'slug' => Str::slug($tag),
+                    ],
+                    [
+                        'company_id' => $company->id,
+                        'name' => $tag,
+                        'slug' => Str::slug($tag),
+                        'color' => '#0f766e',
+                        'is_active' => true,
+                    ],
+                ),
+            ]);
+
+        $crmCompanies = collect([
+            ['name' => 'Urban Threads Retail', 'industry' => 'Fashion', 'email' => 'ops@urbanthreads.test', 'phone' => '+91 90000 10001', 'city' => 'Mumbai', 'estimated_value' => 420000],
+            ['name' => 'FreshMart Grocers', 'industry' => 'Grocery', 'email' => 'it@freshmart.test', 'phone' => '+91 90000 10002', 'city' => 'Bengaluru', 'estimated_value' => 680000],
+            ['name' => 'StrideLine Footwear', 'industry' => 'Footwear', 'email' => 'retail@strideline.test', 'phone' => '+91 90000 10003', 'city' => 'Pune', 'estimated_value' => 350000],
+            ['name' => 'GlowCare Beauty', 'industry' => 'Beauty', 'email' => 'admin@glowcare.test', 'phone' => '+91 90000 10004', 'city' => 'Delhi', 'estimated_value' => 510000],
+        ])->map(fn (array $account) => CrmCompany::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'name' => $account['name'],
+            ],
+            $account + [
+                'company_id' => $company->id,
+                'branch_id' => $branch->id,
+                'assigned_user_id' => $sales->id,
+                'country' => 'India',
+                'is_active' => true,
+            ],
+        ));
+
+        $contacts = $crmCompanies->map(fn (CrmCompany $account, int $index) => CrmContact::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'email' => 'buyer'.($index + 1).'@crm-demo.test',
+            ],
+            [
+                'company_id' => $company->id,
+                'branch_id' => $branch->id,
+                'crm_company_id' => $account->id,
+                'assigned_user_id' => $sales->id,
+                'first_name' => ['Aarav', 'Meera', 'Kabir', 'Nisha'][$index],
+                'last_name' => ['Shah', 'Iyer', 'Kapoor', 'Menon'][$index],
+                'job_title' => 'Retail Operations Lead',
+                'phone' => '+91 90000 20'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
+                'preferred_contact_method' => PreferredContactMethod::WhatsApp->value,
+                'is_primary' => true,
+            ],
+        ));
+
+        $leadTitles = [
+            'POS rollout for flagship fashion chain',
+            'Multi-store grocery inventory sync',
+            'Footwear stock visibility upgrade',
+            'Beauty retail CRM and POS evaluation',
+            'Franchise billing and branch controls',
+            'Barcode-led checkout modernization',
+            'Loyalty and repeat purchase tracking',
+            'Centralized purchasing workflow',
+            'Retail analytics dashboard review',
+            'WhatsApp order follow-up process',
+            'Store staff role controls',
+            'Seasonal product catalog migration',
+            'Wholesale-to-retail transition',
+            'Cloud POS replacement',
+            'Branch audit and sales controls',
+            'Integrated website enquiry flow',
+            'Mall kiosk quick billing',
+            'Enterprise retail rollout discovery',
+            'Inventory variance reduction program',
+            'Executive demo for retail group',
+        ];
+
+        collect($leadTitles)->each(function (string $title, int $index) use ($company, $branch, $admin, $sales, $sources, $statuses, $crmCompanies, $contacts, $tags): void {
+            $status = $statuses->values()[$index % $statuses->count()];
+            $source = $sources->values()[$index % $sources->count()];
+            $account = $crmCompanies[$index % $crmCompanies->count()];
+            $contact = $contacts[$index % $contacts->count()];
+
+            $lead = CrmLead::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'title' => $title,
+                ],
+                [
+                    'branch_id' => $branch->id,
+                    'crm_company_id' => $index < 10 ? $account->id : null,
+                    'crm_contact_id' => $index < 10 ? $contact->id : null,
+                    'source_id' => $source->id,
+                    'status_id' => $status->id,
+                    'assigned_user_id' => $sales->id,
+                    'created_by' => $admin->id,
+                    'business_name' => $account->name,
+                    'contact_name' => $contact->fullName(),
+                    'email' => $contact->email,
+                    'phone' => $contact->phone,
+                    'industry' => $account->industry,
+                    'interested_modules' => ['crm', 'pos', 'inventory'],
+                    'expected_value' => 125000 + ($index * 17500),
+                    'currency' => 'INR',
+                    'priority' => [LeadPriority::Medium, LeadPriority::High, LeadPriority::Urgent, LeadPriority::Low][$index % 4]->value,
+                    'lead_score' => min(95, 35 + ($index * 3)),
+                    'next_follow_up_at' => now()->addDays(($index % 8) - 2)->setTime(11, 0),
+                    'last_contacted_at' => now()->subDays($index % 5),
+                    'description' => 'Seeded CRM opportunity for Phase 2 dashboard, pipeline, and follow-up workflows.',
+                    'converted_at' => $status->is_won ? now()->subDays(3) : null,
+                ],
+            );
+
+            $lead->tags()->sync($tags->values()->take(($index % 3) + 1)->pluck('id')->all());
+
+            CrmActivity::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'crm_lead_id' => $lead->id,
+                    'subject' => 'Follow up on '.$lead->title,
+                ],
+                [
+                    'crm_company_id' => $lead->crm_company_id,
+                    'crm_contact_id' => $lead->crm_contact_id,
+                    'assigned_user_id' => $sales->id,
+                    'created_by' => $admin->id,
+                    'type' => [ActivityType::Call, ActivityType::Meeting, ActivityType::Email, ActivityType::WhatsApp][$index % 4]->value,
+                    'description' => 'Seeded follow-up activity for CRM demo data.',
+                    'scheduled_at' => $lead->next_follow_up_at,
+                    'completed_at' => $index % 6 === 0 ? now()->subDay() : null,
+                    'outcome' => $index % 6 === 0 ? 'Discovery completed' : null,
+                    'priority' => $lead->priority->value,
+                ],
+            );
+        });
     }
 }

@@ -1,6 +1,6 @@
-# RetailPOS Platform - Phase 1 / 1.5 Project Structure
+# RetailPOS Platform - Phase 1 / 1.5 / 1.6 / 2 Project Structure
 
-This document describes the Command Center foundation built in Phase 1 and the dynamic Module Registry foundation added in Phase 1.5.
+This document describes the Command Center foundation built in Phase 1, the dynamic Module Registry foundation added in Phase 1.5, the Enterprise CMS foundation added in Phase 1.6, and the Enterprise CRM foundation added in Phase 2.
 
 ## Folder Structure
 
@@ -760,7 +760,7 @@ Reset password:
 ## Current Limitations
 
 - Phase 1 uses seeded demo statistics only. Dashboard values are not yet calculated from sales, inventory, CRM, or order tables.
-- Sidebar modules such as CRM, POS, Inventory, Orders, Finance, Marketing, CMS, SEO, WhatsApp, Analytics, Reports, AI Assistant, Users, Branches, and Company currently route to foundation module screens.
+- Sidebar modules such as POS, Inventory, Orders, Finance, Marketing, SEO, WhatsApp, Analytics, Reports, AI Assistant, Users, Branches, and Company currently route to foundation module screens until their dedicated phases are built.
 - Settings are persisted, but most settings are not yet applied to runtime behavior.
 - Roles are basic enum-backed roles. Granular permissions are not implemented yet.
 - Multi-company support has the tenant data model foundation, but request-level tenant resolution and subscription/billing boundaries are not implemented yet.
@@ -793,3 +793,329 @@ Reset password:
   - The Command Center shell is responsive, mobile-friendly, dark-mode-ready, and does not require a JavaScript framework.
 - Kept tests focused on Phase 1 behavior.
   - Feature tests cover protected dashboard access, login, role-protected settings, settings persistence, and audit-log creation.
+
+## Enterprise CRM Architecture
+
+Phase 2 adds the Enterprise CRM Foundation. CRM is company-scoped, role-aware, auditable, server-rendered, and intentionally limited to relationship and pipeline workflows. Phase 2 does not build POS, Inventory, Finance, AI, Quotes, Orders, Customers, Invoices, or external messaging integrations.
+
+CRM module registration:
+
+- Parent module id: `crm`
+- Category: `Sales & CRM`
+- Route: `crm.dashboard`
+- Roles: `administrator`, `manager`, `sales`
+- Child modules: `crm-dashboard`, `leads`, `crm-companies`, `contacts`, `crm-pipeline`, `crm-activities`, `crm-follow-ups`
+
+### CRM Folder Structure
+
+```text
+app/
+  Enums/
+    Crm/
+      ActivityType.php
+      LeadPriority.php
+      LeadStageType.php
+      PreferredContactMethod.php
+  Http/
+    Controllers/
+      CommandCenter/
+        Crm/
+          ActivityController.php
+          ContactController.php
+          CrmCompanyController.php
+          CrmDashboardController.php
+          FollowUpController.php
+          LeadController.php
+          PipelineController.php
+    Requests/
+      Crm/
+        BulkLeadActionRequest.php
+        CompleteActivityRequest.php
+        ConvertLeadRequest.php
+        RescheduleActivityRequest.php
+        StoreActivityRequest.php
+        StoreCrmCompanyRequest.php
+        StoreCrmContactRequest.php
+        StoreLeadRequest.php
+        StoreNoteRequest.php
+        TransitionLeadStatusRequest.php
+        UpdateCrmCompanyRequest.php
+        UpdateCrmContactRequest.php
+        UpdateLeadRequest.php
+  Models/
+    Crm/
+      CrmActivity.php
+      CrmCompany.php
+      CrmContact.php
+      CrmLead.php
+      CrmLeadSource.php
+      CrmLeadStatus.php
+      CrmNote.php
+      CrmTag.php
+  Policies/
+    Crm/
+      CrmActivityPolicy.php
+      CrmCompanyPolicy.php
+      CrmContactPolicy.php
+      CrmLeadPolicy.php
+  Repositories/
+    Crm/
+      ActivityRepository.php
+      ContactRepository.php
+      CrmCompanyRepository.php
+      LeadRepository.php
+      PipelineRepository.php
+  Services/
+    Crm/
+      ActivityService.php
+      LeadConversionService.php
+      LeadService.php
+      PipelineService.php
+
+config/
+  permissions.php
+
+resources/
+  views/
+    command-center/
+      crm/
+        activities/index.blade.php
+        companies/_form.blade.php
+        companies/create.blade.php
+        companies/edit.blade.php
+        companies/index.blade.php
+        companies/show.blade.php
+        contacts/_form.blade.php
+        contacts/create.blade.php
+        contacts/edit.blade.php
+        contacts/index.blade.php
+        contacts/show.blade.php
+        dashboard.blade.php
+        followups/index.blade.php
+        leads/_form.blade.php
+        leads/create.blade.php
+        leads/edit.blade.php
+        leads/index.blade.php
+        leads/show.blade.php
+        partials/nav.blade.php
+        pipeline/index.blade.php
+```
+
+### CRM Database Design
+
+Phase 2 adds normalized CRM tables:
+
+- `crm_lead_sources`
+  - Company-scoped source definitions for inbound leads.
+- `crm_lead_statuses`
+  - Company-scoped pipeline/status definitions with stage type, probability, won/lost flags, active flag, and ordering.
+- `crm_companies`
+  - CRM account records linked to the tenant company, optional branch, and assigned owner.
+- `crm_contacts`
+  - CRM contact records linked to tenant company, optional CRM company, optional branch, and assigned owner.
+- `crm_leads`
+  - Lead records linked to tenant company, optional CRM company/contact, source, status, owner, creator, value, priority, follow-up timestamps, and conversion timestamp.
+- `crm_activities`
+  - Calls, meetings, email tasks, WhatsApp tasks, follow-ups, notes, scheduling, completion, outcome, and owner fields.
+- `crm_notes`
+  - Polymorphic notes for leads, companies, and contacts.
+- `crm_tags`
+  - Company-scoped CRM tags.
+- `crm_lead_tag`
+  - Lead/tag pivot.
+- `crm_company_tag`
+  - CRM company/tag pivot.
+- `crm_contact_tag`
+  - Contact/tag pivot.
+
+### CRM Models and Relationships
+
+- `Company`
+  - Owns CRM companies, contacts, leads, and activities.
+- `User`
+  - Owns assigned CRM leads, companies, contacts, activities, created leads, and created activities.
+- `CrmCompany`
+  - Belongs to the tenant company, branch, and assigned user.
+  - Has contacts, leads, activities, polymorphic notes, and tags.
+- `CrmContact`
+  - Belongs to the tenant company, optional CRM company, branch, and assigned user.
+  - Has leads, activities, polymorphic notes, and tags.
+- `CrmLead`
+  - Belongs to tenant company, optional CRM company, optional contact, source, status, assigned user, creator, and branch.
+  - Has activities, polymorphic notes, and tags.
+- `CrmActivity`
+  - Belongs to tenant company, optional lead, optional CRM company, optional contact, assigned user, and creator.
+
+### CRM Routes
+
+CRM routes are defined in `routes/web.php` under:
+
+- Prefix: `/crm`
+- Route name prefix: `crm.`
+- Middleware: `auth`, `role:administrator,manager,sales`, `can:crm.view`
+
+Route groups include:
+
+- `GET /crm` named `crm.dashboard`
+- Lead CRUD, restore, bulk status/assignment, notes, and conversion under `crm.leads.*`
+- Company CRUD and restore under `crm.companies.*`
+- Contact CRUD and restore under `crm.contacts.*`
+- Pipeline board and transition under `crm.pipeline.*`
+- Activity scheduling, completion, and rescheduling under `crm.activities.*`
+- Follow-up queue under `crm.followups.index`
+
+### CRM Permissions
+
+Phase 2 adds a first-party permission registry in `config/permissions.php` and registers capability gates in `AppServiceProvider`.
+
+Capabilities:
+
+- `crm.view`
+- `crm.leads.view`
+- `crm.leads.create`
+- `crm.leads.update`
+- `crm.leads.delete`
+- `crm.leads.assign`
+- `crm.leads.convert`
+- `crm.companies.manage`
+- `crm.contacts.manage`
+- `crm.activities.manage`
+- `crm.pipeline.manage`
+- `crm.settings.manage`
+
+Role behavior:
+
+- `administrator`
+  - Full CRM access.
+- `manager`
+  - Full CRM operational access.
+- `sales`
+  - CRM access for assigned or self-created records.
+  - Cannot perform destructive lead delete/restore or lead assignment gates.
+- `staff`
+  - No CRM access.
+
+Policies:
+
+- `CrmLeadPolicy`
+- `CrmCompanyPolicy`
+- `CrmContactPolicy`
+- `CrmActivityPolicy`
+
+Repositories also enforce tenant and Sales ownership filtering so direct index/show access does not leak records across companies or assignments.
+
+### CRM Services and Repositories
+
+Repositories:
+
+- `LeadRepository`
+  - Lead search, filtering, pagination, dashboard metrics, option lists, and Sales ownership scoping.
+- `CrmCompanyRepository`
+  - Company search, pagination, show lookup, and owner scoping.
+- `ContactRepository`
+  - Contact search, pagination, show lookup, and owner scoping.
+- `PipelineRepository`
+  - Server-rendered pipeline grouping by active statuses.
+- `ActivityRepository`
+  - Activity queues, follow-up queues, upcoming activity lists, and owner scoping.
+
+Services:
+
+- `LeadService`
+  - Create, update, soft delete, restore, assign, status changes, bulk status, bulk assignment, tag sync, notes, and audit events.
+- `LeadConversionService`
+  - Converts qualified leads into CRM companies and contacts inside a database transaction.
+  - Reuses existing CRM company/contact records when ids are supplied.
+  - Performs a basic duplicate-safe lookup by company/name or contact email/phone.
+  - Sets `converted_at`, transitions to a won status when configured, creates a conversion note, and records audit activity.
+- `ActivityService`
+  - Creates, completes, and reschedules CRM activities with audit events.
+- `PipelineService`
+  - Validates company-scoped active statuses and records pipeline transition audit events.
+
+### CRM Dashboard Widgets
+
+CRM dashboard widgets are calculated from CRM tables, not hardcoded in Blade:
+
+- Total Leads
+- New Leads
+- Qualified Leads
+- Demo Scheduled
+- Won Leads
+- Lost Leads
+- Pipeline Value
+- Overdue Follow-ups
+- Leads by Source
+- Leads by Status
+- Recent Leads
+- Upcoming Activities
+
+### CRM Audit Log
+
+CRM uses the existing `Auditable` concern for CRUD-style model events and explicit domain audit events for:
+
+- `crm.lead.created`
+- `crm.lead.updated`
+- `crm.lead.deleted`
+- `crm.lead.restored`
+- `crm.lead.assigned`
+- `crm.lead.status_changed`
+- `crm.lead.bulk_status_changed`
+- `crm.lead.bulk_assigned`
+- `crm.lead.note_added`
+- `crm.lead.converted`
+- `crm.pipeline.transitioned`
+- `crm.activity.created`
+- `crm.activity.completed`
+- `crm.activity.rescheduled`
+- `crm.company.created`
+- `crm.company.updated`
+- `crm.company.deleted`
+- `crm.company.restored`
+- `crm.contact.created`
+- `crm.contact.updated`
+- `crm.contact.deleted`
+- `crm.contact.restored`
+
+### CRM Seed Data
+
+`DatabaseSeeder` now creates:
+
+- Admin user: `admin@retailpos.test`
+- Manager user: `manager@retailpos.test`
+- Sales user: `sales@retailpos.test`
+- CRM lead sources: Website Demo, WhatsApp, Referral, Retail Expo
+- CRM lead statuses: New, Contacted, Qualified, Demo Scheduled, Proposal, Won, Lost
+- CRM tags: Hot Lead, Multi Branch, Fashion, Grocery, Implementation Ready
+- CRM companies and contacts for demo retail accounts
+- At least 20 demo leads
+- Follow-up activities tied to demo leads
+
+### CRM Lead Lifecycle
+
+1. A user creates a lead with status, source, owner, priority, value, and follow-up metadata.
+2. Leads move through configured statuses in the server-rendered pipeline.
+3. Activities and notes create a visible lead timeline.
+4. Bulk actions allow safe status changes and owner assignment within company scope.
+5. Qualified leads can be converted to CRM company/contact records.
+6. Conversion preserves the lead, links the new or reused CRM company/contact, sets `converted_at`, and logs the conversion.
+
+### CRM Tenant Isolation
+
+Tenant isolation is enforced through:
+
+- Company-scoped foreign keys on every CRM table.
+- Form Request validation that restricts related ids to the authenticated user's company.
+- Repository lookup methods that always require the authenticated user.
+- Sales ownership filters for assigned/self-created records.
+- Route middleware and capability gates.
+- Policies prepared for model-level authorization.
+
+### CRM Current Limitations
+
+- CRM uses server-rendered forms and tables only; no drag-and-drop pipeline JavaScript is included in Phase 2.
+- CRM does not send email, WhatsApp, SMS, or calendar invites.
+- Lead conversion creates CRM company/contact records only; it does not create quotes, orders, customers, invoices, subscriptions, or POS records.
+- CRM settings UI is represented by capability foundation only; dedicated CRM settings screens are future work.
+- The duplicate prevention logic is intentionally basic and will need stronger matching rules before importing large real-world datasets.
+- Reporting is limited to CRM dashboard metrics and lists; advanced forecasting and attribution analytics are future milestones.

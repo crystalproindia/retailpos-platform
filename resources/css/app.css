@@ -3,7 +3,51 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+@layer base {
+    html {
+        color-scheme: light;
+    }
+
+    html.dark {
+        color-scheme: dark;
+    }
+
+    body {
+        min-width: 320px;
+    }
+}
+
+body.sidebar-mobile-open [data-sidebar] {
+    transform: translateX(0);
+}
+
+body.sidebar-mobile-open [data-sidebar-overlay] {
+    display: block;
+}
+
+@media (min-width: 1024px) {
+    body.sidebar-collapsed [data-sidebar] {
+        width: 5rem;
+    }
+
+    body.sidebar-collapsed [data-sidebar-label] {
+        display: none;
+    }
+
+    body.sidebar-collapsed [data-sidebar-brand] {
+        justify-content: center;
+    }
+
+    body.sidebar-collapsed [data-sidebar] nav a {
+        justify-content: center;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
 }

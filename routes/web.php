@@ -19,6 +19,12 @@ use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\DashboardController;
 use App\Http\Controllers\CommandCenter\ModuleController;
+use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
+use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
+use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController;
+use App\Http\Controllers\CommandCenter\Notifications\NotificationPreferenceController;
+use App\Http\Controllers\CommandCenter\Notifications\NotificationTemplateController;
+use App\Http\Controllers\CommandCenter\Notifications\WebhookEndpointController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -125,6 +131,31 @@ Route::middleware('auth')->group(function (): void {
         Route::get('seo', [CmsSeoController::class, 'index'])->name('seo.index');
         Route::put('seo', [CmsSeoController::class, 'update'])->name('seo.update');
         Route::post('seo/redirects', [CmsSeoController::class, 'storeRedirect'])->name('seo.redirects.store');
+    });
+
+    Route::middleware(['role:administrator,manager,sales', 'can:notifications.view'])->prefix('notifications')->name('notifications.')->group(function (): void {
+        Route::get('/', [NotificationInboxController::class, 'index'])->middleware('can:notifications.manage_own')->name('index');
+        Route::post('inbox/{notification}/read', [NotificationInboxController::class, 'markRead'])->middleware('can:notifications.manage_own')->name('inbox.read');
+        Route::post('inbox/{notification}/unread', [NotificationInboxController::class, 'markUnread'])->middleware('can:notifications.manage_own')->name('inbox.unread');
+        Route::post('inbox/read-all', [NotificationInboxController::class, 'markAllRead'])->middleware('can:notifications.manage_own')->name('inbox.read-all');
+        Route::delete('inbox/{notification}', [NotificationInboxController::class, 'destroy'])->middleware('can:notifications.manage_own')->name('inbox.destroy');
+
+        Route::get('preferences', [NotificationPreferenceController::class, 'index'])->middleware('can:notifications.preferences.manage_own')->name('preferences.index');
+        Route::put('preferences', [NotificationPreferenceController::class, 'update'])->middleware('can:notifications.preferences.manage_own')->name('preferences.update');
+        Route::post('preferences/reset', [NotificationPreferenceController::class, 'reset'])->middleware('can:notifications.preferences.manage_own')->name('preferences.reset');
+
+        Route::get('events', EventLogController::class)->middleware('can:notifications.events.view')->name('events.index');
+        Route::get('deliveries', DeliveryLogController::class)->middleware('can:notifications.deliveries.view')->name('deliveries.index');
+
+        Route::get('templates', [NotificationTemplateController::class, 'index'])->middleware('can:notifications.templates.manage')->name('templates.index');
+        Route::put('templates/{template}', [NotificationTemplateController::class, 'update'])->middleware('can:notifications.templates.manage')->name('templates.update');
+
+        Route::get('webhooks', [WebhookEndpointController::class, 'index'])->middleware('can:notifications.webhooks.view')->name('webhooks.index');
+        Route::post('webhooks', [WebhookEndpointController::class, 'store'])->middleware('can:notifications.webhooks.manage')->name('webhooks.store');
+        Route::put('webhooks/{webhook}', [WebhookEndpointController::class, 'update'])->middleware('can:notifications.webhooks.manage')->name('webhooks.update');
+        Route::post('webhooks/{webhook}/toggle', [WebhookEndpointController::class, 'toggle'])->middleware('can:notifications.webhooks.manage')->name('webhooks.toggle');
+        Route::post('webhooks/{webhook}/rotate-secret', [WebhookEndpointController::class, 'rotateSecret'])->middleware('can:notifications.webhooks.manage')->name('webhooks.rotate-secret');
+        Route::post('webhook-deliveries/{delivery}/retry', [WebhookEndpointController::class, 'retryDelivery'])->middleware('can:notifications.webhooks.retry')->name('webhooks.deliveries.retry');
     });
 
     Route::redirect('settings', 'settings/general')->name('settings.index');

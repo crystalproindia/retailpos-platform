@@ -3,24 +3,29 @@
 namespace App\Services\Crm;
 
 use App\Enums\Crm\LeadStageType;
+use App\Events\Domain\Crm\LeadConverted;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmLeadStatus;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Support\Facades\DB;
 
 class LeadConversionService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+        private readonly DomainEventDispatcher $domainEvents,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
      */
     public function convert(CrmLead $lead, User $user, array $data = []): CrmLead
     {
-        return DB::transaction(function () use ($lead, $user, $data): CrmLead {
+        $converted = DB::transaction(function () use ($lead, $user, $data): CrmLead {
             $crmCompany = $this->resolveCompany($lead, $user, $data);
             $contact = $this->resolveContact($lead, $user, $crmCompany, $data);
             $wonStatus = CrmLeadStatus::query()
@@ -48,6 +53,24 @@ class LeadConversionService
 
             return $lead->refresh()->load(['crmCompany', 'contact', 'status']);
         });
+
+        $this->domainEvents->dispatch(new LeadConverted(
+            companyId: $converted->company_id,
+            actorId: $user->id,
+            aggregateType: CrmLead::class,
+            aggregateId: $converted->id,
+            payload: [
+                'lead_id' => $converted->id,
+                'lead_title' => $converted->title,
+                'business_name' => $converted->business_name,
+                'assigned_user_id' => $converted->assigned_user_id,
+                'crm_company_id' => $converted->crm_company_id,
+                'crm_contact_id' => $converted->crm_contact_id,
+                'status_id' => $converted->status_id,
+            ],
+        ));
+
+        return $converted;
     }
 
     /**

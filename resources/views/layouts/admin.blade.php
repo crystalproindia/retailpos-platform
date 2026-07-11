@@ -13,6 +13,8 @@
         @php
             $user = auth()->user();
             $moduleGroups = app(\App\Support\Modules\ModuleRegistry::class)->grouped($user?->role);
+            $unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0;
+            $recentNotifications = $user?->notifications()->latest()->limit(5)->get() ?? collect();
         @endphp
 
         <div class="min-h-screen lg:grid lg:grid-cols-[auto_1fr]">
@@ -108,21 +110,31 @@
                             <div class="relative">
                                 <button type="button" class="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white" data-dropdown-button="notifications-menu" aria-label="Notifications">
                                     <x-icon name="bell" class="size-5" />
-                                    <span class="absolute right-1.5 top-1.5 size-2 rounded-full bg-teal-500"></span>
+                                    @if ($unreadNotificationCount > 0)
+                                        <span class="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-teal-500 px-1 text-[0.62rem] font-bold leading-none text-white">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
+                                    @endif
                                 </button>
                                 <div id="notifications-menu" class="absolute right-0 z-30 mt-2 hidden w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
-                                    <div class="px-3 py-2">
+                                    <div class="flex items-center justify-between px-3 py-2">
                                         <p class="text-sm font-semibold text-slate-950 dark:text-white">Notifications</p>
+                                        <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">View all</a>
                                     </div>
                                     <div class="space-y-1">
-                                        <div class="rounded-md px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
-                                            <p class="text-sm font-medium">Low stock review</p>
-                                            <p class="text-xs text-slate-500 dark:text-slate-400">8 products need attention.</p>
-                                        </div>
-                                        <div class="rounded-md px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
-                                            <p class="text-sm font-medium">Daily sales digest</p>
-                                            <p class="text-xs text-slate-500 dark:text-slate-400">Today is tracking above target.</p>
-                                        </div>
+                                        @forelse ($recentNotifications as $notification)
+                                            <a href="{{ $notification->data['action_url'] ?? route('notifications.index') }}" class="block rounded-md px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                                                <div class="flex items-start gap-2">
+                                                    @unless ($notification->read_at)
+                                                        <span class="mt-1.5 size-2 shrink-0 rounded-full bg-teal-500"></span>
+                                                    @endunless
+                                                    <span class="min-w-0">
+                                                        <span class="block truncate text-sm font-medium">{{ $notification->data['title'] ?? str($notification->data['event_key'] ?? 'Notification')->replace('.', ' ')->headline() }}</span>
+                                                        <span class="mt-1 block line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{{ $notification->data['message'] ?? 'Open Command Center for details.' }}</span>
+                                                    </span>
+                                                </div>
+                                            </a>
+                                        @empty
+                                            <div class="rounded-md px-3 py-4 text-sm text-slate-500 dark:text-slate-400">No notifications yet.</div>
+                                        @endforelse
                                     </div>
                                 </div>
                             </div>

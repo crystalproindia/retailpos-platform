@@ -96,4 +96,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(CrmActivity::class, 'created_by');
     }
+
+    public function notificationPreferences(): HasMany
+    {
+        return $this->hasMany(NotificationPreference::class);
+    }
 }

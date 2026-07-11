@@ -2,15 +2,21 @@
 
 namespace App\Services\Cms;
 
+use App\Events\Domain\Cms\CmsPagePublished;
+use App\Events\Domain\Cms\CmsPageUnpublished;
 use App\Models\Cms\CmsPage;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 class CmsPageService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+        private readonly DomainEventDispatcher $domainEvents,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -54,6 +60,13 @@ class CmsPageService
 
         $this->createRevision($page->refresh(), $user);
         $this->auditLogger->record('cms.page.published', $page, 'CMS page published');
+        $this->domainEvents->dispatch(new CmsPagePublished(
+            companyId: $page->company_id,
+            actorId: $user->id,
+            aggregateType: CmsPage::class,
+            aggregateId: $page->id,
+            payload: $this->eventPayload($page),
+        ));
 
         return $page;
     }
@@ -68,6 +81,13 @@ class CmsPageService
 
         $this->createRevision($page->refresh(), $user);
         $this->auditLogger->record('cms.page.unpublished', $page, 'CMS page unpublished');
+        $this->domainEvents->dispatch(new CmsPageUnpublished(
+            companyId: $page->company_id,
+            actorId: $user->id,
+            aggregateType: CmsPage::class,
+            aggregateId: $page->id,
+            payload: $this->eventPayload($page),
+        ));
 
         return $page;
     }
@@ -157,5 +177,19 @@ class CmsPageService
     private function slug(string $value): string
     {
         return Str::slug($value);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eventPayload(CmsPage $page): array
+    {
+        return [
+            'page_id' => $page->id,
+            'title' => $page->title,
+            'slug' => $page->slug,
+            'status' => $page->status,
+            'published_at' => $page->published_at?->toISOString(),
+        ];
     }
 }

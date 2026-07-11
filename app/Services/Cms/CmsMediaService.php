@@ -2,16 +2,21 @@
 
 namespace App\Services\Cms;
 
+use App\Events\Domain\Cms\CmsMediaUploaded;
 use App\Models\Cms\CmsMedia;
 use App\Models\Cms\CmsMediaFolder;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 class CmsMediaService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+        private readonly DomainEventDispatcher $domainEvents,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -51,6 +56,20 @@ class CmsMediaService
         ]);
 
         $this->auditLogger->record('cms.media.uploaded', $media, 'CMS media uploaded');
+        $this->domainEvents->dispatch(new CmsMediaUploaded(
+            companyId: $media->company_id,
+            actorId: $user->id,
+            aggregateType: CmsMedia::class,
+            aggregateId: $media->id,
+            payload: [
+                'media_id' => $media->id,
+                'name' => $media->name,
+                'file_name' => $media->file_name,
+                'mime_type' => $media->mime_type,
+                'type' => $media->type,
+                'size' => $media->size,
+            ],
+        ));
 
         return $media;
     }

@@ -23,10 +23,18 @@ use App\Models\Crm\CrmLeadSource;
 use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmTag;
 use App\Models\DashboardStatistic;
+use App\Models\DomainEventLog;
+use App\Models\NotificationDelivery;
+use App\Models\NotificationPreference;
+use App\Models\NotificationTemplate;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\WebhookDelivery;
+use App\Models\WebhookEndpoint;
+use App\Notifications\PlatformNotification;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
@@ -173,6 +181,78 @@ class DatabaseSeeder extends Seeder
                     'value' => ['value' => $value],
                 ],
             ));
+        });
+
+        collect([
+            [
+                'event_key' => 'crm.lead.assigned',
+                'channel' => 'email',
+                'name' => 'Lead assigned email',
+                'subject' => 'New lead assigned: {{ lead_title }}',
+                'body' => 'A CRM lead has been assigned to you. Lead: {{ lead_title }}. Business: {{ business_name }}.',
+            ],
+            [
+                'event_key' => 'crm.follow_up.due',
+                'channel' => 'email',
+                'name' => 'Follow-up due email',
+                'subject' => 'Follow-up due: {{ subject }}',
+                'body' => 'Your CRM follow-up is due soon. Activity: {{ subject }}. Lead: {{ lead_title }}.',
+            ],
+            [
+                'event_key' => 'crm.follow_up.overdue',
+                'channel' => 'email',
+                'name' => 'Follow-up overdue email',
+                'subject' => 'Overdue follow-up: {{ subject }}',
+                'body' => 'A CRM follow-up is overdue. Activity: {{ subject }}. Please update the activity outcome.',
+            ],
+            [
+                'event_key' => 'cms.page.published',
+                'channel' => 'database',
+                'name' => 'CMS page published in-app',
+                'subject' => 'CMS page published',
+                'body' => 'The CMS page {{ title }} was published and is ready for website delivery.',
+            ],
+            [
+                'event_key' => 'system.settings.updated',
+                'channel' => 'database',
+                'name' => 'Settings updated in-app',
+                'subject' => 'Settings updated',
+                'body' => 'Command Center settings were updated in {{ section }}.',
+            ],
+        ])->each(fn (array $template) => NotificationTemplate::updateOrCreate(
+            [
+                'company_id' => null,
+                'event_key' => $template['event_key'],
+                'channel' => $template['channel'],
+                'locale' => 'en',
+            ],
+            $template + [
+                'company_id' => null,
+                'locale' => 'en',
+                'is_system' => true,
+                'is_active' => true,
+                'version' => 1,
+            ],
+        ));
+
+        collect([$admin, $manager, $sales])->each(function (User $user): void {
+            collect(['crm.lead.created', 'crm.lead.assigned', 'crm.follow_up.due', 'crm.follow_up.overdue'])->each(
+                fn (string $eventKey) => NotificationPreference::updateOrCreate(
+                    [
+                        'company_id' => $user->company_id,
+                        'user_id' => $user->id,
+                        'event_key' => $eventKey,
+                    ],
+                    [
+                        'database_enabled' => true,
+                        'email_enabled' => in_array($eventKey, ['crm.lead.assigned', 'crm.follow_up.due', 'crm.follow_up.overdue'], true),
+                        'quiet_hours_enabled' => true,
+                        'quiet_hours_start' => '20:00',
+                        'quiet_hours_end' => '08:00',
+                        'timezone' => 'Asia/Kolkata',
+                    ],
+                ),
+            );
         });
 
         collect(config('cms.homepage_sections'))->each(function (array $section, string $key) use ($company): void {
@@ -446,5 +526,89 @@ class DatabaseSeeder extends Seeder
                 ],
             );
         });
+
+        $eventLog = DomainEventLog::updateOrCreate(
+            ['correlation_id' => 'seed:system.settings.updated'],
+            [
+                'company_id' => $company->id,
+                'user_id' => $admin->id,
+                'event_key' => 'system.settings.updated',
+                'event_class' => 'seed',
+                'aggregate_type' => 'settings',
+                'aggregate_id' => null,
+                'causation_id' => null,
+                'payload' => ['section' => 'notifications', 'keys' => ['lead_alerts']],
+                'occurred_at' => now()->subHour(),
+                'processed_at' => now()->subHour(),
+                'status' => 'processed',
+            ],
+        );
+
+        DatabaseNotification::query()->updateOrCreate(
+            ['id' => '11111111-1111-4111-8111-111111111111'],
+            [
+                'type' => PlatformNotification::class,
+                'notifiable_type' => $admin->getMorphClass(),
+                'notifiable_id' => $admin->id,
+                'data' => [
+                    'title' => 'Notification Center ready',
+                    'message' => 'Phase 2.5 demo notification preferences and delivery logs are available.',
+                    'event_key' => 'system.settings.updated',
+                    'severity' => 'info',
+                    'action_url' => route('notifications.index'),
+                ],
+                'read_at' => null,
+            ],
+        );
+
+        NotificationDelivery::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'domain_event_log_id' => $eventLog->id,
+                'event_key' => 'system.settings.updated',
+                'channel' => 'database',
+                'recipient' => (string) $admin->id,
+            ],
+            [
+                'user_id' => $admin->id,
+                'notification_id' => '11111111-1111-4111-8111-111111111111',
+                'status' => 'delivered',
+                'attempt_count' => 1,
+                'payload' => ['title' => 'Notification Center ready'],
+                'sent_at' => now()->subHour(),
+                'delivered_at' => now()->subHour(),
+            ],
+        );
+
+        $webhookEndpoint = WebhookEndpoint::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'name' => 'Demo automation endpoint',
+            ],
+            [
+                'url' => 'https://automation.example.com/retailpos/events',
+                'secret' => 'whsec_demo_secret_rotatable',
+                'subscribed_events' => ['crm.lead.created', 'crm.lead.assigned', 'cms.page.published'],
+                'is_active' => false,
+            ],
+        );
+
+        WebhookDelivery::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'webhook_endpoint_id' => $webhookEndpoint->id,
+                'domain_event_log_id' => $eventLog->id,
+                'event_key' => 'system.settings.updated',
+            ],
+            [
+                'payload' => ['event_key' => 'system.settings.updated', 'data' => ['section' => 'notifications']],
+                'status' => 'failed',
+                'response_code' => 410,
+                'response_body' => 'Seeded disabled endpoint sample.',
+                'attempt_count' => 1,
+                'failed_at' => now()->subMinutes(45),
+                'next_retry_at' => now()->addMinutes(15),
+            ],
+        );
     }
 }

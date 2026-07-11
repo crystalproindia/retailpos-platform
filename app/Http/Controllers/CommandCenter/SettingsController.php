@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\CommandCenter;
 
+use App\Events\Domain\System\SettingsUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\UpdateSettingsRequest;
 use App\Repositories\SettingsRepository;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,6 +30,7 @@ class SettingsController extends Controller
         UpdateSettingsRequest $request,
         SettingsRepository $settingsRepository,
         AuditLogger $auditLogger,
+        DomainEventDispatcher $domainEvents,
         string $section,
     ): RedirectResponse {
         abort_unless($settingsRepository->exists($section), 404);
@@ -39,6 +42,16 @@ class SettingsController extends Controller
             'section' => $section,
             'keys' => array_keys($request->validated()),
         ]);
+        $domainEvents->dispatch(new SettingsUpdated(
+            companyId: $request->user()->company_id,
+            actorId: $request->user()->id,
+            aggregateType: 'settings',
+            aggregateId: null,
+            payload: [
+                'section' => $section,
+                'keys' => array_keys($request->validated()),
+            ],
+        ));
 
         return back()->with('status', 'Settings saved.');
     }

@@ -3,15 +3,22 @@
 namespace App\Services\Crm;
 
 use App\Enums\UserRole;
+use App\Events\Domain\Crm\LeadAssigned;
+use App\Events\Domain\Crm\LeadCreated;
+use App\Events\Domain\Crm\LeadStatusChanged;
 use App\Models\Crm\CrmLead;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 
 class LeadService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+        private readonly DomainEventDispatcher $domainEvents,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -27,6 +34,13 @@ class LeadService
 
         $this->syncTags($lead, $data['tag_ids'] ?? []);
         $this->auditLogger->record('crm.lead.created', $lead, 'CRM lead created');
+        $this->domainEvents->dispatch(new LeadCreated(
+            companyId: $lead->company_id,
+            actorId: $user->id,
+            aggregateType: CrmLead::class,
+            aggregateId: $lead->id,
+            payload: $this->eventPayload($lead),
+        ));
 
         return $lead->load(['source', 'status', 'assignedUser', 'tags']);
     }
@@ -69,6 +83,16 @@ class LeadService
             'to_status_id' => $statusId,
             'changed_by' => $user->id,
         ]);
+        $this->domainEvents->dispatch(new LeadStatusChanged(
+            companyId: $lead->company_id,
+            actorId: $user->id,
+            aggregateType: CrmLead::class,
+            aggregateId: $lead->id,
+            payload: $this->eventPayload($lead, [
+                'from_status_id' => $oldStatusId,
+                'to_status_id' => $statusId,
+            ]),
+        ));
 
         return $lead->refresh()->load('status');
     }
@@ -81,6 +105,16 @@ class LeadService
             'assigned_user_id' => $assignedUserId,
             'assigned_by' => $user->id,
         ]);
+        $this->domainEvents->dispatch(new LeadAssigned(
+            companyId: $lead->company_id,
+            actorId: $user->id,
+            aggregateType: CrmLead::class,
+            aggregateId: $lead->id,
+            payload: $this->eventPayload($lead, [
+                'assigned_user_id' => $assignedUserId,
+                'assigned_by' => $user->id,
+            ]),
+        ));
 
         return $lead->refresh()->load('assignedUser');
     }
@@ -197,5 +231,25 @@ class LeadService
         $role = $user->role instanceof UserRole ? $user->role : UserRole::tryFrom((string) $user->role);
 
         return $role === UserRole::Sales;
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function eventPayload(CrmLead $lead, array $overrides = []): array
+    {
+        return array_merge([
+            'lead_id' => $lead->id,
+            'lead_title' => $lead->title,
+            'business_name' => $lead->business_name,
+            'contact_name' => $lead->contact_name,
+            'email' => $lead->email,
+            'phone' => $lead->phone,
+            'assigned_user_id' => $lead->assigned_user_id,
+            'status_id' => $lead->status_id,
+            'expected_value' => $lead->expected_value,
+            'priority' => $lead->priority?->value ?? $lead->priority,
+        ], $overrides);
     }
 }

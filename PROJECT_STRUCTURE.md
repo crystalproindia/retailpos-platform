@@ -1119,3 +1119,272 @@ Tenant isolation is enforced through:
 - CRM settings UI is represented by capability foundation only; dedicated CRM settings screens are future work.
 - The duplicate prevention logic is intentionally basic and will need stronger matching rules before importing large real-world datasets.
 - Reporting is limited to CRM dashboard metrics and lists; advanced forecasting and attribution analytics are future milestones.
+
+## Phase 2.5 - Notification & Event Center Foundation
+
+Phase 2.5 adds the shared event and notification backbone used by CRM, CMS, settings, and future modules. It is company-scoped, user-aware, auditable, queue-ready, and channel-independent.
+
+### Notification Folder Structure
+
+- `app/Contracts/Events/DomainEvent.php`
+- `app/Contracts/Notifications/NotificationChannel.php`
+- `app/Events/Domain/`
+  - `Concerns/SerializesDomainEvent.php`
+  - `DomainEventOccurred.php`
+  - `Crm/LeadCreated.php`
+  - `Crm/LeadAssigned.php`
+  - `Crm/LeadStatusChanged.php`
+  - `Crm/LeadConverted.php`
+  - `Crm/FollowUpDue.php`
+  - `Crm/FollowUpOverdue.php`
+  - `Cms/CmsPagePublished.php`
+  - `Cms/CmsPageUnpublished.php`
+  - `Cms/CmsMediaUploaded.php`
+  - `System/SettingsUpdated.php`
+- `app/Services/Events/DomainEventDispatcher.php`
+- `app/Services/Notifications/`
+  - `NotificationService.php`
+  - `NotificationTemplateRenderer.php`
+  - `RecipientResolver.php`
+  - `WebhookService.php`
+  - `Channels/DatabaseNotificationChannel.php`
+  - `Channels/EmailNotificationChannel.php`
+  - `Channels/UnsupportedNotificationChannel.php`
+- `app/Jobs/Notifications/`
+  - `SendNotificationDeliveryJob.php`
+  - `SendWebhookDeliveryJob.php`
+- `app/Listeners/Notifications/`
+  - `DispatchDomainEventNotifications.php`
+  - `DispatchDomainEventWebhooks.php`
+  - `FinalizeDomainEventLog.php`
+- `app/Console/Commands/Notifications/`
+  - `DispatchDueFollowUpRemindersCommand.php`
+  - `DispatchOverdueFollowUpRemindersCommand.php`
+  - `RetryNotificationDeliveriesCommand.php`
+  - `PruneDomainEventLogsCommand.php`
+- `app/Http/Controllers/CommandCenter/Notifications/`
+- `app/Http/Requests/Notifications/`
+- `app/Repositories/Notifications/`
+- `resources/views/command-center/notifications/`
+- `config/events.php`
+
+### Notification Models
+
+- `DomainEventLog`
+  - Immutable-ish event ledger for domain events, payloads, correlation IDs, processing status, and retention.
+- `NotificationPreference`
+  - Per-user event/channel toggles with quiet hours and timezone.
+- `NotificationTemplate`
+  - CMS-managed templates for database and email notification copy.
+- `NotificationDelivery`
+  - Delivery attempt log for database, email, and future user channels.
+- `WebhookEndpoint`
+  - Company-scoped outbound webhook endpoint with encrypted secret and subscribed events.
+- `WebhookDelivery`
+  - Signed outbound webhook delivery attempts and retry metadata.
+- Laravel database notifications table
+  - User inbox storage through Laravel's first-party notification system.
+
+### Notification Database Tables
+
+- `notifications`
+- `notification_preferences`
+- `notification_templates`
+- `notification_deliveries`
+- `domain_event_logs`
+- `webhook_endpoints`
+- `webhook_deliveries`
+
+All custom tables include company scoping where relevant. Delivery tables link back to `domain_event_logs` for traceability.
+
+### Event Catalog
+
+`config/events.php` defines the event catalog, default channels, allowed channels, severity, categories, user preference support, webhook eligibility, and future AI flags.
+
+Event families include:
+
+- Authentication: login, logout, password reset requested/completed
+- CRM: lead created, updated, assigned, status changed, converted, follow-up due/overdue, activity created/completed
+- CMS: page created, updated, published, unpublished, media uploaded, redirects, broken links
+- System: user created/deactivated, settings updated, webhook failed, queue failed
+
+### Domain Event Architecture
+
+`DomainEventDispatcher` records the event to `domain_event_logs`, preserves correlation/causation IDs, dispatches the concrete Laravel event, and emits `DomainEventOccurred` for cross-cutting notification and webhook listeners.
+
+Duplicate reminder processing is prevented with deterministic correlation IDs for scheduled follow-up events.
+
+### Notification Channels
+
+Supported in Phase 2.5:
+
+- Database notifications
+- Email notifications through Laravel Mail/Notification
+- Outbound webhooks
+
+Future-ready but disabled:
+
+- WhatsApp
+- SMS
+- Push
+
+Unsupported future channels create delivery records with `unsupported` status instead of silently disappearing.
+
+### Notification Center UI
+
+Routes under `/notifications` provide:
+
+- Inbox
+  - List, unread/read filter, search, mark read, mark unread, mark all read, delete
+- Preferences
+  - Per-event database/email toggles, quiet hours, timezone, reset defaults
+- Event Log
+  - Filterable domain event ledger
+- Delivery Log
+  - Notification and webhook delivery attempts
+- Webhooks
+  - Create, update, enable/disable, rotate secret, retry delivery
+- Templates
+  - Admin-managed notification templates
+
+The admin header dropdown now reads real unread notifications and links to the inbox.
+
+### Notification Permissions
+
+Capabilities added:
+
+- `notifications.view`
+- `notifications.manage_own`
+- `notifications.preferences.manage_own`
+- `notifications.preferences.manage_company`
+- `notifications.events.view`
+- `notifications.deliveries.view`
+- `notifications.templates.manage`
+- `notifications.webhooks.view`
+- `notifications.webhooks.manage`
+- `notifications.webhooks.retry`
+- `notifications.settings.manage`
+
+Role behavior:
+
+- Administrator: full Notification Center access
+- Manager: operational access to inbox, preferences, event log, delivery log, and webhook view/retry
+- Sales: own inbox and own preferences only
+- Staff: no Notification Center access
+
+### Module Registry
+
+The Module Registry now includes a parent `notifications` module:
+
+- Name: Notification Center
+- Category: System & Operations
+- Icon: bell
+- Route: `notifications.index`
+- Roles: Administrator, Manager, Sales
+
+Child modules:
+
+- Notifications
+- Preferences
+- Event Log
+- Webhooks
+- Delivery Log
+
+### CRM Integration
+
+CRM now emits domain events for:
+
+- Lead created
+- Lead assigned
+- Lead status changed
+- Lead converted
+- Follow-up due
+- Follow-up overdue
+
+Lead creation, assignment, pipeline transition, conversion, and scheduled reminder commands preserve existing CRM behavior and add notification/event side effects.
+
+### CMS and Settings Integration
+
+CMS emits domain events for:
+
+- Page published
+- Page unpublished
+- Media uploaded
+
+Settings emits:
+
+- Settings updated
+
+### Recipient Resolution
+
+Initial recipient rules:
+
+- Lead created: assigned user plus managers/admins
+- Lead assigned: newly assigned user
+- Follow-up due/overdue: assigned activity user
+- CMS publish/unpublish/media: managers/admins
+- Settings updated: admins/managers
+
+### Webhook Foundation
+
+Outbound webhooks support:
+
+- Company-scoped endpoints
+- Active/disabled state
+- Event subscriptions
+- Encrypted secret storage
+- Secret rotation
+- HMAC SHA-256 signatures
+- Event, timestamp, and signature headers
+- Queued deliveries
+- Retry tracking
+- Manual retry
+- SSRF guardrails for localhost/private IP targets
+
+Secrets are never displayed in the UI after generation.
+
+### Scheduler
+
+`routes/console.php` schedules:
+
+- `notifications:retry-failed-deliveries` every 15 minutes
+- `notifications:dispatch-followup-due` every 15 minutes
+- `notifications:dispatch-followup-overdue` hourly
+- `notifications:prune-domain-events` daily at 02:30
+
+### Notification Seed Data
+
+`DatabaseSeeder` adds:
+
+- System notification templates
+- Per-user CRM notification preferences
+- Demo inbox notification
+- Demo domain event log
+- Demo notification delivery
+- Disabled demo webhook endpoint
+- Demo webhook delivery record
+
+### Notification Tests
+
+`tests/Feature/NotificationCenterFoundationTest.php` covers:
+
+- Module registry visibility
+- Role filtering
+- Inbox ownership and read/unread/delete actions
+- Preferences update/reset and disabled future channels
+- CRM event and database notification emission
+- CMS publish and settings event emission
+- Unsupported future channel delivery records
+- Webhook URL validation, secret rotation, and queued delivery creation
+- Scheduled follow-up reminder idempotency
+- Seeded foundation records
+
+### Current Limitations
+
+- No external WhatsApp, SMS, Push, RCS, or inbound webhook providers are connected in Phase 2.5.
+- Webhook delivery is outbound only.
+- No n8n integration is included.
+- Reminder commands are foundation-level and use basic due/overdue windows.
+- Notification templates support simple `{{ variable }}` interpolation only.
+- Delivery logs do not include provider-specific message IDs except where future adapters populate them.
+- No POS, Inventory, Finance, Quotes, Invoices, AI automation, or external communication modules are started in Phase 2.5.

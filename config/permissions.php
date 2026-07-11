@@ -4,6 +4,7 @@ $crmManagementRoles = ['administrator', 'manager'];
 $crmUserRoles = ['administrator', 'manager', 'sales'];
 $notificationManagementRoles = ['administrator', 'manager'];
 $notificationUserRoles = ['administrator', 'manager', 'sales'];
+$operationsManagementRoles = ['administrator', 'manager'];
 $administratorRoles = ['administrator'];
 
 return [
@@ -31,5 +32,14 @@ return [
         'notifications.webhooks.manage' => $administratorRoles,
         'notifications.webhooks.retry' => $notificationManagementRoles,
         'notifications.settings.manage' => $administratorRoles,
+        'operations.view' => $operationsManagementRoles,
+        'operations.health.view' => $operationsManagementRoles,
+        'operations.queue.view' => $operationsManagementRoles,
+        'operations.failed_jobs.view' => $operationsManagementRoles,
+        'operations.failed_jobs.retry' => $administratorRoles,
+        'operations.failed_jobs.delete' => $administratorRoles,
+        'operations.schedule.view' => $operationsManagementRoles,
+        'operations.application.view' => $operationsManagementRoles,
+        'operations.settings.manage' => $administratorRoles,
     ],
 ];

@@ -13,3 +13,6 @@ Schedule::command('notifications:retry-failed-deliveries')->everyFifteenMinutes(
 Schedule::command('notifications:dispatch-followup-due')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-overdue')->hourly()->withoutOverlapping();
 Schedule::command('notifications:prune-domain-events')->dailyAt('02:30')->withoutOverlapping();
+Schedule::command('operations:health-check')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('operations:capture-queue-snapshot')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('operations:prune-health-checks')->dailyAt('03:00')->withoutOverlapping();

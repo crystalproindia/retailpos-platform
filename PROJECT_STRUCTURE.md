@@ -1388,3 +1388,270 @@ Secrets are never displayed in the UI after generation.
 - Notification templates support simple `{{ variable }}` interpolation only.
 - Delivery logs do not include provider-specific message IDs except where future adapters populate them.
 - No POS, Inventory, Finance, Quotes, Invoices, AI automation, or external communication modules are started in Phase 2.5.
+
+## Phase 2.6 - Queue, System Health & Operations Monitor
+
+Phase 2.6 adds a production operations layer for administrators and managers to inspect system health, queues, failed jobs, scheduled tasks, notification deliveries, webhook deliveries, event failures, and safe application metadata.
+
+### Operations Folder Structure
+
+- `app/Console/Commands/Operations/`
+  - `RunHealthCheckCommand.php`
+  - `CaptureQueueSnapshotCommand.php`
+  - `PruneHealthChecksCommand.php`
+- `app/Http/Controllers/CommandCenter/Operations/`
+  - `OperationsDashboardController.php`
+  - `HealthCheckController.php`
+  - `QueueMonitorController.php`
+  - `FailedJobController.php`
+  - `ScheduleMonitorController.php`
+  - `ApplicationInfoController.php`
+- `app/Models/`
+  - `SystemHealthCheck.php`
+  - `ScheduledTaskRun.php`
+  - `QueueJobSnapshot.php`
+- `app/Repositories/Operations/`
+  - `HealthCheckRepository.php`
+  - `FailedJobRepository.php`
+  - `QueueSnapshotRepository.php`
+  - `ScheduledTaskRunRepository.php`
+- `app/Services/Operations/`
+  - `HealthCheckService.php`
+  - `QueueMonitorService.php`
+  - `ScheduleMonitorService.php`
+  - `ApplicationInfoService.php`
+  - `FailedJobService.php`
+- `resources/views/command-center/operations/`
+- `config/operations.php`
+
+### Operations Database Tables
+
+- `system_health_checks`
+  - Stores health check snapshots with key, category, status, message, safe payload, and checked timestamp.
+- `scheduled_task_runs`
+  - Stores command run history, status, timing, output, and failure reason for operational commands.
+- `queue_job_snapshots`
+  - Stores queue depth snapshots with pending, reserved, failed, and optional processed counts.
+
+Live queue jobs and failed jobs continue to use Laravel's first-party `jobs` and `failed_jobs` tables.
+
+### Operations Module Registry
+
+Parent module:
+
+- `operations`
+  - Name: Operations Monitor
+  - Category: System & Operations
+  - Icon: activity
+  - Route: `operations.dashboard`
+  - Roles: Administrator, Manager
+
+Child modules:
+
+- System Health
+- Queue Monitor
+- Failed Jobs
+- Schedule Monitor
+- Notification Deliveries
+- Webhook Deliveries
+- Event Logs
+- Application Info
+
+Notification delivery, webhook delivery, and event log children link to the existing Phase 2.5 Notification/Event Center screens instead of duplicating them.
+
+### Operations Routes
+
+Route prefix: `/operations`
+
+- `operations.dashboard`
+- `operations.health.index`
+- `operations.health.run`
+- `operations.queue.index`
+- `operations.queue.snapshot`
+- `operations.failed-jobs.index`
+- `operations.failed-jobs.retry`
+- `operations.failed-jobs.destroy`
+- `operations.failed-jobs.bulk-retry`
+- `operations.failed-jobs.bulk-destroy`
+- `operations.schedule.index`
+- `operations.application.index`
+
+All routes are protected by auth, role middleware, and capability gates.
+
+### Operations Permissions
+
+Capabilities added:
+
+- `operations.view`
+- `operations.health.view`
+- `operations.queue.view`
+- `operations.failed_jobs.view`
+- `operations.failed_jobs.retry`
+- `operations.failed_jobs.delete`
+- `operations.schedule.view`
+- `operations.application.view`
+- `operations.settings.manage`
+
+Role behavior:
+
+- Administrator: full access, including manual health checks, queue snapshots, retry, delete, bulk retry, and bulk delete.
+- Manager: view-only access to dashboard, health, queue, failed jobs, schedule, and app info.
+- Sales: no access.
+- Staff: no access.
+
+### Health Checks
+
+`HealthCheckService` implements:
+
+- Application boot
+- Database connection
+- Cache connection
+- Queue connection
+- Mail configuration
+- Storage write/read
+- Scheduler availability
+- Failed jobs count
+- Notification delivery failures
+- Webhook delivery failures
+- Domain event processing failures
+- PHP version
+- Laravel version
+- Node build manifest status
+- Environment configuration sanity
+
+Statuses:
+
+- healthy
+- warning
+- critical
+- unknown
+
+### Queue Monitoring
+
+`QueueMonitorService` reads Laravel queue tables and reports:
+
+- Queue connection
+- Queue driver
+- Default queue
+- Pending jobs
+- Reserved jobs
+- Failed jobs
+- Queue breakdown
+- Snapshot history
+
+`operations:capture-queue-snapshot` stores periodic queue snapshots.
+
+### Failed Jobs
+
+Failed jobs use Laravel's `failed_jobs` table.
+
+Supported actions:
+
+- List failed jobs
+- Search/filter by queue and connection
+- View safe payload summary
+- View redacted exception preview
+- Retry one failed job
+- Delete one failed job
+- Bulk retry
+- Bulk delete
+
+Retry pushes the stored raw payload back to the original queue connection and removes the failed job record after queuing.
+
+### Scheduler Monitoring
+
+`ScheduleMonitorService` presents configured scheduled commands, expected cadence, estimated next run, last tracked run, status, and failure reason.
+
+Scheduled operations commands:
+
+- `operations:health-check` every 5 minutes
+- `operations:capture-queue-snapshot` every 15 minutes
+- `operations:prune-health-checks` daily at 03:00
+
+Existing notification scheduled commands are preserved.
+
+### Application Info
+
+`ApplicationInfoService` displays safe runtime metadata:
+
+- App name
+- Environment
+- Debug mode status
+- Laravel version
+- PHP version
+- Database driver
+- Cache driver
+- Queue driver
+- Mail driver
+- Filesystem disk
+- Git commit hash
+- Current branch
+- Last deployment time from Vite manifest when available
+- App timezone
+- Server timezone
+
+Secrets, API keys, credentials, webhook secrets, and app keys are not rendered.
+
+### Security Redaction
+
+Failed job views never render full raw payloads. `FailedJobService` exposes only:
+
+- UUID
+- Display name
+- Job handler name
+- Retry metadata
+- Data key names
+- Redacted exception preview
+
+Sensitive terms such as password, token, secret, authorization, API key, credential, and webhook secret are redacted from exception previews.
+
+### Operations Audit Log
+
+Human actions audited:
+
+- `operations.health_check.run`
+- `operations.queue_snapshot.captured`
+- `operations.failed_job.retried`
+- `operations.failed_job.deleted`
+- `operations.failed_jobs.bulk_retried`
+- `operations.failed_jobs.bulk_deleted`
+
+Scheduled/background command results are stored in `scheduled_task_runs`, not human audit logs.
+
+### Operations Seed Data
+
+`DatabaseSeeder` adds clearly marked demonstration data only:
+
+- Demo application boot health snapshot
+- Demo queue connection health snapshot
+- Demo queue snapshot for `demo-default`
+
+Live health and queue state are generated by running the operations commands.
+
+### Operations Tests
+
+`tests/Feature/OperationsMonitorFoundationTest.php` covers:
+
+- Module Registry integration
+- Role access and Sales/Staff denial
+- Dashboard loading
+- Notification, webhook, and event failure count surfaces
+- Health check command execution
+- Database, cache, and storage health checks
+- Queue snapshot command
+- Schedule list compatibility
+- Failed jobs list
+- Failed job retry/delete permissions
+- Admin retry/delete/bulk actions
+- Secret redaction in failed job views
+- Operations page loading
+- Seeded demo records
+
+### Operations Current Limitations
+
+- No third-party monitoring package is installed.
+- No external alerting, Slack, email escalation, or pager integration is connected.
+- Queue processed counts are reserved for future worker instrumentation.
+- Schedule next-run values are estimated from configured cadence and verified separately by `php artisan schedule:list`.
+- Health checks are lightweight application checks, not infrastructure probes for CPU, memory, disk usage, or network latency.
+- No Inventory, POS, Finance, Quotes, Invoices, AI, WhatsApp external API, SMS, Push, n8n, or Analytics BI work is included in Phase 2.6.

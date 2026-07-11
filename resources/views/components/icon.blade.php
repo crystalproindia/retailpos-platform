@@ -24,6 +24,25 @@
         </svg>
         @break
 
+    @case('activity')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12h4l2.5-6 5 12 2.5-6h4" />
+        </svg>
+        @break
+
+    @case('server')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M5 4h14a2 2 0 0 1 2 2v4H3V6a2 2 0 0 1 2-2Zm-2 10h18v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4Z" />
+            <path stroke-linecap="round" d="M7 7h.01M7 17h.01M11 7h6M11 17h6" />
+        </svg>
+        @break
+
+    @case('calendar')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 3v3M17 3v3M4 9h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+        </svg>
+        @break
+
     @case('chevron-down')
         <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
             <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />

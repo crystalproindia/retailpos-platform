@@ -27,7 +27,9 @@ use App\Models\DomainEventLog;
 use App\Models\NotificationDelivery;
 use App\Models\NotificationPreference;
 use App\Models\NotificationTemplate;
+use App\Models\QueueJobSnapshot;
 use App\Models\Setting;
+use App\Models\SystemHealthCheck;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
@@ -608,6 +610,42 @@ class DatabaseSeeder extends Seeder
                 'attempt_count' => 1,
                 'failed_at' => now()->subMinutes(45),
                 'next_retry_at' => now()->addMinutes(15),
+            ],
+        );
+
+        collect([
+            [
+                'key' => 'demo_app_boot',
+                'name' => 'Demo application boot',
+                'category' => 'Demo',
+                'status' => 'healthy',
+                'message' => 'Demonstration snapshot only. Run operations:health-check for live health data.',
+                'payload' => ['demo' => true],
+            ],
+            [
+                'key' => 'demo_queue_connection',
+                'name' => 'Demo queue connection',
+                'category' => 'Demo',
+                'status' => 'unknown',
+                'message' => 'Demonstration snapshot only. Live queue state is captured by operations:capture-queue-snapshot.',
+                'payload' => ['demo' => true],
+            ],
+        ])->each(fn (array $check) => SystemHealthCheck::updateOrCreate(
+            ['key' => $check['key']],
+            $check + [
+                'company_id' => null,
+                'checked_at' => now()->subMinutes(30),
+            ],
+        ));
+
+        QueueJobSnapshot::updateOrCreate(
+            ['queue' => 'demo-default'],
+            [
+                'pending_count' => 0,
+                'failed_count' => 0,
+                'processed_count' => null,
+                'reserved_count' => 0,
+                'captured_at' => now()->subMinutes(15),
             ],
         );
     }

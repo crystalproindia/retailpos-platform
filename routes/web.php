@@ -25,6 +25,12 @@ use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController
 use App\Http\Controllers\CommandCenter\Notifications\NotificationPreferenceController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationTemplateController;
 use App\Http\Controllers\CommandCenter\Notifications\WebhookEndpointController;
+use App\Http\Controllers\CommandCenter\Operations\ApplicationInfoController;
+use App\Http\Controllers\CommandCenter\Operations\FailedJobController;
+use App\Http\Controllers\CommandCenter\Operations\HealthCheckController;
+use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
+use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
+use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -156,6 +162,25 @@ Route::middleware('auth')->group(function (): void {
         Route::post('webhooks/{webhook}/toggle', [WebhookEndpointController::class, 'toggle'])->middleware('can:notifications.webhooks.manage')->name('webhooks.toggle');
         Route::post('webhooks/{webhook}/rotate-secret', [WebhookEndpointController::class, 'rotateSecret'])->middleware('can:notifications.webhooks.manage')->name('webhooks.rotate-secret');
         Route::post('webhook-deliveries/{delivery}/retry', [WebhookEndpointController::class, 'retryDelivery'])->middleware('can:notifications.webhooks.retry')->name('webhooks.deliveries.retry');
+    });
+
+    Route::middleware(['role:administrator,manager', 'can:operations.view'])->prefix('operations')->name('operations.')->group(function (): void {
+        Route::get('/', OperationsDashboardController::class)->name('dashboard');
+
+        Route::get('health', [HealthCheckController::class, 'index'])->middleware('can:operations.health.view')->name('health.index');
+        Route::post('health/run', [HealthCheckController::class, 'run'])->middleware('can:operations.settings.manage')->name('health.run');
+
+        Route::get('queue', [QueueMonitorController::class, 'index'])->middleware('can:operations.queue.view')->name('queue.index');
+        Route::post('queue/snapshot', [QueueMonitorController::class, 'capture'])->middleware('can:operations.settings.manage')->name('queue.snapshot');
+
+        Route::get('failed-jobs', [FailedJobController::class, 'index'])->middleware('can:operations.failed_jobs.view')->name('failed-jobs.index');
+        Route::post('failed-jobs/{failedJob}/retry', [FailedJobController::class, 'retry'])->middleware('can:operations.failed_jobs.retry')->name('failed-jobs.retry');
+        Route::post('failed-jobs/bulk-retry', [FailedJobController::class, 'bulkRetry'])->middleware('can:operations.failed_jobs.retry')->name('failed-jobs.bulk-retry');
+        Route::delete('failed-jobs/bulk-delete', [FailedJobController::class, 'bulkDestroy'])->middleware('can:operations.failed_jobs.delete')->name('failed-jobs.bulk-destroy');
+        Route::delete('failed-jobs/{failedJob}', [FailedJobController::class, 'destroy'])->middleware('can:operations.failed_jobs.delete')->name('failed-jobs.destroy');
+
+        Route::get('schedule', ScheduleMonitorController::class)->middleware('can:operations.schedule.view')->name('schedule.index');
+        Route::get('application', ApplicationInfoController::class)->middleware('can:operations.application.view')->name('application.index');
     });
 
     Route::redirect('settings', 'settings/general')->name('settings.index');

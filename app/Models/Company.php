@@ -7,6 +7,10 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmLead;
+use App\Models\Inventory\InventoryBrand;
+use App\Models\Inventory\InventoryCategory;
+use App\Models\Inventory\Product;
+use App\Models\Inventory\Warehouse;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -64,5 +68,25 @@ class Company extends Model
     public function crmActivities(): HasMany
     {
         return $this->hasMany(CrmActivity::class);
+    }
+
+    public function inventoryCategories(): HasMany
+    {
+        return $this->hasMany(InventoryCategory::class);
+    }
+
+    public function inventoryBrands(): HasMany
+    {
+        return $this->hasMany(InventoryBrand::class);
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    public function warehouses(): HasMany
+    {
+        return $this->hasMany(Warehouse::class);
     }
 }

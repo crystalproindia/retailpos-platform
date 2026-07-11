@@ -24,6 +24,25 @@ use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmTag;
 use App\Models\DashboardStatistic;
 use App\Models\DomainEventLog;
+use App\Models\Inventory\BarcodeLabelTemplate;
+use App\Models\Inventory\BarcodePrintBatch;
+use App\Models\Inventory\ChannelProductMapping;
+use App\Models\Inventory\ChannelStockLevel;
+use App\Models\Inventory\InventoryBrand;
+use App\Models\Inventory\InventoryCategory;
+use App\Models\Inventory\InventorySyncLog;
+use App\Models\Inventory\InventoryTaxRate;
+use App\Models\Inventory\InventoryUnit;
+use App\Models\Inventory\Product;
+use App\Models\Inventory\ProductAttribute;
+use App\Models\Inventory\ProductAttributeValue;
+use App\Models\Inventory\ReorderRule;
+use App\Models\Inventory\ReorderSuggestion;
+use App\Models\Inventory\SalesChannel;
+use App\Models\Inventory\StockLevel;
+use App\Models\Inventory\StockLocation;
+use App\Models\Inventory\StockMovement;
+use App\Models\Inventory\Warehouse;
 use App\Models\NotificationDelivery;
 use App\Models\NotificationPreference;
 use App\Models\NotificationTemplate;
@@ -612,6 +631,445 @@ class DatabaseSeeder extends Seeder
                 'next_retry_at' => now()->addMinutes(15),
             ],
         );
+
+        $units = collect([
+            ['name' => 'Piece', 'short_code' => 'PCS', 'type' => 'quantity', 'decimal_allowed' => false, 'is_system' => true],
+            ['name' => 'Pair', 'short_code' => 'PAIR', 'type' => 'quantity', 'decimal_allowed' => false, 'is_system' => true],
+            ['name' => 'Kilogram', 'short_code' => 'KG', 'type' => 'weight', 'decimal_allowed' => true, 'is_system' => true],
+        ])->mapWithKeys(fn (array $unit): array => [
+            $unit['short_code'] => InventoryUnit::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'short_code' => $unit['short_code'],
+                ],
+                $unit + [
+                    'company_id' => $company->id,
+                    'conversion_factor' => 1,
+                    'is_active' => true,
+                ],
+            ),
+        ]);
+
+        $taxRates = collect([
+            ['name' => 'GST 0%', 'rate' => 0],
+            ['name' => 'GST 5%', 'rate' => 5],
+            ['name' => 'GST 12%', 'rate' => 12],
+            ['name' => 'GST 18%', 'rate' => 18],
+        ])->mapWithKeys(fn (array $tax): array => [
+            $tax['name'] => InventoryTaxRate::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'name' => $tax['name'],
+                ],
+                $tax + [
+                    'company_id' => $company->id,
+                    'tax_type' => 'gst',
+                    'country' => 'India',
+                    'is_default' => $tax['rate'] === 18,
+                    'is_active' => true,
+                ],
+            ),
+        ]);
+
+        $inventoryCategories = collect(['Footwear', 'Apparel', 'Grocery', 'Electronics'])
+            ->mapWithKeys(fn (string $name, int $index): array => [
+                Str::slug($name) => InventoryCategory::updateOrCreate(
+                    [
+                        'company_id' => $company->id,
+                        'slug' => Str::slug($name),
+                    ],
+                    [
+                        'company_id' => $company->id,
+                        'name' => $name,
+                        'description' => 'Demo inventory category for '.$name.'.',
+                        'sort_order' => $index + 1,
+                        'is_active' => true,
+                    ],
+                ),
+            ]);
+
+        $brands = collect(['StrideLine', 'Urban Threads', 'FreshMart', 'Crystal'])
+            ->mapWithKeys(fn (string $name): array => [
+                Str::slug($name) => InventoryBrand::updateOrCreate(
+                    [
+                        'company_id' => $company->id,
+                        'slug' => Str::slug($name),
+                    ],
+                    [
+                        'company_id' => $company->id,
+                        'name' => $name,
+                        'description' => 'Demo inventory brand.',
+                        'is_active' => true,
+                    ],
+                ),
+            ]);
+
+        $sizeAttribute = ProductAttribute::updateOrCreate(
+            ['company_id' => $company->id, 'slug' => 'size'],
+            ['company_id' => $company->id, 'name' => 'Size', 'type' => 'select', 'is_active' => true, 'sort_order' => 1],
+        );
+        $colorAttribute = ProductAttribute::updateOrCreate(
+            ['company_id' => $company->id, 'slug' => 'color'],
+            ['company_id' => $company->id, 'name' => 'Color', 'type' => 'select', 'is_active' => true, 'sort_order' => 2],
+        );
+
+        $attributeValues = collect([
+            [$sizeAttribute, '8'],
+            [$sizeAttribute, '9'],
+            [$sizeAttribute, '10'],
+            [$colorAttribute, 'Black'],
+            [$colorAttribute, 'Tan'],
+            [$colorAttribute, 'Blue'],
+        ])->mapWithKeys(fn (array $item, int $index): array => [
+            Str::slug($item[0]->slug.'-'.$item[1]) => ProductAttributeValue::updateOrCreate(
+                [
+                    'attribute_id' => $item[0]->id,
+                    'slug' => Str::slug($item[1]),
+                ],
+                [
+                    'company_id' => $company->id,
+                    'attribute_id' => $item[0]->id,
+                    'value' => $item[1],
+                    'slug' => Str::slug($item[1]),
+                    'sort_order' => $index + 1,
+                    'is_active' => true,
+                ],
+            ),
+        ]);
+
+        $products = collect([
+            ['name' => 'StrideLine Runner Shoe', 'sku' => 'DEMO-SHOE-001', 'barcode' => '890100000001', 'category' => 'footwear', 'brand' => 'strideline', 'unit' => 'PAIR', 'tax' => 'GST 18%', 'selling_price' => 2499, 'cost_price' => 1450, 'track_inventory' => true, 'has_variants' => true, 'type' => 'variant_parent'],
+            ['name' => 'Urban Cotton Tee', 'sku' => 'DEMO-TEE-001', 'barcode' => '890100000002', 'category' => 'apparel', 'brand' => 'urban-threads', 'unit' => 'PCS', 'tax' => 'GST 12%', 'selling_price' => 799, 'cost_price' => 320, 'track_inventory' => true, 'has_variants' => false, 'type' => 'simple'],
+            ['name' => 'FreshMart Organic Rice 5kg', 'sku' => 'DEMO-RICE-005', 'barcode' => '890100000003', 'category' => 'grocery', 'brand' => 'freshmart', 'unit' => 'KG', 'tax' => 'GST 5%', 'selling_price' => 640, 'cost_price' => 430, 'track_inventory' => true, 'has_variants' => false, 'type' => 'simple'],
+            ['name' => 'Crystal Barcode Scanner', 'sku' => 'DEMO-SCAN-001', 'barcode' => '890100000004', 'category' => 'electronics', 'brand' => 'crystal', 'unit' => 'PCS', 'tax' => 'GST 18%', 'selling_price' => 3499, 'cost_price' => 2200, 'track_inventory' => true, 'has_variants' => false, 'type' => 'simple'],
+        ])->mapWithKeys(fn (array $item): array => [
+            $item['sku'] => Product::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'sku' => $item['sku'],
+                ],
+                [
+                    'company_id' => $company->id,
+                    'branch_id' => $branch->id,
+                    'category_id' => $inventoryCategories[$item['category']]->id,
+                    'brand_id' => $brands[$item['brand']]->id,
+                    'unit_id' => $units[$item['unit']]->id,
+                    'tax_rate_id' => $taxRates[$item['tax']]->id,
+                    'type' => $item['type'],
+                    'name' => $item['name'],
+                    'slug' => Str::slug($item['name']),
+                    'barcode' => $item['barcode'],
+                    'hsn_code' => 'DEMO'.substr($item['sku'], -3),
+                    'description' => 'Demo product seeded for Phase 3 inventory workflows.',
+                    'cost_price' => $item['cost_price'],
+                    'selling_price' => $item['selling_price'],
+                    'mrp' => $item['selling_price'] + 300,
+                    'purchase_price' => $item['cost_price'],
+                    'track_inventory' => $item['track_inventory'],
+                    'allow_negative_stock' => false,
+                    'has_variants' => $item['has_variants'],
+                    'is_variant' => false,
+                    'status' => 'active',
+                    'is_active' => true,
+                ],
+            ),
+        ]);
+
+        $variantParent = $products['DEMO-SHOE-001'];
+        collect([
+            ['name' => 'StrideLine Runner Shoe / 8 Black', 'sku' => 'DEMO-SHOE-8-BLK', 'barcode' => '890100000081', 'size' => 'size-8', 'color' => 'color-black'],
+            ['name' => 'StrideLine Runner Shoe / 9 Tan', 'sku' => 'DEMO-SHOE-9-TAN', 'barcode' => '890100000092', 'size' => 'size-9', 'color' => 'color-tan'],
+        ])->each(function (array $variant) use ($company, $branch, $variantParent, $units, $taxRates, $inventoryCategories, $brands, $attributeValues): void {
+            $product = Product::updateOrCreate(
+                ['company_id' => $company->id, 'sku' => $variant['sku']],
+                [
+                    'company_id' => $company->id,
+                    'branch_id' => $branch->id,
+                    'category_id' => $inventoryCategories['footwear']->id,
+                    'brand_id' => $brands['strideline']->id,
+                    'unit_id' => $units['PAIR']->id,
+                    'tax_rate_id' => $taxRates['GST 18%']->id,
+                    'parent_product_id' => $variantParent->id,
+                    'type' => 'variant',
+                    'name' => $variant['name'],
+                    'slug' => Str::slug($variant['name']),
+                    'barcode' => $variant['barcode'],
+                    'selling_price' => 2499,
+                    'cost_price' => 1450,
+                    'track_inventory' => true,
+                    'allow_negative_stock' => false,
+                    'has_variants' => false,
+                    'is_variant' => true,
+                    'variant_name' => str($variant['name'])->after('/ ')->toString(),
+                    'status' => 'active',
+                    'is_active' => true,
+                ],
+            );
+
+            $product->attributeValues()->sync([
+                $attributeValues[$variant['size']]->id => ['attribute_id' => $attributeValues[$variant['size']]->attribute_id],
+                $attributeValues[$variant['color']]->id => ['attribute_id' => $attributeValues[$variant['color']]->attribute_id],
+            ]);
+        });
+
+        $warehouse = Warehouse::updateOrCreate(
+            ['company_id' => $company->id, 'code' => 'DEMO-MAIN'],
+            [
+                'company_id' => $company->id,
+                'branch_id' => $branch->id,
+                'name' => 'Demo Main Warehouse',
+                'type' => 'store',
+                'address_line_1' => 'MG Road Flagship Store',
+                'city' => 'Bengaluru',
+                'state' => 'Karnataka',
+                'country' => 'India',
+                'contact_name' => 'Demo Stock Manager',
+                'phone' => '+91 98765 43212',
+                'is_primary' => true,
+                'is_active' => true,
+            ],
+        );
+
+        $location = StockLocation::updateOrCreate(
+            ['warehouse_id' => $warehouse->id, 'code' => 'A1-R1-B1'],
+            [
+                'company_id' => $company->id,
+                'warehouse_id' => $warehouse->id,
+                'name' => 'Demo Aisle A1 Rack R1 Bin B1',
+                'type' => 'bin',
+                'aisle' => 'A1',
+                'rack' => 'R1',
+                'shelf' => 'S1',
+                'bin' => 'B1',
+                'is_active' => true,
+            ],
+        );
+
+        Product::query()->where('company_id', $company->id)->where('track_inventory', true)->get()->each(function (Product $product, int $index) use ($company, $branch, $warehouse, $location, $admin): void {
+            $quantity = [12, 4, 28, 0, 6, 3][$index % 6];
+            $level = StockLevel::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'warehouse_id' => $warehouse->id,
+                    'stock_location_id' => $location->id,
+                    'product_id' => $product->id,
+                ],
+                [
+                    'branch_id' => $branch->id,
+                    'quantity_on_hand' => $quantity,
+                    'quantity_reserved' => $index % 2,
+                    'quantity_available' => max(0, $quantity - ($index % 2)),
+                    'reorder_point' => 5,
+                    'reorder_quantity' => 12,
+                    'minimum_stock' => 3,
+                    'maximum_stock' => 50,
+                    'safety_stock' => 2,
+                    'supplier_lead_time_days' => 7,
+                    'average_daily_sales' => 1.5,
+                    'last_stock_movement_at' => now()->subDays($index),
+                ],
+            );
+
+            StockMovement::updateOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'warehouse_id' => $warehouse->id,
+                    'stock_location_id' => $location->id,
+                    'product_id' => $product->id,
+                    'movement_type' => 'opening',
+                ],
+                [
+                    'branch_id' => $branch->id,
+                    'direction' => 'initial',
+                    'quantity' => $level->quantity_on_hand,
+                    'quantity_before' => 0,
+                    'quantity_after' => $level->quantity_on_hand,
+                    'unit_cost' => $product->cost_price,
+                    'reason' => 'Seeded opening stock',
+                    'notes' => 'Demo data for Phase 3 inventory foundation.',
+                    'created_by' => $admin->id,
+                    'occurred_at' => now()->subDays($index + 1),
+                ],
+            );
+        });
+
+        $template = BarcodeLabelTemplate::updateOrCreate(
+            ['company_id' => $company->id, 'name' => 'Demo Retail Shelf Label'],
+            [
+                'company_id' => $company->id,
+                'description' => 'Demo label template for Phase 3 barcode preview.',
+                'industry_type' => 'Retail',
+                'paper_size' => 'A4',
+                'label_width_mm' => 50,
+                'label_height_mm' => 25,
+                'columns' => 2,
+                'rows' => 10,
+                'gap_horizontal_mm' => 3,
+                'gap_vertical_mm' => 2,
+                'margin_top_mm' => 8,
+                'margin_right_mm' => 8,
+                'margin_bottom_mm' => 8,
+                'margin_left_mm' => 8,
+                'barcode_type' => 'CODE128',
+                'font_size' => 10,
+                'show_product_name' => true,
+                'show_sku' => true,
+                'show_barcode_text' => true,
+                'show_price' => true,
+                'show_mrp' => false,
+                'show_company_name' => true,
+                'is_default' => true,
+                'is_active' => true,
+            ],
+        );
+
+        $printBatch = BarcodePrintBatch::updateOrCreate(
+            ['company_id' => $company->id, 'batch_number' => 'BC-DEMO-0001'],
+            [
+                'template_id' => $template->id,
+                'title' => 'Demo shelf label batch',
+                'created_by' => $admin->id,
+                'status' => 'draft',
+                'total_labels' => 6,
+            ],
+        );
+
+        $products->values()->take(2)->each(fn (Product $product) => $printBatch->items()->updateOrCreate(
+            ['product_id' => $product->id],
+            [
+                'quantity' => 3,
+                'price_override' => null,
+                'label_data' => ['name' => $product->name, 'sku' => $product->sku, 'barcode' => $product->barcode, 'price' => $product->selling_price],
+            ],
+        ));
+
+        $reorderRule = ReorderRule::updateOrCreate(
+            ['company_id' => $company->id, 'warehouse_id' => $warehouse->id, 'product_id' => $products['DEMO-TEE-001']->id],
+            [
+                'branch_id' => $branch->id,
+                'minimum_stock' => 3,
+                'maximum_stock' => 40,
+                'reorder_point' => 5,
+                'reorder_quantity' => 15,
+                'safety_stock' => 2,
+                'supplier_lead_time_days' => 5,
+                'average_daily_sales' => 2,
+                'seasonal_factor' => 1,
+                'auto_generate_purchase_request' => false,
+                'requires_approval' => true,
+                'is_active' => true,
+            ],
+        );
+
+        ReorderSuggestion::updateOrCreate(
+            ['company_id' => $company->id, 'warehouse_id' => $warehouse->id, 'product_id' => $reorderRule->product_id, 'status' => 'pending'],
+            [
+                'branch_id' => $branch->id,
+                'current_stock' => 4,
+                'available_stock' => 3,
+                'reorder_point' => $reorderRule->reorder_point,
+                'suggested_quantity' => $reorderRule->reorder_quantity,
+                'stockout_risk_level' => 'medium',
+                'estimated_stockout_date' => now()->addDays(2)->toDateString(),
+                'reason' => 'Demo suggestion: available stock is at or below reorder point.',
+            ],
+        );
+
+        $channels = collect([
+            ['name' => 'Flagship Store', 'code' => 'STORE', 'type' => 'store', 'is_online' => false, 'sync_enabled' => false],
+            ['name' => 'RetailPOS Website', 'code' => 'WEB', 'type' => 'website', 'is_online' => true, 'sync_enabled' => false],
+            ['name' => 'Marketplace Placeholder', 'code' => 'MKT', 'type' => 'marketplace', 'is_online' => true, 'sync_enabled' => false],
+        ])->mapWithKeys(fn (array $channel, int $index): array => [
+            $channel['code'] => SalesChannel::updateOrCreate(
+                ['company_id' => $company->id, 'code' => $channel['code']],
+                $channel + [
+                    'company_id' => $company->id,
+                    'description' => 'Demo internal channel. No external integration is connected in Phase 3.',
+                    'is_active' => true,
+                    'price_strategy' => 'selling_price',
+                    'stock_strategy' => 'available_stock',
+                    'sort_order' => $index + 1,
+                ],
+            ),
+        ]);
+
+        $channels->each(function (SalesChannel $channel) use ($company, $warehouse, $products): void {
+            $product = $products->values()->first();
+            $mapping = ChannelProductMapping::updateOrCreate(
+                ['sales_channel_id' => $channel->id, 'product_id' => $product->id],
+                [
+                    'company_id' => $company->id,
+                    'channel_sku' => $channel->code.'-'.$product->sku,
+                    'channel_product_name' => $product->name,
+                    'channel_price' => $product->selling_price,
+                    'channel_mrp' => $product->mrp,
+                    'stock_buffer_quantity' => 1,
+                    'max_listed_quantity' => 10,
+                    'sync_product' => true,
+                    'sync_price' => true,
+                    'sync_stock' => true,
+                    'sync_status' => 'not_synced',
+                ],
+            );
+
+            ChannelStockLevel::updateOrCreate(
+                ['sales_channel_id' => $channel->id, 'product_id' => $mapping->product_id, 'warehouse_id' => $warehouse->id],
+                [
+                    'company_id' => $company->id,
+                    'listed_quantity' => 10,
+                    'reserved_quantity' => 1,
+                    'available_quantity' => 9,
+                    'buffer_quantity' => 1,
+                    'sync_status' => 'not_synced',
+                ],
+            );
+        });
+
+        InventorySyncLog::updateOrCreate(
+            ['company_id' => $company->id, 'sales_channel_id' => $channels['WEB']->id, 'action' => 'demo_inventory_sync'],
+            [
+                'status' => 'warning',
+                'message' => 'Demo channel sync warning. External adapters are intentionally not connected in Phase 3.',
+                'payload_summary' => ['demo' => true, 'products_checked' => 1],
+                'started_at' => now()->subMinutes(20),
+                'completed_at' => now()->subMinutes(19),
+            ],
+        );
+
+        collect([
+            'default_cost_method' => 'weighted_average',
+            'low_stock_notifications' => true,
+            'allow_negative_stock_default' => false,
+            'barcode_price_source' => 'selling_price',
+        ])->each(fn (mixed $value, string $key) => Setting::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'group' => 'inventory',
+                'key' => $key,
+            ],
+            ['value' => ['value' => $value]],
+        ));
+
+        collect([
+            ['event_key' => 'inventory.stock.low', 'channel' => 'database', 'name' => 'Low stock in-app', 'subject' => 'Low stock: {{ product_name }}', 'body' => '{{ product_name }} has reached the configured stock threshold.'],
+            ['event_key' => 'inventory.stock.out', 'channel' => 'database', 'name' => 'Out of stock in-app', 'subject' => 'Out of stock: {{ product_name }}', 'body' => '{{ product_name }} is out of stock.'],
+            ['event_key' => 'inventory.reorder.suggested', 'channel' => 'database', 'name' => 'Reorder suggestion in-app', 'subject' => 'Reorder suggestion generated', 'body' => 'A reorder suggestion was generated for product {{ product_id }}.'],
+            ['event_key' => 'inventory.channel.sync_warning', 'channel' => 'database', 'name' => 'Channel sync warning in-app', 'subject' => 'Inventory channel warning', 'body' => '{{ message }}'],
+        ])->each(fn (array $template) => NotificationTemplate::updateOrCreate(
+            [
+                'company_id' => null,
+                'event_key' => $template['event_key'],
+                'channel' => $template['channel'],
+                'locale' => 'en',
+            ],
+            $template + [
+                'company_id' => null,
+                'locale' => 'en',
+                'is_system' => true,
+                'is_active' => true,
+                'version' => 1,
+            ],
+        ));
 
         collect([
             [

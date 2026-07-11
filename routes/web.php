@@ -18,6 +18,23 @@ use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\DashboardController;
+use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
+use App\Http\Controllers\CommandCenter\Inventory\BarcodePrintBatchController;
+use App\Http\Controllers\CommandCenter\Inventory\ChannelProductMappingController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryBrandController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryCategoryController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryDashboardController;
+use App\Http\Controllers\CommandCenter\Inventory\InventorySettingsController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryTaxRateController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryUnitController;
+use App\Http\Controllers\CommandCenter\Inventory\OpeningStockController;
+use App\Http\Controllers\CommandCenter\Inventory\ProductController;
+use App\Http\Controllers\CommandCenter\Inventory\ReorderSuggestionController;
+use App\Http\Controllers\CommandCenter\Inventory\SalesChannelController;
+use App\Http\Controllers\CommandCenter\Inventory\StockAdjustmentController;
+use App\Http\Controllers\CommandCenter\Inventory\StockLedgerController;
+use App\Http\Controllers\CommandCenter\Inventory\StockLocationController;
+use App\Http\Controllers\CommandCenter\Inventory\WarehouseController;
 use App\Http\Controllers\CommandCenter\ModuleController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
@@ -181,6 +198,67 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('schedule', ScheduleMonitorController::class)->middleware('can:operations.schedule.view')->name('schedule.index');
         Route::get('application', ApplicationInfoController::class)->middleware('can:operations.application.view')->name('application.index');
+    });
+
+    Route::middleware(['role:administrator,manager,sales', 'can:inventory.view'])->prefix('inventory')->name('inventory.')->group(function (): void {
+        Route::get('/', InventoryDashboardController::class)->name('dashboard');
+
+        Route::get('products', [ProductController::class, 'index'])->middleware('can:inventory.products.view')->name('products.index');
+        Route::get('products/create', [ProductController::class, 'create'])->middleware('can:inventory.products.create')->name('products.create');
+        Route::post('products', [ProductController::class, 'store'])->middleware('can:inventory.products.create')->name('products.store');
+        Route::get('products/{product}', [ProductController::class, 'show'])->middleware('can:inventory.products.view')->name('products.show');
+        Route::get('products/{product}/edit', [ProductController::class, 'edit'])->middleware('can:inventory.products.update')->name('products.edit');
+        Route::put('products/{product}', [ProductController::class, 'update'])->middleware('can:inventory.products.update')->name('products.update');
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->middleware('can:inventory.products.delete')->name('products.destroy');
+        Route::post('products/{product}/restore', [ProductController::class, 'restore'])->middleware('can:inventory.products.restore')->name('products.restore');
+
+        Route::resource('categories', InventoryCategoryController::class)->except(['show'])->middleware('can:inventory.categories.manage');
+        Route::post('categories/{category}/restore', [InventoryCategoryController::class, 'restore'])->middleware('can:inventory.categories.manage')->name('categories.restore');
+        Route::resource('brands', InventoryBrandController::class)->except(['show'])->middleware('can:inventory.brands.manage');
+        Route::post('brands/{brand}/restore', [InventoryBrandController::class, 'restore'])->middleware('can:inventory.brands.manage')->name('brands.restore');
+        Route::resource('units', InventoryUnitController::class)->except(['show'])->middleware('can:inventory.units.manage');
+        Route::post('units/{unit}/restore', [InventoryUnitController::class, 'restore'])->middleware('can:inventory.units.manage')->name('units.restore');
+        Route::resource('tax-rates', InventoryTaxRateController::class)->parameters(['tax-rates' => 'tax_rate'])->except(['show'])->middleware('can:inventory.tax.manage');
+        Route::post('tax-rates/{tax_rate}/restore', [InventoryTaxRateController::class, 'restore'])->middleware('can:inventory.tax.manage')->name('tax-rates.restore');
+
+        Route::resource('warehouses', WarehouseController::class)->except(['show'])->middleware('can:inventory.warehouses.manage');
+        Route::post('warehouses/{warehouse}/restore', [WarehouseController::class, 'restore'])->middleware('can:inventory.warehouses.manage')->name('warehouses.restore');
+        Route::resource('locations', StockLocationController::class)->except(['show'])->middleware('can:inventory.warehouses.manage');
+        Route::post('locations/{location}/restore', [StockLocationController::class, 'restore'])->middleware('can:inventory.warehouses.manage')->name('locations.restore');
+
+        Route::get('stock-ledger', StockLedgerController::class)->middleware('can:inventory.stock.view')->name('stock.ledger');
+        Route::get('opening-stock', [OpeningStockController::class, 'create'])->middleware('can:inventory.stock.opening')->name('opening-stock.create');
+        Route::post('opening-stock', [OpeningStockController::class, 'store'])->middleware('can:inventory.stock.opening')->name('opening-stock.store');
+        Route::get('adjustments', [StockAdjustmentController::class, 'index'])->middleware('can:inventory.stock.adjust')->name('adjustments.index');
+        Route::get('adjustments/create', [StockAdjustmentController::class, 'create'])->middleware('can:inventory.stock.adjust')->name('adjustments.create');
+        Route::post('adjustments', [StockAdjustmentController::class, 'store'])->middleware('can:inventory.stock.adjust')->name('adjustments.store');
+        Route::get('adjustments/{adjustment}', [StockAdjustmentController::class, 'show'])->middleware('can:inventory.stock.adjust')->name('adjustments.show');
+        Route::post('adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve'])->middleware('can:inventory.stock.approve_adjustment')->name('adjustments.approve');
+
+        Route::get('barcode-templates', [BarcodeLabelTemplateController::class, 'index'])->middleware('can:inventory.barcode.manage')->name('barcode-templates.index');
+        Route::get('barcode-templates/create', [BarcodeLabelTemplateController::class, 'create'])->middleware('can:inventory.barcode.manage')->name('barcode-templates.create');
+        Route::post('barcode-templates', [BarcodeLabelTemplateController::class, 'store'])->middleware('can:inventory.barcode.manage')->name('barcode-templates.store');
+        Route::get('barcode-templates/{template}/edit', [BarcodeLabelTemplateController::class, 'edit'])->middleware('can:inventory.barcode.manage')->name('barcode-templates.edit');
+        Route::put('barcode-templates/{template}', [BarcodeLabelTemplateController::class, 'update'])->middleware('can:inventory.barcode.manage')->name('barcode-templates.update');
+        Route::post('barcode-templates/{template}/default', [BarcodeLabelTemplateController::class, 'setDefault'])->middleware('can:inventory.barcode.manage')->name('barcode-templates.default');
+        Route::get('barcode-batches', [BarcodePrintBatchController::class, 'index'])->middleware('can:inventory.barcode.print')->name('barcode-batches.index');
+        Route::get('barcode-batches/create', [BarcodePrintBatchController::class, 'create'])->middleware('can:inventory.barcode.print')->name('barcode-batches.create');
+        Route::post('barcode-batches', [BarcodePrintBatchController::class, 'store'])->middleware('can:inventory.barcode.print')->name('barcode-batches.store');
+        Route::get('barcode-batches/{batch}', [BarcodePrintBatchController::class, 'show'])->middleware('can:inventory.barcode.print')->name('barcode-batches.show');
+
+        Route::get('reorder', [ReorderSuggestionController::class, 'index'])->middleware('can:inventory.reorder.view')->name('reorder.index');
+        Route::post('reorder/rules', [ReorderSuggestionController::class, 'storeRule'])->middleware('can:inventory.reorder.manage')->name('reorder.rules.store');
+        Route::post('reorder/rules/{rule}/generate', [ReorderSuggestionController::class, 'generate'])->middleware('can:inventory.reorder.manage')->name('reorder.rules.generate');
+        Route::post('reorder/suggestions/{suggestion}/review', [ReorderSuggestionController::class, 'review'])->middleware('can:inventory.reorder.manage')->name('reorder.suggestions.review');
+        Route::post('reorder/suggestions/{suggestion}/dismiss', [ReorderSuggestionController::class, 'dismiss'])->middleware('can:inventory.reorder.manage')->name('reorder.suggestions.dismiss');
+
+        Route::resource('channels', SalesChannelController::class)->except(['show', 'destroy'])->middleware('can:inventory.channels.manage');
+        Route::post('channels/{channel}/warning', [SalesChannelController::class, 'warning'])->middleware('can:inventory.channels.manage')->name('channels.warning');
+        Route::get('channel-mappings', [ChannelProductMappingController::class, 'index'])->middleware('can:inventory.channels.view')->name('channel-mappings.index');
+        Route::post('channel-mappings', [ChannelProductMappingController::class, 'store'])->middleware('can:inventory.channels.manage')->name('channel-mappings.store');
+
+        Route::get('settings', [InventorySettingsController::class, 'index'])->middleware('can:inventory.settings.manage')->name('settings.index');
+        Route::put('settings', [InventorySettingsController::class, 'update'])->middleware('can:inventory.settings.manage')->name('settings.update');
     });
 
     Route::redirect('settings', 'settings/general')->name('settings.index');

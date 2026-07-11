@@ -90,6 +90,78 @@
         </svg>
         @break
 
+    @case('package')
+    @case('boxes')
+    @case('products')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="m12 3 8 4.25v9.5L12 21l-8-4.25v-9.5L12 3Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 7.5 7.5 4 7.5-4M12 11.5V20M8.2 5.25l7.6 4" />
+        </svg>
+        @break
+
+    @case('folders')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M3.5 6.5h6l2 2h9v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6.5Z" />
+            <path stroke-linecap="round" d="M3.5 10.5h17" />
+        </svg>
+        @break
+
+    @case('tag')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M4 11V5h6l10 10-6 6L4 11Z" />
+            <path stroke-linecap="round" d="M8 8h.01" />
+        </svg>
+        @break
+
+    @case('ruler')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="m4 16 12-12 4 4L8 20l-4-4Z" />
+            <path stroke-linecap="round" d="m8 16-1.5-1.5M11 13l-1.5-1.5M14 10l-1.5-1.5" />
+        </svg>
+        @break
+
+    @case('percent')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linecap="round" d="M19 5 5 19" />
+            <path stroke-linejoin="round" d="M7.5 8.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM16.5 19.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+        </svg>
+        @break
+
+    @case('layers')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="m12 4 8 4-8 4-8-4 8-4Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4 12 8 4 8-4M4 16l8 4 8-4" />
+        </svg>
+        @break
+
+    @case('barcode')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linecap="round" d="M5 5v14M8 5v14M12 5v14M16 5v14M19 5v14" />
+            <path stroke-linecap="round" d="M3 7V4h3M18 4h3v3M3 17v3h3M18 20h3v-3" />
+        </svg>
+        @break
+
+    @case('printer')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2M7 14h10v6H7v-6Z" />
+            <path stroke-linecap="round" d="M17 12h.01" />
+        </svg>
+        @break
+
+    @case('warehouse')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M3 20V8l9-4 9 4v12M6 20v-8h12v8" />
+            <path stroke-linecap="round" d="M8 15h8M8 18h8" />
+        </svg>
+        @break
+
+    @case('map-pin')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" />
+            <path stroke-linejoin="round" d="M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+        </svg>
+        @break
+
     @case('logout')
         <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
             <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4M14 8l4 4-4 4M18 12H9" />

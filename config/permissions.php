@@ -5,6 +5,8 @@ $crmUserRoles = ['administrator', 'manager', 'sales'];
 $notificationManagementRoles = ['administrator', 'manager'];
 $notificationUserRoles = ['administrator', 'manager', 'sales'];
 $operationsManagementRoles = ['administrator', 'manager'];
+$inventoryManagementRoles = ['administrator', 'manager'];
+$inventoryUserRoles = ['administrator', 'manager', 'sales'];
 $administratorRoles = ['administrator'];
 
 return [
@@ -41,5 +43,27 @@ return [
         'operations.schedule.view' => $operationsManagementRoles,
         'operations.application.view' => $operationsManagementRoles,
         'operations.settings.manage' => $administratorRoles,
+        'inventory.view' => $inventoryUserRoles,
+        'inventory.products.view' => $inventoryUserRoles,
+        'inventory.products.create' => $inventoryManagementRoles,
+        'inventory.products.update' => $inventoryManagementRoles,
+        'inventory.products.delete' => $inventoryManagementRoles,
+        'inventory.products.restore' => $inventoryManagementRoles,
+        'inventory.categories.manage' => $inventoryManagementRoles,
+        'inventory.brands.manage' => $inventoryManagementRoles,
+        'inventory.units.manage' => $inventoryManagementRoles,
+        'inventory.tax.manage' => $inventoryManagementRoles,
+        'inventory.warehouses.manage' => $inventoryManagementRoles,
+        'inventory.stock.view' => $inventoryManagementRoles,
+        'inventory.stock.opening' => $inventoryManagementRoles,
+        'inventory.stock.adjust' => $inventoryManagementRoles,
+        'inventory.stock.approve_adjustment' => $inventoryManagementRoles,
+        'inventory.barcode.manage' => $inventoryManagementRoles,
+        'inventory.barcode.print' => $inventoryManagementRoles,
+        'inventory.reorder.view' => $inventoryManagementRoles,
+        'inventory.reorder.manage' => $inventoryManagementRoles,
+        'inventory.channels.view' => $inventoryManagementRoles,
+        'inventory.channels.manage' => $inventoryManagementRoles,
+        'inventory.settings.manage' => $inventoryManagementRoles,
     ],
 ];

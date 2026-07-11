@@ -30,6 +30,10 @@ class RecipientResolver
             'crm.lead.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
             'cms.page.published', 'cms.page.unpublished', 'cms.media.uploaded', 'system.settings.updated' => $this->managers($event->companyId()),
+            'inventory.stock.low',
+            'inventory.stock.out',
+            'inventory.reorder.suggested',
+            'inventory.channel.sync_warning' => $this->managers($event->companyId()),
             default => $this->managers($event->companyId()),
         };
 

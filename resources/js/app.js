@@ -55,6 +55,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.querySelectorAll('[data-copy-text]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const text = button.dataset.copyText;
+
+            if (!text || !navigator.clipboard) {
+                return;
+            }
+
+            await navigator.clipboard.writeText(text);
+            const originalLabel = button.textContent;
+            button.textContent = 'Copied';
+
+            window.setTimeout(() => {
+                button.textContent = originalLabel;
+            }, 1600);
+        });
+    });
+
     document.addEventListener('click', () => closeDropdowns());
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {

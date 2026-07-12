@@ -9,7 +9,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100">
+    <body class="min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100 {{ request()->routeIs('cms.*') ? 'cms-light-workspace' : '' }}">
         @php
             $user = auth()->user();
             $moduleGroups = app(\App\Support\Modules\ModuleRegistry::class)->grouped($user?->role);
@@ -163,7 +163,7 @@
                     </div>
                 </header>
 
-                <main class="px-4 py-6 sm:px-6 lg:px-8">
+                <main class="px-4 py-6 sm:px-6 lg:px-8 {{ request()->routeIs('cms.*') ? 'cms-workspace-main' : '' }}">
                     @if (session('status'))
                         <div class="mb-6 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-100">
                             {{ session('status') }}

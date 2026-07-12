@@ -8,7 +8,7 @@
 
 @section('content')
     @include('command-center.inventory.partials.nav')
-    <form method="POST" action="{{ route('inventory.products.store') }}">
+    <form method="POST" action="{{ route('inventory.products.store') }}" class="inventory-product-workspace">
         @include('command-center.inventory.products._form')
     </form>
 @endsection

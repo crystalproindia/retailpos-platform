@@ -19,11 +19,11 @@
     ];
 @endphp
 
-<div class="cms-tabs overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <nav class="flex min-w-max gap-1.5 pr-3">
+<div class="cms-tabs overflow-x-auto rounded-xl border border-slate-200/90 bg-white/95 p-2 shadow-[0_8px_24px_rgb(15_23_42_/_0.045)]">
+    <nav class="flex min-w-max gap-2 pr-3" aria-label="CMS sections">
         @foreach ($links as $link)
             <a href="{{ route($link['route']) }}"
-                class="whitespace-nowrap rounded-md px-3.5 py-2.5 text-sm font-medium transition {{ request()->routeIs($link['route']) || str(request()->route()->getName())->startsWith(str($link['route'])->beforeLast('.')->toString()) ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}">
+                class="whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition {{ request()->routeIs($link['route']) || str(request()->route()->getName())->startsWith(str($link['route'])->beforeLast('.')->toString()) ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950' }}">
                 {{ $link['label'] }}
             </a>
         @endforeach

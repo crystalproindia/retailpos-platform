@@ -103,8 +103,115 @@
     }
 
     .cms-tabs {
-        scrollbar-width: thin;
-        scrollbar-color: rgb(148 163 184 / 0.65) transparent;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .cms-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .cms-light-workspace {
+        background: #f5f7f6;
+    }
+
+    .cms-light-workspace .cms-workspace-main {
+        min-height: calc(100vh - 4rem);
+        background: linear-gradient(180deg, #f7faf9 0%, #f3f6f5 100%);
+    }
+
+    .cms-light-workspace .form-section,
+    .cms-light-workspace .cms-card {
+        @apply border-slate-200/90 bg-white shadow-[0_8px_24px_rgb(15_23_42_/_0.045)];
+        background-color: white !important;
+    }
+
+    .cms-light-workspace .form-section-title {
+        @apply text-slate-900;
+    }
+
+    .cms-light-workspace .form-section-help {
+        @apply text-slate-600;
+    }
+
+    .cms-light-workspace label {
+        @apply text-slate-700;
+    }
+
+    .cms-light-workspace input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+    .cms-light-workspace select,
+    .cms-light-workspace textarea {
+        background-color: white !important;
+        border-color: rgb(203 213 225) !important;
+        color: rgb(15 23 42) !important;
+    }
+
+    .cms-light-workspace .sticky-form-actions {
+        @apply border-slate-200 bg-white/95 shadow-[0_-8px_28px_rgb(15_23_42_/_0.09)];
+    }
+
+    .cms-light-workspace .cms-panel {
+        @apply rounded-xl border border-slate-200/90 bg-white p-5 shadow-[0_8px_24px_rgb(15_23_42_/_0.045)];
+    }
+
+    .cms-light-workspace .cms-subtle-panel {
+        @apply rounded-xl border border-slate-200/80 bg-slate-50/80 p-4;
+    }
+
+    .cms-light-workspace .cms-section-card {
+        @apply rounded-xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgb(15_23_42_/_0.045)] transition hover:border-teal-200 hover:shadow-[0_12px_30px_rgb(13_148_136_/_0.09)];
+    }
+
+    .cms-light-workspace .cms-kicker {
+        @apply text-xs font-semibold uppercase tracking-[0.14em] text-teal-700;
+    }
+
+    .cms-light-workspace .cms-control-label {
+        @apply block text-sm font-semibold text-slate-800;
+    }
+
+    .cms-light-workspace .cms-control-help {
+        @apply mt-1 text-xs leading-5 text-slate-500;
+    }
+
+    .cms-light-workspace .cms-toggle {
+        @apply inline-flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700;
+    }
+
+    .cms-light-workspace .cms-preview {
+        @apply overflow-hidden rounded-xl border border-slate-200 bg-slate-50;
+    }
+
+    .cms-light-workspace .cms-preview-header {
+        @apply flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500;
+    }
+
+    .cms-light-workspace .cms-chip {
+        @apply inline-flex items-center rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700;
+    }
+
+    .cms-light-workspace .cms-button-primary {
+        @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .cms-light-workspace .cms-button-secondary {
+        @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800;
+    }
+
+    .cms-light-workspace .cms-error {
+        @apply mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800;
+    }
+
+    .inventory-product-workspace .product-form-card {
+        @apply rounded-xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgb(15_23_42_/_0.045)];
+    }
+
+    .inventory-product-workspace .product-form-heading {
+        @apply text-base font-semibold text-slate-900;
+    }
+
+    .inventory-product-workspace .product-form-help {
+        @apply mt-1 text-sm leading-6 text-slate-500;
     }
 }
 

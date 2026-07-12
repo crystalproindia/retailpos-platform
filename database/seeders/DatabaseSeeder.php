@@ -315,8 +315,20 @@ class DatabaseSeeder extends Seeder
                 [
                     'name' => $section['name'],
                     'heading' => $section['name'],
-                    'subheading' => 'Managed content for '.$section['name'],
-                    'content' => 'Editable website content managed from the RetailPOS CMS.',
+                    'subheading' => match ($key) {
+                        'hero' => 'Bring sales, inventory, customers, and branches into one confident retail workflow.',
+                        'features' => 'Practical tools for teams that need clarity without the clutter.',
+                        'modules' => 'Explore the connected capabilities available across the RetailPOS platform.',
+                        'industries' => 'Built for retailers who want dependable operations as they grow.',
+                        default => 'Demo content for the RetailPOS website builder. Review and approve before publishing.',
+                    },
+                    'content' => match ($key) {
+                        'hero' => 'Demo website content: RetailPOS gives business owners a calmer way to see what is selling, what needs attention, and what comes next.',
+                        'features' => 'Demo website content: organise day-to-day retail work with clear controls, useful reporting, and a team-friendly command center.',
+                        'modules' => 'Demo website content: choose the RetailPOS capabilities that support your current operation and grow into the rest when ready.',
+                        'industries' => 'Demo website content: adapt the platform story for fashion, grocery, lifestyle, specialty, and multi-store retail teams.',
+                        default => 'Demo website content for this homepage section. Replace with approved customer-facing copy before publication.',
+                    },
                     'is_enabled' => true,
                     'sort_order' => $section['sort_order'],
                 ],
@@ -428,9 +440,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         collect([
-            ['name' => 'Demo Apparel Group', 'industry' => 'Retail', 'location' => 'Bengaluru', 'short_description' => 'Demo-only client logo placeholder; not a real approved endorsement.', 'display_style' => 'color', 'is_featured' => true, 'show_on_homepage' => true, 'show_on_case_studies' => true, 'is_active' => true, 'sort_order' => 1],
-            ['name' => 'Demo Grocery Collective', 'industry' => 'Grocery', 'location' => 'Mumbai', 'short_description' => 'Demo-only client logo placeholder; not a real approved endorsement.', 'display_style' => 'monochrome', 'is_featured' => false, 'show_on_homepage' => true, 'show_on_case_studies' => false, 'is_active' => true, 'sort_order' => 2],
-            ['name' => 'Demo Lifestyle Stores', 'industry' => 'Lifestyle', 'location' => 'Delhi', 'short_description' => 'Demo-only client logo placeholder; not a real approved endorsement.', 'display_style' => 'color', 'is_featured' => false, 'show_on_homepage' => true, 'show_on_case_studies' => false, 'is_active' => true, 'sort_order' => 3],
+            ['name' => 'Demo Apparel Group', 'industry' => 'Retail', 'location' => 'Bengaluru', 'short_description' => 'Demo client record for the logo wall. Not a real client endorsement.', 'display_style' => 'color', 'is_featured' => true, 'show_on_homepage' => true, 'show_on_case_studies' => true, 'is_active' => true, 'sort_order' => 1],
+            ['name' => 'Demo Grocery Collective', 'industry' => 'Grocery', 'location' => 'Mumbai', 'short_description' => 'Demo client record for the logo wall. Not a real client endorsement.', 'display_style' => 'monochrome', 'is_featured' => false, 'show_on_homepage' => true, 'show_on_case_studies' => false, 'is_active' => true, 'sort_order' => 2],
+            ['name' => 'Demo Lifestyle Stores', 'industry' => 'Lifestyle', 'location' => 'Delhi', 'short_description' => 'Demo client record for the logo wall. Not a real client endorsement.', 'display_style' => 'color', 'is_featured' => false, 'show_on_homepage' => true, 'show_on_case_studies' => false, 'is_active' => true, 'sort_order' => 3],
         ])->each(fn (array $logo) => CmsClientLogo::updateOrCreate(['company_id' => $company->id, 'name' => $logo['name']], $logo + ['company_id' => $company->id]));
 
         $caseStudy = CmsCaseStudy::updateOrCreate(
@@ -440,7 +452,7 @@ class DatabaseSeeder extends Seeder
                 'short_summary' => 'Illustrative demo content showing a multi-store implementation story.', 'challenge' => 'Demo scenario: disconnected stock and sales visibility.',
                 'solution' => 'Demo scenario: centralised retail operations and branch reporting.', 'key_features' => 'Inventory, branch controls, reporting, and customer workflows.',
                 'results' => 'Illustrative results only. Replace with approved client outcomes before publication.', 'metrics' => ['stores' => '12', 'visibility' => 'Centralised'],
-                'testimonial_quote' => 'Demo testimonial content. Replace with approved client language.', 'related_product' => 'RetailPOS Platform', 'related_module' => 'Inventory', 'related_industry' => 'Retail',
+                'testimonial_quote' => 'Demo quote only: replace with approved client language before publishing.', 'related_product' => 'RetailPOS Platform', 'related_module' => 'Inventory', 'related_industry' => 'Retail',
                 'cta_text' => 'Discuss your rollout', 'cta_link' => '/contact', 'status' => 'published', 'is_featured' => true, 'sort_order' => 1,
                 'seo_title' => 'Demo Multi-Store Retail Rollout | RetailPOS', 'seo_description' => 'Illustrative RetailPOS case study content for CMS demonstration.', 'published_at' => now(),
             ],
@@ -453,8 +465,8 @@ class DatabaseSeeder extends Seeder
         ])->each(fn (array $section) => CmsCaseStudySection::updateOrCreate(['case_study_id' => $caseStudy->id, 'section_type' => $section['section_type']], $section + ['company_id' => $company->id, 'case_study_id' => $caseStudy->id]));
 
         collect([
-            ['client_name' => 'Demo Retail Operations Lead', 'company_name' => 'Demo Retail Group', 'designation' => 'Operations Lead', 'testimonial_text' => 'Demo testimonial content for CMS presentation only. Replace with approved client copy before publication.', 'rating' => 5, 'industry' => 'Retail', 'is_featured' => true, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 1],
-            ['client_name' => 'Demo Store Director', 'company_name' => 'Demo Lifestyle Stores', 'designation' => 'Store Director', 'testimonial_text' => 'Demo testimonial content for CMS presentation only. Replace with approved client copy before publication.', 'rating' => 5, 'industry' => 'Lifestyle', 'is_featured' => false, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 2],
+            ['client_name' => 'Demo Retail Operations Lead', 'company_name' => 'Demo Retail Group', 'designation' => 'Operations Lead', 'testimonial_text' => 'Demo quote: RetailPOS gives our team a clearer daily view of the work that matters. Replace this with approved customer copy before publication.', 'rating' => 5, 'industry' => 'Retail', 'is_featured' => true, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 1],
+            ['client_name' => 'Demo Store Director', 'company_name' => 'Demo Lifestyle Stores', 'designation' => 'Store Director', 'testimonial_text' => 'Demo quote: we can review branch activity with more confidence and less manual follow-up. Replace this with approved customer copy before publication.', 'rating' => 5, 'industry' => 'Lifestyle', 'is_featured' => false, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 2],
         ])->each(fn (array $testimonial) => CmsTestimonial::updateOrCreate(['company_id' => $company->id, 'client_name' => $testimonial['client_name']], $testimonial + ['company_id' => $company->id, 'case_study_id' => $caseStudy->id]));
 
         collect([
@@ -466,18 +478,18 @@ class DatabaseSeeder extends Seeder
 
         CmsCtaBlock::updateOrCreate(
             ['company_id' => $company->id, 'title' => 'Ready to simplify retail operations?'],
-            ['description' => 'Demo CTA block managed through the RetailPOS CMS.', 'button_text' => 'Book a demo', 'button_link' => '/contact', 'secondary_button_text' => 'Explore products', 'secondary_button_link' => '/products', 'location' => 'final_cta', 'style' => 'primary', 'is_active' => true, 'sort_order' => 1],
+            ['description' => 'Demo CTA: invite prospective customers to explore a calmer way to run retail operations.', 'button_text' => 'Book a demo', 'button_link' => '/contact', 'secondary_button_text' => 'Explore products', 'secondary_button_link' => '/products', 'location' => 'final_cta', 'style' => 'primary', 'is_active' => true, 'sort_order' => 1],
         );
 
         collect([
-            ['question' => 'Which retail teams can use RetailPOS?', 'answer' => 'This is demo FAQ content managed through the CMS.', 'category' => 'General', 'page_location' => 'homepage', 'sort_order' => 1, 'is_active' => true],
-            ['question' => 'Can website pages be managed without code?', 'answer' => 'This is demo FAQ content managed through the CMS.', 'category' => 'CMS', 'page_location' => 'homepage', 'sort_order' => 2, 'is_active' => true],
+            ['question' => 'Which retail teams can use RetailPOS?', 'answer' => 'Demo answer: RetailPOS is designed for business owners and teams that need a more connected view of daily retail operations. Replace with approved public copy before publishing.', 'category' => 'General', 'page_location' => 'homepage', 'sort_order' => 1, 'is_active' => true],
+            ['question' => 'Can website pages be managed without code?', 'answer' => 'Demo answer: administrators can manage structured website content through the CMS workspace. Replace with approved public copy before publishing.', 'category' => 'CMS', 'page_location' => 'homepage', 'sort_order' => 2, 'is_active' => true],
         ])->each(fn (array $faq) => CmsFaq::updateOrCreate(['company_id' => $company->id, 'question' => $faq['question']], $faq + ['company_id' => $company->id]));
 
         collect([
-            ['slug' => 'products', 'title' => 'RetailPOS Products', 'page_type' => 'product', 'subtitle' => 'Connected retail operations', 'body_content' => 'Demo product page content managed through the CMS.', 'cta_label' => 'Book a demo', 'cta_url' => '/contact', 'sort_order' => 1],
-            ['slug' => 'retail-solutions', 'title' => 'Retail Solutions', 'page_type' => 'solution', 'subtitle' => 'Solutions for growing teams', 'body_content' => 'Demo solution page content managed through the CMS.', 'cta_label' => 'Explore solutions', 'cta_url' => '/products', 'sort_order' => 2],
-            ['slug' => 'retail-industry', 'title' => 'Retail Industry', 'page_type' => 'industry', 'subtitle' => 'Built for modern retail', 'body_content' => 'Demo industry page content managed through the CMS.', 'cta_label' => 'Talk to our team', 'cta_url' => '/contact', 'sort_order' => 3],
+            ['slug' => 'products', 'title' => 'RetailPOS Products', 'page_type' => 'product', 'subtitle' => 'Connected retail operations', 'body_content' => 'Demo page copy: explore the operational tools that help retail teams work with clearer information and steadier routines.', 'cta_label' => 'Book a demo', 'cta_url' => '/contact', 'sort_order' => 1],
+            ['slug' => 'retail-solutions', 'title' => 'Retail Solutions', 'page_type' => 'solution', 'subtitle' => 'Solutions for growing teams', 'body_content' => 'Demo page copy: connect the workflows that matter now, then extend your platform as your retail operation grows.', 'cta_label' => 'Explore solutions', 'cta_url' => '/products', 'sort_order' => 2],
+            ['slug' => 'retail-industry', 'title' => 'Retail Industry', 'page_type' => 'industry', 'subtitle' => 'Built for modern retail', 'body_content' => 'Demo page copy: adapt the RetailPOS story for the retail teams, categories, and locations you serve.', 'cta_label' => 'Talk to our team', 'cta_url' => '/contact', 'sort_order' => 3],
         ])->each(function (array $pageData) use ($company, $admin): void {
             $page = CmsPage::updateOrCreate(
                 ['company_id' => $company->id, 'slug' => $pageData['slug']],

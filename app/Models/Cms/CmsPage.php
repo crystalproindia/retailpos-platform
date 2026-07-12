@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'author_user_id', 'featured_image_id', 'slug', 'title', 'subtitle', 'hero_content', 'body_content', 'status', 'published_at', 'scheduled_for'])]
+#[Fillable(['company_id', 'author_user_id', 'featured_image_id', 'slug', 'title', 'page_type', 'subtitle', 'hero_content', 'body_content', 'cta_label', 'cta_url', 'status', 'is_active', 'sort_order', 'published_at', 'scheduled_for'])]
 class CmsPage extends Model
 {
     use Auditable, SoftDeletes;
@@ -28,6 +28,7 @@ class CmsPage extends Model
         return [
             'published_at' => 'datetime',
             'scheduled_for' => 'datetime',
+            'is_active' => 'boolean',
         ];
     }
 

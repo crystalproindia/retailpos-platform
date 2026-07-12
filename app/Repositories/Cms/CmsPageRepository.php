@@ -22,6 +22,7 @@ class CmsPageRepository
                 });
             })
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['page_type'] ?? null, fn ($query, string $type) => $query->where('page_type', $type))
             ->when(($filters['trashed'] ?? null) === 'with', fn ($query) => $query->withTrashed())
             ->latest()
             ->paginate(10)

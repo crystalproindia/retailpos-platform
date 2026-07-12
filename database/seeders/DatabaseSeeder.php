@@ -9,9 +9,18 @@ use App\Enums\Crm\PreferredContactMethod;
 use App\Enums\UserRole;
 use App\Models\Branch;
 use App\Models\Cms\CmsFooterProfile;
+use App\Models\Cms\CmsFaq;
 use App\Models\Cms\CmsHomepageSection;
+use App\Models\Cms\CmsCaseStudy;
+use App\Models\Cms\CmsCaseStudySection;
+use App\Models\Cms\CmsClientLogo;
+use App\Models\Cms\CmsCtaBlock;
 use App\Models\Cms\CmsMenu;
 use App\Models\Cms\CmsMenuItem;
+use App\Models\Cms\CmsPage;
+use App\Models\Cms\CmsTestimonial;
+use App\Models\Cms\CmsThemeSetting;
+use App\Models\Cms\CmsTrustMetric;
 use App\Models\Cms\CmsSeoSetting;
 use App\Models\Cms\CmsSetting;
 use App\Models\Company;
@@ -383,6 +392,99 @@ class DatabaseSeeder extends Seeder
                 'is_enabled' => true,
             ],
         ));
+
+        collect([
+            'brand_name' => 'RetailPOS',
+            'brand_tagline' => 'Enterprise retail operations, connected.',
+            'primary_brand_color' => '#0f766e',
+            'secondary_brand_color' => '#1e293b',
+            'accent_brand_color' => '#f59e0b',
+            'button_style' => 'rounded',
+            'default_cta_text' => 'Book a demo',
+            'default_cta_link' => '/contact',
+        ])->each(function (string $value, string $key) use ($company): void {
+            $definition = config("cms.branding_settings.{$key}");
+            CmsSetting::updateOrCreate(
+                ['company_id' => $company->id, 'key' => $key],
+                ['label' => $definition['label'], 'value' => $value, 'value_type' => $definition['type']],
+            );
+        });
+
+        CmsThemeSetting::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'primary_color' => '#0f766e', 'secondary_color' => '#1e293b', 'accent_color' => '#f59e0b',
+                'background_color' => '#ffffff', 'text_color' => '#0f172a', 'button_color' => '#0f766e',
+                'button_radius_style' => 'rounded', 'card_radius_style' => 'soft', 'website_theme_mode' => 'clean_light',
+                'header_style' => 'standard', 'footer_style' => 'structured', 'cta_button_style' => 'solid',
+            ],
+        );
+
+        CmsFooterProfile::where('company_id', $company->id)->update([
+            'india_contact' => 'Bengaluru, India | +91 98765 43210',
+            'singapore_contact' => 'Singapore | Regional business contact',
+            'malaysia_contact' => 'Malaysia | Regional business contact',
+            'bahrain_contact' => 'Bahrain | Regional business contact',
+        ]);
+
+        collect([
+            ['name' => 'Demo Apparel Group', 'industry' => 'Retail', 'location' => 'Bengaluru', 'short_description' => 'Demo-only client logo placeholder; not a real approved endorsement.', 'display_style' => 'color', 'is_featured' => true, 'show_on_homepage' => true, 'show_on_case_studies' => true, 'is_active' => true, 'sort_order' => 1],
+            ['name' => 'Demo Grocery Collective', 'industry' => 'Grocery', 'location' => 'Mumbai', 'short_description' => 'Demo-only client logo placeholder; not a real approved endorsement.', 'display_style' => 'monochrome', 'is_featured' => false, 'show_on_homepage' => true, 'show_on_case_studies' => false, 'is_active' => true, 'sort_order' => 2],
+            ['name' => 'Demo Lifestyle Stores', 'industry' => 'Lifestyle', 'location' => 'Delhi', 'short_description' => 'Demo-only client logo placeholder; not a real approved endorsement.', 'display_style' => 'color', 'is_featured' => false, 'show_on_homepage' => true, 'show_on_case_studies' => false, 'is_active' => true, 'sort_order' => 3],
+        ])->each(fn (array $logo) => CmsClientLogo::updateOrCreate(['company_id' => $company->id, 'name' => $logo['name']], $logo + ['company_id' => $company->id]));
+
+        $caseStudy = CmsCaseStudy::updateOrCreate(
+            ['company_id' => $company->id, 'slug' => 'demo-multi-store-retail-rollout'],
+            [
+                'title' => 'Demo Multi-Store Retail Rollout', 'client_name' => 'Demo Retail Group', 'industry' => 'Retail', 'location' => 'India', 'project_type' => 'Retail operations rollout',
+                'short_summary' => 'Illustrative demo content showing a multi-store implementation story.', 'challenge' => 'Demo scenario: disconnected stock and sales visibility.',
+                'solution' => 'Demo scenario: centralised retail operations and branch reporting.', 'key_features' => 'Inventory, branch controls, reporting, and customer workflows.',
+                'results' => 'Illustrative results only. Replace with approved client outcomes before publication.', 'metrics' => ['stores' => '12', 'visibility' => 'Centralised'],
+                'testimonial_quote' => 'Demo testimonial content. Replace with approved client language.', 'related_product' => 'RetailPOS Platform', 'related_module' => 'Inventory', 'related_industry' => 'Retail',
+                'cta_text' => 'Discuss your rollout', 'cta_link' => '/contact', 'status' => 'published', 'is_featured' => true, 'sort_order' => 1,
+                'seo_title' => 'Demo Multi-Store Retail Rollout | RetailPOS', 'seo_description' => 'Illustrative RetailPOS case study content for CMS demonstration.', 'published_at' => now(),
+            ],
+        );
+
+        collect([
+            ['section_type' => 'challenge', 'title' => 'The challenge', 'content' => 'Illustrative challenge content for the CMS demo.', 'sort_order' => 1, 'is_active' => true],
+            ['section_type' => 'solution', 'title' => 'The solution', 'content' => 'Illustrative solution content for the CMS demo.', 'sort_order' => 2, 'is_active' => true],
+            ['section_type' => 'results', 'title' => 'The outcome', 'content' => 'Illustrative outcome content for the CMS demo.', 'sort_order' => 3, 'is_active' => true],
+        ])->each(fn (array $section) => CmsCaseStudySection::updateOrCreate(['case_study_id' => $caseStudy->id, 'section_type' => $section['section_type']], $section + ['company_id' => $company->id, 'case_study_id' => $caseStudy->id]));
+
+        collect([
+            ['client_name' => 'Demo Retail Operations Lead', 'company_name' => 'Demo Retail Group', 'designation' => 'Operations Lead', 'testimonial_text' => 'Demo testimonial content for CMS presentation only. Replace with approved client copy before publication.', 'rating' => 5, 'industry' => 'Retail', 'is_featured' => true, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 1],
+            ['client_name' => 'Demo Store Director', 'company_name' => 'Demo Lifestyle Stores', 'designation' => 'Store Director', 'testimonial_text' => 'Demo testimonial content for CMS presentation only. Replace with approved client copy before publication.', 'rating' => 5, 'industry' => 'Lifestyle', 'is_featured' => false, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 2],
+        ])->each(fn (array $testimonial) => CmsTestimonial::updateOrCreate(['company_id' => $company->id, 'client_name' => $testimonial['client_name']], $testimonial + ['company_id' => $company->id, 'case_study_id' => $caseStudy->id]));
+
+        collect([
+            ['label' => 'Businesses Served', 'value' => '500+', 'description' => 'Demo metric for the CMS manager.', 'icon' => 'users', 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 1],
+            ['label' => 'Years Experience', 'value' => '15+', 'description' => 'Demo metric for the CMS manager.', 'icon' => 'calendar', 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 2],
+            ['label' => 'Successful Software Projects', 'value' => '100+', 'description' => 'Demo metric for the CMS manager.', 'icon' => 'analytics', 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 3],
+            ['label' => 'Support', 'value' => '24/7', 'description' => 'Demo metric for the CMS manager.', 'icon' => 'support', 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 4],
+        ])->each(fn (array $metric) => CmsTrustMetric::updateOrCreate(['company_id' => $company->id, 'label' => $metric['label']], $metric + ['company_id' => $company->id]));
+
+        CmsCtaBlock::updateOrCreate(
+            ['company_id' => $company->id, 'title' => 'Ready to simplify retail operations?'],
+            ['description' => 'Demo CTA block managed through the RetailPOS CMS.', 'button_text' => 'Book a demo', 'button_link' => '/contact', 'secondary_button_text' => 'Explore products', 'secondary_button_link' => '/products', 'location' => 'final_cta', 'style' => 'primary', 'is_active' => true, 'sort_order' => 1],
+        );
+
+        collect([
+            ['question' => 'Which retail teams can use RetailPOS?', 'answer' => 'This is demo FAQ content managed through the CMS.', 'category' => 'General', 'page_location' => 'homepage', 'sort_order' => 1, 'is_active' => true],
+            ['question' => 'Can website pages be managed without code?', 'answer' => 'This is demo FAQ content managed through the CMS.', 'category' => 'CMS', 'page_location' => 'homepage', 'sort_order' => 2, 'is_active' => true],
+        ])->each(fn (array $faq) => CmsFaq::updateOrCreate(['company_id' => $company->id, 'question' => $faq['question']], $faq + ['company_id' => $company->id]));
+
+        collect([
+            ['slug' => 'products', 'title' => 'RetailPOS Products', 'page_type' => 'product', 'subtitle' => 'Connected retail operations', 'body_content' => 'Demo product page content managed through the CMS.', 'cta_label' => 'Book a demo', 'cta_url' => '/contact', 'sort_order' => 1],
+            ['slug' => 'retail-solutions', 'title' => 'Retail Solutions', 'page_type' => 'solution', 'subtitle' => 'Solutions for growing teams', 'body_content' => 'Demo solution page content managed through the CMS.', 'cta_label' => 'Explore solutions', 'cta_url' => '/products', 'sort_order' => 2],
+            ['slug' => 'retail-industry', 'title' => 'Retail Industry', 'page_type' => 'industry', 'subtitle' => 'Built for modern retail', 'body_content' => 'Demo industry page content managed through the CMS.', 'cta_label' => 'Talk to our team', 'cta_url' => '/contact', 'sort_order' => 3],
+        ])->each(function (array $pageData) use ($company, $admin): void {
+            $page = CmsPage::updateOrCreate(
+                ['company_id' => $company->id, 'slug' => $pageData['slug']],
+                $pageData + ['company_id' => $company->id, 'author_user_id' => $admin->id, 'status' => CmsPage::STATUS_PUBLISHED, 'is_active' => true, 'published_at' => now()],
+            );
+            $page->seo()->updateOrCreate([], ['meta_title' => $page->title.' | RetailPOS', 'meta_description' => 'Demo SEO content managed from the RetailPOS CMS.', 'canonical_url' => '/'.$page->slug, 'og_type' => 'website', 'twitter_card' => 'summary_large_image']);
+        });
 
         $sources = collect([
             ['name' => 'Website Demo', 'description' => 'Inbound website demo request.', 'tone' => 'success', 'sort_order' => 1],

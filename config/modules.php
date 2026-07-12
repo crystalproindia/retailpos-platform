@@ -926,7 +926,7 @@ return [
         ],
         'cms' => [
             'name' => 'CMS',
-            'description' => 'Enterprise website content management foundation.',
+            'description' => 'Enterprise website builder, content library, SEO, and brand management.',
             'icon' => 'layout',
             'route' => 'cms.dashboard',
             'route_params' => [],
@@ -935,9 +935,27 @@ return [
             'enabled' => true,
             'visible_in_sidebar' => true,
             'roles' => $managementRoles,
-            'badge' => null,
+            'badge' => ['label' => 'Pro', 'tone' => 'info'],
             'license_key' => null,
             'parent_id' => null,
+        ],
+        'cms-control-center' => [
+            'name' => 'Website Control Center', 'description' => 'CMS readiness, content health, and publishing overview.', 'icon' => 'dashboard', 'route' => 'cms.dashboard', 'route_params' => [], 'sort_order' => 521, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-branding' => [
+            'name' => 'Branding', 'description' => 'Brand identity, logos, colours, and default calls to action.', 'icon' => 'layout', 'route' => 'cms.branding.index', 'route_params' => [], 'sort_order' => 522, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-theme' => [
+            'name' => 'Theme', 'description' => 'Website theme tokens and visual presentation settings.', 'icon' => 'settings', 'route' => 'cms.theme.index', 'route_params' => [], 'sort_order' => 523, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-pages' => [
+            'name' => 'Website Pages', 'description' => 'Marketing, product, solution, industry, and landing pages.', 'icon' => 'cms', 'route' => 'cms.pages.index', 'route_params' => [], 'sort_order' => 524, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-content-library' => [
+            'name' => 'Content Library', 'description' => 'Case studies, testimonials, client logos, trust metrics, FAQs, and CTAs.', 'icon' => 'blog', 'route' => 'cms.case-studies.index', 'route_params' => [], 'sort_order' => 525, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-seo-center' => [
+            'name' => 'SEO Center', 'description' => 'Website SEO defaults, redirects, sitemap, robots, and verification settings.', 'icon' => 'seo', 'route' => 'cms.seo.index', 'route_params' => [], 'sort_order' => 526, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
         ],
         'blog' => [
             'name' => 'Blog',

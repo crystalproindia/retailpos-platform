@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['company_id', 'media_id', 'key', 'name', 'heading', 'subheading', 'content', 'cta_label', 'cta_url', 'is_enabled', 'sort_order'])]
+#[Fillable(['company_id', 'media_id', 'key', 'name', 'eyebrow', 'heading', 'subheading', 'content', 'cta_label', 'cta_url', 'background_style', 'layout_style', 'is_enabled', 'sort_order'])]
 class CmsHomepageSection extends Model
 {
     use Auditable;

@@ -2473,3 +2473,89 @@ They use the existing `DomainEventDispatcher`, notification resolver, renderer, 
 - External marketplace, WhatsApp, SMS, push, AI, n8n, and analytics BI APIs are not connected.
 - V1 rule forms provide a clean single-action foundation with one target per target dimension; the normalized action and target tables support richer future builders without changing cart evaluation contracts.
 - Future POS and order services should call `PromotionRuleEngine`, then record selected rules with `PromotionUsageService` and coupon redemption with `PromotionCouponService` only after a successful order transaction.
+
+## Phase 4.6 - Website Builder CMS Pro, Content Library & Admin UX Upgrade
+
+Phase 4.6 extends the Phase 1.6 CMS without coupling it to the public website. It provides a company-scoped Website Control Center, brand and theme management, reusable website content records, and an additive design system for the Laravel Command Center. It does not create public-site routes, a Next.js synchronisation layer, a blog, a POS flow, or external integrations.
+
+### Module Registry, Roles, and Permissions
+
+`config/modules.php` retains `cms` as the Content Management parent and marks it as `Pro`. It now exposes registry children for Website Control Center, Branding, Theme, Website Pages, Content Library, and SEO Center. No controller builds sidebar entries manually; the existing Module Registry remains the source of navigation metadata.
+
+Administrator and Manager can access CMS Pro. Staff is denied through the existing role middleware and `cms.view` capability. CMS capabilities are registered in `config/permissions.php`:
+
+- `cms.view` and `cms.website_builder.view`
+- `cms.branding.manage`, `cms.theme.manage`, `cms.header.manage`, `cms.footer.manage`
+- `cms.pages.manage`, `cms.homepage.manage`, `cms.media.manage`, `cms.seo.manage`, `cms.redirects.manage`
+- `cms.client_logos.manage`, `cms.case_studies.manage`, `cms.testimonials.manage`, `cms.trust_metrics.manage`, `cms.faq.manage`, `cms.cta.manage`, and `cms.settings.manage`
+
+### Folder Structure
+
+CMS Pro code is additive:
+
+- `app/Events/Domain/Cms/CmsProDomainEvent.php`
+- `app/Http/Controllers/CommandCenter/Cms` for the Website Control Center, branding, theme, header, footer, and content library controllers
+- `app/Http/Requests/Cms` for validated CMS Pro form requests
+- `app/Models/Cms` for CMS Pro tenant-scoped records
+- `app/Repositories/Cms` for tenant-filtered query boundaries
+- `app/Services/Cms` for lifecycle, audit, and event orchestration
+- `resources/views/command-center/cms` for responsive Blade/Tailwind administration screens
+- `resources/views/components` for reusable form sections, status badges, and sticky form actions
+- `tests/Feature/CmsProFoundationTest.php`
+
+### Database Design
+
+Migration `2026_07_12_070001_create_cms_pro_content_library_tables.php` extends existing CMS tables with page type/CTA/activity/order metadata, homepage visual metadata, menu badge/description metadata, and regional footer contact fields. It creates:
+
+- `cms_client_logos`
+- `cms_case_studies`
+- `cms_case_study_sections`
+- `cms_testimonials`
+- `cms_trust_metrics`
+- `cms_cta_blocks`
+- `cms_theme_settings`
+- `cms_faqs`
+
+All new operational tables have `company_id`, use company-scoped repository queries, and carry soft deletes where recovery is an administrator workflow. Media references use the existing `cms_media` table. Structured arrays are limited to case-study metrics, gallery IDs, section settings, and extensible theme settings; primary queryable content remains normalized.
+
+### Website Builder and Content Library
+
+The Website Control Center presents content counts, readiness indicators, SEO warnings, and recently changed pages. Its managers are:
+
+- Branding: brand name, tagline, logo slots, colour tokens, favicon/Open Graph media slots, and default CTA.
+- Theme: primary/secondary/accent/background/text/button colours, theme mode, button/card radius, and header/footer/CTA styles.
+- Header: logo slot, sticky setting, menu selection, login/demo/WhatsApp CTA foundations.
+- Footer: company contacts, business hours, map link, legal text, social/footer/legal menu links, and India, Singapore, Malaysia, and Bahrain contact blocks.
+- Homepage: independently editable hero, features, benefits, modules, industries, solutions, pricing CTA, testimonials, partners, statistics, FAQ, final/footer CTAs, trust metrics, client logos, product showcase, AI features, mobile app, screenshots, and case studies sections.
+- Pages: standard, product, solution, industry, marketing, and landing-page foundations with page SEO, CTA, draft/scheduled/published lifecycle, revisions, filtering, pagination, bulk actions, soft delete, and restore.
+- Content Library: client logos, case studies with ordered sections, testimonials, trust metrics, FAQs, and reusable CTA blocks.
+- SEO Center and Media: existing SEO, redirects, robots, sitemap, verification, and media capabilities are retained and surfaced in the upgraded CMS navigation.
+
+### Service and Repository Boundaries
+
+Controllers coordinate requests, tenant identity, redirects, and views only. Repositories own company-scoped loading and pagination. Services own state changes, audit logging, transactions for case study/section writes, and domain-event dispatch. `CmsWebsiteControlService` composes the read model for the dashboard. This keeps the CMS consumable by a future public-site adapter or API without binding public rendering to admin controllers.
+
+### Events, Notifications, and Audit
+
+The existing domain-event pipeline and audit logger are used for CMS Pro. `config/events.php` registers:
+
+- `cms.branding.updated`, `cms.theme.updated`, and `cms.seo.updated`
+- `cms.client_logo.created` and `cms.client_logo.updated`
+- `cms.case_study.created`, `cms.case_study.published`, and `cms.case_study.unpublished`
+- `cms.testimonial.created`, `cms.trust_metric.updated`, and `cms.cta.updated`
+
+CMS services also audit create, update, delete, restore, publish, unpublish, settings, header, footer, SEO, and content-library actions. The Notification Center recognises CMS Pro events and routes management notices to the existing administrator/manager audience.
+
+### Demo Data and Tests
+
+`DatabaseSeeder` idempotently creates clearly labelled demo branding/theme settings, regional footer contacts, client logo placeholders, an illustrative case study and sections, demo testimonials, a CTA, FAQs, product/solution/industry pages, and homepage-ready trust metrics: `500+ Businesses Served`, `15+ Years Experience`, `100+ Successful Software Projects`, and `24/7 Support`.
+
+`CmsProFoundationTest` verifies Manager access, Staff denial, branding/theme/footer updates, domain events, client-logo tenant isolation plus soft delete/restore, case-study publish/unpublish lifecycle, content-library creation, and demo seed content. `CmsFoundationTest` remains the compatibility contract for the original CMS.
+
+### Current Limitations and Future Extensions
+
+- Public-site rendering, Next.js synchronisation, public API resources, and cache invalidation adapters are intentionally deferred.
+- Media usage reporting is a foundation only; future public rendering should register a cross-content usage resolver before exposing destructive media cleanup.
+- Page builder sections are structured CMS records, not a freeform drag-and-drop canvas. The normalized content contracts leave room for a future block/page-layout service.
+- No blog, news, knowledge base, documentation, careers, dynamic forms, external CDNs, image optimisation service, email, WhatsApp, SMS, analytics API, n8n, or AI content integration is included.
+- Case studies and testimonials are seeded only as transparently labelled demo content. Production publication requires approved customer copy and media.

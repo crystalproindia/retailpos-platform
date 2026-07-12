@@ -9,7 +9,7 @@ use App\Services\AuditLogger;
 
 class CmsSeoService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(private readonly AuditLogger $auditLogger, private readonly CmsProEventService $events) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -19,6 +19,7 @@ class CmsSeoService
         $settings->update($data);
 
         $this->auditLogger->record('cms.seo.updated', $settings, 'CMS SEO settings updated');
+        $this->events->dispatch('cms.seo.updated', $user, $settings);
 
         return $settings;
     }

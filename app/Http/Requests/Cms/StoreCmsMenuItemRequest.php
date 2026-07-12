@@ -22,6 +22,8 @@ class StoreCmsMenuItemRequest extends FormRequest
             'parent_id' => ['nullable', 'integer', 'exists:cms_menu_items,id'],
             'route_name' => ['nullable', 'string', 'max:255'],
             'icon' => ['nullable', 'string', 'max:100'],
+            'badge_text' => ['nullable', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
             'opens_new_tab' => ['required', 'boolean'],
             'is_enabled' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:1000'],

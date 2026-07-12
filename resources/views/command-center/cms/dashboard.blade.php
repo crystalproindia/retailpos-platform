@@ -1,65 +1,20 @@
 @extends('layouts.admin')
 
-@section('title', 'CMS')
-@section('page-title', 'CMS')
-
-@section('breadcrumbs')
-    <span>/</span>
-    <span>CMS</span>
-@endsection
+@section('title', 'Website Control Center')
+@section('page-title', 'Website Control Center')
+@section('breadcrumbs')<span>/</span><span>CMS</span>@endsection
 
 @section('content')
-    <div class="space-y-6">
-        @include('command-center.cms.partials.nav')
-
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-                <div>
-                    <p class="text-sm font-medium text-teal-700 dark:text-teal-300">Enterprise CMS</p>
-                    <h1 class="mt-2 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white">Website Control Center</h1>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">Manage RetailPOS.biz content, SEO, media, menus, homepage sections, and global website settings without touching application code.</p>
-                </div>
-                <a href="{{ route('cms.pages.create') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">
-                    New page
-                </a>
-            </div>
-        </section>
-
-        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Pages</p>
-                <p class="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{{ $pageCount }}</p>
-            </article>
-            <article class="rounded-lg border border-teal-200 bg-teal-50 p-5 shadow-sm dark:border-teal-800 dark:bg-teal-950">
-                <p class="text-sm font-medium text-teal-700 dark:text-teal-200">Published</p>
-                <p class="mt-3 text-3xl font-semibold text-teal-950 dark:text-teal-50">{{ $publishedPageCount }}</p>
-            </article>
-            <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Media Files</p>
-                <p class="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{{ $mediaCount }}</p>
-            </article>
-            <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Menus</p>
-                <p class="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{{ $menuCount }}</p>
-            </article>
-        </section>
-
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between gap-4">
-                <div>
-                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">Homepage Builder</h2>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Every primary homepage section is managed as content.</p>
-                </div>
-                <a href="{{ route('cms.homepage.index') }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Manage</a>
-            </div>
-            <div class="mt-5 grid gap-3 md:grid-cols-3">
-                @foreach ($homepageSections->take(6) as $section)
-                    <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-                        <p class="font-medium text-slate-950 dark:text-white">{{ $section->name }}</p>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $section->is_enabled ? 'Enabled' : 'Disabled' }}</p>
-                    </div>
-                @endforeach
-            </div>
-        </section>
+<div class="space-y-6">
+    @include('command-center.cms.partials.nav')
+    <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="border-b border-slate-100 bg-slate-50/80 px-6 py-6 dark:border-slate-800 dark:bg-slate-900"><div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p class="text-sm font-semibold text-teal-700 dark:text-teal-300">CMS Pro</p><h1 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Website Control Center</h1><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">Run the complete RetailPOS website content library, brand system, discovery metadata, and reusable conversion blocks from one calm workspace.</p></div><div class="flex flex-wrap gap-2"><a href="{{ route('cms.pages.create') }}" class="rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">New page</a><a href="{{ route('cms.case-studies.create') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">New case study</a></div></div></div>
+        <div class="grid gap-px bg-slate-100 sm:grid-cols-2 xl:grid-cols-4 dark:bg-slate-800">@foreach(['Total pages' => $dashboard['counts']['pages'], 'Published' => $dashboard['counts']['published_pages'], 'Drafts' => $dashboard['counts']['draft_pages'], 'Scheduled' => $dashboard['counts']['scheduled_pages'], 'Client logos' => $dashboard['counts']['client_logos'], 'Case studies' => $dashboard['counts']['case_studies'], 'Testimonials' => $dashboard['counts']['testimonials'], 'Media files' => $dashboard['counts']['media']] as $label => $value)<article class="bg-white p-5 dark:bg-slate-900"><p class="text-sm text-slate-500 dark:text-slate-400">{{ $label }}</p><p class="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{{ $value }}</p></article>@endforeach</div>
+    </section>
+    <div class="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <x-form-section title="Website Readiness" help="Live database signals, not a generic checklist."><div class="space-y-3">@foreach($dashboard['readiness'] as $item)<div class="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-sm dark:bg-slate-800"><span class="font-medium text-slate-800 dark:text-slate-100">{{ $item['label'] }}</span><span class="rounded-full px-2 py-1 text-xs font-semibold {{ $item['ready'] ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200' }}">{{ $item['ready'] ? 'Ready' : 'Needs attention' }}</span></div>@endforeach</div><div class="mt-5 grid gap-3 sm:grid-cols-3"><a href="{{ route('cms.branding.index') }}" class="rounded-lg border border-slate-200 p-4 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-700 dark:border-slate-700 dark:text-slate-200">Branding</a><a href="{{ route('cms.homepage.index') }}" class="rounded-lg border border-slate-200 p-4 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-700 dark:border-slate-700 dark:text-slate-200">Homepage</a><a href="{{ route('cms.seo.index') }}" class="rounded-lg border border-slate-200 p-4 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-700 dark:border-slate-700 dark:text-slate-200">SEO Center</a></div></x-form-section>
+        <x-form-section title="SEO Health" help="Metadata gaps are ready for content review."><dl class="space-y-4"><div class="flex justify-between"><dt class="text-sm text-slate-500">Missing meta titles</dt><dd class="font-semibold text-slate-950 dark:text-white">{{ $dashboard['warnings']['missing_titles'] }}</dd></div><div class="flex justify-between"><dt class="text-sm text-slate-500">Missing descriptions</dt><dd class="font-semibold text-slate-950 dark:text-white">{{ $dashboard['warnings']['missing_descriptions'] }}</dd></div><div class="flex justify-between"><dt class="text-sm text-slate-500">Missing OG images</dt><dd class="font-semibold text-slate-950 dark:text-white">{{ $dashboard['warnings']['missing_og_images'] }}</dd></div><div class="flex justify-between"><dt class="text-sm text-slate-500">Redirects</dt><dd class="font-semibold text-slate-950 dark:text-white">{{ $dashboard['counts']['redirects'] }}</dd></div></dl></x-form-section>
     </div>
+    <x-form-section title="Recent Page Updates" help="The latest edits in this company workspace."><div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">@forelse($dashboard['recentPages'] as $page)<a href="{{ route('cms.pages.edit',$page) }}" class="rounded-lg border border-slate-200 p-4 transition hover:border-teal-300 hover:shadow-sm dark:border-slate-700"><p class="font-semibold text-slate-950 dark:text-white">{{ $page->title }}</p><div class="mt-3 flex items-center justify-between"><x-status-badge :status="$page->status"/><span class="text-xs text-slate-500">{{ $page->updated_at->diffForHumans() }}</span></div></a>@empty<p class="text-sm text-slate-500">No website pages have been created yet.</p>@endforelse</div></x-form-section>
+</div>
 @endsection

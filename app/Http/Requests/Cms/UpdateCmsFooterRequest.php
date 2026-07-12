@@ -18,7 +18,12 @@ class UpdateCmsFooterRequest extends FormRequest
     {
         return [
             'company_name' => ['nullable', 'string', 'max:255'],
+            'footer_logo_media_id' => ['nullable', 'integer', 'exists:cms_media,id'],
             'address' => ['nullable', 'string'],
+            'india_contact' => ['nullable', 'string'],
+            'singapore_contact' => ['nullable', 'string'],
+            'malaysia_contact' => ['nullable', 'string'],
+            'bahrain_contact' => ['nullable', 'string'],
             'phone' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'whatsapp' => ['nullable', 'string', 'max:255'],

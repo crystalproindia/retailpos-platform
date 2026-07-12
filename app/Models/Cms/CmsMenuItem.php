@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['menu_id', 'parent_id', 'label', 'url', 'route_name', 'icon', 'opens_new_tab', 'is_enabled', 'sort_order'])]
+#[Fillable(['menu_id', 'parent_id', 'label', 'url', 'route_name', 'icon', 'badge_text', 'description', 'opens_new_tab', 'is_enabled', 'sort_order'])]
 class CmsMenuItem extends Model
 {
     use Auditable, SoftDeletes;

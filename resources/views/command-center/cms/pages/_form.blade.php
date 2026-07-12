@@ -51,8 +51,24 @@
                     </select>
                 </div>
                 <div>
+                    <label for="page_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Page Type</label>
+                    <select id="page_type" name="page_type" class="mt-2 block w-full">
+                        @foreach (['standard' => 'Standard', 'landing' => 'Landing Page', 'product' => 'Product Page', 'module' => 'Module Page', 'industry' => 'Industry Page', 'solution' => 'Solution Page', 'legal' => 'Legal Page'] as $value => $label)
+                            <option value="{{ $value }}" @selected(old('page_type', $page->page_type ?? 'standard') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label for="scheduled_for" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Scheduled For</label>
                     <input id="scheduled_for" type="datetime-local" name="scheduled_for" value="{{ old('scheduled_for', $page->scheduled_for?->format('Y-m-d\TH:i')) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none focus:border-slate-950 focus:ring-4 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-slate-800">
+                </div>
+                <div>
+                    <label for="cta_label" class="block text-sm font-medium text-slate-700 dark:text-slate-300">CTA Text</label>
+                    <input id="cta_label" name="cta_label" value="{{ old('cta_label', $page->cta_label) }}" class="mt-2 block w-full">
+                </div>
+                <div>
+                    <label for="cta_url" class="block text-sm font-medium text-slate-700 dark:text-slate-300">CTA Link</label>
+                    <input id="cta_url" name="cta_url" value="{{ old('cta_url', $page->cta_url) }}" class="mt-2 block w-full">
                 </div>
                 <div>
                     <label for="featured_image_id" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Featured Image ID</label>

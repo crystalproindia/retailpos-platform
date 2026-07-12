@@ -14,14 +14,14 @@
     <div class="space-y-6">
         @include('command-center.cms.partials.nav')
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h1 class="text-xl font-semibold text-slate-950 dark:text-white">Homepage Builder</h1>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">Manage every homepage section independently. The public site can consume these records without hardcoded homepage text.</p>
         </section>
 
         <div class="grid gap-5 xl:grid-cols-2">
             @foreach ($sections as $section)
-                <form method="POST" action="{{ route('cms.homepage.update', $section->key) }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <form method="POST" action="{{ route('cms.homepage.update', $section->key) }}" class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     @csrf
                     @method('PUT')
                     <div class="flex items-start justify-between gap-4">
@@ -37,12 +37,17 @@
                     </div>
 
                     <div class="mt-5 space-y-4">
+                        <input name="eyebrow" value="{{ old('eyebrow', $section->eyebrow) }}" placeholder="Eyebrow text" class="block w-full">
                         <input name="heading" value="{{ old('heading', $section->heading) }}" placeholder="Heading" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                         <input name="subheading" value="{{ old('subheading', $section->subheading) }}" placeholder="Subheading" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                         <textarea name="content" rows="4" placeholder="Content" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">{{ old('content', $section->content) }}</textarea>
                         <div class="grid gap-4 md:grid-cols-2">
                             <input name="cta_label" value="{{ old('cta_label', $section->cta_label) }}" placeholder="CTA label" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                             <input name="cta_url" value="{{ old('cta_url', $section->cta_url) }}" placeholder="CTA URL" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <input name="background_style" value="{{ old('background_style', $section->background_style) }}" placeholder="Background style foundation" class="block w-full">
+                            <input name="layout_style" value="{{ old('layout_style', $section->layout_style) }}" placeholder="Layout style foundation" class="block w-full">
                         </div>
                         <div class="grid gap-4 md:grid-cols-2">
                             <input type="number" name="media_id" value="{{ old('media_id', $section->media_id) }}" placeholder="Media ID" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">

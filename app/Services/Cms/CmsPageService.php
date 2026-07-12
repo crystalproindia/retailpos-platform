@@ -131,6 +131,11 @@ class CmsPageService
             'subtitle',
             'hero_content',
             'body_content',
+            'page_type',
+            'cta_label',
+            'cta_url',
+            'is_active',
+            'sort_order',
             'status',
             'scheduled_for',
         ]);

@@ -4,6 +4,16 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CommandCenter\Cms\CmsDashboardController;
+use App\Http\Controllers\CommandCenter\Cms\CmsBrandingController;
+use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
+use App\Http\Controllers\CommandCenter\Cms\CmsHeaderController;
+use App\Http\Controllers\CommandCenter\Cms\CmsFooterBuilderController;
+use App\Http\Controllers\CommandCenter\Cms\CmsClientLogoController;
+use App\Http\Controllers\CommandCenter\Cms\CmsCaseStudyController;
+use App\Http\Controllers\CommandCenter\Cms\CmsTestimonialController;
+use App\Http\Controllers\CommandCenter\Cms\CmsTrustMetricController;
+use App\Http\Controllers\CommandCenter\Cms\CmsFaqController;
+use App\Http\Controllers\CommandCenter\Cms\CmsCtaController;
 use App\Http\Controllers\CommandCenter\Cms\CmsHomepageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsMediaController;
 use App\Http\Controllers\CommandCenter\Cms\CmsMenuController;
@@ -134,10 +144,19 @@ Route::middleware('auth')->group(function (): void {
         Route::get('follow-ups', FollowUpController::class)->middleware('can:crm.activities.manage')->name('followups.index');
     });
 
-    Route::middleware('role:administrator,manager')->prefix('cms')->name('cms.')->group(function (): void {
-        Route::get('/', CmsDashboardController::class)->name('dashboard');
+    Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {
+        Route::get('/', CmsDashboardController::class)->middleware('can:cms.website_builder.view')->name('dashboard');
 
-        Route::get('pages', [CmsPageController::class, 'index'])->name('pages.index');
+        Route::get('branding', [CmsBrandingController::class, 'index'])->middleware('can:cms.branding.manage')->name('branding.index');
+        Route::put('branding', [CmsBrandingController::class, 'update'])->middleware('can:cms.branding.manage')->name('branding.update');
+        Route::get('theme', [CmsThemeController::class, 'index'])->middleware('can:cms.theme.manage')->name('theme.index');
+        Route::put('theme', [CmsThemeController::class, 'update'])->middleware('can:cms.theme.manage')->name('theme.update');
+        Route::get('header', [CmsHeaderController::class, 'index'])->middleware('can:cms.header.manage')->name('header.index');
+        Route::put('header', [CmsHeaderController::class, 'update'])->middleware('can:cms.header.manage')->name('header.update');
+        Route::get('footer', [CmsFooterBuilderController::class, 'index'])->middleware('can:cms.footer.manage')->name('footer.index');
+        Route::put('footer', [CmsFooterBuilderController::class, 'update'])->middleware('can:cms.footer.manage')->name('footer.update');
+
+        Route::get('pages', [CmsPageController::class, 'index'])->middleware('can:cms.pages.manage')->name('pages.index');
         Route::get('pages/create', [CmsPageController::class, 'create'])->name('pages.create');
         Route::post('pages', [CmsPageController::class, 'store'])->name('pages.store');
         Route::post('pages/bulk', [CmsPageController::class, 'bulk'])->name('pages.bulk');
@@ -148,8 +167,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('pages/{page}/publish', [CmsPageController::class, 'publish'])->name('pages.publish');
         Route::post('pages/{page}/unpublish', [CmsPageController::class, 'unpublish'])->name('pages.unpublish');
 
-        Route::get('homepage', [CmsHomepageController::class, 'index'])->name('homepage.index');
-        Route::put('homepage/{section}', [CmsHomepageController::class, 'update'])->name('homepage.update');
+        Route::get('homepage', [CmsHomepageController::class, 'index'])->middleware('can:cms.homepage.manage')->name('homepage.index');
+        Route::put('homepage/{section}', [CmsHomepageController::class, 'update'])->middleware('can:cms.homepage.manage')->name('homepage.update');
 
         Route::get('menus', [CmsMenuController::class, 'index'])->name('menus.index');
         Route::post('menus', [CmsMenuController::class, 'store'])->name('menus.store');
@@ -158,7 +177,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('menus/{menu}/restore', [CmsMenuController::class, 'restore'])->name('menus.restore');
         Route::post('menus/{menu}/items', [CmsMenuController::class, 'storeItem'])->name('menus.items.store');
 
-        Route::get('media', [CmsMediaController::class, 'index'])->name('media.index');
+        Route::get('media', [CmsMediaController::class, 'index'])->middleware('can:cms.media.manage')->name('media.index');
         Route::post('media', [CmsMediaController::class, 'store'])->name('media.store');
         Route::post('media/folders', [CmsMediaController::class, 'storeFolder'])->name('media.folders.store');
         Route::delete('media/{media}', [CmsMediaController::class, 'destroy'])->name('media.destroy');
@@ -167,9 +186,49 @@ Route::middleware('auth')->group(function (): void {
         Route::put('settings', [CmsAdminSettingsController::class, 'update'])->name('settings.update');
         Route::put('settings/footer', [CmsAdminSettingsController::class, 'updateFooter'])->name('settings.footer.update');
 
-        Route::get('seo', [CmsSeoController::class, 'index'])->name('seo.index');
+        Route::get('seo', [CmsSeoController::class, 'index'])->middleware('can:cms.seo.manage')->name('seo.index');
         Route::put('seo', [CmsSeoController::class, 'update'])->name('seo.update');
         Route::post('seo/redirects', [CmsSeoController::class, 'storeRedirect'])->name('seo.redirects.store');
+
+        Route::get('client-logos', [CmsClientLogoController::class, 'index'])->middleware('can:cms.client_logos.manage')->name('client-logos.index');
+        Route::post('client-logos', [CmsClientLogoController::class, 'store'])->middleware('can:cms.client_logos.manage')->name('client-logos.store');
+        Route::put('client-logos/{logo}', [CmsClientLogoController::class, 'update'])->middleware('can:cms.client_logos.manage')->name('client-logos.update');
+        Route::delete('client-logos/{logo}', [CmsClientLogoController::class, 'destroy'])->middleware('can:cms.client_logos.manage')->name('client-logos.destroy');
+        Route::post('client-logos/{logo}/restore', [CmsClientLogoController::class, 'restore'])->middleware('can:cms.client_logos.manage')->name('client-logos.restore');
+
+        Route::get('case-studies', [CmsCaseStudyController::class, 'index'])->middleware('can:cms.case_studies.manage')->name('case-studies.index');
+        Route::get('case-studies/create', [CmsCaseStudyController::class, 'create'])->middleware('can:cms.case_studies.manage')->name('case-studies.create');
+        Route::post('case-studies', [CmsCaseStudyController::class, 'store'])->middleware('can:cms.case_studies.manage')->name('case-studies.store');
+        Route::get('case-studies/{caseStudy}/edit', [CmsCaseStudyController::class, 'edit'])->middleware('can:cms.case_studies.manage')->name('case-studies.edit');
+        Route::put('case-studies/{caseStudy}', [CmsCaseStudyController::class, 'update'])->middleware('can:cms.case_studies.manage')->name('case-studies.update');
+        Route::post('case-studies/{caseStudy}/publish', [CmsCaseStudyController::class, 'publish'])->middleware('can:cms.case_studies.manage')->name('case-studies.publish');
+        Route::post('case-studies/{caseStudy}/unpublish', [CmsCaseStudyController::class, 'unpublish'])->middleware('can:cms.case_studies.manage')->name('case-studies.unpublish');
+        Route::delete('case-studies/{caseStudy}', [CmsCaseStudyController::class, 'destroy'])->middleware('can:cms.case_studies.manage')->name('case-studies.destroy');
+        Route::post('case-studies/{caseStudy}/restore', [CmsCaseStudyController::class, 'restore'])->middleware('can:cms.case_studies.manage')->name('case-studies.restore');
+
+        Route::get('testimonials', [CmsTestimonialController::class, 'index'])->middleware('can:cms.testimonials.manage')->name('testimonials.index');
+        Route::post('testimonials', [CmsTestimonialController::class, 'store'])->middleware('can:cms.testimonials.manage')->name('testimonials.store');
+        Route::put('testimonials/{testimonial}', [CmsTestimonialController::class, 'update'])->middleware('can:cms.testimonials.manage')->name('testimonials.update');
+        Route::delete('testimonials/{testimonial}', [CmsTestimonialController::class, 'destroy'])->middleware('can:cms.testimonials.manage')->name('testimonials.destroy');
+        Route::post('testimonials/{testimonial}/restore', [CmsTestimonialController::class, 'restore'])->middleware('can:cms.testimonials.manage')->name('testimonials.restore');
+
+        Route::get('trust-metrics', [CmsTrustMetricController::class, 'index'])->middleware('can:cms.trust_metrics.manage')->name('trust-metrics.index');
+        Route::post('trust-metrics', [CmsTrustMetricController::class, 'store'])->middleware('can:cms.trust_metrics.manage')->name('trust-metrics.store');
+        Route::put('trust-metrics/{metric}', [CmsTrustMetricController::class, 'update'])->middleware('can:cms.trust_metrics.manage')->name('trust-metrics.update');
+        Route::delete('trust-metrics/{metric}', [CmsTrustMetricController::class, 'destroy'])->middleware('can:cms.trust_metrics.manage')->name('trust-metrics.destroy');
+        Route::post('trust-metrics/{metric}/restore', [CmsTrustMetricController::class, 'restore'])->middleware('can:cms.trust_metrics.manage')->name('trust-metrics.restore');
+
+        Route::get('faqs', [CmsFaqController::class, 'index'])->middleware('can:cms.faq.manage')->name('faqs.index');
+        Route::post('faqs', [CmsFaqController::class, 'store'])->middleware('can:cms.faq.manage')->name('faqs.store');
+        Route::put('faqs/{faq}', [CmsFaqController::class, 'update'])->middleware('can:cms.faq.manage')->name('faqs.update');
+        Route::delete('faqs/{faq}', [CmsFaqController::class, 'destroy'])->middleware('can:cms.faq.manage')->name('faqs.destroy');
+        Route::post('faqs/{faq}/restore', [CmsFaqController::class, 'restore'])->middleware('can:cms.faq.manage')->name('faqs.restore');
+
+        Route::get('ctas', [CmsCtaController::class, 'index'])->middleware('can:cms.cta.manage')->name('ctas.index');
+        Route::post('ctas', [CmsCtaController::class, 'store'])->middleware('can:cms.cta.manage')->name('ctas.store');
+        Route::put('ctas/{cta}', [CmsCtaController::class, 'update'])->middleware('can:cms.cta.manage')->name('ctas.update');
+        Route::delete('ctas/{cta}', [CmsCtaController::class, 'destroy'])->middleware('can:cms.cta.manage')->name('ctas.destroy');
+        Route::post('ctas/{cta}/restore', [CmsCtaController::class, 'restore'])->middleware('can:cms.cta.manage')->name('ctas.restore');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:notifications.view'])->prefix('notifications')->name('notifications.')->group(function (): void {

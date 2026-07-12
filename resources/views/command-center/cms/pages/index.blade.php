@@ -31,6 +31,12 @@
                         <option value="{{ $status }}" @selected(request('status') === $status)>{{ str($status)->headline() }}</option>
                     @endforeach
                 </select>
+                <select name="page_type" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    <option value="">All page types</option>
+                    @foreach ($pageTypes as $type)
+                        <option value="{{ $type }}" @selected(request('page_type') === $type)>{{ str($type)->headline() }}</option>
+                    @endforeach
+                </select>
                 <select name="trashed" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     <option value="">Active only</option>
                     <option value="with" @selected(request('trashed') === 'with')>Include trash</option>

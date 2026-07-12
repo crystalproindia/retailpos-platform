@@ -17,8 +17,9 @@ class CmsPageController extends Controller
     public function index(Request $request, CmsPageRepository $pageRepository): View
     {
         return view('command-center.cms.pages.index', [
-            'pages' => $pageRepository->paginateForCompany($request->user()->company_id, $request->only(['search', 'status', 'trashed'])),
+            'pages' => $pageRepository->paginateForCompany($request->user()->company_id, $request->only(['search', 'status', 'page_type', 'trashed'])),
             'statuses' => [CmsPage::STATUS_DRAFT, CmsPage::STATUS_PUBLISHED, CmsPage::STATUS_SCHEDULED],
+            'pageTypes' => ['standard', 'landing', 'product', 'module', 'industry', 'solution', 'legal'],
         ]);
     }
 

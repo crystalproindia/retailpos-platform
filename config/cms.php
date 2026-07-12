@@ -15,6 +15,13 @@ return [
         'faq' => ['name' => 'FAQ', 'sort_order' => 110],
         'final_cta' => ['name' => 'Final CTA', 'sort_order' => 120],
         'footer_cta' => ['name' => 'Footer CTA', 'sort_order' => 130],
+        'trust_metrics' => ['name' => 'Trust Metrics', 'sort_order' => 135],
+        'client_logos' => ['name' => 'Client Logo Wall', 'sort_order' => 140],
+        'product_showcase' => ['name' => 'Product Showcase', 'sort_order' => 145],
+        'ai_features' => ['name' => 'AI Features', 'sort_order' => 150],
+        'mobile_app' => ['name' => 'Mobile App', 'sort_order' => 155],
+        'screenshots' => ['name' => 'Screenshots and Mockups', 'sort_order' => 160],
+        'case_studies' => ['name' => 'Case Studies', 'sort_order' => 165],
     ],
 
     'settings' => [
@@ -38,6 +45,35 @@ return [
         'footer' => 'Footer Menu',
         'mega' => 'Mega Menu',
         'legal' => 'Legal Links',
+        'mobile' => 'Mobile Menu',
+    ],
+
+    'branding_settings' => [
+        'brand_name' => ['label' => 'Brand Name', 'type' => 'text'],
+        'brand_tagline' => ['label' => 'Brand Tagline', 'type' => 'text'],
+        'primary_logo' => ['label' => 'Primary Logo', 'type' => 'media'],
+        'light_logo' => ['label' => 'Light Logo', 'type' => 'media'],
+        'dark_logo' => ['label' => 'Dark Logo', 'type' => 'media'],
+        'icon_logo' => ['label' => 'Icon Logo', 'type' => 'media'],
+        'favicon' => ['label' => 'Favicon', 'type' => 'media'],
+        'apple_touch_icon' => ['label' => 'Apple Touch Icon', 'type' => 'media'],
+        'default_og_image' => ['label' => 'Default Open Graph Image', 'type' => 'media'],
+        'primary_brand_color' => ['label' => 'Primary Brand Color', 'type' => 'text'],
+        'secondary_brand_color' => ['label' => 'Secondary Brand Color', 'type' => 'text'],
+        'accent_brand_color' => ['label' => 'Accent Brand Color', 'type' => 'text'],
+        'button_style' => ['label' => 'Button Style', 'type' => 'text'],
+        'default_cta_text' => ['label' => 'Default CTA Text', 'type' => 'text'],
+        'default_cta_link' => ['label' => 'Default CTA Link', 'type' => 'url'],
+    ],
+
+    'header_settings' => [
+        'header_logo' => ['label' => 'Header Logo', 'type' => 'media'],
+        'header_sticky' => ['label' => 'Sticky Header', 'type' => 'boolean'],
+        'header_cta_text' => ['label' => 'Header CTA Text', 'type' => 'text'],
+        'header_cta_link' => ['label' => 'Header CTA Link', 'type' => 'url'],
+        'header_login_label' => ['label' => 'Login Button Label', 'type' => 'text'],
+        'header_demo_label' => ['label' => 'Demo Button Label', 'type' => 'text'],
+        'header_whatsapp_cta' => ['label' => 'WhatsApp CTA Foundation', 'type' => 'text'],
     ],
 
     'media_types' => [

@@ -29,7 +29,7 @@ class RecipientResolver
             'crm.follow_up.due', 'crm.follow_up.overdue' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
             'crm.lead.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
-            'cms.page.published', 'cms.page.unpublished', 'cms.media.uploaded', 'system.settings.updated' => $this->managers($event->companyId()),
+            'cms.page.published', 'cms.page.unpublished', 'cms.media.uploaded', 'cms.branding.updated', 'cms.theme.updated', 'cms.client_logo.created', 'cms.client_logo.updated', 'cms.case_study.created', 'cms.case_study.published', 'cms.case_study.unpublished', 'cms.testimonial.created', 'cms.trust_metric.updated', 'cms.cta.updated', 'cms.seo.updated', 'system.settings.updated' => $this->managers($event->companyId()),
             'inventory.stock.low',
             'inventory.stock.out',
             'inventory.reorder.suggested',

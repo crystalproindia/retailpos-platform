@@ -1,0 +1,4 @@
+@extends('layouts.admin')
+@section('title','Edit Case Study') @section('page-title','Edit Case Study')
+@section('breadcrumbs')<span>/</span><a href="{{ route('cms.dashboard') }}">CMS</a><span>/</span><a href="{{ route('cms.case-studies.index') }}">Case Studies</a><span>/</span><span>{{ $study->title }}</span>@endsection
+@section('content')<div class="space-y-6">@include('command-center.cms.partials.nav')<form method="POST" action="{{ route('cms.case-studies.update',$study) }}">@csrf @method('PUT') @include('command-center.cms.case-studies.form')<x-sticky-form-actions><a href="{{ route('cms.case-studies.index') }}" class="rounded-lg px-4 py-2 text-sm font-semibold">Cancel</a><button class="rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white">Save case study</button></x-sticky-form-actions></form></div>@endsection

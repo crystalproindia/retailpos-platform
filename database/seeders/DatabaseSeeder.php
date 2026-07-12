@@ -46,6 +46,17 @@ use App\Models\Inventory\Warehouse;
 use App\Models\NotificationDelivery;
 use App\Models\NotificationPreference;
 use App\Models\NotificationTemplate;
+use App\Models\Purchases\GoodsReceipt;
+use App\Models\Purchases\PurchaseApprovalLog;
+use App\Models\Purchases\PurchaseOrder;
+use App\Models\Purchases\PurchaseRequest;
+use App\Models\Purchases\PurchaseReturn;
+use App\Models\Purchases\PurchaseSettings;
+use App\Models\Purchases\Supplier;
+use App\Models\Purchases\SupplierAddress;
+use App\Models\Purchases\SupplierContact;
+use App\Models\Purchases\SupplierProduct;
+use App\Models\Purchases\SupplierScoreSnapshot;
 use App\Models\QueueJobSnapshot;
 use App\Models\Setting;
 use App\Models\SystemHealthCheck;
@@ -974,6 +985,343 @@ class DatabaseSeeder extends Seeder
                 'reason' => 'Demo suggestion: available stock is at or below reorder point.',
             ],
         );
+
+        PurchaseSettings::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'po_prefix' => 'PO',
+                'pr_prefix' => 'PR',
+                'grn_prefix' => 'GRN',
+                'return_prefix' => 'PRN',
+                'next_po_number' => 25,
+                'next_pr_number' => 18,
+                'next_grn_number' => 12,
+                'next_return_number' => 6,
+                'require_po_approval' => true,
+                'require_purchase_request_approval' => true,
+                'require_return_approval' => true,
+                'default_payment_terms' => 'Net 15',
+                'allow_receive_without_po' => false,
+                'auto_create_pr_from_reorder' => false,
+            ],
+        );
+
+        $suppliers = collect([
+            ['code' => 'SUP-STRIDE', 'name' => 'StrideLine Wholesale', 'supplier_type' => 'wholesaler', 'email' => 'supply@strideline.test', 'phone' => '+91 90000 31001', 'lead_time_days' => 5, 'manual_rating' => 86],
+            ['code' => 'SUP-URBAN', 'name' => 'Urban Threads Distribution', 'supplier_type' => 'distributor', 'email' => 'orders@urbanthreads.test', 'phone' => '+91 90000 31002', 'lead_time_days' => 4, 'manual_rating' => 82],
+            ['code' => 'SUP-FRESH', 'name' => 'FreshMart Staples Supply', 'supplier_type' => 'manufacturer', 'email' => 'procurement@freshmart.test', 'phone' => '+91 90000 31003', 'lead_time_days' => 3, 'manual_rating' => 78],
+        ])->mapWithKeys(fn (array $supplier): array => [
+            $supplier['code'] => Supplier::updateOrCreate(
+                ['company_id' => $company->id, 'code' => $supplier['code']],
+                $supplier + [
+                    'company_id' => $company->id,
+                    'display_name' => $supplier['name'],
+                    'gstin' => '29DEMO'.substr($supplier['code'], -3).'1Z5',
+                    'payment_terms' => 'Net 15',
+                    'credit_limit' => 250000,
+                    'default_currency' => 'INR',
+                    'service_notes' => 'Demo supplier service profile for Phase 4 scoring.',
+                    'notes' => 'Seeded supplier for purchase foundation.',
+                    'is_active' => true,
+                ],
+            ),
+        ]);
+
+        $suppliers->each(function (Supplier $supplier): void {
+            SupplierContact::updateOrCreate(
+                ['company_id' => $supplier->company_id, 'supplier_id' => $supplier->id, 'email' => 'primary.'.$supplier->code.'@supplier-demo.test'],
+                [
+                    'name' => 'Primary Contact',
+                    'designation' => 'Account Manager',
+                    'phone' => $supplier->phone,
+                    'whatsapp' => $supplier->phone,
+                    'is_primary' => true,
+                    'is_active' => true,
+                ],
+            );
+
+            SupplierAddress::updateOrCreate(
+                ['company_id' => $supplier->company_id, 'supplier_id' => $supplier->id, 'type' => 'office'],
+                [
+                    'address_line_1' => 'Demo Supplier Office',
+                    'city' => 'Bengaluru',
+                    'state' => 'Karnataka',
+                    'country' => 'India',
+                    'postal_code' => '560001',
+                    'is_default' => true,
+                ],
+            );
+        });
+
+        $supplierMappings = collect([
+            ['supplier' => 'SUP-STRIDE', 'product' => 'DEMO-SHOE-001', 'purchase_price' => 1425, 'lead_time_days' => 5, 'is_preferred' => true],
+            ['supplier' => 'SUP-URBAN', 'product' => 'DEMO-TEE-001', 'purchase_price' => 315, 'lead_time_days' => 4, 'is_preferred' => true],
+            ['supplier' => 'SUP-FRESH', 'product' => 'DEMO-RICE-005', 'purchase_price' => 420, 'lead_time_days' => 3, 'is_preferred' => true],
+        ])->map(function (array $mapping) use ($company, $suppliers, $products, $taxRates): SupplierProduct {
+            return SupplierProduct::updateOrCreate(
+                [
+                    'supplier_id' => $suppliers[$mapping['supplier']]->id,
+                    'product_id' => $products[$mapping['product']]->id,
+                ],
+                [
+                    'company_id' => $company->id,
+                    'supplier_sku' => $mapping['supplier'].'-'.$products[$mapping['product']]->sku,
+                    'supplier_product_name' => $products[$mapping['product']]->name,
+                    'purchase_price' => $mapping['purchase_price'],
+                    'mrp' => $products[$mapping['product']]->mrp,
+                    'minimum_order_quantity' => 5,
+                    'lead_time_days' => $mapping['lead_time_days'],
+                    'tax_rate_id' => $taxRates->first()->id,
+                    'is_preferred' => $mapping['is_preferred'],
+                    'is_active' => true,
+                    'last_purchase_price' => $mapping['purchase_price'],
+                    'last_purchased_at' => now()->subDays(4),
+                    'price_score' => 75,
+                    'delivery_score' => 88,
+                    'return_quality_score' => 94,
+                    'service_score' => 82,
+                    'overall_score' => 84.75,
+                ],
+            );
+        });
+
+        $purchaseRequest = PurchaseRequest::updateOrCreate(
+            ['company_id' => $company->id, 'request_number' => 'PR-000017'],
+            [
+                'branch_id' => $branch->id,
+                'warehouse_id' => $warehouse->id,
+                'source_type' => 'reorder_suggestion',
+                'source_id' => $reorderRule->id,
+                'status' => 'approved',
+                'priority' => 'high',
+                'requested_by' => $manager->id,
+                'reviewed_by' => $admin->id,
+                'reviewed_at' => now()->subDays(2),
+                'notes' => 'Seeded purchase request from reorder suggestion.',
+                'expected_by' => now()->addDays(5)->toDateString(),
+            ],
+        );
+
+        $purchaseRequest->items()->updateOrCreate(
+            ['product_id' => $products['DEMO-TEE-001']->id],
+            [
+                'supplier_id' => $suppliers['SUP-URBAN']->id,
+                'requested_quantity' => 15,
+                'approved_quantity' => 15,
+                'estimated_price' => 315,
+                'expected_by' => now()->addDays(5)->toDateString(),
+                'notes' => 'Replenish cotton tees before weekend demand.',
+            ],
+        );
+
+        $purchaseOrder = PurchaseOrder::updateOrCreate(
+            ['company_id' => $company->id, 'po_number' => 'PO-000024'],
+            [
+                'branch_id' => $branch->id,
+                'warehouse_id' => $warehouse->id,
+                'supplier_id' => $suppliers['SUP-URBAN']->id,
+                'purchase_request_id' => $purchaseRequest->id,
+                'status' => 'sent',
+                'order_date' => now()->subDays(2)->toDateString(),
+                'expected_delivery_date' => now()->addDays(2)->toDateString(),
+                'currency' => 'INR',
+                'subtotal' => 4725,
+                'discount_total' => 0,
+                'tax_total' => 567,
+                'shipping_total' => 0,
+                'grand_total' => 5292,
+                'payment_terms' => 'Net 15',
+                'notes' => 'Seeded purchase order for Phase 4.',
+                'created_by' => $manager->id,
+                'approved_by' => $admin->id,
+                'approved_at' => now()->subDay(),
+                'sent_at' => now()->subDay(),
+            ],
+        );
+
+        $purchaseOrderItem = $purchaseOrder->items()->updateOrCreate(
+            ['product_id' => $products['DEMO-TEE-001']->id],
+            [
+                'supplier_product_id' => $supplierMappings->firstWhere('product_id', $products['DEMO-TEE-001']->id)?->id,
+                'product_name_snapshot' => $products['DEMO-TEE-001']->name,
+                'sku_snapshot' => $products['DEMO-TEE-001']->sku,
+                'ordered_quantity' => 15,
+                'received_quantity' => 5,
+                'pending_quantity' => 10,
+                'unit_price' => 315,
+                'discount_amount' => 0,
+                'tax_rate' => 12,
+                'tax_amount' => 567,
+                'line_total' => 5292,
+                'notes' => 'Partial receipt expected.',
+            ],
+        );
+
+        $goodsReceipt = GoodsReceipt::updateOrCreate(
+            ['company_id' => $company->id, 'grn_number' => 'GRN-000011'],
+            [
+                'branch_id' => $branch->id,
+                'warehouse_id' => $warehouse->id,
+                'supplier_id' => $suppliers['SUP-URBAN']->id,
+                'purchase_order_id' => $purchaseOrder->id,
+                'receipt_date' => now()->subDay()->toDateString(),
+                'status' => 'partially_accepted',
+                'received_by' => $manager->id,
+                'checked_by' => $admin->id,
+                'checked_at' => now()->subDay(),
+                'supplier_invoice_number' => 'INV-URBAN-1024',
+                'supplier_invoice_date' => now()->subDay()->toDateString(),
+                'notes' => 'Seeded partial GRN for Phase 4.',
+            ],
+        );
+
+        $goodsReceipt->items()->updateOrCreate(
+            ['purchase_order_item_id' => $purchaseOrderItem->id, 'product_id' => $products['DEMO-TEE-001']->id],
+            [
+                'stock_location_id' => $location->id,
+                'ordered_quantity' => 15,
+                'received_quantity' => 6,
+                'accepted_quantity' => 5,
+                'rejected_quantity' => 1,
+                'unit_cost' => 315,
+                'batch_number' => 'TEE-BATCH-01',
+                'notes' => 'One piece rejected for demo quality issue.',
+            ],
+        );
+
+        $purchaseReturn = PurchaseReturn::updateOrCreate(
+            ['company_id' => $company->id, 'return_number' => 'PRN-000005'],
+            [
+                'branch_id' => $branch->id,
+                'warehouse_id' => $warehouse->id,
+                'supplier_id' => $suppliers['SUP-URBAN']->id,
+                'goods_receipt_id' => $goodsReceipt->id,
+                'status' => 'completed',
+                'return_date' => now()->toDateString(),
+                'reason' => 'Quality rejection',
+                'notes' => 'Seeded return for rejected demo item.',
+                'created_by' => $manager->id,
+                'approved_by' => $admin->id,
+                'approved_at' => now(),
+            ],
+        );
+
+        $purchaseReturn->items()->updateOrCreate(
+            ['product_id' => $products['DEMO-TEE-001']->id],
+            [
+                'stock_location_id' => $location->id,
+                'quantity' => 1,
+                'unit_cost' => 315,
+                'reason' => 'Rejected on receipt.',
+            ],
+        );
+
+        collect([
+            [$purchaseRequest, PurchaseRequest::class, 'approved', 'pending_review', 'approved'],
+            [$purchaseOrder, PurchaseOrder::class, 'approved', 'pending_approval', 'approved'],
+            [$purchaseReturn, PurchaseReturn::class, 'completed', 'approved', 'completed'],
+        ])->each(fn (array $log) => PurchaseApprovalLog::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'approvable_type' => $log[1],
+                'approvable_id' => $log[0]->id,
+                'action' => $log[2],
+            ],
+            [
+                'from_status' => $log[3],
+                'to_status' => $log[4],
+                'user_id' => $admin->id,
+                'comments' => 'Seeded approval history.',
+            ],
+        ));
+
+        StockMovement::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'warehouse_id' => $warehouse->id,
+                'stock_location_id' => $location->id,
+                'product_id' => $products['DEMO-TEE-001']->id,
+                'movement_type' => 'purchase',
+                'reference_type' => GoodsReceipt::class,
+                'reference_id' => $goodsReceipt->id,
+            ],
+            [
+                'branch_id' => $branch->id,
+                'direction' => 'in',
+                'quantity' => 5,
+                'quantity_before' => 4,
+                'quantity_after' => 9,
+                'unit_cost' => 315,
+                'reason' => 'Seeded goods receipt',
+                'notes' => 'Demo Phase 4 purchase movement.',
+                'created_by' => $admin->id,
+                'occurred_at' => now()->subDay(),
+            ],
+        );
+
+        StockMovement::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'warehouse_id' => $warehouse->id,
+                'stock_location_id' => $location->id,
+                'product_id' => $products['DEMO-TEE-001']->id,
+                'movement_type' => 'purchase_return',
+                'reference_type' => PurchaseReturn::class,
+                'reference_id' => $purchaseReturn->id,
+            ],
+            [
+                'branch_id' => $branch->id,
+                'direction' => 'out',
+                'quantity' => 1,
+                'quantity_before' => 9,
+                'quantity_after' => 8,
+                'unit_cost' => 315,
+                'reason' => 'Seeded supplier return',
+                'notes' => 'Demo Phase 4 purchase return movement.',
+                'created_by' => $admin->id,
+                'occurred_at' => now(),
+            ],
+        );
+
+        $suppliers->each(fn (Supplier $supplier) => SupplierScoreSnapshot::updateOrCreate(
+            ['company_id' => $company->id, 'supplier_id' => $supplier->id, 'calculated_at' => now()->startOfDay()],
+            [
+                'product_performance_score' => null,
+                'price_score' => 75,
+                'delivery_score' => max(40, min(95, 100 - ((int) $supplier->lead_time_days * 2))),
+                'return_quality_score' => $supplier->id === $suppliers['SUP-URBAN']->id ? 90 : 96,
+                'service_score' => $supplier->manual_rating,
+                'overall_score' => $supplier->id === $suppliers['SUP-URBAN']->id ? 83.75 : 85.5,
+                'purchase_value' => $supplier->id === $suppliers['SUP-URBAN']->id ? 5292 : 0,
+                'received_quantity' => $supplier->id === $suppliers['SUP-URBAN']->id ? 5 : 0,
+                'rejected_quantity' => $supplier->id === $suppliers['SUP-URBAN']->id ? 1 : 0,
+                'returned_quantity' => $supplier->id === $suppliers['SUP-URBAN']->id ? 1 : 0,
+                'delayed_delivery_count' => 0,
+                'notes' => 'Seeded rule-based score. Product sales score is future-ready and does not use fake POS sales.',
+            ],
+        ));
+
+        collect([
+            ['event_key' => 'purchase.request.submitted', 'channel' => 'database', 'name' => 'Purchase request approval', 'subject' => 'Purchase request needs approval', 'body' => 'Purchase request {{ request_number }} is waiting for approval.'],
+            ['event_key' => 'purchase.order.submitted', 'channel' => 'database', 'name' => 'Purchase order approval', 'subject' => 'Purchase order needs approval', 'body' => 'Purchase order {{ po_number }} is waiting for approval.'],
+            ['event_key' => 'purchase.goods_received', 'channel' => 'database', 'name' => 'Goods received', 'subject' => 'Goods received: {{ grn_number }}', 'body' => 'Goods receipt {{ grn_number }} has been posted to stock.'],
+            ['event_key' => 'purchase.reorder_request.created', 'channel' => 'database', 'name' => 'Reorder request created', 'subject' => 'Reorder converted to purchase request', 'body' => 'Purchase request {{ request_number }} was created from reorder suggestions.'],
+            ['event_key' => 'purchase.supplier.score_updated', 'channel' => 'database', 'name' => 'Supplier score updated', 'subject' => 'Supplier score updated', 'body' => 'Supplier score updated to {{ overall_score }}.'],
+        ])->each(fn (array $template) => NotificationTemplate::updateOrCreate(
+            [
+                'company_id' => null,
+                'event_key' => $template['event_key'],
+                'channel' => $template['channel'],
+                'locale' => 'en',
+            ],
+            $template + [
+                'company_id' => null,
+                'locale' => 'en',
+                'is_system' => true,
+                'is_active' => true,
+                'version' => 1,
+            ],
+        ));
 
         $channels = collect([
             ['name' => 'Flagship Store', 'code' => 'STORE', 'type' => 'store', 'is_online' => false, 'sync_enabled' => false],

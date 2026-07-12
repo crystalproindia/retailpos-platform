@@ -11,6 +11,11 @@ use App\Models\Inventory\InventoryBrand;
 use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
+use App\Models\Purchases\GoodsReceipt;
+use App\Models\Purchases\PurchaseOrder;
+use App\Models\Purchases\PurchaseRequest;
+use App\Models\Purchases\PurchaseReturn;
+use App\Models\Purchases\Supplier;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -88,5 +93,30 @@ class Company extends Model
     public function warehouses(): HasMany
     {
         return $this->hasMany(Warehouse::class);
+    }
+
+    public function suppliers(): HasMany
+    {
+        return $this->hasMany(Supplier::class);
+    }
+
+    public function purchaseRequests(): HasMany
+    {
+        return $this->hasMany(PurchaseRequest::class);
+    }
+
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class);
+    }
+
+    public function goodsReceipts(): HasMany
+    {
+        return $this->hasMany(GoodsReceipt::class);
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class);
     }
 }

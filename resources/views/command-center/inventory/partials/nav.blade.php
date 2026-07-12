@@ -1,6 +1,7 @@
 @php
     $links = [
         ['label' => 'Dashboard', 'route' => 'inventory.dashboard', 'can' => 'inventory.view'],
+        ['label' => 'Decision Dashboard', 'route' => 'inventory.decision-dashboard', 'can' => 'inventory.decision_dashboard.view'],
         ['label' => 'Products', 'route' => 'inventory.products.index', 'can' => 'inventory.products.view'],
         ['label' => 'Categories', 'route' => 'inventory.categories.index', 'can' => 'inventory.categories.manage'],
         ['label' => 'Brands', 'route' => 'inventory.brands.index', 'can' => 'inventory.brands.manage'],

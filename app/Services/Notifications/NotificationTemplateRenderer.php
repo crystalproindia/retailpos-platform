@@ -74,6 +74,11 @@ class NotificationTemplateRenderer
             'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => route('crm.followups.index'),
             'cms.page.published', 'cms.page.unpublished' => $event->aggregateId() ? route('cms.pages.edit', $event->aggregateId()) : null,
+            'purchase.request.created', 'purchase.request.submitted', 'purchase.request.approved', 'purchase.request.rejected', 'purchase.request.converted_to_po', 'purchase.reorder_request.created' => $event->aggregateId() ? route('purchases.requests.show', $event->aggregateId()) : null,
+            'purchase.order.created', 'purchase.order.submitted', 'purchase.order.approved', 'purchase.order.sent', 'purchase.order.cancelled' => $event->aggregateId() ? route('purchases.orders.show', $event->aggregateId()) : null,
+            'purchase.goods_received' => $event->aggregateId() ? route('purchases.grn.show', $event->aggregateId()) : null,
+            'purchase.return.created', 'purchase.return.approved', 'purchase.return.completed' => $event->aggregateId() ? route('purchases.returns.show', $event->aggregateId()) : null,
+            'purchase.supplier.created', 'purchase.supplier.updated', 'purchase.supplier.score_updated' => $event->aggregateId() ? route('purchases.suppliers.show', $event->aggregateId()) : null,
             default => route('notifications.index'),
         };
     }

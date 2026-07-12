@@ -34,6 +34,13 @@ class RecipientResolver
             'inventory.stock.out',
             'inventory.reorder.suggested',
             'inventory.channel.sync_warning' => $this->managers($event->companyId()),
+            'purchase.request.submitted',
+            'purchase.order.submitted',
+            'purchase.goods_received',
+            'purchase.return.created',
+            'purchase.return.completed',
+            'purchase.reorder_request.created',
+            'purchase.supplier.score_updated' => $this->managers($event->companyId()),
             default => $this->managers($event->companyId()),
         };
 

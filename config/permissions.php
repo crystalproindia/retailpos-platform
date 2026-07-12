@@ -7,6 +7,7 @@ $notificationUserRoles = ['administrator', 'manager', 'sales'];
 $operationsManagementRoles = ['administrator', 'manager'];
 $inventoryManagementRoles = ['administrator', 'manager'];
 $inventoryUserRoles = ['administrator', 'manager', 'sales'];
+$purchaseManagementRoles = ['administrator', 'manager'];
 $administratorRoles = ['administrator'];
 
 return [
@@ -65,5 +66,37 @@ return [
         'inventory.channels.view' => $inventoryManagementRoles,
         'inventory.channels.manage' => $inventoryManagementRoles,
         'inventory.settings.manage' => $inventoryManagementRoles,
+        'inventory.decision_dashboard.view' => $inventoryManagementRoles,
+        'purchases.view' => $purchaseManagementRoles,
+        'purchases.dashboard.view' => $purchaseManagementRoles,
+        'purchases.supplier_dashboard.view' => $purchaseManagementRoles,
+        'purchases.suppliers.view' => $purchaseManagementRoles,
+        'purchases.suppliers.create' => $purchaseManagementRoles,
+        'purchases.suppliers.update' => $purchaseManagementRoles,
+        'purchases.suppliers.delete' => $purchaseManagementRoles,
+        'purchases.suppliers.restore' => $purchaseManagementRoles,
+        'purchases.supplier_products.manage' => $purchaseManagementRoles,
+        'purchases.supplier_scores.view' => $purchaseManagementRoles,
+        'purchases.supplier_scores.manage' => $purchaseManagementRoles,
+        'purchases.requests.view' => $purchaseManagementRoles,
+        'purchases.requests.create' => $purchaseManagementRoles,
+        'purchases.requests.update' => $purchaseManagementRoles,
+        'purchases.requests.approve' => $purchaseManagementRoles,
+        'purchases.requests.reject' => $purchaseManagementRoles,
+        'purchases.requests.convert' => $purchaseManagementRoles,
+        'purchases.orders.view' => $purchaseManagementRoles,
+        'purchases.orders.create' => $purchaseManagementRoles,
+        'purchases.orders.update' => $purchaseManagementRoles,
+        'purchases.orders.approve' => $purchaseManagementRoles,
+        'purchases.orders.send' => $purchaseManagementRoles,
+        'purchases.orders.cancel' => $purchaseManagementRoles,
+        'purchases.grn.view' => $purchaseManagementRoles,
+        'purchases.grn.create' => $purchaseManagementRoles,
+        'purchases.grn.receive' => $purchaseManagementRoles,
+        'purchases.returns.view' => $purchaseManagementRoles,
+        'purchases.returns.create' => $purchaseManagementRoles,
+        'purchases.returns.approve' => $purchaseManagementRoles,
+        'purchases.returns.complete' => $purchaseManagementRoles,
+        'purchases.settings.manage' => $purchaseManagementRoles,
     ],
 ];

@@ -2019,3 +2019,308 @@ These are registered in `config/events.php`. Stock warnings, reorder suggestions
 - Inventory sync logs are internal readiness records only.
 - Reorder suggestions do not create purchase orders.
 - Supplier records are placeholders for later purchasing phases.
+
+## Phase 4 - Supplier, Purchase & Stock Decision Foundation
+
+Phase 4 replaces the Phase 3 supplier/purchase placeholders with a tenant-scoped purchasing foundation connected to Inventory. It does not include POS billing, finance/accounting, external supplier APIs, WhatsApp/SMS/Push delivery, n8n automations, or BI analytics.
+
+### Module Registry
+
+`config/modules.php` now registers `purchases` as a Retail Operations parent module routed to `purchases.dashboard`.
+
+Purchase child modules:
+
+- Purchase Dashboard
+- Supplier Dashboard
+- Suppliers
+- Supplier Contacts
+- Supplier Products
+- Supplier Ratings
+- Purchase Requests
+- Purchase Orders
+- Goods Receipts
+- Purchase Returns
+- Pending Approvals
+- Reorder to Purchase
+- Purchase Settings
+
+Inventory also adds `inventory-decision-dashboard`, routed to `inventory.decision-dashboard`.
+
+### Folder Structure
+
+Phase 4 files live under:
+
+- `app/Enums/Purchases`
+- `app/Events/Domain/Purchases`
+- `app/Models/Purchases`
+- `app/Repositories/Purchases`
+- `app/Services/Purchases`
+- `app/Http/Controllers/CommandCenter/Purchases`
+- `resources/views/command-center/purchases`
+- `resources/views/command-center/inventory/decision`
+- `tests/Feature/PurchaseFoundationTest.php`
+
+### Database Tables
+
+Migration `2026_07_12_050001_create_purchase_foundation_tables.php` creates:
+
+- `suppliers`
+- `supplier_contacts`
+- `supplier_addresses`
+- `supplier_products`
+- `supplier_score_snapshots`
+- `purchase_settings`
+- `purchase_requests`
+- `purchase_request_items`
+- `purchase_orders`
+- `purchase_order_items`
+- `goods_receipts`
+- `goods_receipt_items`
+- `purchase_returns`
+- `purchase_return_items`
+- `purchase_approval_logs`
+
+All primary operational tables are company scoped. Branch, warehouse, supplier, user, product, stock location, and purchase document relationships are normalized. JSON blobs are avoided.
+
+### Models
+
+Purchase models:
+
+- `Supplier`
+- `SupplierContact`
+- `SupplierAddress`
+- `SupplierProduct`
+- `SupplierScoreSnapshot`
+- `PurchaseSettings`
+- `PurchaseRequest`
+- `PurchaseRequestItem`
+- `PurchaseOrder`
+- `PurchaseOrderItem`
+- `GoodsReceipt`
+- `GoodsReceiptItem`
+- `PurchaseReturn`
+- `PurchaseReturnItem`
+- `PurchaseApprovalLog`
+
+`Company` and `Branch` now expose purchase relationships for future SaaS and branch-level workflows.
+
+### Enums
+
+Purchase enums:
+
+- `SupplierType`
+- `PurchaseRequestStatus`
+- `PurchaseRequestPriority`
+- `PurchaseOrderStatus`
+- `GoodsReceiptStatus`
+- `PurchaseReturnStatus`
+- `PurchaseSourceType`
+
+### Services
+
+Purchase services:
+
+- `PurchaseNumberService`: purchase settings and sequential PR/PO/GRN/return numbers
+- `SupplierService`: supplier CRUD, contacts, addresses, product mapping, audit events
+- `SupplierScoreService`: rule-based supplier scoring from purchase, GRN, return, lead-time, and manual service data
+- `PurchaseRequestService`: create, submit, approve, reject, convert, and reorder-to-request flow
+- `PurchaseOrderService`: create, submit, approve, send, cancel, conversion from request, receipt status updates
+- `GoodsReceiptService`: create GRN and post accepted quantities into Inventory stock
+- `PurchaseReturnService`: create, approve, complete, and post supplier return stock reductions
+- `PurchaseDashboardService`: purchase cards, approvals, recent orders, supplier value
+- `SupplierDashboardService`: supplier cards, scores, recent receipts and returns
+- `InventoryDecisionService`: product stock decision rows and expected sales days
+
+`StockService` was extended with:
+
+- `recordPurchaseReceipt()`
+- `recordPurchaseReturn()`
+
+These methods write `stock_movements` with `movement_type` values `purchase` and `purchase_return`, update `stock_levels`, and preserve the negative-stock guard.
+
+### Controllers And Routes
+
+Purchase controllers:
+
+- `PurchaseDashboardController`
+- `SupplierDashboardController`
+- `SupplierController`
+- `PurchaseRequestController`
+- `PurchaseOrderController`
+- `GoodsReceiptController`
+- `PurchaseReturnController`
+- `PurchaseSettingsController`
+
+Inventory controller:
+
+- `InventoryDecisionDashboardController`
+
+Main route groups:
+
+- `/purchases`
+- `/purchases/supplier-dashboard`
+- `/purchases/suppliers`
+- `/purchases/requests`
+- `/purchases/orders`
+- `/purchases/grn`
+- `/purchases/returns`
+- `/purchases/settings`
+- `/inventory/decision-dashboard`
+
+All purchase routes use `auth`, role middleware, and Gate capabilities.
+
+### Permissions
+
+`config/permissions.php` adds:
+
+- `purchases.view`
+- `purchases.dashboard.view`
+- `purchases.supplier_dashboard.view`
+- `purchases.suppliers.view`
+- `purchases.suppliers.create`
+- `purchases.suppliers.update`
+- `purchases.suppliers.delete`
+- `purchases.suppliers.restore`
+- `purchases.supplier_products.manage`
+- `purchases.supplier_scores.view`
+- `purchases.supplier_scores.manage`
+- `purchases.requests.view`
+- `purchases.requests.create`
+- `purchases.requests.update`
+- `purchases.requests.approve`
+- `purchases.requests.reject`
+- `purchases.requests.convert`
+- `purchases.orders.view`
+- `purchases.orders.create`
+- `purchases.orders.update`
+- `purchases.orders.approve`
+- `purchases.orders.send`
+- `purchases.orders.cancel`
+- `purchases.grn.view`
+- `purchases.grn.create`
+- `purchases.grn.receive`
+- `purchases.returns.view`
+- `purchases.returns.create`
+- `purchases.returns.approve`
+- `purchases.returns.complete`
+- `purchases.settings.manage`
+- `inventory.decision_dashboard.view`
+
+Administrator and Manager roles have purchase access. Sales and Staff have no purchase access.
+
+### Supplier Foundation
+
+Supplier records support:
+
+- CRUD with soft delete and restore
+- Type, tax IDs, GSTIN, PAN, contact details, payment terms, credit limit, lead time, rating notes
+- Contacts with primary contact handling
+- Addresses with default address handling
+- Product mapping with supplier SKU, price, MOQ, tax, lead time, preferred supplier, and active state
+- Supplier score snapshots
+
+Supplier scoring is rule-based only. It does not invent POS sales history.
+
+### Purchase Workflow
+
+Purchase requests support manual creation and creation from reorder suggestions. Requests can be submitted, approved, rejected, and converted to purchase orders.
+
+Purchase orders support creation, approval workflow, sent status, cancellation, totals, item snapshots, and a print-friendly view.
+
+Goods receipts can be created from a PO or without a PO when settings allow it. Receiving posts accepted quantities to Inventory stock, updates PO item received and pending quantities, updates supplier product last purchase data, writes audit records, and dispatches `purchase.goods_received`.
+
+Purchase returns support create, approve, and complete. Completion writes `purchase_return` stock movements and blocks negative stock unless the product allows it.
+
+### Inventory Decision Dashboard
+
+The decision dashboard calculates:
+
+- Available stock
+- Average daily sales
+- Expected sales days = available stock / average daily sales
+- Explicit `Not enough sales data` label when sales data is missing or zero
+- Reorder and stockout risk labels
+- Preferred supplier display
+- AI-ready row metadata without external AI calls
+
+### Audit Log
+
+Purchase actions recorded through `AuditLogger` include:
+
+- Supplier create, update, delete, restore
+- Supplier contact/address/product mapping
+- Supplier score recalculation
+- Purchase request create, submit, approve, reject, conversion
+- Purchase order create, submit, approve, send, cancel
+- Goods receipt create and receive
+- Purchase return create, approve, complete
+- Purchase settings updates
+- Reorder suggestion conversion to purchase request
+
+### Domain Events
+
+Purchase domain events:
+
+- `purchase.supplier.created`
+- `purchase.supplier.updated`
+- `purchase.supplier.score_updated`
+- `purchase.request.created`
+- `purchase.request.submitted`
+- `purchase.request.approved`
+- `purchase.request.rejected`
+- `purchase.request.converted_to_po`
+- `purchase.reorder_request.created`
+- `purchase.order.created`
+- `purchase.order.submitted`
+- `purchase.order.approved`
+- `purchase.order.sent`
+- `purchase.order.cancelled`
+- `purchase.goods_received`
+- `purchase.return.created`
+- `purchase.return.approved`
+- `purchase.return.completed`
+
+These are registered in `config/events.php`. Purchase approval, receipt, return, reorder, and supplier-score notifications resolve to administrator and manager recipients.
+
+### Seeded Demo Data
+
+`DatabaseSeeder` adds:
+
+- Purchase settings
+- Demo suppliers
+- Supplier contacts
+- Supplier addresses
+- Supplier product mappings
+- Supplier score snapshots
+- Purchase request
+- Purchase order and item
+- Goods receipt and item
+- Purchase return and item
+- Purchase approval logs
+- Purchase stock movements
+- Purchase notification templates
+
+### Tests
+
+`tests/Feature/PurchaseFoundationTest.php` covers:
+
+- Purchase module registry and sidebar children
+- Manager-only access
+- Supplier CRUD, contacts, addresses, product mapping, scoring
+- Purchase request approval and conversion to PO
+- Purchase order lifecycle and print view
+- GRN stock posting and PO quantity updates
+- Purchase return stock reduction and negative-stock guard
+- Inventory decision dashboard sales-data labeling
+- Purchase settings
+- Reorder-to-request conversion
+- Seeded demo purchase data
+
+### Current Phase 4 Limitations
+
+- No POS billing, checkout, invoice, or payment workflow is included.
+- No finance/accounting payable posting is included.
+- No external supplier API, marketplace, WhatsApp, SMS, push, n8n, or BI integration is connected.
+- Supplier scoring is transparent and rule-based; product sales contribution is future-ready until real POS sales history exists.
+- Purchase approvals are foundational workflow states, not a configurable approval matrix yet.
+- The UI supports one-line quick create forms for purchase documents; richer dynamic line-item editing can be added later without changing the service contracts.

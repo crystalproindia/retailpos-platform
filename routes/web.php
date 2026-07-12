@@ -23,6 +23,7 @@ use App\Http\Controllers\CommandCenter\Inventory\BarcodePrintBatchController;
 use App\Http\Controllers\CommandCenter\Inventory\ChannelProductMappingController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryBrandController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryCategoryController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryDecisionDashboardController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryDashboardController;
 use App\Http\Controllers\CommandCenter\Inventory\InventorySettingsController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryTaxRateController;
@@ -48,6 +49,14 @@ use App\Http\Controllers\CommandCenter\Operations\HealthCheckController;
 use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
 use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
 use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
+use App\Http\Controllers\CommandCenter\Purchases\GoodsReceiptController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseDashboardController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseOrderController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseRequestController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseReturnController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
+use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
+use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -202,6 +211,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware(['role:administrator,manager,sales', 'can:inventory.view'])->prefix('inventory')->name('inventory.')->group(function (): void {
         Route::get('/', InventoryDashboardController::class)->name('dashboard');
+        Route::get('decision-dashboard', InventoryDecisionDashboardController::class)->middleware('can:inventory.decision_dashboard.view')->name('decision-dashboard');
 
         Route::get('products', [ProductController::class, 'index'])->middleware('can:inventory.products.view')->name('products.index');
         Route::get('products/create', [ProductController::class, 'create'])->middleware('can:inventory.products.create')->name('products.create');
@@ -259,6 +269,60 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('settings', [InventorySettingsController::class, 'index'])->middleware('can:inventory.settings.manage')->name('settings.index');
         Route::put('settings', [InventorySettingsController::class, 'update'])->middleware('can:inventory.settings.manage')->name('settings.update');
+    });
+
+    Route::middleware(['role:administrator,manager', 'can:purchases.view'])->prefix('purchases')->name('purchases.')->group(function (): void {
+        Route::get('/', PurchaseDashboardController::class)->middleware('can:purchases.dashboard.view')->name('dashboard');
+        Route::get('supplier-dashboard', SupplierDashboardController::class)->middleware('can:purchases.supplier_dashboard.view')->name('supplier-dashboard');
+
+        Route::get('suppliers', [SupplierController::class, 'index'])->middleware('can:purchases.suppliers.view')->name('suppliers.index');
+        Route::get('suppliers/create', [SupplierController::class, 'create'])->middleware('can:purchases.suppliers.create')->name('suppliers.create');
+        Route::post('suppliers', [SupplierController::class, 'store'])->middleware('can:purchases.suppliers.create')->name('suppliers.store');
+        Route::get('suppliers/{supplier}', [SupplierController::class, 'show'])->middleware('can:purchases.suppliers.view')->name('suppliers.show');
+        Route::get('suppliers/{supplier}/edit', [SupplierController::class, 'edit'])->middleware('can:purchases.suppliers.update')->name('suppliers.edit');
+        Route::put('suppliers/{supplier}', [SupplierController::class, 'update'])->middleware('can:purchases.suppliers.update')->name('suppliers.update');
+        Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('can:purchases.suppliers.delete')->name('suppliers.destroy');
+        Route::post('suppliers/{supplier}/restore', [SupplierController::class, 'restore'])->middleware('can:purchases.suppliers.restore')->name('suppliers.restore');
+        Route::post('suppliers/{supplier}/contacts', [SupplierController::class, 'storeContact'])->middleware('can:purchases.suppliers.update')->name('suppliers.contacts.store');
+        Route::post('suppliers/{supplier}/addresses', [SupplierController::class, 'storeAddress'])->middleware('can:purchases.suppliers.update')->name('suppliers.addresses.store');
+        Route::post('suppliers/{supplier}/products', [SupplierController::class, 'storeProduct'])->middleware('can:purchases.supplier_products.manage')->name('suppliers.products.store');
+        Route::post('suppliers/{supplier}/score', [SupplierController::class, 'score'])->middleware('can:purchases.supplier_scores.manage')->name('suppliers.score');
+
+        Route::get('requests', [PurchaseRequestController::class, 'index'])->middleware('can:purchases.requests.view')->name('requests.index');
+        Route::get('requests/create', [PurchaseRequestController::class, 'create'])->middleware('can:purchases.requests.create')->name('requests.create');
+        Route::post('requests', [PurchaseRequestController::class, 'store'])->middleware('can:purchases.requests.create')->name('requests.store');
+        Route::post('requests/from-reorder', [PurchaseRequestController::class, 'createFromReorder'])->middleware('can:purchases.requests.create')->name('requests.from-reorder');
+        Route::get('requests/{purchaseRequest}', [PurchaseRequestController::class, 'show'])->middleware('can:purchases.requests.view')->name('requests.show');
+        Route::post('requests/{purchaseRequest}/submit', [PurchaseRequestController::class, 'submit'])->middleware('can:purchases.requests.update')->name('requests.submit');
+        Route::post('requests/{purchaseRequest}/approve', [PurchaseRequestController::class, 'approve'])->middleware('can:purchases.requests.approve')->name('requests.approve');
+        Route::post('requests/{purchaseRequest}/reject', [PurchaseRequestController::class, 'reject'])->middleware('can:purchases.requests.reject')->name('requests.reject');
+        Route::post('requests/{purchaseRequest}/convert', [PurchaseRequestController::class, 'convert'])->middleware('can:purchases.requests.convert')->name('requests.convert');
+
+        Route::get('orders', [PurchaseOrderController::class, 'index'])->middleware('can:purchases.orders.view')->name('orders.index');
+        Route::get('orders/create', [PurchaseOrderController::class, 'create'])->middleware('can:purchases.orders.create')->name('orders.create');
+        Route::post('orders', [PurchaseOrderController::class, 'store'])->middleware('can:purchases.orders.create')->name('orders.store');
+        Route::get('orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->middleware('can:purchases.orders.view')->name('orders.show');
+        Route::get('orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->middleware('can:purchases.orders.view')->name('orders.print');
+        Route::post('orders/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->middleware('can:purchases.orders.update')->name('orders.submit');
+        Route::post('orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->middleware('can:purchases.orders.approve')->name('orders.approve');
+        Route::post('orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send'])->middleware('can:purchases.orders.send')->name('orders.send');
+        Route::post('orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('can:purchases.orders.cancel')->name('orders.cancel');
+
+        Route::get('grn', [GoodsReceiptController::class, 'index'])->middleware('can:purchases.grn.view')->name('grn.index');
+        Route::get('grn/create', [GoodsReceiptController::class, 'create'])->middleware('can:purchases.grn.create')->name('grn.create');
+        Route::post('grn', [GoodsReceiptController::class, 'store'])->middleware('can:purchases.grn.create')->name('grn.store');
+        Route::get('grn/{goodsReceipt}', [GoodsReceiptController::class, 'show'])->middleware('can:purchases.grn.view')->name('grn.show');
+        Route::post('grn/{goodsReceipt}/receive', [GoodsReceiptController::class, 'receive'])->middleware('can:purchases.grn.receive')->name('grn.receive');
+
+        Route::get('returns', [PurchaseReturnController::class, 'index'])->middleware('can:purchases.returns.view')->name('returns.index');
+        Route::get('returns/create', [PurchaseReturnController::class, 'create'])->middleware('can:purchases.returns.create')->name('returns.create');
+        Route::post('returns', [PurchaseReturnController::class, 'store'])->middleware('can:purchases.returns.create')->name('returns.store');
+        Route::get('returns/{purchaseReturn}', [PurchaseReturnController::class, 'show'])->middleware('can:purchases.returns.view')->name('returns.show');
+        Route::post('returns/{purchaseReturn}/approve', [PurchaseReturnController::class, 'approve'])->middleware('can:purchases.returns.approve')->name('returns.approve');
+        Route::post('returns/{purchaseReturn}/complete', [PurchaseReturnController::class, 'complete'])->middleware('can:purchases.returns.complete')->name('returns.complete');
+
+        Route::get('settings', [PurchaseSettingsController::class, 'index'])->middleware('can:purchases.settings.manage')->name('settings.index');
+        Route::put('settings', [PurchaseSettingsController::class, 'update'])->middleware('can:purchases.settings.manage')->name('settings.update');
     });
 
     Route::redirect('settings', 'settings/general')->name('settings.index');

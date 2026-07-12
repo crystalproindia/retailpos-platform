@@ -155,6 +155,29 @@
         </svg>
         @break
 
+    @case('shopping-bag')
+    @case('purchases')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M6 8h12l-1 12H7L6 8Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 8a3 3 0 0 1 6 0M9 12h6" />
+        </svg>
+        @break
+
+    @case('truck')
+    @case('suppliers')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linejoin="round" d="M3 6h11v10H3V6Zm11 4h3l4 4v2h-7v-6Z" />
+            <path stroke-linecap="round" d="M6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+        </svg>
+        @break
+
+    @case('returns')
+        <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 7H5v4M5 7l5.5 5.5A5 5 0 1 0 14 4" />
+            <path stroke-linecap="round" d="M15 14h4M17 12v4" />
+        </svg>
+        @break
+
     @case('map-pin')
         <svg {{ $attributes->merge(['class' => $class, 'viewBox' => '0 0 24 24', 'fill' => 'none', 'stroke' => 'currentColor', 'stroke-width' => '1.8']) }}>
             <path stroke-linejoin="round" d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" />

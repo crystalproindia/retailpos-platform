@@ -199,6 +199,69 @@ class StockService
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function recordPurchaseReceipt(User $user, array $data): StockMovement
+    {
+        return $this->recordExternalMovement($user, $data, 'purchase', 'in');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function recordPurchaseReturn(User $user, array $data): StockMovement
+    {
+        return $this->recordExternalMovement($user, $data, 'purchase_return', 'out');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function recordExternalMovement(User $user, array $data, string $movementType, string $direction): StockMovement
+    {
+        return DB::transaction(function () use ($user, $data, $movementType, $direction): StockMovement {
+            $product = Product::query()->where('company_id', $user->company_id)->findOrFail((int) $data['product_id']);
+            $locationId = $data['stock_location_id'] ?? null;
+            $level = $this->stocks->level($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null, $product->id);
+            $before = (float) $level->quantity_on_hand;
+            $quantity = (float) $data['quantity'];
+            $after = $direction === 'in' ? $before + $quantity : $before - $quantity;
+
+            if ($after < 0 && ! $product->allow_negative_stock) {
+                throw ValidationException::withMessages([
+                    'items' => "{$product->name} does not allow negative stock.",
+                ]);
+            }
+
+            $this->setLevelQuantity($level, $after, $data['branch_id'] ?? $user->branch_id);
+
+            $movement = StockMovement::create([
+                'company_id' => $user->company_id,
+                'branch_id' => $data['branch_id'] ?? $user->branch_id,
+                'warehouse_id' => $data['warehouse_id'],
+                'stock_location_id' => $locationId,
+                'product_id' => $product->id,
+                'movement_type' => $movementType,
+                'direction' => $direction,
+                'quantity' => $quantity,
+                'quantity_before' => $before,
+                'quantity_after' => $after,
+                'unit_cost' => $data['unit_cost'] ?? $product->cost_price,
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reason' => $data['reason'] ?? str($movementType)->replace('_', ' ')->headline()->toString(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $user->id,
+                'occurred_at' => now(),
+            ]);
+
+            $this->dispatchStockThresholdEvents($product, $level, $user);
+
+            return $movement;
+        });
+    }
+
     private function setLevelQuantity(StockLevel $level, float $quantity, ?int $branchId): void
     {
         $reserved = (float) $level->quantity_reserved;

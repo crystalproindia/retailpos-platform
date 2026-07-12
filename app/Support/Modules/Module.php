@@ -97,6 +97,10 @@ class Module
             return request()->routeIs('inventory.*');
         }
 
+        if (str_starts_with($this->route, 'purchases.')) {
+            return request()->routeIs('purchases.*');
+        }
+
         return request()->routeIs($this->route)
             && collect($this->routeParameters)
                 ->every(fn (mixed $value, string $key): bool => request()->route($key) === $value);

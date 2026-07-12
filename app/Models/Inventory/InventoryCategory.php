@@ -4,6 +4,7 @@ namespace App\Models\Inventory;
 
 use App\Models\Company;
 use App\Models\Concerns\Auditable;
+use App\Models\Promotions\PromotionCategoryTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,5 +41,10 @@ class InventoryCategory extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class, 'category_id');
+    }
+
+    public function promotionTargets(): HasMany
+    {
+        return $this->hasMany(PromotionCategoryTarget::class, 'category_id');
     }
 }

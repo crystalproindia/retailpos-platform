@@ -41,6 +41,17 @@ class RecipientResolver
             'purchase.return.completed',
             'purchase.reorder_request.created',
             'purchase.supplier.score_updated' => $this->managers($event->companyId()),
+            'promotion.campaign.created',
+            'promotion.campaign.updated',
+            'promotion.rule.created',
+            'promotion.rule.updated',
+            'promotion.rule.activated',
+            'promotion.rule.paused',
+            'promotion.rule.expired',
+            'promotion.coupon.created',
+            'promotion.coupon.used',
+            'promotion.simulation.ran',
+            'promotion.approval.required' => $this->managers($event->companyId()),
             default => $this->managers($event->companyId()),
         };
 

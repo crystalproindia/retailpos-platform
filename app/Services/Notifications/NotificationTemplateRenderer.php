@@ -79,6 +79,10 @@ class NotificationTemplateRenderer
             'purchase.goods_received' => $event->aggregateId() ? route('purchases.grn.show', $event->aggregateId()) : null,
             'purchase.return.created', 'purchase.return.approved', 'purchase.return.completed' => $event->aggregateId() ? route('purchases.returns.show', $event->aggregateId()) : null,
             'purchase.supplier.created', 'purchase.supplier.updated', 'purchase.supplier.score_updated' => $event->aggregateId() ? route('purchases.suppliers.show', $event->aggregateId()) : null,
+            'promotion.campaign.created', 'promotion.campaign.updated' => $event->aggregateId() ? route('promotions.campaigns.show', $event->aggregateId()) : route('promotions.campaigns.index'),
+            'promotion.rule.created', 'promotion.rule.updated', 'promotion.rule.activated', 'promotion.rule.paused', 'promotion.rule.expired', 'promotion.approval.required' => $event->aggregateId() ? route('promotions.rules.show', $event->aggregateId()) : route('promotions.rules.index'),
+            'promotion.coupon.created', 'promotion.coupon.used' => route('promotions.coupons.index'),
+            'promotion.simulation.ran' => route('promotions.simulator.index'),
             default => route('notifications.index'),
         };
     }

@@ -4,6 +4,7 @@ namespace App\Models\Inventory;
 
 use App\Models\Company;
 use App\Models\Concerns\Auditable;
+use App\Models\Promotions\PromotionBrandTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,5 +31,10 @@ class InventoryBrand extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class, 'brand_id');
+    }
+
+    public function promotionTargets(): HasMany
+    {
+        return $this->hasMany(PromotionBrandTarget::class, 'brand_id');
     }
 }

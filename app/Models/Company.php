@@ -16,6 +16,9 @@ use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseRequest;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\Purchases\Supplier;
+use App\Models\Promotions\PromotionCampaign;
+use App\Models\Promotions\PromotionRule;
+use App\Models\Promotions\PromotionSettings;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -118,5 +121,20 @@ class Company extends Model
     public function purchaseReturns(): HasMany
     {
         return $this->hasMany(PurchaseReturn::class);
+    }
+
+    public function promotionCampaigns(): HasMany
+    {
+        return $this->hasMany(PromotionCampaign::class);
+    }
+
+    public function promotionRules(): HasMany
+    {
+        return $this->hasMany(PromotionRule::class);
+    }
+
+    public function promotionSettings(): HasMany
+    {
+        return $this->hasMany(PromotionSettings::class);
     }
 }

@@ -2324,3 +2324,152 @@ These are registered in `config/events.php`. Purchase approval, receipt, return,
 - Supplier scoring is transparent and rule-based; product sales contribution is future-ready until real POS sales history exists.
 - Purchase approvals are foundational workflow states, not a configurable approval matrix yet.
 - The UI supports one-line quick create forms for purchase documents; richer dynamic line-item editing can be added later without changing the service contracts.
+
+## Phase 4.5 - Discount & Promotion Engine Foundation
+
+Phase 4.5 adds a company-scoped rule engine that future POS, ecommerce, WhatsApp-order, mobile, and marketplace adapters can call with a cart payload. It does not create a POS billing or customer loyalty flow.
+
+### Module Registry and Permissions
+
+`config/modules.php` registers `promotions` under Sales & Marketing with the following children:
+
+- Promotion Dashboard
+- Campaigns
+- Discount Rules
+- Buy X Get Y
+- Coupons
+- Combo Offers
+- Product Offers
+- Category Offers
+- Brand Offers
+- Channel Offers
+- Branch Offers
+- Promotion Simulator
+- Promotion Usage
+- Promotion Settings
+
+Administrator and Manager have full operational permissions. Sales can view the promotions dashboard, campaigns, rules, and coupons but cannot create, update, activate, pause, approve, simulate, or edit settings. Staff has no promotion access by default.
+
+### Folder Structure
+
+Promotion code is additive and lives in:
+
+- `app/Enums/Promotions`
+- `app/Events/Domain/Promotions`
+- `app/Http/Controllers/CommandCenter/Promotions`
+- `app/Http/Requests/Promotions`
+- `app/Models/Promotions`
+- `app/Repositories/Promotions`
+- `app/Services/Promotions`
+- `resources/views/command-center/promotions`
+- `tests/Feature/PromotionFoundationTest.php`
+
+### Database Tables
+
+The migration `2026_07_12_060001_create_promotion_foundation_tables.php` creates:
+
+- `promotion_campaigns`
+- `promotion_rules`
+- `promotion_conditions`
+- `promotion_actions`
+- `promotion_product_targets`
+- `promotion_category_targets`
+- `promotion_brand_targets`
+- `promotion_variant_targets`
+- `promotion_branch_targets`
+- `promotion_channel_targets`
+- `promotion_coupons`
+- `promotion_coupon_redemptions`
+- `promotion_rule_usage`
+- `promotion_simulations`
+- `promotion_settings`
+
+All operational records have a `company_id`. Campaigns, rules, and coupons use soft deletes where an administrator needs recoverable lifecycle management. Coupon codes and campaign/rule slugs are unique within a company, not globally.
+
+### Models and Relationships
+
+`PromotionCampaign` owns promotion rules. `PromotionRule` owns conditions, actions, target rows, coupons, and rule usage. A rule can target products or variants, inventory categories, inventory brands, branches, and Phase 3 sales channels. `PromotionCoupon` owns redemptions. `PromotionSimulation` stores the submitted cart and full calculation result without pretending it is an order.
+
+Company, Branch, Product, InventoryCategory, InventoryBrand, and SalesChannel expose additive promotion target relationships. No existing inventory, purchasing, CMS, CRM, or authentication model behavior was replaced.
+
+### Repositories and Services
+
+Repositories provide tenant-filtered campaign, rule, coupon, and simulation queries. Services keep controllers thin:
+
+- `PromotionCampaignService` manages campaign lifecycle and domain events.
+- `PromotionRuleService` manages rules, actions, targets, lifecycle transitions, approval checks, audit logging, and domain events.
+- `PromotionCouponService` manages coupon creation, validation, activation, and future redemption recording.
+- `PromotionEligibilityService` evaluates date, bill amount, quantity, branch, channel, target, and configured condition eligibility.
+- `PromotionCalculatorService` calculates percentage, flat amount, Buy X Get Y, free-product, and fixed bundle-price foundations.
+- `PromotionRuleEngine` returns a stable cart calculation contract.
+- `PromotionSimulationService` persists simulator runs.
+- `PromotionUsageService` is the future order/POS usage recorder.
+- `PromotionSettingsService` supplies company defaults.
+
+### Rule Engine Contract
+
+`PromotionRuleEngine::evaluate($companyId, $cart)` accepts `branch_id`, optional `sales_channel_id`, optional future `customer_id`, optional `cart_reference`, items with product ID, quantity, unit price, optional category/brand/variant data, optional coupon code, and bill subtotal.
+
+It returns:
+
+- `eligible_promotions`
+- `applied_promotions`
+- `rejected_promotions` with reasons
+- `item_discounts`
+- `bill_discounts`
+- `free_items`
+- `total_before_discount`
+- `total_discount`
+- `total_after_discount`
+- `warnings`
+
+The engine applies active rules in priority order. It honors exclusive and non-stackable rules, company-level stacking settings, company maximum bill discount percentage/amount, per-rule/action discount caps, coupon dates/limits, and the coupon-plus-auto-discount setting. Final payable totals are never negative.
+
+Buy X Get Y supports Buy 1 Get 1, Buy 1 Get 2, Buy 2 Get 1, and Buy 2 Get 3 through `buy_quantity` and `get_quantity`. Quantity discounts use `minimum_quantity`; bill discounts use `minimum_bill_amount`. Selected free products are returned as `free_items`, ready for future checkout line creation.
+
+### Admin Routes and UI
+
+All routes are protected by `auth`, role middleware, and first-party capability Gates:
+
+- `/promotions`
+- `/promotions/campaigns`
+- `/promotions/rules`
+- `/promotions/coupons`
+- `/promotions/simulator`
+- `/promotions/usage`
+- `/promotions/settings`
+
+The Blade/Tailwind Command Center UI provides responsive dashboards, search/filter/pagination lists, form-based campaign/rule/coupon administration, target selection, activation/pause/approval controls, usage history, and a cart simulator that saves an auditable simulation result.
+
+### Events, Notifications, and Audit
+
+Promotion events registered in `config/events.php` are:
+
+- `promotion.campaign.created`
+- `promotion.campaign.updated`
+- `promotion.rule.created`
+- `promotion.rule.updated`
+- `promotion.rule.activated`
+- `promotion.rule.paused`
+- `promotion.rule.expired`
+- `promotion.coupon.created`
+- `promotion.coupon.used`
+- `promotion.simulation.ran`
+- `promotion.approval.required`
+
+They use the existing `DomainEventDispatcher`, notification resolver, renderer, event logs, webhook foundations, and Operations Monitor failed-job visibility. Important human changes are also recorded with `AuditLogger`.
+
+### Demo Data and Tests
+
+`DatabaseSeeder` idempotently adds a demo festival campaign, settings, Buy 1 Get 1, Buy 1 Get 2, Buy 2 Get 1, Buy 2 Get 3, Buy 3 Get 20% Off, bill-above-1000 10% Off, category, brand, website-channel, branch, and `FESTIVE10` coupon examples. All are explicitly described as demo data.
+
+`PromotionFoundationTest` covers module registration, role filtering, staff denial, campaign CRUD/restore, rule lifecycle, simulator storage, Buy X Get Y calculations, quantity and bill calculations, target eligibility, coupon validation/limits, stacking settings, discount caps, tenant isolation, validation, events, and seeded data.
+
+### Current Phase 4.5 Limitations and Future POS Roadmap
+
+- POS billing, checkout, invoices, payments, and customer-facing receipt presentation are not built.
+- Customer loyalty, customer groups, per-customer limits, and birthday offers are schema-ready only; no customer module claim is made.
+- The simulator uses a cart payload and stores history, but does not redeem coupons or write rule usage because there is no real order yet.
+- External marketplace, WhatsApp, SMS, push, AI, n8n, and analytics BI APIs are not connected.
+- V1 rule forms provide a clean single-action foundation with one target per target dimension; the normalized action and target tables support richer future builders without changing cart evaluation contracts.
+- Future POS and order services should call `PromotionRuleEngine`, then record selected rules with `PromotionUsageService` and coupon redemption with `PromotionCouponService` only after a successful order transaction.

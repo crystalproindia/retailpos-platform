@@ -8,6 +8,8 @@ $operationsManagementRoles = ['administrator', 'manager'];
 $inventoryManagementRoles = ['administrator', 'manager'];
 $inventoryUserRoles = ['administrator', 'manager', 'sales'];
 $purchaseManagementRoles = ['administrator', 'manager'];
+$promotionManagementRoles = ['administrator', 'manager'];
+$promotionReadRoles = ['administrator', 'manager', 'sales'];
 $administratorRoles = ['administrator'];
 
 return [
@@ -98,5 +100,28 @@ return [
         'purchases.returns.approve' => $purchaseManagementRoles,
         'purchases.returns.complete' => $purchaseManagementRoles,
         'purchases.settings.manage' => $purchaseManagementRoles,
+        'promotions.view' => $promotionReadRoles,
+        'promotions.dashboard.view' => $promotionReadRoles,
+        'promotions.campaigns.view' => $promotionReadRoles,
+        'promotions.campaigns.create' => $promotionManagementRoles,
+        'promotions.campaigns.update' => $promotionManagementRoles,
+        'promotions.campaigns.delete' => $promotionManagementRoles,
+        'promotions.campaigns.restore' => $promotionManagementRoles,
+        'promotions.rules.view' => $promotionReadRoles,
+        'promotions.rules.create' => $promotionManagementRoles,
+        'promotions.rules.update' => $promotionManagementRoles,
+        'promotions.rules.delete' => $promotionManagementRoles,
+        'promotions.rules.restore' => $promotionManagementRoles,
+        'promotions.rules.approve' => $promotionManagementRoles,
+        'promotions.rules.activate' => $promotionManagementRoles,
+        'promotions.rules.pause' => $promotionManagementRoles,
+        'promotions.coupons.view' => $promotionReadRoles,
+        'promotions.coupons.create' => $promotionManagementRoles,
+        'promotions.coupons.update' => $promotionManagementRoles,
+        'promotions.coupons.disable' => $promotionManagementRoles,
+        'promotions.simulator.view' => $promotionManagementRoles,
+        'promotions.simulator.run' => $promotionManagementRoles,
+        'promotions.usage.view' => $promotionManagementRoles,
+        'promotions.settings.manage' => $promotionManagementRoles,
     ],
 ];

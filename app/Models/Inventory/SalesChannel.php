@@ -4,6 +4,7 @@ namespace App\Models\Inventory;
 
 use App\Models\Company;
 use App\Models\Concerns\Auditable;
+use App\Models\Promotions\PromotionChannelTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,5 +33,10 @@ class SalesChannel extends Model
     public function mappings(): HasMany
     {
         return $this->hasMany(ChannelProductMapping::class);
+    }
+
+    public function promotionTargets(): HasMany
+    {
+        return $this->hasMany(PromotionChannelTarget::class, 'sales_channel_id');
     }
 }

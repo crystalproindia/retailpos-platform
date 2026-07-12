@@ -7,6 +7,7 @@ use App\Models\Purchases\GoodsReceipt;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseRequest;
 use App\Models\Purchases\PurchaseReturn;
+use App\Models\Promotions\PromotionBranchTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -54,5 +55,10 @@ class Branch extends Model
     public function purchaseReturns(): HasMany
     {
         return $this->hasMany(PurchaseReturn::class);
+    }
+
+    public function promotionTargets(): HasMany
+    {
+        return $this->hasMany(PromotionBranchTarget::class);
     }
 }

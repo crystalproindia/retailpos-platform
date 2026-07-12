@@ -57,6 +57,13 @@ use App\Http\Controllers\CommandCenter\Purchases\PurchaseReturnController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionCampaignController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionCouponController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionDashboardController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionRuleController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionSettingsController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionSimulatorController;
+use App\Http\Controllers\CommandCenter\Promotions\PromotionUsageController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -323,6 +330,44 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('settings', [PurchaseSettingsController::class, 'index'])->middleware('can:purchases.settings.manage')->name('settings.index');
         Route::put('settings', [PurchaseSettingsController::class, 'update'])->middleware('can:purchases.settings.manage')->name('settings.update');
+    });
+
+    Route::middleware(['role:administrator,manager,sales', 'can:promotions.view'])->prefix('promotions')->name('promotions.')->group(function (): void {
+        Route::get('/', PromotionDashboardController::class)->middleware('can:promotions.dashboard.view')->name('dashboard');
+
+        Route::get('campaigns', [PromotionCampaignController::class, 'index'])->middleware('can:promotions.campaigns.view')->name('campaigns.index');
+        Route::get('campaigns/create', [PromotionCampaignController::class, 'create'])->middleware('can:promotions.campaigns.create')->name('campaigns.create');
+        Route::post('campaigns', [PromotionCampaignController::class, 'store'])->middleware('can:promotions.campaigns.create')->name('campaigns.store');
+        Route::get('campaigns/{campaign}', [PromotionCampaignController::class, 'show'])->middleware('can:promotions.campaigns.view')->name('campaigns.show');
+        Route::get('campaigns/{campaign}/edit', [PromotionCampaignController::class, 'edit'])->middleware('can:promotions.campaigns.update')->name('campaigns.edit');
+        Route::put('campaigns/{campaign}', [PromotionCampaignController::class, 'update'])->middleware('can:promotions.campaigns.update')->name('campaigns.update');
+        Route::delete('campaigns/{campaign}', [PromotionCampaignController::class, 'destroy'])->middleware('can:promotions.campaigns.delete')->name('campaigns.destroy');
+        Route::post('campaigns/{campaign}/restore', [PromotionCampaignController::class, 'restore'])->middleware('can:promotions.campaigns.restore')->name('campaigns.restore');
+
+        Route::get('rules', [PromotionRuleController::class, 'index'])->middleware('can:promotions.rules.view')->name('rules.index');
+        Route::get('rules/create', [PromotionRuleController::class, 'create'])->middleware('can:promotions.rules.create')->name('rules.create');
+        Route::post('rules', [PromotionRuleController::class, 'store'])->middleware('can:promotions.rules.create')->name('rules.store');
+        Route::get('rules/{rule}', [PromotionRuleController::class, 'show'])->middleware('can:promotions.rules.view')->name('rules.show');
+        Route::get('rules/{rule}/edit', [PromotionRuleController::class, 'edit'])->middleware('can:promotions.rules.update')->name('rules.edit');
+        Route::put('rules/{rule}', [PromotionRuleController::class, 'update'])->middleware('can:promotions.rules.update')->name('rules.update');
+        Route::delete('rules/{rule}', [PromotionRuleController::class, 'destroy'])->middleware('can:promotions.rules.delete')->name('rules.destroy');
+        Route::post('rules/{rule}/restore', [PromotionRuleController::class, 'restore'])->middleware('can:promotions.rules.restore')->name('rules.restore');
+        Route::post('rules/{rule}/activate', [PromotionRuleController::class, 'activate'])->middleware('can:promotions.rules.activate')->name('rules.activate');
+        Route::post('rules/{rule}/pause', [PromotionRuleController::class, 'pause'])->middleware('can:promotions.rules.pause')->name('rules.pause');
+        Route::post('rules/{rule}/approve', [PromotionRuleController::class, 'approve'])->middleware('can:promotions.rules.approve')->name('rules.approve');
+
+        Route::get('coupons', [PromotionCouponController::class, 'index'])->middleware('can:promotions.coupons.view')->name('coupons.index');
+        Route::get('coupons/create', [PromotionCouponController::class, 'create'])->middleware('can:promotions.coupons.create')->name('coupons.create');
+        Route::post('coupons', [PromotionCouponController::class, 'store'])->middleware('can:promotions.coupons.create')->name('coupons.store');
+        Route::get('coupons/{coupon}/edit', [PromotionCouponController::class, 'edit'])->middleware('can:promotions.coupons.update')->name('coupons.edit');
+        Route::put('coupons/{coupon}', [PromotionCouponController::class, 'update'])->middleware('can:promotions.coupons.update')->name('coupons.update');
+        Route::post('coupons/{coupon}/toggle', [PromotionCouponController::class, 'toggle'])->middleware('can:promotions.coupons.disable')->name('coupons.toggle');
+
+        Route::get('simulator', [PromotionSimulatorController::class, 'index'])->middleware('can:promotions.simulator.view')->name('simulator.index');
+        Route::post('simulator', [PromotionSimulatorController::class, 'run'])->middleware('can:promotions.simulator.run')->name('simulator.run');
+        Route::get('usage', PromotionUsageController::class)->middleware('can:promotions.usage.view')->name('usage.index');
+        Route::get('settings', [PromotionSettingsController::class, 'index'])->middleware('can:promotions.settings.manage')->name('settings.index');
+        Route::put('settings', [PromotionSettingsController::class, 'update'])->middleware('can:promotions.settings.manage')->name('settings.update');
     });
 
     Route::redirect('settings', 'settings/general')->name('settings.index');

@@ -57,6 +57,16 @@ use App\Models\Purchases\SupplierAddress;
 use App\Models\Purchases\SupplierContact;
 use App\Models\Purchases\SupplierProduct;
 use App\Models\Purchases\SupplierScoreSnapshot;
+use App\Models\Promotions\PromotionAction;
+use App\Models\Promotions\PromotionBrandTarget;
+use App\Models\Promotions\PromotionBranchTarget;
+use App\Models\Promotions\PromotionCampaign;
+use App\Models\Promotions\PromotionCategoryTarget;
+use App\Models\Promotions\PromotionChannelTarget;
+use App\Models\Promotions\PromotionCoupon;
+use App\Models\Promotions\PromotionProductTarget;
+use App\Models\Promotions\PromotionRule;
+use App\Models\Promotions\PromotionSettings;
 use App\Models\QueueJobSnapshot;
 use App\Models\Setting;
 use App\Models\SystemHealthCheck;
@@ -1384,6 +1394,94 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
+        PromotionSettings::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'allow_stacking' => true,
+                'default_priority_strategy' => 'priority_then_benefit',
+                'allow_coupon_with_auto_discount' => true,
+                'max_discount_percentage_per_bill' => 50,
+                'max_discount_amount_per_bill' => 5000,
+                'require_approval_for_promotions' => false,
+                'show_discount_breakup_on_bill_future' => true,
+            ],
+        );
+
+        $promotionCampaign = PromotionCampaign::updateOrCreate(
+            ['company_id' => $company->id, 'slug' => 'demo-festive-retail-offers'],
+            [
+                'name' => 'Demo Festive Retail Offers',
+                'description' => 'Seeded demonstration campaign for Phase 4.5. These are not live customer promotions.',
+                'campaign_type' => 'festival',
+                'start_at' => now()->subDay(),
+                'end_at' => now()->addMonths(2),
+                'status' => 'active',
+                'priority' => 200,
+                'is_active' => true,
+                'created_by' => $admin->id,
+                'approved_by' => $admin->id,
+                'approved_at' => now()->subDay(),
+            ],
+        );
+
+        $demoRules = collect([
+            ['slug' => 'demo-buy-1-get-1-free', 'name' => 'Demo Buy 1 Get 1 Free', 'type' => 'buy_x_get_y', 'discount_type' => 'free_quantity', 'action' => ['action_type' => 'free_quantity', 'buy_quantity' => 1, 'get_quantity' => 1, 'applies_to_same_product' => true], 'product' => 'DEMO-TEE-001'],
+            ['slug' => 'demo-buy-1-get-2-free', 'name' => 'Demo Buy 1 Get 2 Free', 'type' => 'buy_x_get_y', 'discount_type' => 'free_quantity', 'action' => ['action_type' => 'free_quantity', 'buy_quantity' => 1, 'get_quantity' => 2, 'applies_to_same_product' => true], 'product' => 'DEMO-RICE-005'],
+            ['slug' => 'demo-buy-2-get-1-free', 'name' => 'Demo Buy 2 Get 1 Free', 'type' => 'buy_x_get_y', 'discount_type' => 'free_quantity', 'action' => ['action_type' => 'free_quantity', 'buy_quantity' => 2, 'get_quantity' => 1, 'applies_to_same_product' => true], 'product' => 'DEMO-SCAN-001'],
+            ['slug' => 'demo-buy-2-get-3-free', 'name' => 'Demo Buy 2 Get 3 Free', 'type' => 'buy_x_get_y', 'discount_type' => 'free_quantity', 'action' => ['action_type' => 'free_quantity', 'buy_quantity' => 2, 'get_quantity' => 3, 'applies_to_same_product' => true], 'product' => 'DEMO-SHOE-001'],
+            ['slug' => 'demo-buy-3-get-20-percent', 'name' => 'Demo Buy 3 Get 20% Off', 'type' => 'quantity_discount', 'discount_type' => 'percentage', 'minimum_quantity' => 3, 'action' => ['action_type' => 'percentage_off', 'discount_percentage' => 20], 'category' => 'apparel'],
+            ['slug' => 'demo-bill-1000-get-10-percent', 'name' => 'Demo Bill Above 1000 Get 10% Off', 'type' => 'minimum_bill_discount', 'discount_type' => 'percentage', 'minimum_bill_amount' => 1000, 'action' => ['action_type' => 'percentage_off', 'discount_percentage' => 10]],
+            ['slug' => 'demo-apparel-category-15-percent', 'name' => 'Demo Apparel Category 15% Off', 'type' => 'percentage_discount', 'discount_type' => 'percentage', 'action' => ['action_type' => 'percentage_off', 'discount_percentage' => 15], 'category' => 'apparel'],
+            ['slug' => 'demo-urban-brand-20-percent', 'name' => 'Demo Urban Threads Brand 20% Off', 'type' => 'percentage_discount', 'discount_type' => 'percentage', 'action' => ['action_type' => 'percentage_off', 'discount_percentage' => 20], 'brand' => 'urban-threads'],
+            ['slug' => 'demo-website-100-off', 'name' => 'Demo Website Only 100 Off', 'type' => 'channel_discount', 'discount_type' => 'fixed_amount', 'action' => ['action_type' => 'amount_off', 'discount_value' => 100], 'channel' => 'WEB'],
+            ['slug' => 'demo-main-store-50-off', 'name' => 'Demo Main Store 50 Off', 'type' => 'branch_discount', 'discount_type' => 'fixed_amount', 'action' => ['action_type' => 'amount_off', 'discount_value' => 50], 'branch' => true],
+            ['slug' => 'demo-festive10-coupon', 'name' => 'Demo FESTIVE10 Coupon', 'type' => 'coupon_discount', 'discount_type' => 'percentage', 'requires_coupon' => true, 'auto_apply' => false, 'action' => ['action_type' => 'percentage_off', 'discount_percentage' => 10]],
+        ])->mapWithKeys(function (array $definition, int $index) use ($company, $admin, $promotionCampaign): array {
+            $rule = PromotionRule::updateOrCreate(
+                ['company_id' => $company->id, 'slug' => $definition['slug']],
+                [
+                    'campaign_id' => $promotionCampaign->id,
+                    'name' => $definition['name'],
+                    'description' => 'Demo promotion seeded for Phase 4.5 only.',
+                    'promotion_type' => $definition['type'],
+                    'discount_type' => $definition['discount_type'],
+                    'priority' => 300 - $index,
+                    'stackable' => false,
+                    'exclusive' => false,
+                    'requires_coupon' => $definition['requires_coupon'] ?? false,
+                    'auto_apply' => $definition['auto_apply'] ?? true,
+                    'start_at' => now()->subDay(),
+                    'end_at' => now()->addMonths(2),
+                    'minimum_bill_amount' => $definition['minimum_bill_amount'] ?? null,
+                    'minimum_quantity' => $definition['minimum_quantity'] ?? null,
+                    'status' => 'active',
+                    'is_active' => true,
+                    'created_by' => $admin->id,
+                    'approved_by' => $admin->id,
+                    'approved_at' => now()->subDay(),
+                ],
+            );
+            PromotionAction::updateOrCreate(['promotion_rule_id' => $rule->id, 'action_type' => $definition['action']['action_type']], ['company_id' => $company->id] + $definition['action']);
+            return [$definition['slug'] => $rule];
+        });
+
+        foreach ($demoRules as $slug => $rule) {
+            $definition = collect([
+                'demo-buy-1-get-1-free' => ['product' => 'DEMO-TEE-001'], 'demo-buy-1-get-2-free' => ['product' => 'DEMO-RICE-005'], 'demo-buy-2-get-1-free' => ['product' => 'DEMO-SCAN-001'], 'demo-buy-2-get-3-free' => ['product' => 'DEMO-SHOE-001'],
+                'demo-buy-3-get-20-percent' => ['category' => 'apparel'], 'demo-apparel-category-15-percent' => ['category' => 'apparel'], 'demo-urban-brand-20-percent' => ['brand' => 'urban-threads'], 'demo-website-100-off' => ['channel' => 'WEB'], 'demo-main-store-50-off' => ['branch' => true],
+            ])->get($slug, []);
+            if (isset($definition['product'])) PromotionProductTarget::updateOrCreate(['promotion_rule_id' => $rule->id, 'product_id' => $products[$definition['product']]->id], ['company_id' => $company->id, 'include_or_exclude' => 'include']);
+            if (isset($definition['category'])) PromotionCategoryTarget::updateOrCreate(['promotion_rule_id' => $rule->id, 'category_id' => $inventoryCategories[$definition['category']]->id], ['company_id' => $company->id, 'include_or_exclude' => 'include']);
+            if (isset($definition['brand'])) PromotionBrandTarget::updateOrCreate(['promotion_rule_id' => $rule->id, 'brand_id' => $brands[$definition['brand']]->id], ['company_id' => $company->id, 'include_or_exclude' => 'include']);
+            if (isset($definition['channel'])) PromotionChannelTarget::updateOrCreate(['promotion_rule_id' => $rule->id, 'sales_channel_id' => $channels[$definition['channel']]->id], ['company_id' => $company->id, 'include_or_exclude' => 'include']);
+            if (isset($definition['branch'])) PromotionBranchTarget::updateOrCreate(['promotion_rule_id' => $rule->id, 'branch_id' => $branch->id], ['company_id' => $company->id, 'include_or_exclude' => 'include']);
+        }
+
+        PromotionCoupon::updateOrCreate(
+            ['company_id' => $company->id, 'code' => 'FESTIVE10'],
+            ['promotion_rule_id' => $demoRules['demo-festive10-coupon']->id, 'description' => 'Demo-only coupon for Phase 4.5 validation.', 'usage_limit_total' => 100, 'used_count' => 0, 'start_at' => now()->subDay(), 'end_at' => now()->addMonths(2), 'is_active' => true],
+        );
+
         collect([
             'default_cost_method' => 'weighted_average',
             'low_stock_notifications' => true,
@@ -1403,6 +1501,9 @@ class DatabaseSeeder extends Seeder
             ['event_key' => 'inventory.stock.out', 'channel' => 'database', 'name' => 'Out of stock in-app', 'subject' => 'Out of stock: {{ product_name }}', 'body' => '{{ product_name }} is out of stock.'],
             ['event_key' => 'inventory.reorder.suggested', 'channel' => 'database', 'name' => 'Reorder suggestion in-app', 'subject' => 'Reorder suggestion generated', 'body' => 'A reorder suggestion was generated for product {{ product_id }}.'],
             ['event_key' => 'inventory.channel.sync_warning', 'channel' => 'database', 'name' => 'Channel sync warning in-app', 'subject' => 'Inventory channel warning', 'body' => '{{ message }}'],
+            ['event_key' => 'promotion.approval.required', 'channel' => 'database', 'name' => 'Promotion approval required', 'subject' => 'Promotion approval required', 'body' => 'Promotion {{ rule_name }} requires manager review.'],
+            ['event_key' => 'promotion.rule.activated', 'channel' => 'database', 'name' => 'Promotion activated', 'subject' => 'Promotion activated: {{ rule_name }}', 'body' => 'Promotion {{ rule_name }} is active.'],
+            ['event_key' => 'promotion.coupon.used', 'channel' => 'database', 'name' => 'Promotion coupon used', 'subject' => 'Coupon used: {{ coupon_code }}', 'body' => 'Coupon {{ coupon_code }} was redeemed for ₹{{ discount_amount }}.'],
         ])->each(fn (array $template) => NotificationTemplate::updateOrCreate(
             [
                 'company_id' => null,

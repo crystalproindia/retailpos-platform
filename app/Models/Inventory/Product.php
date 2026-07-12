@@ -5,6 +5,8 @@ namespace App\Models\Inventory;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Concerns\Auditable;
+use App\Models\Promotions\PromotionProductTarget;
+use App\Models\Promotions\PromotionVariantTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -98,6 +100,16 @@ class Product extends Model
     public function reorderRules(): HasMany
     {
         return $this->hasMany(ReorderRule::class);
+    }
+
+    public function promotionProductTargets(): HasMany
+    {
+        return $this->hasMany(PromotionProductTarget::class);
+    }
+
+    public function promotionVariantTargets(): HasMany
+    {
+        return $this->hasMany(PromotionVariantTarget::class);
     }
 
     public function availableStock(): string

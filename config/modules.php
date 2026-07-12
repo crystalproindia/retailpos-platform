@@ -7,6 +7,8 @@ $crmRoles = ['administrator', 'manager', 'sales'];
 $notificationRoles = ['administrator', 'manager', 'sales'];
 $operationsRoles = ['administrator', 'manager'];
 $inventoryRoles = ['administrator', 'manager', 'sales'];
+$promotionRoles = ['administrator', 'manager', 'sales'];
+$promotionManagementRoles = ['administrator', 'manager'];
 
 return [
     'modules' => [
@@ -204,6 +206,63 @@ return [
             'badge' => null,
             'license_key' => null,
             'parent_id' => null,
+        ],
+        'promotions' => [
+            'name' => 'Promotions',
+            'description' => 'Centralized discount, coupon, campaign, and retail offer operations.',
+            'icon' => 'tag',
+            'route' => 'promotions.dashboard',
+            'route_params' => [],
+            'sort_order' => 170,
+            'category' => 'Sales & Marketing',
+            'enabled' => true,
+            'visible_in_sidebar' => true,
+            'roles' => $promotionRoles,
+            'badge' => ['label' => 'New', 'tone' => 'info'],
+            'license_key' => null,
+            'parent_id' => null,
+        ],
+        'promotion-dashboard' => [
+            'name' => 'Promotion Dashboard', 'description' => 'Promotion health, active offers, and simulation signals.', 'icon' => 'dashboard', 'route' => 'promotions.dashboard', 'route_params' => [], 'sort_order' => 171, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-campaigns' => [
+            'name' => 'Campaigns', 'description' => 'Seasonal, festival, clearance, branch, and channel campaigns.', 'icon' => 'marketing', 'route' => 'promotions.campaigns.index', 'route_params' => [], 'sort_order' => 172, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-rules' => [
+            'name' => 'Discount Rules', 'description' => 'Targeted discount and offer rule management.', 'icon' => 'tag', 'route' => 'promotions.rules.index', 'route_params' => [], 'sort_order' => 173, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-buy-x-get-y' => [
+            'name' => 'Buy X Get Y', 'description' => 'Buy-and-get offer rule workspace.', 'icon' => 'tag', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'buy_x_get_y'], 'sort_order' => 174, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-coupons' => [
+            'name' => 'Coupons', 'description' => 'Coupon lifecycle, activation, and redemption foundation.', 'icon' => 'tag', 'route' => 'promotions.coupons.index', 'route_params' => [], 'sort_order' => 175, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-combos' => [
+            'name' => 'Combo Offers', 'description' => 'Fixed-price and bundle discount foundation.', 'icon' => 'tag', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'bundle_discount'], 'sort_order' => 176, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-product-offers' => [
+            'name' => 'Product Offers', 'description' => 'Product and variant-targeted discounts.', 'icon' => 'products', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'percentage_discount'], 'sort_order' => 177, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-category-offers' => [
+            'name' => 'Category Offers', 'description' => 'Category-targeted discount rules.', 'icon' => 'package', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'percentage_discount'], 'sort_order' => 178, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-brand-offers' => [
+            'name' => 'Brand Offers', 'description' => 'Brand-targeted discount rules.', 'icon' => 'marketing', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'percentage_discount'], 'sort_order' => 179, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-channel-offers' => [
+            'name' => 'Channel Offers', 'description' => 'Store, web, WhatsApp, and marketplace-ready channel offers.', 'icon' => 'sales', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'channel_discount'], 'sort_order' => 180, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-branch-offers' => [
+            'name' => 'Branch Offers', 'description' => 'Branch-targeted promotion rules.', 'icon' => 'branches', 'route' => 'promotions.rules.index', 'route_params' => ['promotion_type' => 'branch_discount'], 'sort_order' => 181, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-simulator' => [
+            'name' => 'Promotion Simulator', 'description' => 'Test cart outcomes before POS billing exists.', 'icon' => 'analytics', 'route' => 'promotions.simulator.index', 'route_params' => [], 'sort_order' => 182, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionManagementRoles, 'badge' => ['label' => 'Test', 'tone' => 'success'], 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-usage' => [
+            'name' => 'Promotion Usage', 'description' => 'Promotion and coupon usage history foundation.', 'icon' => 'analytics', 'route' => 'promotions.usage.index', 'route_params' => [], 'sort_order' => 183, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionManagementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
+        ],
+        'promotion-settings' => [
+            'name' => 'Promotion Settings', 'description' => 'Stacking, approval, and discount cap controls.', 'icon' => 'settings', 'route' => 'promotions.settings.index', 'route_params' => [], 'sort_order' => 184, 'category' => 'Sales & Marketing', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $promotionManagementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'promotions',
         ],
         'inventory' => [
             'name' => 'Inventory',

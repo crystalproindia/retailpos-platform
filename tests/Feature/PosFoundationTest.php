@@ -75,6 +75,22 @@ class PosFoundationTest extends TestCase
         $this->actingAs($outsider)->get("/pos/held/{$sale->id}")->assertNotFound();
     }
 
+    public function test_pos_checkout_accepts_supported_split_cash_and_card_payments(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $product = $this->product($manager, 'POS-SPLIT-001', 'Split Payment Product', 4, 120);
+
+        $this->actingAs($manager)->post('/pos/checkout', [
+            'device_type' => 'desktop',
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 120]],
+            'payments' => [['method' => 'cash', 'amount' => 60], ['method' => 'card', 'amount' => 60, 'reference' => 'APPROVAL-1']],
+        ])->assertRedirect();
+
+        $sale = PosSale::query()->firstOrFail();
+        $this->assertDatabaseHas('pos_payments', ['pos_sale_id' => $sale->id, 'payment_method' => 'cash', 'amount' => 60]);
+        $this->assertDatabaseHas('pos_payments', ['pos_sale_id' => $sale->id, 'payment_method' => 'card', 'amount' => 60, 'reference' => 'APPROVAL-1']);
+    }
+
     public function test_mobile_lookup_quick_capture_and_rule_based_product_suggestions_work(): void
     {
         $manager = $this->user(UserRole::Manager);
@@ -111,7 +127,7 @@ class PosFoundationTest extends TestCase
         $this->actingAs($manager)->post('/pos/hold', $this->cartPayload($product, null, 1))->assertRedirect();
 
         $this->actingAs($manager)->get('/pos/dashboard')->assertOk()->assertSee('POS dashboard');
-        $this->actingAs($manager)->get('/pos/terminal')->assertOk()->assertSee('data-pos-mode="terminal"', false)->assertSee('Scan barcode or search product')->assertSee('data-pos-payment-modal', false)->assertSee('Checkout');
+        $this->actingAs($manager)->get('/pos/terminal')->assertOk()->assertSee('data-pos-mode="terminal"', false)->assertSee('Scan barcode or search product')->assertSee('data-pos-payment-modal', false)->assertSee('data-pos-split-payment', false)->assertSee('Checkout');
         $this->actingAs($manager)->get('/pos/mobile')->assertOk()->assertSee('data-pos-mode="mobile"', false)->assertSee('Products')->assertSee('data-pos-payment-modal', false);
         $this->actingAs($manager)->get('/pos/held')->assertOk()->assertSee('Held bills')->assertSee(PosSale::query()->value('sale_number'));
         $this->assertFileExists(public_path('pos-manifest.webmanifest'));

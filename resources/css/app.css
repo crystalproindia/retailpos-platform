@@ -524,6 +524,19 @@
         @apply inline-flex min-h-13 items-center justify-center rounded-xl bg-orange-500 px-4 text-base font-bold text-white shadow-[0_8px_18px_rgb(249_115_22_/_0.28)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300;
     }
 
+    .pos-split-row {
+        @apply grid grid-cols-[minmax(0,.9fr)_minmax(0,.8fr)_minmax(0,1fr)_2rem] items-center gap-2 rounded-xl border border-slate-200 bg-white p-2;
+    }
+
+    .pos-split-row select,
+    .pos-split-row input {
+        @apply min-w-0 text-sm;
+    }
+
+    .pos-split-remove {
+        @apply grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-700;
+    }
+
     [data-pos-mobile-pane]:not(.hidden) {
         animation: pos-pane-in 180ms ease-out;
     }
@@ -555,6 +568,9 @@
     .pos-payment-sheet { @apply max-h-[92dvh] rounded-b-none rounded-t-2xl p-4; }
     .pos-payment-modal-grid { @apply grid-cols-1 gap-4; }
     .pos-payment-method-list { @apply p-3; }
+    .pos-modal-accept { @apply sticky bottom-0; }
+    .pos-split-row { grid-template-columns: minmax(0, .9fr) minmax(0, .8fr) 2rem; }
+    .pos-split-row input[data-pos-split-reference] { grid-column: span 2 / span 2; }
 }
 
 body.sidebar-mobile-open [data-sidebar] {

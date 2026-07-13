@@ -2787,3 +2787,27 @@ QR, Wallet, Credit, Split, Bank Transfer, and Cheque are visibly labelled interf
 - Card and UPI remain a cashier-declared internal payment with an optional manual reference.
 - No direct thermal-printer driver is introduced; receipt output remains browser print.
 - No offline bill creation, sensitive local cart/customer storage, or synchronisation is started in this phase.
+
+## Phase 6.1.3 - Checkout Payment Modal & POS Payment UX Polish
+
+Phase 6.1.3 refines only the Phase 6.1.2 Checkout modal. The full POS terminal, product search, customer lookup/suggestions, cart, held bills, receipt, database tables, checkout service, and server-side request rules remain intact.
+
+### Checkout Payment Flow
+
+The sticky Checkout action and F9 open the payment modal only when the cart contains products. The modal remains a centred blurred-backdrop cashier surface on desktop and a bottom sheet on mobile. Escape/backdrop close it before submission. Its primary action becomes disabled with a saving label after submission, while existing Laravel validation stays authoritative.
+
+Cash defaults to the exact bill total, supports editable tender, Exact/Round/common amount shortcuts, and shows change in real time. Card and UPI remain internal cashier declarations: their manual reference field is available, their message explicitly states no gateway/card-terminal integration exists, and their submitted amount must match the total. Reference capture stays optional because there is currently no configured company setting that makes it mandatory.
+
+### Split Payments and Foundation Modes
+
+Split payment is now a real UI over the existing `payments[]` request structure for Cash, Card, and UPI. Cashiers can add/remove rows, select a supported method, enter amount/reference, see paid/remaining totals, and submit only when the rows equal the bill total. The checkout service continues to persist each supported row as a normal `pos_payments` record in the existing sale transaction.
+
+Wallet and Credit are customer-aware but non-settling foundations: the controls are disabled without a selected customer and surface the current customer wallet balance when present. QR, Wallet, Credit, Bank Transfer, Cheque, and unsupported mixed settlement remain visibly labelled future integrations; they do not submit unsupported payment types, reduce wallet balance, create credit due, call external providers, or create accounting entries.
+
+### Mobile, Keyboard, and Current Limits
+
+Mobile keeps the same payment modal as a touch-sized bottom sheet with a sticky accept action. Enter on amount/reference safely activates the current acceptance action, F9 opens payment, and Escape closes it before submission. A successful payment continues to use the existing receipt redirect, which provides browser print, receipt view, and new-bill navigation without adding an asynchronous checkout protocol.
+
+- No gateway, UPI API, QR provider, card terminal, wallet settlement, credit-due ledger, bank-transfer, cheque, or accounting integration is connected.
+- No offline payment queue, IndexedDB sale storage, or offline sync is added; the existing PWA fallback remains informational only.
+- Direct thermal printer integration remains deferred; receipt output remains browser print.

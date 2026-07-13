@@ -103,8 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
         customer: parse(posApp.dataset.initialCustomer, null),
         suggestions: {},
         paymentMethod: 'cash',
+        paymentMode: 'cash',
         manualDiscount: 0,
         paymentAmount: 0,
+        splitPayments: [],
         categoryId: 'all',
         recentlyAdded: [],
         popularProductIds: parse(posApp.dataset.popularProducts, []),
@@ -115,6 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const manualDiscount = () => Math.max(0, Number(state.manualDiscount || 0));
     const subtotal = () => state.cart.reduce((total, item) => total + Number(item.price) * Number(item.quantity), 0);
     const total = () => Math.max(0, subtotal() - manualDiscount());
+    const splitPaid = () => state.splitPayments.reduce((sum, payment) => sum + Math.max(0, Number(payment.amount || 0)), 0);
+    const paymentEntries = () => state.paymentMode === 'split'
+        ? state.splitPayments.map((payment) => ({ method: payment.method, amount: Number(payment.amount || 0), reference: payment.reference || '' }))
+        : [{ method: state.paymentMethod, amount: Number(state.paymentAmount || 0), reference: [...document.querySelectorAll('[data-pos-payment-reference]')].map((input) => input.value.trim()).find(Boolean) || '' }];
 
     const productMarkup = (product) => `<button type="button" data-pos-product='${escapeHtml(JSON.stringify(product))}' class="pos-product-card pos-compact-product-card text-left"><span class="pos-compact-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" class="size-full object-cover">` : escapeHtml(product.name).slice(0, 1)}</span><span class="mt-2 block truncate text-sm font-semibold text-slate-900">${escapeHtml(product.name)}</span><span class="mt-0.5 block truncate text-xs text-slate-500">${escapeHtml(product.sku || '')}</span><span class="mt-2 flex items-center justify-between gap-2"><span class="text-sm font-bold text-teal-700">${money(product.price)}</span>${product.track_inventory ? `<span class="pos-stock-badge ${product.low_stock ? 'is-low' : ''}">${Number(product.available_stock || 0)}</span>` : ''}</span></button>`;
 
@@ -237,13 +243,31 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-pos-suggestions]').forEach((node) => { node.innerHTML = suggestionMarkup(); });
         if (!state.paymentAmount) state.paymentAmount = money(finalTotal);
         document.querySelectorAll('[data-pos-payment-amount]').forEach((node) => { if (document.activeElement !== node) node.value = state.paymentAmount; });
-        const paid = Math.max(0, Number(state.paymentAmount || 0));
+        const isSplit = state.paymentMode === 'split';
+        const paid = isSplit ? splitPaid() : Math.max(0, Number(state.paymentAmount || 0));
         document.querySelectorAll('[data-pos-paid]').forEach((node) => { node.textContent = money(paid); });
-        document.querySelectorAll('[data-pos-change]').forEach((node) => { node.textContent = money(Math.max(0, paid - finalTotal)); });
+        document.querySelectorAll('[data-pos-change]').forEach((node) => { node.textContent = money(isSplit ? 0 : Math.max(0, paid - finalTotal)); });
+        document.querySelectorAll('[data-pos-remaining]').forEach((node) => { node.textContent = money(Math.max(0, finalTotal - paid)); });
         document.querySelectorAll('[data-payment-method]').forEach((node) => node.classList.toggle('is-selected', node.dataset.paymentMethod === state.paymentMethod));
+        document.querySelectorAll('[data-pos-split-payment]').forEach((button) => button.classList.toggle('is-selected', isSplit));
         document.querySelectorAll('[data-pos-wallet-foundation], [data-pos-credit-foundation]').forEach((button) => { button.disabled = !state.customer; });
-        document.querySelectorAll('[data-pos-checkout]').forEach((button) => { button.textContent = state.isSubmitting ? 'Saving payment…' : `Accept ${state.paymentMethod}`; button.disabled = state.isSubmitting; });
-        bindCartActions(); bindProducts(); bindQuickCustomer();
+        document.querySelectorAll('[data-pos-standard-payment], [data-pos-standard-summary]').forEach((node) => node.classList.toggle('hidden', isSplit));
+        document.querySelectorAll('[data-pos-split-payment-panel]').forEach((node) => node.classList.toggle('hidden', !isSplit));
+        document.querySelectorAll('[data-pos-split-rows]').forEach((node) => { node.innerHTML = isSplit ? splitRowsMarkup() : ''; });
+        const modeNotes = { cash: 'Cash is ready for this bill. Enter the cash given to calculate change.', upi: 'Manual UPI reference only. Gateway integration is not connected yet.', card: 'Manual card reference only. Card terminal integration is not connected yet.', split: 'Use Cash, Card, or UPI rows. Their total must equal the bill total.' };
+        document.querySelectorAll('[data-pos-payment-mode-note]').forEach((node) => { node.textContent = modeNotes[state.paymentMode] || modeNotes.cash; });
+        document.querySelectorAll('[data-pos-wallet-context]').forEach((node) => { node.classList.remove('hidden'); node.textContent = state.customer ? `Wallet balance: ${money(state.customer.wallet_balance)}. Wallet settlement and credit due are not enabled in this phase.` : 'Select a customer to use wallet or credit payment foundations.'; });
+        document.querySelectorAll('[data-pos-checkout]').forEach((button) => { button.textContent = state.isSubmitting ? 'Saving payment…' : (isSplit ? 'Accept split payment' : `Accept ${state.paymentMethod}`); button.disabled = state.isSubmitting; });
+        bindCartActions(); bindProducts(); bindQuickCustomer(); bindSplitActions();
+    };
+
+    const splitRowsMarkup = () => state.splitPayments.map((payment, index) => `<div class="pos-split-row"><select data-pos-split-method="${index}" aria-label="Payment method"><option value="cash" ${payment.method === 'cash' ? 'selected' : ''}>Cash</option><option value="card" ${payment.method === 'card' ? 'selected' : ''}>Card</option><option value="upi" ${payment.method === 'upi' ? 'selected' : ''}>UPI</option></select><input data-pos-split-amount="${index}" type="number" min="0" step="0.01" value="${escapeHtml(payment.amount)}" aria-label="Payment amount"><input data-pos-split-reference="${index}" value="${escapeHtml(payment.reference || '')}" placeholder="Reference" aria-label="Payment reference"><button type="button" data-pos-remove-split="${index}" class="pos-split-remove" aria-label="Remove payment">×</button></div>`).join('');
+
+    const bindSplitActions = () => {
+        document.querySelectorAll('[data-pos-split-method]').forEach((input) => input.addEventListener('change', () => { state.splitPayments[Number(input.dataset.posSplitMethod)].method = input.value; clearPaymentError(); render(); }));
+        document.querySelectorAll('[data-pos-split-amount]').forEach((input) => input.addEventListener('input', () => { const index = Number(input.dataset.posSplitAmount); state.splitPayments[index].amount = input.value; clearPaymentError(); render(); window.setTimeout(() => document.querySelector(`[data-pos-split-amount="${index}"]`)?.focus(), 0); }));
+        document.querySelectorAll('[data-pos-split-reference]').forEach((input) => input.addEventListener('input', () => { state.splitPayments[Number(input.dataset.posSplitReference)].reference = input.value; }));
+        document.querySelectorAll('[data-pos-remove-split]').forEach((button) => button.addEventListener('click', () => { if (state.splitPayments.length > 1) { state.splitPayments.splice(Number(button.dataset.posRemoveSplit), 1); render(); } }));
     };
 
     const filterProducts = () => {
@@ -305,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
         append('coupon_code', document.querySelector('[data-pos-coupon]')?.value || '');
         append('notes', [...document.querySelectorAll('[data-pos-notes]')].map((input) => input.value.trim()).find(Boolean) || '');
         state.cart.forEach((item, index) => { append(`items[${index}][product_id]`, item.id); append(`items[${index}][quantity]`, item.quantity); append(`items[${index}][unit_price]`, item.price); });
-        if (action === 'checkout') { state.isSubmitting = true; render(); append('payments[0][method]', state.paymentMethod); append('payments[0][amount]', state.paymentAmount || total()); append('payments[0][reference]', [...document.querySelectorAll('[data-pos-payment-reference]')].map((input) => input.value.trim()).find(Boolean) || ''); }
+        if (action === 'checkout') { state.isSubmitting = true; render(); paymentEntries().forEach((payment, index) => { append(`payments[${index}][method]`, payment.method); append(`payments[${index}][amount]`, payment.amount); append(`payments[${index}][reference]`, payment.reference); }); }
         form.submit();
     };
 
@@ -331,9 +355,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-pos-clear]').forEach((button) => button.addEventListener('click', () => { state.cart = []; render(); }));
     document.querySelectorAll('[data-pos-discount]').forEach((input) => input.addEventListener('input', () => { state.manualDiscount = input.value; document.querySelectorAll('[data-pos-discount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
     document.querySelectorAll('[data-pos-payment-amount]').forEach((input) => input.addEventListener('input', () => { state.paymentAmount = input.value; document.querySelectorAll('[data-pos-payment-amount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
-    document.querySelectorAll('[data-payment-method]').forEach((button) => button.addEventListener('click', () => { state.paymentMethod = button.dataset.paymentMethod; if (state.paymentMethod === 'cash') state.paymentAmount = money(total()); clearPaymentError(); render(); }));
+    document.querySelectorAll('[data-payment-method]').forEach((button) => button.addEventListener('click', () => { state.paymentMethod = button.dataset.paymentMethod; state.paymentMode = state.paymentMethod; if (state.paymentMethod === 'cash') state.paymentAmount = money(total()); clearPaymentError(); render(); }));
     document.querySelectorAll('[data-pos-hold]').forEach((button) => button.addEventListener('click', () => submitSale('hold')));
-    document.querySelectorAll('[data-pos-checkout]').forEach((button) => button.addEventListener('click', () => { if (state.isSubmitting) return; if (Number(state.paymentAmount || 0) < total()) { showPaymentError('Amount received must cover the total due.'); return; } submitSale('checkout'); }));
+    document.querySelectorAll('[data-pos-checkout]').forEach((button) => button.addEventListener('click', () => { if (state.isSubmitting) return; const due = total(); const paid = state.paymentMode === 'split' ? splitPaid() : Number(state.paymentAmount || 0); if (state.paymentMode === 'split' && Math.abs(paid - due) > 0.009) { showPaymentError(`Split payments must equal ${money(due)}.`); return; } if (state.paymentMode !== 'split' && paid < due) { showPaymentError('Amount received must cover the total due.'); return; } if (['upi', 'card'].includes(state.paymentMode) && Math.abs(paid - due) > 0.009) { showPaymentError(`${state.paymentMode.toUpperCase()} amount must match the total due.`); return; } submitSale('checkout'); }));
     document.querySelectorAll('[data-pos-open-payment]').forEach((button) => button.addEventListener('click', openPayment));
     document.querySelectorAll('[data-pos-close-payment]').forEach((button) => button.addEventListener('click', closePayment));
     document.querySelectorAll('[data-pos-open-cart]').forEach((button) => button.addEventListener('click', () => document.querySelector('[data-pos-cart-drawer]')?.classList.remove('hidden')));
@@ -346,7 +370,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     document.querySelectorAll('[data-pos-payment-foundation], [data-pos-split-foundation]').forEach((button) => button.addEventListener('click', () => foundationNotice(button.title || 'This payment option is prepared for a later POS payment workflow.')));
     document.querySelectorAll('[data-pos-wallet-foundation], [data-pos-credit-foundation]').forEach((button) => button.addEventListener('click', () => foundationNotice(state.customer ? 'This settlement option is a future POS foundation.' : 'Select a customer before using this payment foundation.', 'error')));
-    document.querySelectorAll('[data-pos-quick-amount]').forEach((button) => button.addEventListener('click', () => { state.paymentAmount = button.dataset.posQuickAmount === 'exact' ? money(total()) : button.dataset.posQuickAmount; render(); }));
+    document.querySelectorAll('[data-pos-split-payment]').forEach((button) => button.addEventListener('click', () => { state.paymentMode = 'split'; if (!state.splitPayments.length) state.splitPayments = [{ method: 'cash', amount: money(total()), reference: '' }]; clearPaymentError(); render(); }));
+    document.querySelectorAll('[data-pos-add-split]').forEach((button) => button.addEventListener('click', () => { if (state.splitPayments.length < 4) { state.splitPayments.push({ method: 'upi', amount: 0, reference: '' }); render(); } }));
+    document.querySelectorAll('[data-pos-quick-amount]').forEach((button) => button.addEventListener('click', () => { const value = button.dataset.posQuickAmount; state.paymentAmount = value === 'exact' ? money(total()) : value === 'round' ? money(Math.ceil(total() / 100) * 100) : value; render(); }));
+    document.querySelectorAll('[data-pos-payment-amount], [data-pos-payment-reference]').forEach((input) => input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); document.querySelector('[data-pos-checkout]')?.click(); } }));
     document.querySelectorAll('[data-pos-fullscreen]').forEach((button) => button.addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen?.(); } catch { showFeedback('Fullscreen is not available in this browser.', 'error'); } }));
     document.addEventListener('keydown', (event) => {
         if (event.key === 'F2' || (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName))) { event.preventDefault(); focusScanner(); }

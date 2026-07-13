@@ -181,6 +181,7 @@ return [
         ],
         'pos-billing' => ['name'=>'Terminal','description'=>'Full-screen cashier billing terminal.','icon'=>'pos','route'=>'pos.terminal','route_params'=>[],'sort_order'=>141,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$posRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'pos'],
         'pos-held' => ['name'=>'Held Bills','description'=>'Resume bills held by the current cashier.','icon'=>'audit','route'=>'pos.held.index','route_params'=>[],'sort_order'=>142,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$posRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'pos'],
+        'pos-offline' => ['name'=>'Offline Sync','description'=>'Review offline POS synchronization records.','icon'=>'activity','route'=>'pos.offline.index','route_params'=>[],'sort_order'=>143,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>['administrator','manager'],'badge'=>null,'license_key'=>null,'parent_id'=>'pos'],
         'customers' => [
             'name' => 'Customers',
             'description' => 'Customer intelligence, loyalty, wallet, and retention foundation.',

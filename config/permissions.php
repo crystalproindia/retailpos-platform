@@ -15,6 +15,7 @@ $cmsManagementRoles = ['administrator', 'manager'];
 $customerManagementRoles = ['administrator', 'manager'];
 $customerUserRoles = ['administrator', 'manager', 'sales'];
 $posUserRoles = ['administrator', 'manager', 'sales'];
+$posManagementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
@@ -23,6 +24,11 @@ return [
         'pos.hold' => $posUserRoles,
         'pos.customers.create' => $posUserRoles,
         'pos.receipts.view' => $posUserRoles,
+        'pos.offline.use' => $posUserRoles,
+        'pos.offline.sync' => $posUserRoles,
+        'pos.offline.monitor' => $posManagementRoles,
+        'pos.offline.retry' => $posManagementRoles,
+        'pos.offline.settings' => $posManagementRoles,
         'customers.view' => $customerUserRoles,
         'customers.dashboard.view' => $customerUserRoles,
         'customers.create' => $customerUserRoles,

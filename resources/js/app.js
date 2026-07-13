@@ -1,3 +1,5 @@
+import { createPosOfflineStore } from './pos-offline';
+
 const applyTheme = () => {
     const storedTheme = localStorage.getItem('retailpos.theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -95,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    const offlineStore = createPosOfflineStore({ bootstrapUrl: posApp.dataset.offlineBootstrapUrl, syncUrl: posApp.dataset.offlineSyncUrl, csrf });
     const parse = (value, fallback) => {
         try { return JSON.parse(value || ''); } catch { return fallback; }
     };
@@ -111,6 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
         recentlyAdded: [],
         popularProductIds: parse(posApp.dataset.popularProducts, []),
         isSubmitting: false,
+        online: navigator.onLine,
+        offlineSettings: {},
     };
     const money = (value) => Number(value || 0).toFixed(2);
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]));
@@ -132,6 +137,32 @@ document.addEventListener('DOMContentLoaded', () => {
             window.clearTimeout(Number(node.dataset.timeout));
             node.dataset.timeout = String(window.setTimeout(() => node.classList.add('hidden'), 2200));
         });
+    };
+
+    const updateConnectivity = async (message = null) => {
+        const pending = await offlineStore.pendingCount();
+        document.querySelectorAll('[data-pos-connectivity]').forEach((node) => { node.textContent = state.online ? 'Online' : 'Offline mode'; node.closest('[data-pos-sync]')?.classList.toggle('is-offline', !state.online); });
+        document.querySelectorAll('[data-pos-pending-sync]').forEach((node) => { node.textContent = pending; node.classList.toggle('hidden', !pending); });
+        const modalHeader = paymentModal?.querySelector('header');
+        if (modalHeader && !modalHeader.querySelector('[data-pos-offline-label]')) modalHeader.querySelector('div')?.insertAdjacentHTML('beforeend', ' <span data-pos-offline-label class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">Offline mode</span>');
+        document.querySelectorAll('[data-pos-offline-label]').forEach((node) => node.classList.toggle('hidden', state.online));
+        if (message) showFeedback(message, state.online ? 'success' : 'error');
+    };
+
+    const refreshOfflineBootstrap = async () => {
+        try {
+            const snapshot = await offlineStore.bootstrap();
+            state.offlineSettings = snapshot?.settings || {};
+            await updateConnectivity();
+        } catch { await updateConnectivity('Offline cache is not ready yet. Connect once to prepare POS offline mode.'); }
+    };
+
+    const syncOfflineBills = async () => {
+        if (!state.online) { await updateConnectivity('Offline bills will sync automatically when internet returns.'); return; }
+        try {
+            const result = await offlineStore.sync();
+            await updateConnectivity(result.results?.length ? 'Offline bills synchronized.' : null);
+        } catch { await updateConnectivity('Offline bill sync failed. Pending bills remain safely queued.'); }
     };
 
     const focusScanner = () => window.setTimeout(() => [...document.querySelectorAll('[data-pos-scanner]')].find((input) => input.offsetParent !== null)?.focus(), 30);
@@ -209,6 +240,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mobile = [...document.querySelectorAll('[data-pos-customer-mobile]')].map((input) => input.value.trim()).find(Boolean);
                 const name = button.closest('[data-pos-quick-customer]')?.querySelector('[data-pos-quick-name]')?.value.trim();
                 if (!mobile) return;
+                if (!state.online) {
+                    state.customer = { id: null, name: name || 'Offline customer', mobile, group: 'Pending sync', loyalty_points: 0, wallet_balance: 0, last_purchase_at: null, retention_note: 'Customer will be created or merged during sync.' };
+                    state.suggestions = {};
+                    render();
+                    showFeedback('Customer saved with this offline bill and will be synchronized later.');
+                    return;
+                }
                 const response = await fetch(posApp.dataset.quickCustomerUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ mobile, name }) });
                 if (!response.ok) { showFeedback('Customer could not be created. Check the number and try again.', 'error'); return; }
                 const payload = await response.json();
@@ -289,6 +327,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const searchProducts = async (value) => {
+        if (!state.online) {
+            const products = await offlineStore.products(value);
+            const markup = products.map(productMarkup).join('');
+            document.querySelectorAll('[data-pos-products], [data-pos-products-mobile]').forEach((node) => { node.innerHTML = markup; });
+            document.querySelectorAll('[data-pos-product-count]').forEach((node) => { node.textContent = `${products.length} cached`; });
+            bindProducts(); filterProducts();
+            return;
+        }
         const url = new URL(posApp.dataset.catalogUrl, window.location.origin);
         if (value) url.searchParams.set('q', value);
         const response = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -306,6 +352,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!mobile) return;
         document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => { input.value = mobile; });
         const url = new URL(posApp.dataset.customerUrl, window.location.origin); url.searchParams.set('mobile', mobile);
+        if (!state.online) {
+            state.customer = await offlineStore.customer(mobile);
+            state.suggestions = {};
+            render();
+            showFeedback(state.customer ? `${state.customer.name} selected from offline cache.` : 'No cached customer found. A new customer can be synced later.', state.customer ? 'success' : 'error');
+            return;
+        }
         document.querySelectorAll('[data-pos-customer-loading]').forEach((node) => node.classList.remove('hidden'));
         const response = await fetch(url, { headers: { Accept: 'application/json' } });
         document.querySelectorAll('[data-pos-customer-loading]').forEach((node) => node.classList.add('hidden'));
@@ -317,8 +370,23 @@ document.addEventListener('DOMContentLoaded', () => {
         showFeedback(payload.customer ? `${payload.customer.name} selected.` : 'No customer found. Add them in one step.');
     };
 
-    const submitSale = (action) => {
+    const submitSale = async (action) => {
         if (!state.cart.length) { showFeedback('Add a product before checkout.', 'error'); return; }
+        if (action === 'checkout' && !state.online) {
+            const allowed = { cash: state.offlineSettings.allow_offline_cash !== false, card: state.offlineSettings.allow_offline_manual_card === true, upi: state.offlineSettings.allow_offline_manual_upi === true };
+            const payments = paymentEntries();
+            if (payments.some((payment) => !allowed[payment.method])) { showPaymentError('This payment method requires internet in the current offline POS settings.'); return; }
+            const sequence = (await offlineStore.pendingCount()) + 1;
+            const offlineUuid = crypto.randomUUID();
+            const offlineReference = `OFF-${offlineStore.deviceId.slice(-6).toUpperCase()}-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(sequence).padStart(4, '0')}`;
+            await offlineStore.queueBill({ offline_uuid: offlineUuid, offline_reference: offlineReference, offline_created_at: new Date().toISOString(), items: state.cart.map((item) => ({ product_id: item.id, quantity: item.quantity, unit_price: item.price })), payments, customer: state.customer ? { mobile: state.customer.mobile, name: state.customer.name } : null, coupon_code: document.querySelector('[data-pos-coupon]')?.value || null, notes: [...document.querySelectorAll('[data-pos-notes]')].map((input) => input.value.trim()).find(Boolean) || null });
+            let offlineSuccess = paymentModal?.querySelector('[data-pos-offline-success]');
+            if (!offlineSuccess && paymentModal) { paymentModal.querySelector('header')?.insertAdjacentHTML('afterend', '<p data-pos-offline-success class="mx-1 mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800"></p>'); offlineSuccess = paymentModal.querySelector('[data-pos-offline-success]'); }
+            if (offlineSuccess) { offlineSuccess.textContent = `Bill ${offlineReference} saved offline. It is pending sync and will receive an official bill number after sync.`; offlineSuccess.classList.remove('hidden'); }
+            state.cart = []; state.customer = null; state.suggestions = {}; state.paymentAmount = 0; state.splitPayments = []; state.isSubmitting = false;
+            render(); await updateConnectivity();
+            return;
+        }
         const form = document.querySelector('[data-pos-submit]');
         form.action = action === 'hold' ? posApp.dataset.holdUrl : posApp.dataset.checkoutUrl;
         form.innerHTML = `<input type="hidden" name="_token" value="${csrf}">`;
@@ -375,6 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-pos-quick-amount]').forEach((button) => button.addEventListener('click', () => { const value = button.dataset.posQuickAmount; state.paymentAmount = value === 'exact' ? money(total()) : value === 'round' ? money(Math.ceil(total() / 100) * 100) : value; render(); }));
     document.querySelectorAll('[data-pos-payment-amount], [data-pos-payment-reference]').forEach((input) => input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); document.querySelector('[data-pos-checkout]')?.click(); } }));
     document.querySelectorAll('[data-pos-fullscreen]').forEach((button) => button.addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen?.(); } catch { showFeedback('Fullscreen is not available in this browser.', 'error'); } }));
+    document.querySelectorAll('[data-pos-sync]').forEach((button) => button.addEventListener('click', syncOfflineBills));
+    window.addEventListener('online', async () => { state.online = true; await refreshOfflineBootstrap(); await syncOfflineBills(); await updateConnectivity('Online restored. Checking pending offline bills…'); });
+    window.addEventListener('offline', async () => { state.online = false; await updateConnectivity('Offline mode active. Bills will be saved locally and synced later.'); });
     document.addEventListener('keydown', (event) => {
         if (event.key === 'F2' || (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName))) { event.preventDefault(); focusScanner(); }
         if (event.key === 'F4') { event.preventDefault(); [...document.querySelectorAll('[data-pos-customer-mobile]')].find((input) => input.offsetParent !== null)?.focus(); }
@@ -389,4 +460,5 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
     filterProducts();
     focusScanner();
+    refreshOfflineBootstrap();
 });

@@ -15,6 +15,7 @@ use App\Models\Inventory\Warehouse;
 use App\Models\Pos\CustomerProductSummary;
 use App\Models\Pos\PosProductPairSummary;
 use App\Models\Pos\PosSale;
+use App\Models\Pos\PosOfflineSyncRecord;
 use App\Models\User;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -133,6 +134,32 @@ class PosFoundationTest extends TestCase
         $this->assertFileExists(public_path('pos-manifest.webmanifest'));
         $this->assertFileExists(public_path('pos-sw.js'));
         $this->assertFileExists(public_path('pos-offline.html'));
+    }
+
+    public function test_offline_bootstrap_and_idempotent_bill_sync_use_existing_pos_checkout(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $product = $this->product($manager, 'POS-OFFLINE-001', 'Offline Product', 5, 100);
+        $customer = $this->customer($manager, '9000000404');
+        $record = ['offline_uuid' => '0c2092d0-95d9-482f-bccc-6fe9d5d6f62b', 'offline_reference' => 'OFF-TERM01-20260713-0001', 'offline_created_at' => now()->subMinute()->toIso8601String(), 'customer' => ['mobile' => $customer->phone, 'name' => $customer->display_name], 'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100]], 'payments' => [['method' => 'cash', 'amount' => 100]]];
+
+        $this->get('/pos/offline/bootstrap')->assertRedirect(route('login'));
+        $this->actingAs($manager)->getJson('/pos/offline/bootstrap')->assertOk()->assertJsonFragment(['id' => $product->id])->assertJsonPath('settings.enable_offline_pos', true);
+        $response = $this->actingAs($manager)->postJson('/pos/offline/sync', ['batch_uuid' => 'e3cf0004-a8d8-4f0a-a191-8cef1d8032cb', 'device_id' => 'browser-device', 'records' => [$record]])->assertOk();
+        $sale = PosSale::query()->firstOrFail();
+        $response->assertJsonPath('results.0.sale_number', $sale->sale_number);
+        $this->assertTrue($sale->synced_from_offline);
+        $this->assertSame($record['offline_uuid'], $sale->offline_uuid);
+        $this->assertDatabaseHas('pos_payments', ['pos_sale_id' => $sale->id, 'payment_method' => 'cash', 'amount' => 100]);
+        $this->assertDatabaseHas('stock_levels', ['product_id' => $product->id, 'quantity_on_hand' => 4]);
+        $this->assertDatabaseHas('customer_product_summaries', ['customer_id' => $customer->id, 'product_id' => $product->id]);
+        $this->actingAs($manager)->postJson('/pos/offline/sync', ['batch_uuid' => 'b4154c19-c18d-4bb3-89f6-b6e92d987e2d', 'device_id' => 'browser-device', 'records' => [$record]])->assertOk()->assertJsonPath('results.0.status', 'duplicate');
+        $this->assertSame(1, PosSale::query()->count());
+        $this->assertDatabaseHas('pos_offline_sync_records', ['offline_uuid' => $record['offline_uuid']]);
+        $this->actingAs($manager)->get('/pos/offline')->assertOk()->assertSee($record['offline_reference']);
+        $sales = $this->user(UserRole::Sales, $manager->company, $manager->branch);
+        $this->actingAs($sales)->get('/pos/offline')->assertForbidden();
+        $this->assertContains(PosOfflineSyncRecord::query()->firstOrFail()->status, ['synced', 'warning']);
     }
 
     private function user(UserRole $role, ?Company $company = null, ?Branch $branch = null): User

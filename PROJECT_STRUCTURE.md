@@ -2811,3 +2811,34 @@ Mobile keeps the same payment modal as a touch-sized bottom sheet with a sticky 
 - No gateway, UPI API, QR provider, card terminal, wallet settlement, credit-due ledger, bank-transfer, cheque, or accounting integration is connected.
 - No offline payment queue, IndexedDB sale storage, or offline sync is added; the existing PWA fallback remains informational only.
 - Direct thermal printer integration remains deferred; receipt output remains browser print.
+
+## Phase 6.2 - Offline POS Mode & Auto Sync Foundation
+
+Phase 6.2 adds an additive offline queue around the existing online POS checkout flow. It preserves the premium terminal, Checkout modal, inventory posting, promotions, customer intelligence, and receipts. Online bills still post directly to Laravel; only a browser-detected offline checkout is stored locally as a Pending Sync bill.
+
+### Server Architecture and Idempotency
+
+Migration `2026_07_13_130001_create_pos_offline_sync_foundation_tables.php` adds `pos_offline_sync_batches`, `pos_offline_sync_records`, and `pos_offline_settings`. It also adds nullable `offline_uuid`, `offline_reference`, `synced_from_offline`, `offline_created_at`, and `device_id` fields to `pos_sales`. The company/offline UUID unique index ensures the same queued bill cannot create more than one official sale.
+
+`PosOfflineSyncService` owns safe bootstrap generation and sync processing. A sync batch contains scoped client records; each record is persisted before processing, then either becomes synced/warning with its official `PosSale` reference, failed with a safe error message, or duplicate without creating another sale. On sync, the service invokes the existing `PosCheckoutService`, so item persistence, payment rows, stock movements, customer purchase totals, customer-product summaries, product-pair suggestions, audit, and standard POS events remain authoritative. Offline price differences are preserved as the cashier-sold price and recorded as warnings for review.
+
+### Offline APIs, Permissions, and Monitor
+
+Authenticated `pos.offline.*` routes provide bootstrap, status, sync, monitor, records, and retry. Bootstrap is company/branch/user scoped and returns active product stock snapshots, minimal customer snapshots, and safe offline settings. Sync requires a batch UUID, browser device ID, record UUIDs, safe payment methods, and company-scoped products. Sales may use/sync their own device records; Administrators and Managers can open `/pos/offline`, inspect all records, and retry failures. The monitor shows status, offline reference, device/cashier, official bill reference, and warning/error context.
+
+The new capabilities are `pos.offline.use`, `pos.offline.sync`, `pos.offline.monitor`, `pos.offline.retry`, and `pos.offline.settings`. Offline sync events are registered through the existing domain-event and notification systems: queued/synced bill, sync started/completed/failed, record failed, and warning.
+
+### IndexedDB Queue and Checkout Integration
+
+`resources/js/pos-offline.js` uses IndexedDB for cache snapshots and pending bills. It stores no secrets, authentication tokens, card data, or private HTML. LocalStorage stores only a generated non-secret device UUID. The terminal refreshes bootstrap data while online, shows online/offline and pending-count state, falls back to cached products/customers when offline, supports an offline quick-customer snapshot, and automatically submits queued bills when the browser `online` event fires. A manual sync control is also available.
+
+Offline Checkout remains inside the Phase 6.1.3 payment modal. Cash is allowed by default; Card/UPI manual references are allowed only when the cached offline setting allows them. Wallet, loyalty redemption, credit, gateway verification, QR collection, and unsupported methods remain disabled or foundation-only offline. A queued bill gets an `OFF-{device}-{date}-{sequence}` reference, shows a Pending Sync confirmation, and does not claim an official server bill number until sync succeeds.
+
+### Service Worker, Conflict Safety, and Limitations
+
+The service worker remains limited to the POS shell/assets and branded fallback; authenticated bootstrap snapshots live in IndexedDB and are refreshed through authenticated routes rather than being long-term service-worker-cached. Server sync is still the final authority. Product price changes produce a warning; duplicate UUIDs never duplicate a sale. Existing stock validation remains active, so a later stock conflict stays visible as a failed sync record for manager review rather than silently rewriting inventory.
+
+- Offline UPI/card references are cashier-entered only; no gateway or terminal verification exists.
+- Offline stock is a snapshot; it can differ at sync time and is intended for short outages, not long-term disconnected operation.
+- Wallet/loyalty redemption, credit dues, returns/exchanges, multi-device conflict reconciliation, and full offline promotion re-evaluation remain deferred or disabled by default.
+- No payment gateway, UPI API, card terminal, direct thermal printer, finance/accounting, WhatsApp/SMS, AI, n8n, or BI integration is introduced.

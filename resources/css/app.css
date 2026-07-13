@@ -425,6 +425,18 @@
         @apply min-h-10 rounded-xl border-slate-200 bg-slate-50 text-sm font-medium shadow-none;
     }
 
+    .pos-connectivity {
+        @apply inline-flex min-h-8 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100;
+    }
+
+    .pos-connectivity.is-offline {
+        @apply bg-amber-50 text-amber-800 hover:bg-amber-100;
+    }
+
+    .pos-connectivity b {
+        @apply grid min-w-4 place-items-center rounded-full bg-white px-1 text-[10px] text-slate-700;
+    }
+
     .pos-premium-terminal-grid {
         grid-template-columns: 10.5rem minmax(0, 1fr) 24.5rem;
     }

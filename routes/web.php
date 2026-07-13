@@ -67,6 +67,7 @@ use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
 use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
 use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
 use App\Http\Controllers\CommandCenter\Pos\PosController;
+use App\Http\Controllers\CommandCenter\Pos\PosOfflineController;
 use App\Http\Controllers\CommandCenter\Purchases\GoodsReceiptController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseDashboardController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseOrderController;
@@ -187,6 +188,14 @@ Route::middleware('auth')->group(function (): void {
         Route::get('dashboard', [PosController::class, 'dashboard'])->name('dashboard');
         Route::get('terminal', [PosController::class, 'terminal'])->name('terminal');
         Route::get('mobile', [PosController::class, 'mobile'])->name('mobile');
+        Route::prefix('offline')->name('offline.')->group(function (): void {
+            Route::get('bootstrap', [PosOfflineController::class, 'bootstrap'])->middleware('can:pos.offline.use')->name('bootstrap');
+            Route::post('sync', [PosOfflineController::class, 'sync'])->middleware('can:pos.offline.sync')->name('sync');
+            Route::get('status', [PosOfflineController::class, 'status'])->middleware('can:pos.offline.use')->name('status');
+            Route::get('/', [PosOfflineController::class, 'index'])->middleware(['role:administrator,manager', 'can:pos.offline.monitor'])->name('index');
+            Route::get('records', [PosOfflineController::class, 'records'])->middleware('can:pos.offline.sync')->name('records');
+            Route::post('records/{record}/retry', [PosOfflineController::class, 'retry'])->whereNumber('record')->middleware(['role:administrator,manager', 'can:pos.offline.retry'])->name('records.retry');
+        });
         Route::get('held', [PosController::class, 'heldBills'])->middleware('can:pos.hold')->name('held.index');
         Route::get('catalog', [PosController::class, 'catalog'])->name('catalog');
         Route::get('customers/lookup', [PosController::class, 'customer'])->name('customers.lookup');

@@ -11,6 +11,7 @@ use App\Repositories\Pos\PosSaleRepository;
 use App\Services\Pos\CustomerProductSuggestionService;
 use App\Services\Pos\PosCheckoutService;
 use App\Services\Pos\PosCustomerLookupService;
+use App\Services\Pos\PosDashboardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,11 +21,27 @@ class PosController extends Controller
 {
     public function index(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales): View
     {
-        return view('command-center.pos.index', [
-            'products' => $catalog->search($request->user()->company_id, $request->user()->branch_id, $request->string('search')->toString()),
-            'heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id),
-            'resumedSale' => null,
-        ]);
+        return $this->workspace($request, $catalog, $sales);
+    }
+
+    public function terminal(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales): View
+    {
+        return $this->workspace($request, $catalog, $sales, 'terminal');
+    }
+
+    public function mobile(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales): View
+    {
+        return $this->workspace($request, $catalog, $sales, 'mobile');
+    }
+
+    public function dashboard(Request $request, PosDashboardService $dashboard): View
+    {
+        return view('command-center.pos.dashboard', ['summary' => $dashboard->summary($request->user()->company_id, $request->user()->branch_id)]);
+    }
+
+    public function heldBills(Request $request, PosSaleRepository $sales): View
+    {
+        return view('command-center.pos.held', ['heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id, $request->string('q')->toString())]);
     }
 
     public function catalog(Request $request, PosCatalogRepository $catalog): JsonResponse
@@ -62,12 +79,12 @@ class PosController extends Controller
         return redirect()->route('pos.receipts.show', $sale)->with('status', "Sale {$sale->sale_number} completed.");
     }
 
-    public function resume(Request $request, PosSaleRepository $sales, int $sale): View
+    public function resume(Request $request, PosSaleRepository $sales, PosCatalogRepository $catalog, int $sale): View
     {
         $resumedSale = $sales->findForCompany($request->user()->company_id, $sale);
         abort_unless($resumedSale->status === 'held' && $resumedSale->held_by === $request->user()->id, 403);
 
-        return view('command-center.pos.index', ['products' => app(PosCatalogRepository::class)->search($request->user()->company_id, $request->user()->branch_id), 'heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id)->where('id', '!=', $resumedSale->id), 'resumedSale' => $resumedSale]);
+        return $this->workspace($request, $catalog, $sales, 'terminal', $resumedSale);
     }
 
     public function receipt(Request $request, PosSaleRepository $sales, int $sale): View
@@ -85,8 +102,23 @@ class PosController extends Controller
     }
 
     /** @return array<string, mixed> */
+    private function workspace(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, string $mode = 'desktop', mixed $resumedSale = null): View
+    {
+        $products = $catalog->search($request->user()->company_id, $request->user()->branch_id, $request->string('search')->toString());
+
+        return view('command-center.pos.index', [
+            'products' => $products,
+            'categories' => $products->pluck('category')->filter()->unique('id')->values(),
+            'heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id),
+            'resumedSale' => $resumedSale,
+            'posMode' => $mode,
+        ]);
+    }
+
     private function productPayload($product): array
     {
-        return ['id' => $product->id, 'name' => $product->name, 'sku' => $product->sku, 'barcode' => $product->barcode, 'price' => (float) $product->selling_price, 'category' => $product->category?->name, 'category_id' => $product->category_id, 'available_stock' => (float) $product->stockLevels->sum('quantity_available')];
+        $stock = (float) $product->stockLevels->sum('quantity_available');
+
+        return ['id' => $product->id, 'name' => $product->name, 'sku' => $product->sku, 'barcode' => $product->barcode, 'price' => (float) $product->selling_price, 'category' => $product->category?->name, 'brand' => $product->brand?->name, 'category_id' => $product->category_id, 'image' => $product->image, 'track_inventory' => (bool) $product->track_inventory, 'available_stock' => $stock, 'low_stock' => $product->track_inventory && $stock > 0 && $stock <= 5];
     }
 }

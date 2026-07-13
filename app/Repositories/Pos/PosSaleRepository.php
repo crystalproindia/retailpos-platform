@@ -13,8 +13,15 @@ class PosSaleRepository
     }
 
     /** @return Collection<int, PosSale> */
-    public function heldForUser(int $companyId, int $userId): Collection
+    public function heldForUser(int $companyId, int $userId, ?string $search = null): Collection
     {
-        return PosSale::query()->with('customer')->where('company_id', $companyId)->where('status', 'held')->where('held_by', $userId)->latest('held_at')->get();
+        return PosSale::query()
+            ->with(['customer', 'items'])
+            ->where('company_id', $companyId)
+            ->where('status', 'held')
+            ->where('held_by', $userId)
+            ->when($search, fn ($query, string $search) => $query->where(fn ($held) => $held->where('sale_number', 'like', "%{$search}%")->orWhereHas('customer', fn ($customer) => $customer->where('display_name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"))))
+            ->latest('held_at')
+            ->get();
     }
 }

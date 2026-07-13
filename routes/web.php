@@ -184,6 +184,10 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware(['role:administrator,manager,sales', 'can:pos.view'])->prefix('pos')->name('pos.')->group(function (): void {
         Route::get('/', [PosController::class, 'index'])->name('index');
+        Route::get('dashboard', [PosController::class, 'dashboard'])->name('dashboard');
+        Route::get('terminal', [PosController::class, 'terminal'])->name('terminal');
+        Route::get('mobile', [PosController::class, 'mobile'])->name('mobile');
+        Route::get('held', [PosController::class, 'heldBills'])->middleware('can:pos.hold')->name('held.index');
         Route::get('catalog', [PosController::class, 'catalog'])->name('catalog');
         Route::get('customers/lookup', [PosController::class, 'customer'])->name('customers.lookup');
         Route::post('customers/quick-create', [PosController::class, 'quickCustomer'])->middleware('can:pos.customers.create')->name('customers.quick-create');

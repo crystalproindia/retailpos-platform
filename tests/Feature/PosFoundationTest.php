@@ -103,6 +103,22 @@ class PosFoundationTest extends TestCase
         $this->assertDatabaseHas('pos_product_pair_summaries', ['company_id' => $company->id, 'co_purchase_count' => 4]);
     }
 
+    public function test_pos_terminal_dashboard_mobile_held_bill_and_pwa_foundations_load(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $product = $this->product($manager, 'POS-UI-001', 'Terminal Product', 5, 75);
+
+        $this->actingAs($manager)->post('/pos/hold', $this->cartPayload($product, null, 1))->assertRedirect();
+
+        $this->actingAs($manager)->get('/pos/dashboard')->assertOk()->assertSee('POS dashboard');
+        $this->actingAs($manager)->get('/pos/terminal')->assertOk()->assertSee('data-pos-mode="terminal"', false)->assertSee('Scan barcode or search products');
+        $this->actingAs($manager)->get('/pos/mobile')->assertOk()->assertSee('data-pos-mode="mobile"', false)->assertSee('Products');
+        $this->actingAs($manager)->get('/pos/held')->assertOk()->assertSee('Held bills')->assertSee(PosSale::query()->value('sale_number'));
+        $this->assertFileExists(public_path('pos-manifest.webmanifest'));
+        $this->assertFileExists(public_path('pos-sw.js'));
+        $this->assertFileExists(public_path('pos-offline.html'));
+    }
+
     private function user(UserRole $role, ?Company $company = null, ?Branch $branch = null): User
     {
         $company ??= Company::factory()->create();

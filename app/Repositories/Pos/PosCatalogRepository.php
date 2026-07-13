@@ -11,7 +11,7 @@ class PosCatalogRepository
     public function search(int $companyId, ?int $branchId, ?string $term = null): Collection
     {
         return Product::query()
-            ->with('category')
+            ->with(['category', 'brand'])
             ->where('company_id', $companyId)
             ->where('is_active', true)
             ->where('status', Product::STATUS_ACTIVE)

@@ -242,6 +242,179 @@
         @apply text-teal-700;
     }
 
+    .pos-workspace {
+        @apply min-w-0 bg-slate-100 text-slate-950;
+    }
+
+    .pos-terminal-header {
+        @apply flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 shadow-[0_1px_12px_rgb(15_23_42_/_0.06)] sm:px-6;
+    }
+
+    .pos-terminal-grid {
+        @apply grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_23.5rem] overflow-hidden;
+    }
+
+    .pos-catalog-pane {
+        @apply min-w-0 overflow-y-auto bg-slate-50 p-4 sm:p-5;
+    }
+
+    .pos-cart-pane {
+        @apply flex min-h-0 min-w-0 flex-col border-l border-slate-200 bg-white shadow-[-10px_0_28px_rgb(15_23_42_/_0.035)];
+    }
+
+    .pos-search-row {
+        @apply flex gap-3;
+    }
+
+    .pos-scanner-input {
+        @apply min-h-13 border-teal-200 bg-white text-base font-medium shadow-sm;
+    }
+
+    .pos-scan-action {
+        @apply inline-flex min-h-13 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-200;
+    }
+
+    .pos-feedback {
+        @apply mt-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800;
+    }
+
+    .pos-feedback.is-error {
+        @apply border-rose-100 bg-rose-50 text-rose-800;
+    }
+
+    .pos-catalog-toolbar {
+        @apply mt-5 flex items-center justify-between gap-3;
+    }
+
+    .pos-category {
+        @apply shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800;
+    }
+
+    .pos-category.is-active {
+        @apply border-teal-700 bg-teal-700 text-white hover:bg-teal-800 hover:text-white;
+    }
+
+    .pos-product-grid {
+        @apply mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5;
+    }
+
+    .pos-product-card {
+        @apply relative min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_3px_10px_rgb(15_23_42_/_0.04)] transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-[0_10px_20px_rgb(15_23_42_/_0.08)] active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-product-card.is-added {
+        @apply border-teal-500 bg-teal-50;
+    }
+
+    .pos-product-visual {
+        @apply grid aspect-[1.35/1] overflow-hidden place-items-center rounded-lg bg-teal-50 text-xl font-bold text-teal-700;
+    }
+
+    .pos-cart-heading {
+        @apply flex items-center justify-between border-b border-slate-100 px-4 py-4;
+    }
+
+    .pos-icon-button {
+        @apply grid size-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-customer-lookup {
+        @apply border-b border-slate-100 px-4 py-3;
+    }
+
+    .pos-find-customer {
+        @apply inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-200;
+    }
+
+    .pos-cart-scroll {
+        @apply min-h-0 flex-1 overflow-y-auto px-4 py-3;
+    }
+
+    .pos-empty-cart,
+    .pos-empty-list {
+        @apply grid place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center;
+    }
+
+    .pos-bill-footer {
+        @apply shrink-0 border-t border-slate-200 bg-white p-4 shadow-[0_-8px_20px_rgb(15_23_42_/_0.035)];
+    }
+
+    .pos-grand-total {
+        @apply mt-3 flex items-end justify-between rounded-xl bg-slate-900 px-4 py-3 text-white;
+    }
+
+    .pos-grand-total span:first-child {
+        @apply text-sm font-medium text-slate-300;
+    }
+
+    .pos-grand-total span:last-child {
+        @apply text-2xl font-bold tabular-nums;
+    }
+
+    .pos-primary-action {
+        @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-teal-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-secondary-action {
+        @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-payment-method {
+        @apply min-h-10 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600 transition hover:border-teal-300 hover:bg-teal-50;
+    }
+
+    .pos-payment-method.is-selected {
+        @apply border-teal-700 bg-teal-700 text-white;
+    }
+
+    .pos-mobile-header {
+        @apply sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur;
+    }
+
+    .pos-mobile-bottom-nav {
+        @apply fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)];
+    }
+
+    .pos-mobile-nav {
+        @apply min-w-0 px-1 text-xs font-bold text-slate-500 transition;
+    }
+
+    .pos-mobile-nav.is-active {
+        @apply text-teal-700;
+    }
+
+    .pos-more-row {
+        @apply flex min-h-14 items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50;
+    }
+
+    .pos-dashboard-stat,
+    .pos-dashboard-panel,
+    .pos-held-card {
+        @apply rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgb(15_23_42_/_0.045)];
+    }
+
+    .pos-dashboard-stat {
+        @apply p-4;
+    }
+
+    .pos-dashboard-stat span {
+        @apply text-sm font-medium text-slate-500;
+    }
+
+    .pos-dashboard-stat strong {
+        @apply mt-2 block text-2xl font-bold tabular-nums text-slate-950;
+    }
+
+    .pos-dashboard-panel,
+    .pos-held-card {
+        @apply p-5;
+    }
+
+    .pos-terminal-mode {
+        height: 100dvh;
+        overflow: hidden;
+    }
+
     [data-pos-mobile-pane]:not(.hidden) {
         animation: pos-pane-in 180ms ease-out;
     }
@@ -254,6 +427,15 @@
 
 @media print {
     body { background: white !important; }
+    .pos-print-controls { display: none !important; }
+    .pos-receipt { box-shadow: none !important; border: 0 !important; }
+    body[data-pos-receipt-width='80mm'] .pos-receipt { width: 80mm !important; max-width: 80mm !important; }
+    body[data-pos-receipt-width='58mm'] .pos-receipt { width: 58mm !important; max-width: 58mm !important; font-size: 10px !important; }
+}
+
+@media (max-width: 1279px) and (min-width: 1024px) {
+    .pos-terminal-grid { grid-template-columns: minmax(0, 1fr) 21rem; }
+    .pos-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 body.sidebar-mobile-open [data-sidebar] {

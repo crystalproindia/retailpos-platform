@@ -2718,3 +2718,43 @@ Checkout retrieves active company products, validates stock at the selected bran
 - Full offline sale creation, conflict resolution, background sync, and encrypted device storage are deferred; only the PWA shell/service-worker foundation exists.
 - Loyalty earning/redemption, wallet payment/refund, automatic customer-group pricing, tax calculation, real promotion usage/redemption posting, returns, and e-commerce order merging remain future transactional integrations.
 - The recommendation engine is transparent rule logic over POS/customer facts. Future AI may add ranking only after it can preserve these tenant, availability, and explainability constraints.
+
+## Phase 6.1 - POS Terminal UI, Kiosk Mode & Billing Speed Polish
+
+Phase 6.1 is a presentation and operational-read-model enhancement over Phase 6. It does not alter POS checkout, stock posting, promotion evaluation, customer history, events, or payment persistence. It adds dedicated terminal, dashboard, mobile, and held-bill routes while retaining `/pos` as the existing responsive cashier workspace.
+
+### Terminal and Kiosk Foundation
+
+`/pos/terminal` uses the dedicated POS shell without the Command Center sidebar. The terminal header exposes the compact brand mark, branch, cashier, active-session indicator, draft/resume state, current-clock foundation, POS dashboard link, safe browser fullscreen toggle, and Command Center exit. Fullscreen is requested only after a cashier action through the browser Fullscreen API; unsupported browsers simply remain in the normal terminal layout.
+
+The terminal uses a viewport-bound grid with independent catalog and cart scroll regions. It is tuned for 1366×768 through 1920×1080 displays: the scanner/search area stays at the top, the cart total/payment actions stay in the right panel, and neither panel creates a horizontal browser scrollbar. The product grid adapts from five to three tiles on common desktop widths and two tiles on mobile.
+
+### Billing-Speed and Product Tile Polish
+
+The scanner input auto-focuses on terminal load and regains focus after an item is added. F2 or `/` focuses scan/search, F4 focuses customer mobile lookup, F8 holds the current bill, F9 submits payment, and Escape returns the mobile view to Products. Barcode/SKU entry accepts keyboard-wedge USB scanners, gives immediate add/not-found/out-of-stock feedback, and preserves the existing JSON catalog API.
+
+Product tiles now include a product image when configured or a clean initial fallback, name, brand/category, SKU, price, stock state, and low-stock treatment. Category chips filter the already-loaded saleable catalog without changing the server-side inventory rules. Suggestions use the same add-to-cart interaction and maintain the existing rule-based availability filters.
+
+### Cart, Payment, Customer, and Held-Bill Surfaces
+
+The cart has large quantity controls, remove actions, item SKU/rate/tax foundation, line totals, a stronger empty state, visible manual discount/coupon controls, and a fixed grand-total/payment area. Promotion discounts remain server-evaluated at checkout, so the terminal labels that state instead of fabricating a client-side promotion amount.
+
+Cash, Card, and UPI remain the operational payment choices supported by Phase 6. Card/UPI reference capture is sent through the existing payment-reference field. Wallet, Credit, and Split controls are clearly labelled interface foundations only; they do not claim settlement, credit sales, gateway, or terminal capability. Paid/change feedback is calculated from the entered tender without changing the server’s payment validation.
+
+Customer lookup now shows a loading state, matched card, quick create pathway, loyalty/wallet/birthday/retention information, and grouped rule-based product suggestions. `/pos/held` provides searchable cards with customer, mobile, item count, total, held time, and resume action, while preserving the existing cashier ownership guard on resume.
+
+### Mobile PWA and Receipt Polish
+
+`/pos/mobile` is a mobile-only installed-app-style route with Products, Customer, Cart, Payment, and More tabs; sticky bill total/action; touch-sized tiles; payment controls; and held-bill access. The manifest now opens this route. `pos-sw.js` remains intentionally online-only for authenticated POS data but caches a branded offline fallback document so a disconnected navigation has a clear, safe outcome rather than attempting offline billing.
+
+Receipts now offer browser-print layout selection for Standard, 80 mm, and 58 mm widths. The receipt includes company/branch, bill, cashier, customer, immutable line details, discount/tax foundations, payment references, paid/change, and a thank-you footer. It does not add a thermal driver, printer discovery, or any direct printing integration.
+
+### Dashboard Read Model and Current Limitations
+
+`PosDashboardService` is a read-only service over existing `pos_sales`, `pos_sale_items`, and `pos_payments`. `/pos/dashboard` renders actual branch-scoped current-day sales, bills, average bill, held bills, cashiers with completed sales, payment totals, recent bills, and top sold products. It does not introduce day closing, accounting, returns, payment reconciliation, or fabricated metrics.
+
+- No direct thermal printer driver or hardware integration is present; receipt printing is browser print only.
+- No payment gateway, UPI/card terminal integration, wallet settlement, credit-sale workflow, or finance/accounting posting is introduced.
+- No completed sales, carts, customers, or sensitive payment data are stored for offline use; full offline sync remains deferred.
+- Kiosk behavior depends on browser fullscreen support and always requires an explicit user action.
+- Hardware barcode scanners work through keyboard input; direct scanner SDK/device integration remains deferred.

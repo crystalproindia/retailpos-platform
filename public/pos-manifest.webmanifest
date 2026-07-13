@@ -1,7 +1,7 @@
 {
   "name": "RetailPOS Mobile",
   "short_name": "RetailPOS",
-  "start_url": "/pos",
+  "start_url": "/pos/mobile",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#0f766e",

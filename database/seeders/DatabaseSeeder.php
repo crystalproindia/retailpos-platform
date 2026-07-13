@@ -88,6 +88,11 @@ use App\Models\Promotions\PromotionCoupon;
 use App\Models\Promotions\PromotionProductTarget;
 use App\Models\Promotions\PromotionRule;
 use App\Models\Promotions\PromotionSettings;
+use App\Models\Pos\CustomerProductSummary;
+use App\Models\Pos\PosPayment;
+use App\Models\Pos\PosProductPairSummary;
+use App\Models\Pos\PosSale;
+use App\Models\Pos\PosSaleItem;
 use App\Models\QueueJobSnapshot;
 use App\Models\Setting;
 use App\Models\SystemHealthCheck;
@@ -1071,6 +1076,29 @@ class DatabaseSeeder extends Seeder
                 ],
             );
         });
+
+        $posCustomer = $demoCustomers->first();
+        $posSale = PosSale::updateOrCreate(
+            ['company_id' => $company->id, 'sale_number' => 'POS-DEMO-0001'],
+            ['branch_id' => $branch->id, 'customer_id' => $posCustomer->id, 'status' => 'completed', 'subtotal' => 1438, 'discount_amount' => 40, 'tax_amount' => 0, 'total_amount' => 1398, 'paid_amount' => 1400, 'change_amount' => 2, 'device_type' => 'desktop', 'completed_by' => $sales->id, 'completed_at' => now()->subDays(5), 'notes' => 'Demo-only POS sale for customer suggestion foundations.'],
+        );
+        $demoSaleItems = [
+            ['product' => $products['DEMO-TEE-001'], 'quantity' => 1, 'unit_price' => 799],
+            ['product' => $products['DEMO-RICE-005'], 'quantity' => 1, 'unit_price' => 640],
+        ];
+        foreach ($demoSaleItems as $item) {
+            PosSaleItem::updateOrCreate(
+                ['pos_sale_id' => $posSale->id, 'product_id' => $item['product']->id],
+                ['company_id' => $company->id, 'category_id' => $item['product']->category_id, 'product_name' => $item['product']->name, 'sku' => $item['product']->sku, 'barcode' => $item['product']->barcode, 'quantity' => $item['quantity'], 'unit_price' => $item['unit_price'], 'discount_amount' => 0, 'tax_amount' => 0, 'line_total' => $item['quantity'] * $item['unit_price']],
+            );
+            CustomerProductSummary::updateOrCreate(
+                ['customer_id' => $posCustomer->id, 'product_id' => $item['product']->id],
+                ['company_id' => $company->id, 'category_id' => $item['product']->category_id, 'purchase_count' => 5, 'quantity_purchased' => 7, 'total_spent' => $item['quantity'] * $item['unit_price'] * 5, 'first_purchased_at' => now()->subMonths(4), 'last_purchased_at' => now()->subDays(5)],
+            );
+        }
+        PosProductPairSummary::updateOrCreate(['company_id' => $company->id, 'product_id' => $products['DEMO-TEE-001']->id, 'related_product_id' => $products['DEMO-RICE-005']->id], ['co_purchase_count' => 4, 'last_purchased_together_at' => now()->subDays(5)]);
+        PosProductPairSummary::updateOrCreate(['company_id' => $company->id, 'product_id' => $products['DEMO-RICE-005']->id, 'related_product_id' => $products['DEMO-TEE-001']->id], ['co_purchase_count' => 4, 'last_purchased_together_at' => now()->subDays(5)]);
+        PosPayment::updateOrCreate(['pos_sale_id' => $posSale->id, 'payment_method' => 'cash'], ['company_id' => $company->id, 'amount' => 1400, 'paid_at' => now()->subDays(5), 'created_by' => $sales->id]);
 
         $template = BarcodeLabelTemplate::updateOrCreate(
             ['company_id' => $company->id, 'name' => 'Demo Retail Shelf Label'],

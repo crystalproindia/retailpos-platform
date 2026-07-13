@@ -8,6 +8,7 @@ use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseRequest;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\Promotions\PromotionBranchTarget;
+use App\Models\Pos\PosSale;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -60,5 +61,10 @@ class Branch extends Model
     public function promotionTargets(): HasMany
     {
         return $this->hasMany(PromotionBranchTarget::class);
+    }
+
+    public function posSales(): HasMany
+    {
+        return $this->hasMany(PosSale::class);
     }
 }

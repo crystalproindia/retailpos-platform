@@ -66,6 +66,7 @@ use App\Http\Controllers\CommandCenter\Operations\HealthCheckController;
 use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
 use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
 use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
+use App\Http\Controllers\CommandCenter\Pos\PosController;
 use App\Http\Controllers\CommandCenter\Purchases\GoodsReceiptController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseDashboardController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseOrderController;
@@ -179,6 +180,17 @@ Route::middleware('auth')->group(function (): void {
         Route::post('insights/refresh', [CustomerIntelligenceController::class, 'refresh'])->middleware('can:customers.insights.view')->name('insights.refresh');
         Route::get('settings', [CustomerSettingsController::class, 'index'])->middleware('can:customers.settings.manage')->name('settings.index');
         Route::put('settings', [CustomerSettingsController::class, 'update'])->middleware('can:customers.settings.manage')->name('settings.update');
+    });
+
+    Route::middleware(['role:administrator,manager,sales', 'can:pos.view'])->prefix('pos')->name('pos.')->group(function (): void {
+        Route::get('/', [PosController::class, 'index'])->name('index');
+        Route::get('catalog', [PosController::class, 'catalog'])->name('catalog');
+        Route::get('customers/lookup', [PosController::class, 'customer'])->name('customers.lookup');
+        Route::post('customers/quick-create', [PosController::class, 'quickCustomer'])->middleware('can:pos.customers.create')->name('customers.quick-create');
+        Route::post('hold', [PosController::class, 'hold'])->middleware('can:pos.hold')->name('hold');
+        Route::post('checkout', [PosController::class, 'complete'])->middleware('can:pos.checkout')->name('checkout');
+        Route::get('held/{sale}', [PosController::class, 'resume'])->whereNumber('sale')->middleware('can:pos.hold')->name('held.resume');
+        Route::get('receipts/{sale}', [PosController::class, 'receipt'])->whereNumber('sale')->name('receipts.show');
     });
 
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {

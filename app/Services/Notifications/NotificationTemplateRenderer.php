@@ -71,6 +71,8 @@ class NotificationTemplateRenderer
     private function actionUrl(DomainEvent $event): ?string
     {
         return match ($event->eventKey()) {
+            'pos.sale.held' => route('pos.index'),
+            'pos.sale.completed' => $event->aggregateId() ? route('pos.receipts.show', $event->aggregateId()) : route('pos.index'),
             'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => route('crm.followups.index'),
             'cms.page.published', 'cms.page.unpublished' => $event->aggregateId() ? route('cms.pages.edit', $event->aggregateId()) : null,

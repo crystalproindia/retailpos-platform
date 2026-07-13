@@ -16,6 +16,8 @@ return [
     ],
 
     'catalog' => [
+        'pos.sale.held' => ['name'=>'POS bill held','description'=>'A cashier put a POS bill on hold.','category'=>'POS','default_channels'=>['database'],'allowed_channels'=>$channels,'severity'=>'info','user_preference_enabled'=>true,'webhook_enabled'=>true,'future_ai_eligible'=>false],
+        'pos.sale.completed' => ['name'=>'POS sale completed','description'=>'A POS sale was completed.','category'=>'POS','default_channels'=>['database'],'allowed_channels'=>array_merge($channels,$futureChannels),'severity'=>'success','user_preference_enabled'=>true,'webhook_enabled'=>true,'future_ai_eligible'=>true],
         'customer.created' => ['name'=>'Customer created','description'=>'A customer record was created.','category'=>'Customers','default_channels'=>['database'],'allowed_channels'=>array_merge($channels,$futureChannels),'severity'=>'info','user_preference_enabled'=>true,'webhook_enabled'=>true,'future_ai_eligible'=>true],
         'customer.updated' => ['name'=>'Customer updated','description'=>'A customer record was updated.','category'=>'Customers','default_channels'=>['database'],'allowed_channels'=>array_merge($channels,$futureChannels),'severity'=>'info','user_preference_enabled'=>true,'webhook_enabled'=>true,'future_ai_eligible'=>true],
         'customer.deleted' => ['name'=>'Customer deleted','description'=>'A customer was moved to trash.','category'=>'Customers','default_channels'=>['database'],'allowed_channels'=>$channels,'severity'=>'warning','user_preference_enabled'=>true,'webhook_enabled'=>true,'future_ai_eligible'=>false],

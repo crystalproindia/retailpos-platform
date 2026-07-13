@@ -25,6 +25,7 @@ class RecipientResolver
             ->where('is_active', true);
 
         $users = match ($event->eventKey()) {
+            'pos.sale.held', 'pos.sale.completed' => $this->managers($event->companyId()),
             'crm.lead.assigned' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
             'crm.follow_up.due', 'crm.follow_up.overdue' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
             'crm.lead.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])

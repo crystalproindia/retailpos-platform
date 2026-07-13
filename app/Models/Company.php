@@ -22,6 +22,7 @@ use App\Models\Purchases\Supplier;
 use App\Models\Promotions\PromotionCampaign;
 use App\Models\Promotions\PromotionRule;
 use App\Models\Promotions\PromotionSettings;
+use App\Models\Pos\PosSale;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -154,5 +155,10 @@ class Company extends Model
     public function customerSettings(): HasMany
     {
         return $this->hasMany(CustomerSetting::class);
+    }
+
+    public function posSales(): HasMany
+    {
+        return $this->hasMany(PosSale::class);
     }
 }

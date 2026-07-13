@@ -213,6 +213,47 @@
     .inventory-product-workspace .product-form-help {
         @apply mt-1 text-sm leading-6 text-slate-500;
     }
+
+    .pos-product-card {
+        @apply rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-teal-300 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-primary-action {
+        @apply inline-flex min-h-12 items-center justify-center rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-secondary-action {
+        @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100;
+    }
+
+    .pos-payment-method {
+        @apply min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-600 transition hover:border-teal-300 hover:bg-teal-50;
+    }
+
+    .pos-payment-method.is-selected {
+        @apply border-teal-700 bg-teal-700 text-white;
+    }
+
+    .pos-mobile-nav {
+        @apply flex-1 text-sm font-semibold text-slate-500 transition;
+    }
+
+    .pos-mobile-nav.is-active {
+        @apply text-teal-700;
+    }
+
+    [data-pos-mobile-pane]:not(.hidden) {
+        animation: pos-pane-in 180ms ease-out;
+    }
+}
+
+@keyframes pos-pane-in {
+    from { opacity: 0; transform: translateY(0.35rem); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media print {
+    body { background: white !important; }
 }
 
 body.sidebar-mobile-open [data-sidebar] {

@@ -2656,3 +2656,65 @@ Customer create/update/delete/restore, address/contact capture, group lifecycle/
 - Loyalty earn/redeem rules, tier promotion, expiry, wallet payment, credit-limit settlement, customer portal, campaign delivery, external messaging, AI scoring, and BI exports remain intentionally deferred.
 - Customer groups expose promotion-ready discount percentage and loyalty multiplier fields, but Phase 5 does not alter the Phase 4.5 promotion engine or make checkout claims.
 - Birthday records/events are provider-neutral. A future delivery adapter can use the existing notification pipeline without changing customer profile, activity, or settings contracts.
+
+## Phase 6 - POS, Mobile PWA & Customer Product Suggestions Foundation
+
+Phase 6 turns the existing POS registry placeholder into an additive, company/branch-scoped cashier foundation. It integrates Phase 3 inventory, Phase 4.5 promotion evaluation, and Phase 5 customer intelligence without modifying their existing contracts. It provides server-validated completed and held sales, but deliberately does not claim accounting, external payment gateway, refund, or offline transaction synchronisation support.
+
+### POS Architecture and Database Tables
+
+Migration `2026_07_13_100001_create_pos_foundation_tables.php` creates:
+
+- `pos_sales` for held and completed bills, totals, cashier/device context, customer, and branch ownership.
+- `pos_sale_items` for immutable product, SKU, barcode, price, quantity, category, discount, and line-total snapshots.
+- `pos_payments` for local cash/card/UPI/bank-transfer/other payment declarations and references.
+- `customer_product_summaries` for customer/product purchase count, quantity, spend, first, and last purchase facts.
+- `pos_product_pair_summaries` for normalized product-pair co-purchase counts used by add-on recommendations.
+
+All POS operational records carry `company_id`; bill numbers are unique per company. Customer and product foreign keys are tenant-filtered before any POS mutation. `Company`, `Branch`, and `Customer` expose additive POS relationships. Completed bills write inventory sale movements, customer purchase totals/activity, product summaries, and product-pair facts in the same transaction.
+
+### Services, Repositories, Controllers, and Routes
+
+POS code is additive:
+
+- `app/Models/Pos` for sale, line, payment, customer-product, and product-pair records.
+- `app/Repositories/Pos` for saleable catalog queries and company-scoped held/receipt loading.
+- `app/Services/Pos` for bill numbering, checkout/hold lifecycle, customer mobile lookup, quick capture, and rule-based suggestions.
+- `app/Http/Controllers/CommandCenter/Pos/PosController.php` and `app/Http/Requests/Pos` for thin request/view/JSON coordination.
+- `resources/views/layouts/pos.blade.php` and `resources/views/command-center/pos` for a dedicated cashier shell and receipt.
+- `tests/Feature/PosFoundationTest.php` for POS contracts.
+
+The protected `pos.*` route surface includes the POS workspace, JSON catalog lookup, JSON customer lookup, quick customer capture, hold, checkout, held-bill resume, and receipt view. Administrator, Manager, and Sales roles can operate POS through the central `pos.*` capabilities; Staff is denied. The Module Registry points the POS parent and its New Sale/Held Bills children to the real POS workspace.
+
+### Desktop and Mobile Experiences
+
+The POS view automatically presents a full-width, scanner-first desktop cashier workspace at desktop/tablet breakpoints and a separate mobile-app shell below that breakpoint. The desktop layout contains barcode/product search, product grid, customer panel, suggestion rail, quantity cart, discount/coupon controls, payment selection, hold action, and receipt completion.
+
+The mobile shell has touch-safe product cards, app-like pane transitions, sticky cart access, bottom Sell/Customer/Held navigation, cart drawer, payment panel, customer lookup, quick customer capture, held-bill resume, and receipt view. It uses `pos-manifest.webmanifest`, `pos-icon.svg`, and `pos-sw.js`; the worker only caches the PWA shell assets and intentionally does not cache authenticated carts, customers, or transactions. Full offline queueing/synchronisation is deferred.
+
+### Customer Lookup and Rule-Based Suggestions
+
+POS customer lookup resolves a mobile number against the current company. When found, the cashier receives name, group, loyalty points, wallet balance, last purchase date, birthday, and retention note. When not found, a quick Customer Foundation record is created through the existing `CustomerService`, preserving number allocation, loyalty-account creation, activity, audit, and customer-created event behavior.
+
+`CustomerProductSuggestionService` is intentionally rule based, not AI. It returns active and saleable products in these groups:
+
+- Regular products: highest purchase count and quantity for the selected customer.
+- Frequent products: highest quantity/purchase frequency.
+- Recently and last purchased products: most recent customer-product timestamps.
+- Add-ons: product-pair co-purchase facts first, then active products from the customer’s regular-product categories.
+
+Tracked products without branch stock, inactive products, and inactive catalog records are filtered out. Each suggestion is directly addable to the current cart. Completed POS bills update the summary and pair tables so recommendations improve through actual checkout data.
+
+### Inventory, Promotions, Events, Audit, and Demo Data
+
+Checkout retrieves active company products, validates stock at the selected branch, writes a `sale` stock movement, and prevents negative stock unless the existing product setting permits it. The current Promotion Rule Engine is evaluated for each checkout, alongside an optional manual discount. It remains the source of promotion eligibility; POS does not duplicate discount rules.
+
+`pos.sale.held` and `pos.sale.completed` are registered through the existing Domain Event, Notification Center, webhook, and Operations foundations. POS holds and completed sales are audited. Seed data adds a clearly labelled completed demo POS sale, items, cash payment, customer product summaries, and co-purchase pair facts for the existing demo company.
+
+### Current Limitations and Future POS Roadmap
+
+- No accounting journal, GST invoice workflow, refund/return, cash drawer integration, receipt printer adapter, shift close, external card/UPI gateway, wallet settlement, or payment reconciliation is included.
+- A POS payment record is an internal cashier declaration, not gateway confirmation or finance posting.
+- Full offline sale creation, conflict resolution, background sync, and encrypted device storage are deferred; only the PWA shell/service-worker foundation exists.
+- Loyalty earning/redemption, wallet payment/refund, automatic customer-group pricing, tax calculation, real promotion usage/redemption posting, returns, and e-commerce order merging remain future transactional integrations.
+- The recommendation engine is transparent rule logic over POS/customer facts. Future AI may add ranking only after it can preserve these tenant, availability, and explainability constraints.

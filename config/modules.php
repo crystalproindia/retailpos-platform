@@ -10,6 +10,7 @@ $inventoryRoles = ['administrator', 'manager', 'sales'];
 $promotionRoles = ['administrator', 'manager', 'sales'];
 $promotionManagementRoles = ['administrator', 'manager'];
 $customerRoles = ['administrator', 'manager', 'sales'];
+$posRoles = ['administrator', 'manager', 'sales'];
 
 return [
     'modules' => [
@@ -165,19 +166,21 @@ return [
         ],
         'pos' => [
             'name' => 'POS',
-            'description' => 'Point-of-sale module foundation.',
+            'description' => 'Cashier billing with desktop and mobile PWA-ready experiences.',
             'icon' => 'pos',
-            'route' => 'modules.show',
-            'route_params' => ['module' => 'pos'],
+            'route' => 'pos.index',
+            'route_params' => [],
             'sort_order' => 140,
             'category' => 'Sales & CRM',
             'enabled' => true,
             'visible_in_sidebar' => true,
-            'roles' => $allRoles,
-            'badge' => null,
+            'roles' => $posRoles,
+            'badge' => ['label' => 'New', 'tone' => 'info'],
             'license_key' => null,
             'parent_id' => null,
         ],
+        'pos-billing' => ['name'=>'New Sale','description'=>'Desktop and mobile cashier billing workspace.','icon'=>'pos','route'=>'pos.index','route_params'=>[],'sort_order'=>141,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$posRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'pos'],
+        'pos-held' => ['name'=>'Held Bills','description'=>'Resume bills held by the current cashier.','icon'=>'audit','route'=>'pos.index','route_params'=>[],'sort_order'=>142,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$posRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'pos'],
         'customers' => [
             'name' => 'Customers',
             'description' => 'Customer intelligence, loyalty, wallet, and retention foundation.',

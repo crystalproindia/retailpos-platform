@@ -415,6 +415,115 @@
         overflow: hidden;
     }
 
+    .pos-premium-command-bar {
+        @apply gap-5 bg-white/95 backdrop-blur;
+    }
+
+    .pos-command-search { max-width: 38rem; }
+
+    .pos-command-input {
+        @apply min-h-10 rounded-xl border-slate-200 bg-slate-50 text-sm font-medium shadow-none;
+    }
+
+    .pos-premium-terminal-grid {
+        grid-template-columns: 10.5rem minmax(0, 1fr) 24.5rem;
+    }
+
+    .pos-category-rail {
+        @apply min-h-0 overflow-y-auto border-r border-slate-200 bg-white px-2 py-5;
+    }
+
+    .pos-rail-filter {
+        @apply flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-left text-xs font-semibold text-slate-600 transition hover:bg-teal-50 hover:text-teal-800;
+    }
+
+    .pos-rail-filter b {
+        @apply grid min-w-5 place-items-center rounded-md bg-slate-100 px-1 text-[10px] text-slate-500;
+    }
+
+    .pos-rail-filter.is-active {
+        @apply bg-teal-700 text-white shadow-sm hover:bg-teal-700 hover:text-white;
+    }
+
+    .pos-rail-filter.is-active b {
+        @apply bg-white/15 text-white;
+    }
+
+    .pos-premium-catalog { @apply p-4; }
+
+    .pos-compact-product-grid {
+        @apply grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6;
+    }
+
+    .pos-compact-product-card {
+        @apply flex min-h-29 flex-col rounded-xl p-2.5 shadow-[0_2px_8px_rgb(15_23_42_/_0.045)];
+    }
+
+    .pos-compact-visual {
+        @apply grid aspect-[2/0.78] overflow-hidden place-items-center rounded-lg bg-gradient-to-br from-teal-50 to-emerald-50 text-lg font-bold text-teal-700;
+    }
+
+    .pos-stock-badge {
+        @apply rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700;
+    }
+
+    .pos-stock-badge.is-low { @apply bg-amber-50 text-amber-700; }
+
+    .pos-premium-cart { @apply border-l-slate-200; }
+
+    .pos-premium-total {
+        @apply bg-gradient-to-r from-slate-950 to-slate-800;
+    }
+
+    .pos-checkout-action {
+        @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-[0_8px_18px_rgb(249_115_22_/_0.28)] transition hover:bg-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-100;
+    }
+
+    .pos-payment-modal {
+        @apply fixed inset-0 z-50 grid place-items-center p-4;
+    }
+
+    .pos-modal-backdrop {
+        @apply absolute inset-0 bg-slate-950/55 backdrop-blur-sm;
+    }
+
+    .pos-payment-sheet {
+        @apply relative z-10 max-h-[min(44rem,calc(100dvh-2rem))] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/40 bg-white p-5 shadow-[0_24px_70px_rgb(15_23_42_/_0.35)] sm:p-6;
+    }
+
+    .pos-payment-modal-grid {
+        @apply mt-5 grid gap-6 md:grid-cols-[.8fr_1.2fr];
+    }
+
+    .pos-payment-method-list { @apply rounded-xl bg-slate-50 p-4; }
+
+    .pos-modal-payment-method {
+        @apply min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-sm font-bold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50;
+    }
+
+    .pos-modal-payment-method.is-selected {
+        @apply border-teal-700 bg-teal-700 text-white;
+    }
+
+    .pos-modal-payment-method:disabled {
+        @apply cursor-not-allowed border-slate-100 bg-slate-100 text-slate-400;
+    }
+
+    .pos-modal-total {
+        @apply flex items-end justify-between rounded-xl bg-slate-950 px-5 py-4 text-white;
+    }
+
+    .pos-modal-total span { @apply text-sm font-medium text-slate-300; }
+    .pos-modal-total strong { @apply text-3xl font-bold tabular-nums; }
+
+    .pos-quick-amount {
+        @apply min-h-10 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700;
+    }
+
+    .pos-modal-accept {
+        @apply inline-flex min-h-13 items-center justify-center rounded-xl bg-orange-500 px-4 text-base font-bold text-white shadow-[0_8px_18px_rgb(249_115_22_/_0.28)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300;
+    }
+
     [data-pos-mobile-pane]:not(.hidden) {
         animation: pos-pane-in 180ms ease-out;
     }
@@ -436,6 +545,16 @@
 @media (max-width: 1279px) and (min-width: 1024px) {
     .pos-terminal-grid { grid-template-columns: minmax(0, 1fr) 21rem; }
     .pos-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .pos-premium-terminal-grid { grid-template-columns: 9.25rem minmax(0, 1fr) 21rem; }
+    .pos-compact-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1023px) {
+    .pos-compact-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pos-payment-modal { @apply items-end p-0; }
+    .pos-payment-sheet { @apply max-h-[92dvh] rounded-b-none rounded-t-2xl p-4; }
+    .pos-payment-modal-grid { @apply grid-cols-1 gap-4; }
+    .pos-payment-method-list { @apply p-3; }
 }
 
 body.sidebar-mobile-open [data-sidebar] {

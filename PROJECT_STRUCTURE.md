@@ -2758,3 +2758,32 @@ Receipts now offer browser-print layout selection for Standard, 80 mm, and 58 mm
 - No completed sales, carts, customers, or sensitive payment data are stored for offline use; full offline sync remains deferred.
 - Kiosk behavior depends on browser fullscreen support and always requires an explicit user action.
 - Hardware barcode scanners work through keyboard input; direct scanner SDK/device integration remains deferred.
+
+## Phase 6.1.2 - Premium POS Selling Screen & Checkout Modal Polish
+
+Phase 6.1.2 is UI/UX-only polish over the Phase 6.1 terminal and the existing Phase 6 checkout workflow. It introduces no migrations, accounting, payment gateway, external terminal, printer driver, offline synchronisation, or change to POS sale/payment persistence.
+
+### Premium Selling Screen
+
+The terminal is now arranged as a compact three-zone cashier surface: a fixed category rail, independently scrolling compact product grid, and a persistent bill panel. The command bar carries brand, branch/cashier context, live clock foundation, online placeholder, a scanner-first search field, fullscreen control, dashboard, and exit. The category rail offers All, Popular, Recently Added (current-session), Offers foundation, Low Stock, and company categories with data-derived counts. Popular is derived from completed POS sale-line history through the existing POS read model, rather than a hardcoded list.
+
+Product cards now fit four to six columns on desktop and two columns on mobile. They expose image/initial fallback, SKU, price, stock badge, and touch/click add behavior. Category/product search empty states explain how to recover by checking a category, SKU, barcode, or name. The terminal retains the scanner keyboard-wedge flow, quick feedback, focus restoration, F2 or `/`, F4, F8, F9, and Escape behavior.
+
+### Bill Panel, Customer Sales Strip, and Checkout Modal
+
+The bill panel remains sticky and is the strongest visual surface: compact cart rows, quantity controls, clear remove control, manual discount/coupon inputs, subtotal/discount/tax foundation, a large grand total, Hold, and an orange Checkout action. Customer lookup retains the existing profile and quick-create contract; its rule-based Regular, Frequent, Recent, Last Purchased, and Add-on products render as compact direct-add sales strips. When no history exists, the UI explicitly says the suggestions will improve as purchase history grows.
+
+Checkout is now initiated through an accessible `data-pos-payment-modal` rather than exposing payment fields in the primary selling screen. Desktop uses a centred, blurred-backdrop modal and mobile uses a bottom-sheet layout. The modal supports persisted Cash/Card/UPI payment selection, exact/quick cash amounts, paid/change calculation, manual Card/UPI reference, optional notes, Escape/backdrop close, and duplicate-submit disabling. Cash defaults to the exact total and the client makes underpayment errors visible before the original server-side validation remains authoritative.
+
+QR, Wallet, Credit, Split, Bank Transfer, and Cheque are visibly labelled interface foundations. They do not post unsupported payment methods, settle a wallet, create credit dues, invoke a QR/UPI/card gateway, or add a split-payment data model. Completed checkout continues to redirect to the existing receipt screen, where browser print and new-bill actions already exist.
+
+### Mobile and Responsive Fit
+
+`/pos/mobile` keeps its Products, Customer, Cart, Pay, and More navigation, compact two-column product grid, sticky cart total, and touch-sized checkout action. Opening checkout invokes the same payment surface as an app-style bottom sheet. Terminal grid regions have independent category, catalog, and cart scrolling; product grids have responsive track limits and no intentional horizontal page overflow.
+
+### Current Limitations
+
+- No payment gateway, QR collection, live UPI/card terminal, wallet settlement, credit due, split-payment persistence, bank transfer, or cheque workflow is connected.
+- Card and UPI remain a cashier-declared internal payment with an optional manual reference.
+- No direct thermal-printer driver is introduced; receipt output remains browser print.
+- No offline bill creation, sensitive local cart/customer storage, or synchronisation is started in this phase.

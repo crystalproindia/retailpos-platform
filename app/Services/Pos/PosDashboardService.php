@@ -8,6 +8,21 @@ use Illuminate\Support\Carbon;
 
 class PosDashboardService
 {
+    /** @return array<int, int> */
+    public function popularProductIds(int $companyId, ?int $branchId): array
+    {
+        return PosSaleItem::query()
+            ->selectRaw('product_id, SUM(quantity) as quantity_sold')
+            ->where('company_id', $companyId)
+            ->whereHas('sale', fn ($query) => $query->where('status', 'completed')->when($branchId, fn ($sale) => $sale->where('branch_id', $branchId)))
+            ->groupBy('product_id')
+            ->orderByDesc('quantity_sold')
+            ->limit(20)
+            ->pluck('product_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     /** @return array<string, mixed> */
     public function summary(int $companyId, ?int $branchId): array
     {

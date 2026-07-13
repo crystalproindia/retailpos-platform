@@ -19,19 +19,19 @@ use Illuminate\View\View;
 
 class PosController extends Controller
 {
-    public function index(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales): View
+    public function index(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, PosDashboardService $dashboard): View
     {
-        return $this->workspace($request, $catalog, $sales);
+        return $this->workspace($request, $catalog, $sales, $dashboard);
     }
 
-    public function terminal(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales): View
+    public function terminal(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, PosDashboardService $dashboard): View
     {
-        return $this->workspace($request, $catalog, $sales, 'terminal');
+        return $this->workspace($request, $catalog, $sales, $dashboard, 'terminal');
     }
 
-    public function mobile(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales): View
+    public function mobile(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, PosDashboardService $dashboard): View
     {
-        return $this->workspace($request, $catalog, $sales, 'mobile');
+        return $this->workspace($request, $catalog, $sales, $dashboard, 'mobile');
     }
 
     public function dashboard(Request $request, PosDashboardService $dashboard): View
@@ -79,12 +79,12 @@ class PosController extends Controller
         return redirect()->route('pos.receipts.show', $sale)->with('status', "Sale {$sale->sale_number} completed.");
     }
 
-    public function resume(Request $request, PosSaleRepository $sales, PosCatalogRepository $catalog, int $sale): View
+    public function resume(Request $request, PosSaleRepository $sales, PosCatalogRepository $catalog, PosDashboardService $dashboard, int $sale): View
     {
         $resumedSale = $sales->findForCompany($request->user()->company_id, $sale);
         abort_unless($resumedSale->status === 'held' && $resumedSale->held_by === $request->user()->id, 403);
 
-        return $this->workspace($request, $catalog, $sales, 'terminal', $resumedSale);
+        return $this->workspace($request, $catalog, $sales, $dashboard, 'terminal', $resumedSale);
     }
 
     public function receipt(Request $request, PosSaleRepository $sales, int $sale): View
@@ -102,7 +102,7 @@ class PosController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function workspace(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, string $mode = 'desktop', mixed $resumedSale = null): View
+    private function workspace(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, PosDashboardService $dashboard, string $mode = 'desktop', mixed $resumedSale = null): View
     {
         $products = $catalog->search($request->user()->company_id, $request->user()->branch_id, $request->string('search')->toString());
 
@@ -112,6 +112,7 @@ class PosController extends Controller
             'heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id),
             'resumedSale' => $resumedSale,
             'posMode' => $mode,
+            'popularProductIds' => $dashboard->popularProductIds($request->user()->company_id, $request->user()->branch_id),
         ]);
     }
 

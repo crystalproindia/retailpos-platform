@@ -105,7 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentMethod: 'cash',
         manualDiscount: 0,
         paymentAmount: 0,
-        categoryId: '',
+        categoryId: 'all',
+        recentlyAdded: [],
+        popularProductIds: parse(posApp.dataset.popularProducts, []),
+        isSubmitting: false,
     };
     const money = (value) => Number(value || 0).toFixed(2);
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]));
@@ -113,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const subtotal = () => state.cart.reduce((total, item) => total + Number(item.price) * Number(item.quantity), 0);
     const total = () => Math.max(0, subtotal() - manualDiscount());
 
-    const productMarkup = (product) => `<button type="button" data-pos-product='${escapeHtml(JSON.stringify(product))}' class="pos-product-card text-left"><span class="pos-product-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" class="size-full object-cover">` : escapeHtml(product.name).slice(0, 1)}</span><span class="mt-3 flex items-start justify-between gap-2"><span class="min-w-0"><span class="block truncate text-sm font-semibold text-slate-900">${escapeHtml(product.name)}</span><span class="mt-1 block truncate text-xs text-slate-500">${escapeHtml(product.brand || product.category || 'Product')}</span></span><span class="shrink-0 text-sm font-bold text-teal-700">${money(product.price)}</span></span><span class="mt-2 flex items-center justify-between gap-2 text-xs"><span class="truncate text-slate-400">${escapeHtml(product.sku || '')}</span>${product.track_inventory ? `<span class="${product.low_stock ? 'text-amber-700' : 'text-emerald-700'} font-semibold">${Number(product.available_stock || 0)} in stock</span>` : ''}</span></button>`;
+    const productMarkup = (product) => `<button type="button" data-pos-product='${escapeHtml(JSON.stringify(product))}' class="pos-product-card pos-compact-product-card text-left"><span class="pos-compact-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" class="size-full object-cover">` : escapeHtml(product.name).slice(0, 1)}</span><span class="mt-2 block truncate text-sm font-semibold text-slate-900">${escapeHtml(product.name)}</span><span class="mt-0.5 block truncate text-xs text-slate-500">${escapeHtml(product.sku || '')}</span><span class="mt-2 flex items-center justify-between gap-2"><span class="text-sm font-bold text-teal-700">${money(product.price)}</span>${product.track_inventory ? `<span class="pos-stock-badge ${product.low_stock ? 'is-low' : ''}">${Number(product.available_stock || 0)}</span>` : ''}</span></button>`;
 
     const showFeedback = (message, type = 'success') => {
         document.querySelectorAll('[data-pos-feedback]').forEach((node) => {
@@ -148,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (existing) existing.quantity = Number(existing.quantity) + 1;
         else state.cart.push({ ...product, quantity: 1 });
+        state.recentlyAdded = [Number(product.id), ...state.recentlyAdded.filter((id) => id !== Number(product.id))].slice(0, 12);
         render();
         document.querySelectorAll('[data-pos-product]').forEach((button) => {
             if (Number(parse(button.dataset.posProduct, {})?.id) === Number(product.id)) {
@@ -213,7 +217,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const suggestionMarkup = () => {
         if (!state.customer) return '';
         const labels = { regular: 'Regular', frequent: 'Frequent', recent: 'Recent', last: 'Last purchased', addons: 'Add-ons' };
-        return Object.entries(state.suggestions || {}).filter(([, products]) => products?.length).map(([key, products]) => `<section class="mb-4"><h3 class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">${labels[key]}</h3><div class="flex gap-2 overflow-x-auto pb-1">${products.map((product) => `<button type="button" data-pos-product='${escapeHtml(JSON.stringify(product))}' class="min-w-32 rounded-lg border border-teal-100 bg-white p-2 text-left text-xs shadow-sm"><span class="block truncate font-semibold">${escapeHtml(product.name)}</span><span class="mt-1 block text-teal-700">${money(product.price)}</span></button>`).join('')}</div></section>`).join('');
+        const sections = Object.entries(state.suggestions || {}).filter(([, products]) => products?.length).map(([key, products]) => `<section class="mb-4"><h3 class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">${labels[key]}</h3><div class="flex gap-2 overflow-x-auto pb-1">${products.map((product) => `<button type="button" data-pos-product='${escapeHtml(JSON.stringify(product))}' class="min-w-36 rounded-xl border border-teal-100 bg-white p-2.5 text-left text-xs shadow-sm"><span class="block truncate font-semibold">${escapeHtml(product.name)}</span><span class="mt-2 flex items-center justify-between"><span class="font-bold text-teal-700">${money(product.price)}</span><span class="rounded-md bg-teal-50 px-1.5 py-0.5 font-bold text-teal-700">Add</span></span></button>`).join('')}</div></section>`).join('');
+        return sections || '<p class="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Suggestions will improve as purchase history grows.</p>';
     };
 
     const render = () => {
@@ -230,19 +235,32 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-pos-customer-card]').forEach((node) => { node.innerHTML = customerMarkup(state.customer); });
         document.querySelectorAll('[data-pos-quick-customer]').forEach((node) => { node.classList.toggle('hidden', Boolean(state.customer)); node.innerHTML = state.customer ? '' : quickCustomerMarkup(); });
         document.querySelectorAll('[data-pos-suggestions]').forEach((node) => { node.innerHTML = suggestionMarkup(); });
-        if (!state.paymentAmount || Number(state.paymentAmount) < finalTotal) state.paymentAmount = money(finalTotal);
+        if (!state.paymentAmount) state.paymentAmount = money(finalTotal);
         document.querySelectorAll('[data-pos-payment-amount]').forEach((node) => { if (document.activeElement !== node) node.value = state.paymentAmount; });
         const paid = Math.max(0, Number(state.paymentAmount || 0));
         document.querySelectorAll('[data-pos-paid]').forEach((node) => { node.textContent = money(paid); });
         document.querySelectorAll('[data-pos-change]').forEach((node) => { node.textContent = money(Math.max(0, paid - finalTotal)); });
         document.querySelectorAll('[data-payment-method]').forEach((node) => node.classList.toggle('is-selected', node.dataset.paymentMethod === state.paymentMethod));
+        document.querySelectorAll('[data-pos-wallet-foundation], [data-pos-credit-foundation]').forEach((button) => { button.disabled = !state.customer; });
+        document.querySelectorAll('[data-pos-checkout]').forEach((button) => { button.textContent = state.isSubmitting ? 'Saving payment…' : `Accept ${state.paymentMethod}`; button.disabled = state.isSubmitting; });
         bindCartActions(); bindProducts(); bindQuickCustomer();
     };
 
     const filterProducts = () => {
         document.querySelectorAll('[data-pos-products] [data-pos-product], [data-pos-products-mobile] [data-pos-product]').forEach((node) => {
             const product = parse(node.dataset.posProduct, {});
-            node.classList.toggle('hidden', Boolean(state.categoryId) && String(product.category_id) !== String(state.categoryId));
+            const visible = state.categoryId === 'all'
+                || (state.categoryId === 'low-stock' && product.low_stock)
+                || (state.categoryId === 'recent' && state.recentlyAdded.includes(Number(product.id)))
+                || (state.categoryId === 'popular' && state.popularProductIds.includes(Number(product.id)))
+                || (state.categoryId === 'offers' && false)
+                || String(product.category_id) === String(state.categoryId);
+            node.classList.toggle('hidden', !visible);
+        });
+        document.querySelectorAll('[data-pos-empty-products]').forEach((empty) => {
+            const grid = empty.previousElementSibling;
+            const visibleProducts = grid?.querySelectorAll?.('[data-pos-product]:not(.hidden)').length || 0;
+            empty.classList.toggle('hidden', visibleProducts > 0);
         });
     };
 
@@ -276,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const submitSale = (action) => {
-        if (!state.cart.length) return;
+        if (!state.cart.length) { showFeedback('Add a product before checkout.', 'error'); return; }
         const form = document.querySelector('[data-pos-submit]');
         form.action = action === 'hold' ? posApp.dataset.holdUrl : posApp.dataset.checkoutUrl;
         form.innerHTML = `<input type="hidden" name="_token" value="${csrf}">`;
@@ -285,35 +303,57 @@ document.addEventListener('DOMContentLoaded', () => {
         append('device_type', posApp.dataset.posMode === 'mobile' || window.matchMedia('(max-width: 1023px)').matches ? 'mobile' : 'desktop');
         append('manual_discount_amount', manualDiscount());
         append('coupon_code', document.querySelector('[data-pos-coupon]')?.value || '');
+        append('notes', [...document.querySelectorAll('[data-pos-notes]')].map((input) => input.value.trim()).find(Boolean) || '');
         state.cart.forEach((item, index) => { append(`items[${index}][product_id]`, item.id); append(`items[${index}][quantity]`, item.quantity); append(`items[${index}][unit_price]`, item.price); });
-        if (action === 'checkout') { append('payments[0][method]', state.paymentMethod); append('payments[0][amount]', state.paymentAmount || total()); append('payments[0][reference]', [...document.querySelectorAll('[data-pos-payment-reference]')].map((input) => input.value.trim()).find(Boolean) || ''); }
+        if (action === 'checkout') { state.isSubmitting = true; render(); append('payments[0][method]', state.paymentMethod); append('payments[0][amount]', state.paymentAmount || total()); append('payments[0][reference]', [...document.querySelectorAll('[data-pos-payment-reference]')].map((input) => input.value.trim()).find(Boolean) || ''); }
         form.submit();
     };
+
+    const paymentModal = document.querySelector('[data-pos-payment-modal]');
+    const showPaymentError = (message) => document.querySelectorAll('[data-pos-payment-error]').forEach((node) => { node.textContent = message; node.classList.remove('hidden'); });
+    const clearPaymentError = () => document.querySelectorAll('[data-pos-payment-error]').forEach((node) => node.classList.add('hidden'));
+    const openPayment = () => {
+        if (!state.cart.length) { showFeedback('Add a product before checkout.', 'error'); return; }
+        paymentModal?.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        clearPaymentError();
+        render();
+        window.setTimeout(() => [...document.querySelectorAll('[data-pos-payment-amount]')].find((input) => input.offsetParent !== null)?.focus(), 50);
+    };
+    const closePayment = () => { paymentModal?.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
 
     document.querySelectorAll('[data-pos-scanner]').forEach((input) => {
         input.addEventListener('input', () => searchProducts(input.value));
         input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); const match = [...document.querySelectorAll('[data-pos-product]')].map((node) => parse(node.dataset.posProduct, null)).find((product) => product?.barcode === input.value || product?.sku === input.value); if (match) { addProduct(match); input.value = ''; } else { searchProducts(input.value); showFeedback('No matching barcode or SKU found.', 'error'); } } });
     });
-    document.querySelectorAll('[data-pos-search]').forEach((button) => button.addEventListener('click', () => document.querySelector('[data-pos-scanner]')?.focus()));
+    document.querySelectorAll('[data-pos-search]').forEach((button) => button.addEventListener('click', focusScanner));
     document.querySelectorAll('[data-pos-customer-search]').forEach((button) => button.addEventListener('click', lookupCustomer));
     document.querySelectorAll('[data-pos-clear]').forEach((button) => button.addEventListener('click', () => { state.cart = []; render(); }));
     document.querySelectorAll('[data-pos-discount]').forEach((input) => input.addEventListener('input', () => { state.manualDiscount = input.value; document.querySelectorAll('[data-pos-discount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
     document.querySelectorAll('[data-pos-payment-amount]').forEach((input) => input.addEventListener('input', () => { state.paymentAmount = input.value; document.querySelectorAll('[data-pos-payment-amount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
-    document.querySelectorAll('[data-payment-method]').forEach((button) => button.addEventListener('click', () => { state.paymentMethod = button.dataset.paymentMethod; render(); }));
+    document.querySelectorAll('[data-payment-method]').forEach((button) => button.addEventListener('click', () => { state.paymentMethod = button.dataset.paymentMethod; if (state.paymentMethod === 'cash') state.paymentAmount = money(total()); clearPaymentError(); render(); }));
     document.querySelectorAll('[data-pos-hold]').forEach((button) => button.addEventListener('click', () => submitSale('hold')));
-    document.querySelectorAll('[data-pos-checkout]').forEach((button) => button.addEventListener('click', () => submitSale('checkout')));
+    document.querySelectorAll('[data-pos-checkout]').forEach((button) => button.addEventListener('click', () => { if (state.isSubmitting) return; if (Number(state.paymentAmount || 0) < total()) { showPaymentError('Amount received must cover the total due.'); return; } submitSale('checkout'); }));
+    document.querySelectorAll('[data-pos-open-payment]').forEach((button) => button.addEventListener('click', openPayment));
+    document.querySelectorAll('[data-pos-close-payment]').forEach((button) => button.addEventListener('click', closePayment));
     document.querySelectorAll('[data-pos-open-cart]').forEach((button) => button.addEventListener('click', () => document.querySelector('[data-pos-cart-drawer]')?.classList.remove('hidden')));
     document.querySelectorAll('[data-pos-close-cart]').forEach((button) => button.addEventListener('click', () => document.querySelector('[data-pos-cart-drawer]')?.classList.add('hidden')));
     document.querySelectorAll('[data-pos-mobile-tab]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-pos-mobile-tab]').forEach((tab) => tab.classList.toggle('is-active', tab === button)); document.querySelectorAll('[data-pos-mobile-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.posMobilePane !== button.dataset.posMobileTab)); }));
     document.querySelectorAll('[data-pos-category]').forEach((button) => button.addEventListener('click', () => { state.categoryId = button.dataset.posCategory; document.querySelectorAll('[data-pos-category]').forEach((category) => category.classList.toggle('is-active', category.dataset.posCategory === state.categoryId)); filterProducts(); }));
-    document.querySelectorAll('[data-pos-payment-foundation], [data-pos-split-foundation]').forEach((button) => button.addEventListener('click', () => showFeedback(button.title || 'This payment option is prepared for a later POS payment workflow.')));
+    const foundationNotice = (message, type = 'success') => {
+        if (paymentModal && !paymentModal.classList.contains('hidden')) { showPaymentError(message); return; }
+        showFeedback(message, type);
+    };
+    document.querySelectorAll('[data-pos-payment-foundation], [data-pos-split-foundation]').forEach((button) => button.addEventListener('click', () => foundationNotice(button.title || 'This payment option is prepared for a later POS payment workflow.')));
+    document.querySelectorAll('[data-pos-wallet-foundation], [data-pos-credit-foundation]').forEach((button) => button.addEventListener('click', () => foundationNotice(state.customer ? 'This settlement option is a future POS foundation.' : 'Select a customer before using this payment foundation.', 'error')));
+    document.querySelectorAll('[data-pos-quick-amount]').forEach((button) => button.addEventListener('click', () => { state.paymentAmount = button.dataset.posQuickAmount === 'exact' ? money(total()) : button.dataset.posQuickAmount; render(); }));
     document.querySelectorAll('[data-pos-fullscreen]').forEach((button) => button.addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen?.(); } catch { showFeedback('Fullscreen is not available in this browser.', 'error'); } }));
     document.addEventListener('keydown', (event) => {
         if (event.key === 'F2' || (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName))) { event.preventDefault(); focusScanner(); }
         if (event.key === 'F4') { event.preventDefault(); [...document.querySelectorAll('[data-pos-customer-mobile]')].find((input) => input.offsetParent !== null)?.focus(); }
         if (event.key === 'F8') { event.preventDefault(); submitSale('hold'); }
-        if (event.key === 'F9') { event.preventDefault(); submitSale('checkout'); }
-        if (event.key === 'Escape') { document.querySelectorAll('[data-pos-mobile-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.posMobilePane !== 'products')); document.querySelectorAll('[data-pos-mobile-tab]').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.posMobileTab === 'products')); }
+        if (event.key === 'F9') { event.preventDefault(); openPayment(); }
+        if (event.key === 'Escape') { if (paymentModal && !paymentModal.classList.contains('hidden')) closePayment(); else { document.querySelectorAll('[data-pos-mobile-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.posMobilePane !== 'products')); document.querySelectorAll('[data-pos-mobile-tab]').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.posMobileTab === 'products')); } }
     });
     const clock = () => document.querySelectorAll('[data-pos-clock]').forEach((node) => { node.textContent = new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date()); });
     clock(); window.setInterval(clock, 30000);

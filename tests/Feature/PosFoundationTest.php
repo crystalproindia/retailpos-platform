@@ -111,8 +111,8 @@ class PosFoundationTest extends TestCase
         $this->actingAs($manager)->post('/pos/hold', $this->cartPayload($product, null, 1))->assertRedirect();
 
         $this->actingAs($manager)->get('/pos/dashboard')->assertOk()->assertSee('POS dashboard');
-        $this->actingAs($manager)->get('/pos/terminal')->assertOk()->assertSee('data-pos-mode="terminal"', false)->assertSee('Scan barcode or search products');
-        $this->actingAs($manager)->get('/pos/mobile')->assertOk()->assertSee('data-pos-mode="mobile"', false)->assertSee('Products');
+        $this->actingAs($manager)->get('/pos/terminal')->assertOk()->assertSee('data-pos-mode="terminal"', false)->assertSee('Scan barcode or search product')->assertSee('data-pos-payment-modal', false)->assertSee('Checkout');
+        $this->actingAs($manager)->get('/pos/mobile')->assertOk()->assertSee('data-pos-mode="mobile"', false)->assertSee('Products')->assertSee('data-pos-payment-modal', false);
         $this->actingAs($manager)->get('/pos/held')->assertOk()->assertSee('Held bills')->assertSee(PosSale::query()->value('sale_number'));
         $this->assertFileExists(public_path('pos-manifest.webmanifest'));
         $this->assertFileExists(public_path('pos-sw.js'));

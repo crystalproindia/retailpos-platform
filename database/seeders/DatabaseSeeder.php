@@ -24,6 +24,18 @@ use App\Models\Cms\CmsTrustMetric;
 use App\Models\Cms\CmsSeoSetting;
 use App\Models\Cms\CmsSetting;
 use App\Models\Company;
+use App\Models\Customers\Customer;
+use App\Models\Customers\CustomerActivityLog;
+use App\Models\Customers\CustomerAddress;
+use App\Models\Customers\CustomerContact;
+use App\Models\Customers\CustomerGroup;
+use App\Models\Customers\CustomerGroupMember;
+use App\Models\Customers\CustomerInsightSnapshot;
+use App\Models\Customers\CustomerLoyaltyAccount;
+use App\Models\Customers\CustomerLoyaltyTransaction;
+use App\Models\Customers\CustomerReturnSummary;
+use App\Models\Customers\CustomerSetting;
+use App\Models\Customers\CustomerWalletTransaction;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
@@ -167,6 +179,38 @@ class DatabaseSeeder extends Seeder
                 'password' => 'password',
             ],
         );
+
+        $customerGroups = collect([
+            ['name' => 'Regular', 'description' => 'Demo customer group for standard retail customers.', 'sort_order' => 1, 'is_default' => true],
+            ['name' => 'VIP', 'description' => 'Demo customer group for high-value retail relationships.', 'sort_order' => 2, 'is_default' => false],
+            ['name' => 'Wholesale', 'description' => 'Demo customer group for wholesale accounts.', 'sort_order' => 3, 'is_default' => false],
+            ['name' => 'Loyalty Member', 'description' => 'Demo customer group for loyalty foundation records.', 'sort_order' => 4, 'is_default' => false],
+        ])->mapWithKeys(fn (array $group) => [str($group['name'])->slug()->toString() => CustomerGroup::updateOrCreate(['company_id' => $company->id, 'slug' => str($group['name'])->slug()->toString()], $group + ['company_id' => $company->id, 'slug' => str($group['name'])->slug()->toString(), 'is_active' => true, 'loyalty_multiplier' => 1])]);
+
+        $customerSettings = CustomerSetting::updateOrCreate(['company_id' => $company->id], ['customer_number_prefix' => 'CUS', 'next_customer_number' => 1008, 'default_customer_group_id' => $customerGroups['regular']->id, 'birthday_reminder_days_before' => 7, 'inactive_customer_days' => 90, 'lost_customer_days' => 180, 'frequent_return_threshold_count' => 3, 'frequent_return_threshold_days' => 90, 'loyalty_enabled' => true, 'wallet_enabled' => true, 'loyalty_points_per_amount' => 100, 'loyalty_amount_per_point' => 1, 'allow_negative_wallet' => false]);
+
+        $demoCustomers = collect([
+            ['number' => 'CUS-001001', 'first' => 'Demo', 'last' => 'Top Customer', 'phone' => '+919000000101', 'type' => 'vip', 'status' => 'active', 'purchase' => 245000, 'orders' => 24, 'last_purchase' => now()->subDays(5), 'birthday' => now()->setYear(1990)->toDateString(), 'group' => 'vip', 'points' => 2450, 'wallet' => 500, 'returns' => 1],
+            ['number' => 'CUS-001002', 'first' => 'Demo', 'last' => 'Birthday Today', 'phone' => '+919000000102', 'type' => 'retail', 'status' => 'active', 'purchase' => 35000, 'orders' => 5, 'last_purchase' => now()->subDays(12), 'birthday' => now()->toDateString(), 'group' => 'loyalty-member', 'points' => 350, 'wallet' => 0, 'returns' => 0],
+            ['number' => 'CUS-001003', 'first' => 'Demo', 'last' => 'Upcoming Birthday', 'phone' => '+919000000103', 'type' => 'retail', 'status' => 'active', 'purchase' => 28000, 'orders' => 4, 'last_purchase' => now()->subDays(20), 'birthday' => now()->addDays(3)->setYear(1992)->toDateString(), 'group' => 'regular', 'points' => 280, 'wallet' => 0, 'returns' => 0],
+            ['number' => 'CUS-001004', 'first' => 'Demo', 'last' => 'Inactive Customer', 'phone' => '+919000000104', 'type' => 'retail', 'status' => 'inactive', 'purchase' => 65000, 'orders' => 8, 'last_purchase' => now()->subDays(110), 'birthday' => null, 'group' => 'regular', 'points' => 650, 'wallet' => 0, 'returns' => 0],
+            ['number' => 'CUS-001005', 'first' => 'Demo', 'last' => 'Lost Customer', 'phone' => '+919000000105', 'type' => 'corporate', 'status' => 'lost', 'purchase' => 98000, 'orders' => 9, 'last_purchase' => now()->subDays(200), 'birthday' => null, 'group' => 'wholesale', 'points' => 980, 'wallet' => 0, 'returns' => 0],
+            ['number' => 'CUS-001006', 'first' => 'Demo', 'last' => 'Frequent Returner', 'phone' => '+919000000106', 'type' => 'retail', 'status' => 'active', 'purchase' => 42000, 'orders' => 7, 'last_purchase' => now()->subDays(18), 'birthday' => null, 'group' => 'regular', 'points' => 120, 'wallet' => 100, 'returns' => 4],
+            ['number' => 'CUS-001007', 'first' => 'Demo', 'last' => 'Wholesale Account', 'phone' => '+919000000107', 'type' => 'wholesale', 'status' => 'active', 'purchase' => 152000, 'orders' => 14, 'last_purchase' => now()->subDays(8), 'birthday' => null, 'group' => 'wholesale', 'points' => 1500, 'wallet' => 0, 'returns' => 1],
+        ])->map(function (array $data) use ($company, $branch, $admin, $customerGroups): Customer {
+            $customer = Customer::updateOrCreate(['company_id' => $company->id, 'customer_number' => $data['number']], ['branch_id' => $branch->id, 'first_name' => $data['first'], 'last_name' => $data['last'], 'display_name' => $data['first'].' '.$data['last'], 'phone' => $data['phone'], 'whatsapp' => $data['phone'], 'customer_type' => $data['type'], 'status' => $data['status'], 'source' => 'Demo foundation record', 'date_of_birth' => $data['birthday'], 'created_by' => $admin->id, 'last_purchase_at' => $data['last_purchase'], 'last_return_at' => $data['returns'] ? now()->subDays(14) : null, 'total_purchase_amount' => $data['purchase'], 'total_orders_count' => $data['orders'], 'total_return_amount' => $data['returns'] * 1250, 'total_returns_count' => $data['returns'], 'loyalty_points_balance' => $data['points'], 'wallet_balance' => $data['wallet'], 'is_active' => $data['status'] === 'active', 'notes' => 'Demo/foundation customer record. Not a real customer.']);
+            CustomerGroupMember::updateOrCreate(['company_id' => $company->id, 'customer_id' => $customer->id, 'customer_group_id' => $customerGroups[$data['group']]->id], ['assigned_at' => now(), 'assigned_by' => $admin->id]);
+            CustomerAddress::updateOrCreate(['customer_id' => $customer->id, 'type' => 'billing'], ['company_id' => $company->id, 'name' => $customer->display_name, 'phone' => $customer->phone, 'address_line_1' => 'Demo Retail Address', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'country' => 'India', 'postal_code' => '560001', 'is_default' => true]);
+            CustomerContact::updateOrCreate(['customer_id' => $customer->id, 'name' => $customer->display_name], ['company_id' => $company->id, 'phone' => $customer->phone, 'is_primary' => true, 'is_active' => true]);
+            $account = CustomerLoyaltyAccount::updateOrCreate(['company_id' => $company->id, 'customer_id' => $customer->id], ['loyalty_number' => 'LOY-'.str_pad((string)$customer->id, 6, '0', STR_PAD_LEFT), 'tier' => $data['type'] === 'vip' ? 'vip' : 'standard', 'points_balance' => $data['points'], 'lifetime_points_earned' => $data['points'], 'joined_at' => now()->subMonths(6), 'last_activity_at' => $data['last_purchase'], 'is_active' => true]);
+            CustomerLoyaltyTransaction::updateOrCreate(['customer_id' => $customer->id, 'description' => 'Demo loyalty foundation credit'], ['company_id' => $company->id, 'loyalty_account_id' => $account->id, 'transaction_type' => 'adjustment_credit', 'points' => $data['points'], 'created_by' => $admin->id]);
+            if ($data['wallet']) CustomerWalletTransaction::updateOrCreate(['customer_id' => $customer->id, 'description' => 'Demo wallet foundation credit'], ['company_id' => $company->id, 'transaction_type' => 'adjustment_credit', 'amount' => $data['wallet'], 'balance_after' => $data['wallet'], 'created_by' => $admin->id]);
+            CustomerActivityLog::updateOrCreate(['customer_id' => $customer->id, 'title' => 'Demo customer foundation created'], ['company_id' => $company->id, 'activity_type' => 'created', 'description' => 'Demo-only customer intelligence foundation.', 'user_id' => $admin->id, 'occurred_at' => now()->subMonths(6)]);
+            CustomerReturnSummary::updateOrCreate(['company_id' => $company->id, 'customer_id' => $customer->id], ['return_count' => $data['returns'], 'return_amount' => $data['returns'] * 1250, 'last_return_at' => $data['returns'] ? now()->subDays(14) : null, 'is_frequent_returner' => $data['returns'] >= 3, 'calculated_at' => now(), 'reason_summary' => ['source' => 'Demo/foundation return behavior only.']]);
+            return $customer;
+        });
+
+        $demoCustomers->each(fn (Customer $customer) => app(\App\Services\Customers\CustomerInsightService::class)->calculate($customer));
 
         collect([
             ['key' => 'total_sales', 'label' => 'Total Sales', 'value' => '₹12.84L', 'trend' => '+18.4% this month', 'tone' => 'success', 'sort_order' => 1],

@@ -91,6 +91,11 @@ class NotificationTemplateRenderer
             'promotion.rule.created', 'promotion.rule.updated', 'promotion.rule.activated', 'promotion.rule.paused', 'promotion.rule.expired', 'promotion.approval.required' => $event->aggregateId() ? route('promotions.rules.show', $event->aggregateId()) : route('promotions.rules.index'),
             'promotion.coupon.created', 'promotion.coupon.used' => route('promotions.coupons.index'),
             'promotion.simulation.ran' => route('promotions.simulator.index'),
+            'customer.created', 'customer.updated', 'customer.deleted', 'customer.restored', 'customer.group.assigned', 'customer.status.changed', 'customer.loyalty.points_adjusted', 'customer.wallet.adjusted' => $event->aggregateId() ? route('customers.show', $event->aggregateId()) : route('customers.index'),
+            'customer.birthday.upcoming', 'customer.birthday.today' => route('customers.birthdays.index'),
+            'customer.inactive.detected' => route('customers.inactive.index'),
+            'customer.lost.detected' => route('customers.lost.index'),
+            'customer.frequent_returner.detected' => route('customers.returns.index'),
             default => route('notifications.index'),
         };
     }

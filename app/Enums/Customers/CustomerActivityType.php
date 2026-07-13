@@ -1,0 +1,2 @@
+<?php
+namespace App\Enums\Customers; enum CustomerActivityType: string { case Created='created'; case Updated='updated'; case NoteAdded='note_added'; case GroupChanged='group_changed'; case LoyaltyPointsAdded='loyalty_points_added'; case LoyaltyPointsRedeemed='loyalty_points_redeemed'; case WalletCredit='wallet_credit'; case WalletDebit='wallet_debit'; case BirthdayReminder='birthday_reminder'; case InactiveDetected='inactive_detected'; case LostDetected='lost_detected'; case ReturnRecorded='return_recorded'; case PurchaseRecordedFuture='purchase_recorded_future'; }

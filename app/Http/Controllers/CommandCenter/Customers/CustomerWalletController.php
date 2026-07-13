@@ -1,0 +1,3 @@
+<?php
+namespace App\Http\Controllers\CommandCenter\Customers; use App\Http\Controllers\Controller; use App\Http\Requests\Customers\CustomerAdjustmentRequest; use App\Repositories\Customers\CustomerRepository; use App\Services\Customers\WalletService; use Illuminate\Http\RedirectResponse;
+class CustomerWalletController extends Controller { public function adjust(CustomerAdjustmentRequest $r,CustomerRepository $repo,WalletService $service):RedirectResponse{$customer=$repo->findForCompany($r->user()->company_id,(int)$r->route('customer'));$service->adjust($customer,$r->user(),(float)$r->amount,$r->description);return back()->with('status','Wallet adjusted.');} }

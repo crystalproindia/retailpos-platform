@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Customers; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+#[Fillable(['company_id','customer_id','return_count','return_amount','return_quantity','frequent_return_score','last_return_at','reason_summary','is_frequent_returner','calculated_at'])] class CustomerReturnSummary extends Model {protected function casts():array{return ['last_return_at'=>'datetime','calculated_at'=>'datetime','reason_summary'=>'array','is_frequent_returner'=>'boolean'];} public function customer():BelongsTo{return $this->belongsTo(Customer::class);}}

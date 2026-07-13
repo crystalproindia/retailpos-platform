@@ -7,6 +7,9 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmLead;
+use App\Models\Customers\Customer;
+use App\Models\Customers\CustomerGroup;
+use App\Models\Customers\CustomerSetting;
 use App\Models\Inventory\InventoryBrand;
 use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\Product;
@@ -136,5 +139,20 @@ class Company extends Model
     public function promotionSettings(): HasMany
     {
         return $this->hasMany(PromotionSettings::class);
+    }
+
+    public function customers(): HasMany
+    {
+        return $this->hasMany(Customer::class);
+    }
+
+    public function customerGroups(): HasMany
+    {
+        return $this->hasMany(CustomerGroup::class);
+    }
+
+    public function customerSettings(): HasMany
+    {
+        return $this->hasMany(CustomerSetting::class);
     }
 }

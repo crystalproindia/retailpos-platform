@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Customers; use App\Models\User; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+#[Fillable(['company_id','customer_id','transaction_type','amount','balance_after','reference_type','reference_id','description','created_by','metadata'])] class CustomerWalletTransaction extends Model {protected function casts():array{return ['metadata'=>'array'];} public function customer():BelongsTo{return $this->belongsTo(Customer::class);} public function creator():BelongsTo{return $this->belongsTo(User::class,'created_by');}}

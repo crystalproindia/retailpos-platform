@@ -1,0 +1,3 @@
+<?php
+namespace App\Http\Requests\Customers; use Illuminate\Foundation\Http\FormRequest; use Illuminate\Validation\Rule;
+class CustomerAddressRequest extends FormRequest {public function authorize():bool{return true;} public function rules():array{return ['type'=>['required',Rule::in(['billing','shipping','home','office','other'])],'name'=>['nullable','string','max:255'],'phone'=>['nullable','string','max:50'],'address_line_1'=>['required','string','max:255'],'address_line_2'=>['nullable','string','max:255'],'city'=>['required','string','max:100'],'state'=>['required','string','max:100'],'country'=>['required','string','max:100'],'postal_code'=>['required','string','max:30'],'is_default'=>['nullable','boolean']];}}

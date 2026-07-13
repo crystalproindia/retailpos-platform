@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Customers; use App\Models\User; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+#[Fillable(['company_id','customer_id','customer_group_id','assigned_at','assigned_by','notes'])] class CustomerGroupMember extends Model {protected function casts():array{return ['assigned_at'=>'datetime'];} public function customer():BelongsTo{return $this->belongsTo(Customer::class);} public function group():BelongsTo{return $this->belongsTo(CustomerGroup::class,'customer_group_id');} public function assigner():BelongsTo{return $this->belongsTo(User::class,'assigned_by');}}

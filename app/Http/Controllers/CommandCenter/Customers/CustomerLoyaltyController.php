@@ -1,0 +1,3 @@
+<?php
+namespace App\Http\Controllers\CommandCenter\Customers; use App\Http\Controllers\Controller; use App\Http\Requests\Customers\CustomerAdjustmentRequest; use App\Repositories\Customers\CustomerRepository; use App\Services\Customers\LoyaltyService; use Illuminate\Http\RedirectResponse; use Illuminate\Http\Request;
+class CustomerLoyaltyController extends Controller { public function adjust(CustomerAdjustmentRequest $r,CustomerRepository $repo,LoyaltyService $service):RedirectResponse{$customer=$repo->findForCompany($r->user()->company_id,(int)$r->route('customer'));$service->adjust($customer,$r->user(),(int)$r->amount,$r->description);return back()->with('status','Loyalty points adjusted.');} }

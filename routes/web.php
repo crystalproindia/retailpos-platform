@@ -20,6 +20,13 @@ use App\Http\Controllers\CommandCenter\Cms\CmsMenuController;
 use App\Http\Controllers\CommandCenter\Cms\CmsPageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsSeoController;
 use App\Http\Controllers\CommandCenter\Cms\CmsSettingsController as CmsAdminSettingsController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerDashboardController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerGroupController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerIntelligenceController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
+use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\Crm\ActivityController;
 use App\Http\Controllers\CommandCenter\Crm\ContactController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCompanyController;
@@ -142,6 +149,36 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('activities/{activity}/reschedule', [ActivityController::class, 'reschedule'])->middleware('can:crm.activities.manage')->name('activities.reschedule');
 
         Route::get('follow-ups', FollowUpController::class)->middleware('can:crm.activities.manage')->name('followups.index');
+    });
+
+    Route::middleware(['role:administrator,manager,sales', 'can:customers.view'])->prefix('customers')->name('customers.')->group(function (): void {
+        Route::get('/', CustomerDashboardController::class)->middleware('can:customers.dashboard.view')->name('dashboard');
+        Route::get('directory', [CustomerController::class, 'index'])->name('index');
+        Route::get('create', [CustomerController::class, 'create'])->middleware('can:customers.create')->name('create');
+        Route::post('/', [CustomerController::class, 'store'])->middleware('can:customers.create')->name('store');
+        Route::get('{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('show');
+        Route::get('{customer}/edit', [CustomerController::class, 'edit'])->whereNumber('customer')->middleware('can:customers.update')->name('edit');
+        Route::put('{customer}', [CustomerController::class, 'update'])->whereNumber('customer')->middleware('can:customers.update')->name('update');
+        Route::delete('{customer}', [CustomerController::class, 'destroy'])->whereNumber('customer')->middleware('can:customers.delete')->name('destroy');
+        Route::post('{customer}/restore', [CustomerController::class, 'restore'])->whereNumber('customer')->middleware('can:customers.restore')->name('restore');
+        Route::post('{customer}/addresses', [CustomerController::class, 'storeAddress'])->whereNumber('customer')->middleware('can:customers.update')->name('addresses.store');
+        Route::post('{customer}/contacts', [CustomerController::class, 'storeContact'])->whereNumber('customer')->middleware('can:customers.update')->name('contacts.store');
+        Route::post('{customer}/groups', [CustomerGroupController::class, 'assign'])->whereNumber('customer')->middleware('can:customers.groups.manage')->name('groups.assign');
+        Route::post('{customer}/loyalty-adjustments', [CustomerLoyaltyController::class, 'adjust'])->whereNumber('customer')->middleware('can:customers.loyalty.adjust')->name('loyalty.adjust');
+        Route::post('{customer}/wallet-adjustments', [CustomerWalletController::class, 'adjust'])->whereNumber('customer')->middleware('can:customers.wallet.adjust')->name('wallet.adjust');
+        Route::get('groups/manage', [CustomerGroupController::class, 'index'])->middleware('can:customers.groups.view')->name('groups.index');
+        Route::post('groups/manage', [CustomerGroupController::class, 'store'])->middleware('can:customers.groups.manage')->name('groups.store');
+        Route::put('groups/manage/{group}', [CustomerGroupController::class, 'update'])->middleware('can:customers.groups.manage')->name('groups.update');
+        Route::delete('groups/manage/{group}', [CustomerGroupController::class, 'destroy'])->middleware('can:customers.groups.manage')->name('groups.destroy');
+        Route::post('groups/manage/{group}/restore', [CustomerGroupController::class, 'restore'])->middleware('can:customers.groups.manage')->name('groups.restore');
+        Route::get('birthdays/upcoming', [CustomerIntelligenceController::class, 'birthdays'])->middleware('can:customers.birthdays.view')->name('birthdays.index');
+        Route::get('inactive/list', [CustomerIntelligenceController::class, 'inactive'])->middleware('can:customers.inactive.view')->name('inactive.index');
+        Route::get('lost/list', [CustomerIntelligenceController::class, 'lost'])->middleware('can:customers.lost.view')->name('lost.index');
+        Route::get('returns/frequent', [CustomerIntelligenceController::class, 'returns'])->middleware('can:customers.returns.view')->name('returns.index');
+        Route::get('insights', [CustomerIntelligenceController::class, 'insights'])->middleware('can:customers.insights.view')->name('insights.index');
+        Route::post('insights/refresh', [CustomerIntelligenceController::class, 'refresh'])->middleware('can:customers.insights.view')->name('insights.refresh');
+        Route::get('settings', [CustomerSettingsController::class, 'index'])->middleware('can:customers.settings.manage')->name('settings.index');
+        Route::put('settings', [CustomerSettingsController::class, 'update'])->middleware('can:customers.settings.manage')->name('settings.update');
     });
 
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {

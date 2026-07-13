@@ -2559,3 +2559,100 @@ CMS services also audit create, update, delete, restore, publish, unpublish, set
 - Page builder sections are structured CMS records, not a freeform drag-and-drop canvas. The normalized content contracts leave room for a future block/page-layout service.
 - No blog, news, knowledge base, documentation, careers, dynamic forms, external CDNs, image optimisation service, email, WhatsApp, SMS, analytics API, n8n, or AI content integration is included.
 - Case studies and testimonials are seeded only as transparently labelled demo content. Production publication requires approved customer copy and media.
+
+## Phase 5 - Customers, Loyalty & Customer Intelligence Foundation
+
+Phase 5 adds a company-scoped customer command center without implementing POS, orders, invoicing, payments, external messaging, AI, or BI integrations. It extends the existing Laravel Command Center, Module Registry, capability Gates, audit log, Domain Event pipeline, Notification Center, and Branch/Company boundaries.
+
+### Module Registry, Roles, and Permissions
+
+`config/modules.php` registers `customers` as a `Sales & CRM` parent module with Customer Dashboard, Customers, Customer Groups, Loyalty Foundation, Birthday Reminders, Customer Insights, Inactive Customers, Lost Customers, Frequent Returns, Customer Wallet, and Customer Settings children. The parent carries a `New` badge and is resolved by the shared Module Registry, so no controller manages navigation metadata.
+
+Administrator and Manager have complete customer access. Sales can view, create, and update customer records plus view dashboard, customer intelligence, groups, and account history. Sales cannot delete or restore customers, change groups, adjust loyalty or wallet balances, or change customer settings. Staff has no Customer Foundation access. Capabilities are declared centrally in `config/permissions.php` under the `customers.*` namespace.
+
+### Folder Structure
+
+Customer code is additive and follows the established repository/service boundary:
+
+- `app/Enums/Customers` for customer type, status, address, contact, loyalty, wallet, and activity values.
+- `app/Events/Domain/Customers/CustomerDomainEvent.php` for the existing domain-event dispatcher.
+- `app/Http/Controllers/CommandCenter/Customers` for dashboard, profiles, groups, loyalty, wallet, intelligence, and settings.
+- `app/Http/Requests/Customers` for validated customer, group, address, contact, adjustment, and settings forms.
+- `app/Models/Customers` for the normalized customer records and lifecycle data.
+- `app/Repositories/Customers` for tenant-filtered customer, group, and dashboard queries.
+- `app/Services/Customers` for customer number allocation, lifecycle orchestration, group membership, loyalty, wallet, birthdays, intelligence calculations, dashboard composition, and event dispatch.
+- `resources/views/command-center/customers` for mobile-responsive Blade/Tailwind dashboard, list, profile, groups, intelligence, and settings screens.
+- `tests/Feature/CustomerFoundationTest.php` for customer module behavior.
+
+`Company` now exposes additive `customers`, `customerGroups`, and `customerSettings` relationships. Customer and group models also expose membership relationships without changing prior CRM, CMS, inventory, purchasing, promotion, authentication, or dashboard behavior.
+
+### Database Design
+
+Migration `2026_07_13_080001_create_customer_loyalty_foundation_tables.php` creates twelve company-scoped tables:
+
+- `customers`
+- `customer_groups`
+- `customer_group_members`
+- `customer_addresses`
+- `customer_contacts`
+- `customer_activity_logs`
+- `customer_loyalty_accounts`
+- `customer_loyalty_transactions`
+- `customer_wallet_transactions`
+- `customer_return_summaries`
+- `customer_insight_snapshots`
+- `customer_settings`
+
+Customer, group, address, and contact records use soft deletes where restoration is an operational requirement. Company-scoped unique keys protect customer numbers, customer emails, group slugs, loyalty numbers, account/snapshot/return-summary rows, and settings. Addresses, contacts, activities, membership rows, ledgers, and intelligence records all retain `company_id` to make tenant filtering explicit.
+
+### Customer Operations
+
+The customer directory provides search, status/type/group filters, pagination, soft-delete filtering, and tenant isolation. Profiles provide core identity, contact information, addresses, business contacts, group membership, loyalty account/history, wallet history, intelligence snapshot, return summary, and chronological activity. The dashboard reports total/active/new/VIP customers, loyalty membership, wallet total, birthdays, inactive/lost/frequent-return counts, top ten customer value, return risk, and segment distribution.
+
+`CustomerNumberService` allocates the next number from company settings in a transaction. `CustomerService` owns create, update, delete, restore, customer activity, audit, default-group assignment, loyalty-account creation, and domain events. `CustomerGroupService`, `LoyaltyService`, and `WalletService` own their mutation lifecycles and guard ledger balances against invalid negative states. Customer wallet transactions are foundations only, not payments or store credit settlement.
+
+### Intelligence and Birthday Foundations
+
+`CustomerInsightService` creates a company-scoped snapshot based on currently available foundation data: customer purchase totals/counts, last purchase, return totals/counts, loyalty tier, configured inactivity/lost thresholds, and frequent-return thresholds. It intentionally labels its notes as rule-based foundation data until Phase 6+ POS/order and return sources are connected.
+
+The dashboard and dedicated screens expose upcoming birthdays, inactive customers, lost customers, and frequent-return customers. `BirthdayReminderService` supplies a provider-neutral reminder foundation and records an activity/event when a future delivery adapter prepares a reminder. It does not send email, WhatsApp, SMS, push, or connect external providers.
+
+### Routes and UI
+
+All `/customers` routes are protected by `auth`, role middleware, and capability Gates. The numeric constraint on `{customer}` prevents conflicts with static Customer Foundation paths. The route surface includes:
+
+- dashboard and searchable customer directory
+- customer create, profile, update, soft delete, and restore
+- address/contact capture and customer-group assignment
+- loyalty/wallet adjustments
+- group management with soft delete and restore
+- birthday, inactive, lost, frequent-return, and insights screens
+- intelligence refresh and customer settings
+
+The Blade/Tailwind screens retain the Command Center shell, breadcrumbs, responsive tables, accessible forms, empty states, status messaging, profile workflow actions, and compact mobile layouts.
+
+### Events, Notifications, and Audit
+
+Customer events are registered in `config/events.php` and use the existing `DomainEventDispatcher`, Notification Center, event logs, webhook foundation, and Operations Monitor:
+
+- `customer.created`, `customer.updated`, `customer.deleted`, `customer.restored`
+- `customer.group.assigned`, `customer.status.changed`
+- `customer.birthday.upcoming`, `customer.birthday.today`
+- `customer.inactive.detected`, `customer.lost.detected`, `customer.frequent_returner.detected`
+- `customer.loyalty.points_adjusted`, `customer.wallet.adjusted`
+
+Customer create/update/delete/restore, address/contact capture, group lifecycle/assignment, loyalty and wallet adjustments, settings updates, and explicit intelligence refreshes are also written through `AuditLogger`. Notification recipients use the existing customer-event management audience and renderer mappings.
+
+### Demo Data and Tests
+
+`DatabaseSeeder` idempotently creates transparently labelled demo customer groups, settings, seven customer profiles, addresses, contacts, activity records, loyalty accounts/transactions, wallet transactions, return summaries, and intelligence snapshots. The records intentionally include a top customer, birthday today/upcoming examples, inactive/lost customers, a frequent returner, and a wholesale account.
+
+`CustomerFoundationTest` covers module registration, role filtering, staff denial, sales restrictions, customer CRUD/restore, same-email updates, tenant isolation, group assignment, loyalty/wallet ledger safeguards, audit/domain events, intelligence flags, birthday/inactive/lost/returns screens, refresh behavior, and seeded demo records.
+
+### Current Limitations and Future Extension Points
+
+- No POS billing, order ledger, invoice, payment, real return, refund, or accounting logic is introduced. Future POS/order services should call the dedicated customer, loyalty, wallet, and intelligence services transactionally.
+- Purchase and return values are foundation/demo fields until an order/return integration writes authoritative totals and source references.
+- Loyalty earn/redeem rules, tier promotion, expiry, wallet payment, credit-limit settlement, customer portal, campaign delivery, external messaging, AI scoring, and BI exports remain intentionally deferred.
+- Customer groups expose promotion-ready discount percentage and loyalty multiplier fields, but Phase 5 does not alter the Phase 4.5 promotion engine or make checkout claims.
+- Birthday records/events are provider-neutral. A future delivery adapter can use the existing notification pipeline without changing customer profile, activity, or settings contracts.

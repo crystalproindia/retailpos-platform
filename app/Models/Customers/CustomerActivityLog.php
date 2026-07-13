@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Customers; use App\Models\User; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+#[Fillable(['company_id','customer_id','activity_type','title','description','reference_type','reference_id','user_id','occurred_at','metadata'])] class CustomerActivityLog extends Model {protected function casts():array{return ['occurred_at'=>'datetime','metadata'=>'array'];} public function customer():BelongsTo{return $this->belongsTo(Customer::class);} public function user():BelongsTo{return $this->belongsTo(User::class);}}

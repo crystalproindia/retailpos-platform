@@ -9,6 +9,7 @@ $operationsRoles = ['administrator', 'manager'];
 $inventoryRoles = ['administrator', 'manager', 'sales'];
 $promotionRoles = ['administrator', 'manager', 'sales'];
 $promotionManagementRoles = ['administrator', 'manager'];
+$customerRoles = ['administrator', 'manager', 'sales'];
 
 return [
     'modules' => [
@@ -179,19 +180,30 @@ return [
         ],
         'customers' => [
             'name' => 'Customers',
-            'description' => 'Customer records and retail history foundation.',
+            'description' => 'Customer intelligence, loyalty, wallet, and retention foundation.',
             'icon' => 'customers',
-            'route' => 'modules.show',
-            'route_params' => ['module' => 'customers'],
+            'route' => 'customers.dashboard',
+            'route_params' => [],
             'sort_order' => 150,
             'category' => 'Sales & CRM',
             'enabled' => true,
             'visible_in_sidebar' => true,
-            'roles' => $allRoles,
-            'badge' => null,
+            'roles' => $customerRoles,
+            'badge' => ['label' => 'New', 'tone' => 'info'],
             'license_key' => null,
             'parent_id' => null,
         ],
+        'customer-dashboard' => ['name'=>'Customer Dashboard','description'=>'Customer health, retention, and value overview.','icon'=>'dashboard','route'=>'customers.dashboard','route_params'=>[],'sort_order'=>151,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-records' => ['name'=>'Customers','description'=>'Customer directory and profiles.','icon'=>'customers','route'=>'customers.index','route_params'=>[],'sort_order'=>152,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-groups' => ['name'=>'Customer Groups','description'=>'Customer segments for loyalty and future promotions.','icon'=>'users','route'=>'customers.groups.index','route_params'=>[],'sort_order'=>153,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-loyalty' => ['name'=>'Loyalty Foundation','description'=>'Loyalty accounts and points history.','icon'=>'analytics','route'=>'customers.insights.index','route_params'=>[],'sort_order'=>154,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-birthdays' => ['name'=>'Birthday Reminders','description'=>'Upcoming customer birthday foundation.','icon'=>'calendar','route'=>'customers.birthdays.index','route_params'=>[],'sort_order'=>155,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-insights' => ['name'=>'Customer Insights','description'=>'Rule-based customer intelligence.','icon'=>'analytics','route'=>'customers.insights.index','route_params'=>[],'sort_order'=>156,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-inactive' => ['name'=>'Inactive Customers','description'=>'Customers reaching the configured inactivity threshold.','icon'=>'analytics','route'=>'customers.inactive.index','route_params'=>[],'sort_order'=>157,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-lost' => ['name'=>'Lost Customers','description'=>'Customers reaching the configured lost threshold.','icon'=>'analytics','route'=>'customers.lost.index','route_params'=>[],'sort_order'=>158,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-returns' => ['name'=>'Frequent Returns','description'=>'Customers flagged by return behavior.','icon'=>'analytics','route'=>'customers.returns.index','route_params'=>[],'sort_order'=>159,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-wallet' => ['name'=>'Customer Wallet','description'=>'Customer wallet balances and profile adjustments.','icon'=>'finance','route'=>'customers.index','route_params'=>[],'sort_order'=>160,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
+        'customer-settings' => ['name'=>'Customer Settings','description'=>'Customer numbering, loyalty, wallet, and intelligence thresholds.','icon'=>'settings','route'=>'customers.settings.index','route_params'=>[],'sort_order'=>161,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$customerRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'customers'],
         'orders' => [
             'name' => 'Orders',
             'description' => 'Order management module foundation.',

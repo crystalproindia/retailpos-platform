@@ -2842,3 +2842,33 @@ The service worker remains limited to the POS shell/assets and branded fallback;
 - Offline stock is a snapshot; it can differ at sync time and is intended for short outages, not long-term disconnected operation.
 - Wallet/loyalty redemption, credit dues, returns/exchanges, multi-device conflict reconciliation, and full offline promotion re-evaluation remain deferred or disabled by default.
 - No payment gateway, UPI API, card terminal, direct thermal printer, finance/accounting, WhatsApp/SMS, AI, n8n, or BI integration is introduced.
+
+## Phase 6.3 - Live Deployment & Production/Staging Setup
+
+Phase 6.3 is a deployment-readiness and documentation-only milestone for the separate Laravel Command Center at `https://app.retailpos.biz`. It does not change POS, offline POS, CMS, CRM, inventory, purchases, promotions, customers, dashboard behavior, migrations, queues, scheduler definitions, integrations, or the separate `retailpos-web` application at `https://retailpos.biz`.
+
+### Deployment Assets and Environment Contract
+
+`.env.production.example` supplies a safe committed template with no secrets. It fixes the production contract to `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://app.retailpos.biz`, secure SameSite-Lax sessions, database cache/session/queue drivers, public filesystem media, warning-level logs, and a log-only mailer. The live `.env`, database credentials, generated `APP_KEY`, and any provider secrets remain server-only and ignored by Git.
+
+`DEPLOYMENT.md` is the operational runbook for Hostinger Business/hPanel. It covers SSH/Git deployment, manual-upload fallback, local Vite builds where server Node is unavailable, Composer fallback guidance, MySQL/MariaDB setup, safe migration rules, writable folder expectations, cache commands, hPanel cron jobs, smoke tests, backup/rollback, and troubleshooting.
+
+### Public-Root and Migration Rules
+
+The mandatory deployment boundary is that only `retailpos-platform/public` is exposed by `app.retailpos.biz`. The Laravel root must remain private; `.env`, source directories, `storage`, `vendor`, migrations, and Composer files must never be served by the browser. The preferred hPanel document root is `/home/<hostinger-user>/retailpos-platform/public`; if that cannot be configured, the deployment must keep the application outside `public_html` and arrange for the subdomain to serve only its public directory. Insecure copy or rewrite workarounds are explicitly excluded.
+
+Production uses `php artisan migrate --force` after a database backup. `migrate:fresh`, `db:wipe`, and other destructive reset operations are prohibited. Demo seeding is allowed only on an intentionally new staging database after the current seeders are reviewed; it is not a replacement for live-user provisioning or an excuse to overwrite production data.
+
+### Queue, Scheduler, PWA, and Security Operations
+
+The existing `jobs`, `job_batches`, and `failed_jobs` migration supports the documented `QUEUE_CONNECTION=database` worker. Shared Hostinger hosting may use a one-minute `queue:work --stop-when-empty` cron fallback; a future VPS can run a supervised persistent worker. The existing scheduler remains unchanged and is run by a separate one-minute `schedule:run` hPanel cron job.
+
+The live smoke-test contract includes HTTPS, login, dashboard, desktop POS, mobile POS, receipt printing, manifest/service-worker registration, IndexedDB bootstrap, a short-outage offline queue, online restoration/sync, and the `/pos/offline` manager monitor. This is deliberately a short-outage facility, not long-term offline or payment-verification support.
+
+The runbook requires production debug disabling, HTTPS, secure session cookies, private server environment files, safe storage/cache permissions, cache verification, non-default administrator credentials, no exposed debug/test routes, and pre-deploy database/storage backups. It also records that the initial deployment remains a staging/demo environment until all smoke tests are passed.
+
+### Current Deployment Limitations
+
+- Real customer billing remains blocked until the live deployment checklist and smoke tests pass.
+- External payment gateways, live UPI/card terminals, direct thermal-printer drivers, finance/accounting, WhatsApp/SMS, AI, and n8n remain out of scope.
+- Hostinger shared hosting may require cron-based queue execution rather than a persistent queue worker.

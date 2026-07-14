@@ -55,7 +55,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->unique(['company_id', 'offline_uuid']);
-            $table->index(['company_id', 'status', 'record_type']);
+            $table->index(['company_id', 'status', 'record_type'], 'pos_off_sync_record_company_status_type_idx');
         });
 
         Schema::create('pos_offline_settings', function (Blueprint $table): void {

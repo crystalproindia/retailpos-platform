@@ -364,7 +364,7 @@ return new class extends Migration
             $table->foreignId('dismissed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('dismissed_at')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'status', 'stockout_risk_level']);
+            $table->index(['company_id', 'status', 'stockout_risk_level'], 'reorder_sugg_company_status_risk_idx');
         });
 
         Schema::create('sales_channels', function (Blueprint $table): void {

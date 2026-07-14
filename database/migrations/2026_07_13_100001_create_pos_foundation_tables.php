@@ -82,7 +82,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['customer_id', 'product_id']);
-            $table->index(['company_id', 'customer_id', 'last_purchased_at']);
+            $table->index(['company_id', 'customer_id', 'last_purchased_at'], 'cust_prod_summary_company_customer_last_idx');
         });
 
         Schema::create('pos_product_pair_summaries', function (Blueprint $table): void {
@@ -94,7 +94,7 @@ return new class extends Migration
             $table->timestamp('last_purchased_together_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['company_id', 'product_id', 'related_product_id']);
+            $table->unique(['company_id', 'product_id', 'related_product_id'], 'pos_pair_summary_company_product_related_uq');
         });
     }
 

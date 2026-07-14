@@ -33,7 +33,7 @@ return new class extends Migration
             $table->time('quiet_hours_end')->nullable();
             $table->string('timezone')->nullable();
             $table->timestamps();
-            $table->unique(['company_id', 'user_id', 'event_key']);
+            $table->unique(['company_id', 'user_id', 'event_key'], 'notif_pref_company_user_event_uq');
         });
 
         Schema::create('notification_templates', function (Blueprint $table): void {

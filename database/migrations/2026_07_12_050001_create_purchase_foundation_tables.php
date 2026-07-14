@@ -116,7 +116,7 @@ return new class extends Migration
             $table->timestamp('calculated_at');
             $table->text('notes')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'supplier_id', 'calculated_at']);
+            $table->index(['company_id', 'supplier_id', 'calculated_at'], 'supp_score_company_supplier_calc_idx');
         });
 
         Schema::create('purchase_settings', function (Blueprint $table): void {

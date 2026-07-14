@@ -100,7 +100,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->string('include_or_exclude')->default('include');
             $table->timestamps();
-            $table->unique(['promotion_rule_id', 'product_id']);
+            $table->unique(['promotion_rule_id', 'product_id'], 'promo_prod_target_rule_product_uq');
         });
 
         Schema::create('promotion_category_targets', function (Blueprint $table): void {
@@ -110,7 +110,7 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained('inventory_categories')->cascadeOnDelete();
             $table->string('include_or_exclude')->default('include');
             $table->timestamps();
-            $table->unique(['promotion_rule_id', 'category_id']);
+            $table->unique(['promotion_rule_id', 'category_id'], 'promo_cat_target_rule_category_uq');
         });
 
         Schema::create('promotion_brand_targets', function (Blueprint $table): void {
@@ -130,7 +130,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->string('include_or_exclude')->default('include');
             $table->timestamps();
-            $table->unique(['promotion_rule_id', 'product_id']);
+            $table->unique(['promotion_rule_id', 'product_id'], 'promo_var_target_rule_product_uq');
         });
 
         Schema::create('promotion_branch_targets', function (Blueprint $table): void {
@@ -150,7 +150,7 @@ return new class extends Migration
             $table->foreignId('sales_channel_id')->constrained('sales_channels')->cascadeOnDelete();
             $table->string('include_or_exclude')->default('include');
             $table->timestamps();
-            $table->unique(['promotion_rule_id', 'sales_channel_id']);
+            $table->unique(['promotion_rule_id', 'sales_channel_id'], 'promo_channel_target_rule_channel_uq');
         });
 
         Schema::create('promotion_coupons', function (Blueprint $table): void {
@@ -184,7 +184,7 @@ return new class extends Migration
             $table->timestamp('redeemed_at');
             $table->json('metadata')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'promotion_coupon_id']);
+            $table->index(['company_id', 'promotion_coupon_id'], 'promo_coupon_redemp_company_coupon_idx');
         });
 
         Schema::create('promotion_rule_usage', function (Blueprint $table): void {
@@ -199,7 +199,7 @@ return new class extends Migration
             $table->decimal('quantity_affected', 14, 3)->default(0);
             $table->json('metadata')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'promotion_rule_id', 'usage_date']);
+            $table->index(['company_id', 'promotion_rule_id', 'usage_date'], 'promo_rule_usage_company_rule_date_idx');
         });
 
         Schema::create('promotion_simulations', function (Blueprint $table): void {

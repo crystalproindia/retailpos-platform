@@ -974,7 +974,7 @@ return [
             'name' => 'Website Control Center', 'description' => 'CMS readiness, content health, and publishing overview.', 'icon' => 'dashboard', 'route' => 'cms.dashboard', 'route_params' => [], 'sort_order' => 521, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
         ],
         'cms-branding' => [
-            'name' => 'Branding', 'description' => 'Brand identity, logos, colours, and default calls to action.', 'icon' => 'layout', 'route' => 'cms.branding.index', 'route_params' => [], 'sort_order' => 522, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+            'name' => 'Website Settings', 'description' => 'Brand identity, header settings, contact details, and analytics.', 'icon' => 'layout', 'route' => 'website.settings.index', 'route_params' => [], 'sort_order' => 522, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
         ],
         'cms-theme' => [
             'name' => 'Theme', 'description' => 'Website theme tokens and visual presentation settings.', 'icon' => 'settings', 'route' => 'cms.theme.index', 'route_params' => [], 'sort_order' => 523, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',

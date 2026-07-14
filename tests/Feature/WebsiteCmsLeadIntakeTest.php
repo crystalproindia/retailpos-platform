@@ -208,6 +208,30 @@ class WebsiteCmsLeadIntakeTest extends TestCase
         $this->assertDatabaseHas('cms_settings', ['key' => 'company_name', 'group' => 'company']);
     }
 
+    public function test_legacy_cms_branding_header_and_client_logo_routes_redirect_to_safe_website_surfaces(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+
+        $this->actingAs($manager)
+            ->get('/website/settings')
+            ->assertOk()
+            ->assertSee('Branding')
+            ->assertSee('Header')
+            ->assertSee('Client Logos');
+
+        $this->actingAs($manager)
+            ->get('/cms/branding')
+            ->assertRedirect(route('website.settings.index').'#branding');
+
+        $this->actingAs($manager)
+            ->get('/cms/header')
+            ->assertRedirect(route('website.settings.index').'#header');
+
+        $this->actingAs($manager)
+            ->get('/cms/client-logos')
+            ->assertRedirect(route('website.settings.index').'#client-logos');
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>

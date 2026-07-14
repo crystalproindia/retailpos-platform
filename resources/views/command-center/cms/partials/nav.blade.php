@@ -1,13 +1,13 @@
 @php
     $links = [
         ['label' => 'Control Center', 'route' => 'cms.dashboard'],
-        ['label' => 'Branding', 'route' => 'cms.branding.index'],
+        ['label' => 'Website Settings', 'route' => 'website.settings.index'],
         ['label' => 'Theme', 'route' => 'cms.theme.index'],
-        ['label' => 'Header', 'route' => 'cms.header.index'],
+        ['label' => 'Navigation', 'route' => 'website.navigation.index'],
         ['label' => 'Homepage', 'route' => 'cms.homepage.index'],
         ['label' => 'Pages', 'route' => 'cms.pages.index'],
         ['label' => 'Case Studies', 'route' => 'cms.case-studies.index'],
-        ['label' => 'Client Logos', 'route' => 'cms.client-logos.index'],
+        ['label' => 'Client Logos (Coming Soon)', 'route' => 'website.settings.index'],
         ['label' => 'Testimonials', 'route' => 'cms.testimonials.index'],
         ['label' => 'Trust', 'route' => 'cms.trust-metrics.index'],
         ['label' => 'FAQs', 'route' => 'cms.faqs.index'],

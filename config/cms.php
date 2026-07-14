@@ -53,6 +53,14 @@ return [
         'youtube_url' => ['label' => 'YouTube URL', 'type' => 'url', 'group' => 'social'],
         'google_analytics_id' => ['label' => 'Google Analytics ID', 'type' => 'text', 'group' => 'analytics'],
         'google_tag_manager_id' => ['label' => 'Google Tag Manager ID', 'type' => 'text', 'group' => 'analytics'],
+        'header_sticky' => ['label' => 'Sticky Header', 'type' => 'boolean', 'group' => 'header'],
+        'header_cta_text' => ['label' => 'Header CTA Text', 'type' => 'text', 'group' => 'header'],
+        'header_cta_link' => ['label' => 'Header CTA Link', 'type' => 'url', 'group' => 'header'],
+        'header_login_label' => ['label' => 'Login Button Label', 'type' => 'text', 'group' => 'header'],
+        'header_demo_label' => ['label' => 'Demo Button Label', 'type' => 'text', 'group' => 'header'],
+        'client_logos_enabled' => ['label' => 'Show Client Logos', 'type' => 'boolean', 'group' => 'client_logos'],
+        'client_logos_title' => ['label' => 'Client Logos Title', 'type' => 'text', 'group' => 'client_logos'],
+        'client_logos_description' => ['label' => 'Client Logos Description', 'type' => 'textarea', 'group' => 'client_logos'],
     ],
 
     'menu_locations' => [

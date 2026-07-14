@@ -81,6 +81,10 @@ class Module
             return request()->routeIs('cms.*');
         }
 
+        if (str_starts_with($this->route, 'website.')) {
+            return request()->routeIs('website.*');
+        }
+
         if (str_starts_with($this->route, 'crm.')) {
             return request()->routeIs('crm.*');
         }

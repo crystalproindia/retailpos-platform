@@ -3,12 +3,13 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\CommandCenter\Cms\CmsDashboardController;
 use App\Http\Controllers\CommandCenter\Cms\CmsBrandingController;
-use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
-use App\Http\Controllers\CommandCenter\Cms\CmsHeaderController;
-use App\Http\Controllers\CommandCenter\Cms\CmsFooterBuilderController;
 use App\Http\Controllers\CommandCenter\Cms\CmsClientLogoController;
+use App\Http\Controllers\CommandCenter\Cms\CmsDashboardController;
+use App\Http\Controllers\CommandCenter\Cms\CmsHeaderController;
+use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
+use App\Http\Controllers\CommandCenter\Cms\CmsLegacyRouteRedirectController;
+use App\Http\Controllers\CommandCenter\Cms\CmsFooterBuilderController;
 use App\Http\Controllers\CommandCenter\Cms\CmsCaseStudyController;
 use App\Http\Controllers\CommandCenter\Cms\CmsTestimonialController;
 use App\Http\Controllers\CommandCenter\Cms\CmsTrustMetricController;
@@ -210,11 +211,11 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {
         Route::get('/', CmsDashboardController::class)->middleware('can:cms.website_builder.view')->name('dashboard');
 
-        Route::get('branding', [CmsBrandingController::class, 'index'])->middleware('can:cms.branding.manage')->name('branding.index');
+        Route::get('branding', [CmsLegacyRouteRedirectController::class, 'branding'])->middleware('can:cms.branding.manage')->name('branding.index');
         Route::put('branding', [CmsBrandingController::class, 'update'])->middleware('can:cms.branding.manage')->name('branding.update');
         Route::get('theme', [CmsThemeController::class, 'index'])->middleware('can:cms.theme.manage')->name('theme.index');
         Route::put('theme', [CmsThemeController::class, 'update'])->middleware('can:cms.theme.manage')->name('theme.update');
-        Route::get('header', [CmsHeaderController::class, 'index'])->middleware('can:cms.header.manage')->name('header.index');
+        Route::get('header', [CmsLegacyRouteRedirectController::class, 'header'])->middleware('can:cms.header.manage')->name('header.index');
         Route::put('header', [CmsHeaderController::class, 'update'])->middleware('can:cms.header.manage')->name('header.update');
         Route::get('footer', [CmsFooterBuilderController::class, 'index'])->middleware('can:cms.footer.manage')->name('footer.index');
         Route::put('footer', [CmsFooterBuilderController::class, 'update'])->middleware('can:cms.footer.manage')->name('footer.update');
@@ -257,7 +258,7 @@ Route::middleware('auth')->group(function (): void {
         Route::put('seo', [CmsSeoController::class, 'update'])->name('seo.update');
         Route::post('seo/redirects', [CmsSeoController::class, 'storeRedirect'])->name('seo.redirects.store');
 
-        Route::get('client-logos', [CmsClientLogoController::class, 'index'])->middleware('can:cms.client_logos.manage')->name('client-logos.index');
+        Route::get('client-logos', [CmsLegacyRouteRedirectController::class, 'clientLogos'])->middleware('can:cms.client_logos.manage')->name('client-logos.index');
         Route::post('client-logos', [CmsClientLogoController::class, 'store'])->middleware('can:cms.client_logos.manage')->name('client-logos.store');
         Route::put('client-logos/{logo}', [CmsClientLogoController::class, 'update'])->middleware('can:cms.client_logos.manage')->name('client-logos.update');
         Route::delete('client-logos/{logo}', [CmsClientLogoController::class, 'destroy'])->middleware('can:cms.client_logos.manage')->name('client-logos.destroy');

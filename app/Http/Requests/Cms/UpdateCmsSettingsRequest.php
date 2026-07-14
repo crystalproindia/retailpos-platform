@@ -22,6 +22,7 @@ class UpdateCmsSettingsRequest extends FormRequest
                     'email' => ['nullable', 'email', 'max:255'],
                     'url' => ['nullable', 'string', 'max:255'],
                     'media' => ['nullable', 'integer', 'exists:cms_media,id'],
+                    'boolean' => ['nullable', 'boolean'],
                     default => ['nullable', 'string'],
                 }];
             })

@@ -2872,3 +2872,25 @@ The runbook requires production debug disabling, HTTPS, secure session cookies, 
 - Real customer billing remains blocked until the live deployment checklist and smoke tests pass.
 - External payment gateways, live UPI/card terminals, direct thermal-printer drivers, finance/accounting, WhatsApp/SMS, AI, and n8n remain out of scope.
 - Hostinger shared hosting may require cron-based queue execution rather than a persistent queue worker.
+
+## Phase 6.4 - Live Hardening, Cron, Backup, and Demo Readiness
+
+Phase 6.4 adds deployment-safe operational tooling and documentation only. It preserves every application feature and does not add payment, accounting, messaging, AI, automation, or public-site functionality.
+
+### Safe Console Commands
+
+`retailpos:admin-password {--email=}` rotates the password for an existing user with the Administrator role. It prompts for both password entries using hidden console input, requires at least twelve characters, hashes through Laravel's `Hash` facade, and reports success without printing or logging the password. It cannot create or delete users.
+
+`retailpos:live-check` is read-only. It provides PASS/WARN/FAIL results for production environment and debug settings, HTTPS app URL, PHP version, database/migrations, writable storage/cache/log paths, public-storage link, configuration/route cache state, POS and offline POS route availability, queue configuration, scheduler command discovery, and Vite manifest availability. FAIL results make the command return a non-zero exit code; WARN results identify conditions to review without writing data or changing configuration.
+
+`tests/Feature/LiveHardeningCommandTest.php` covers password rotation, non-administrator refusal, hidden-password output safety, and the read-only readiness report.
+
+### Hostinger Operations and Demo Documentation
+
+`DEPLOYMENT.md` now records the deployed Hostinger PHP 8.4 CLI path, exact every-minute scheduler and queue-fallback cron commands, backup boundaries, local Vite build/upload steps for a server without Node, cache rebuild commands, log diagnostics, private-root/.htaccess checks, and the complete live smoke-test flow.
+
+`DEMO_READINESS.md` provides a client-facing readiness checklist for credentials, branding, demo data, POS/mobile/offline preparation, a suggested product walkthrough, and post-demo review. It labels all intentionally deferred integrations so the demonstration does not overstate current capability.
+
+### Live Safety Boundaries
+
+The live environment remains staging/demo first. Password rotation, cron creation, backups, asset uploads, server cache rebuilds, and browser smoke tests are deliberate Hostinger operator actions; they are not automated by the application. Database backups remain private, `.env` remains outside public paths and Git, and no destructive deployment command or unattended database-backup cron is introduced.

@@ -210,3 +210,124 @@ To roll back application code, deploy the prior known-good Git commit or release
 - This environment is staging/demo first; it is not ready for real customer billing until the smoke tests pass.
 - External payment gateways, live UPI/card terminals, direct thermal-printer drivers, finance/accounting, WhatsApp/SMS, AI, and n8n are not configured.
 - The queue may need the documented cron fallback on shared Hostinger hosting.
+
+## Live hardening and administrator access
+
+The seeded demo administrator must not retain a default password on a live environment. After deploying the current release, rotate the password for an existing Administrator only:
+
+```bash
+cd /home/u237933956/domains/retailpos.biz/retailpos-platform
+/opt/alt/php84/usr/bin/php artisan retailpos:admin-password --email=admin@retailpos.test
+```
+
+The command asks for the new password and confirmation through hidden prompts, requires at least 12 characters, hashes the password with Laravel's `Hash` facade, and never prints or logs the password. It does not create or delete users. Use the actual administrator email if the demo account has already been renamed. Do not run this command in a shared terminal session or paste passwords into shell history.
+
+Run the following read-only report after deployment and whenever staging readiness is in doubt:
+
+```bash
+/opt/alt/php84/usr/bin/php artisan retailpos:live-check
+```
+
+It reports `PASS`, `WARN`, or `FAIL` for environment settings, PHP, database/migration availability, writable application paths, storage link, cache state, POS/offline POS routes, queue configuration, scheduler command availability, and the Vite build manifest. It does not change data, configuration, users, queues, or caches. A `WARN` identifies an item to review; any `FAIL` must be resolved before a client demo.
+
+## Hostinger cron jobs
+
+Create two separate hPanel Cron Jobs with an every-minute frequency. The Laravel root is private; run both commands from that root using Hostinger's PHP 8.4 CLI.
+
+Scheduler:
+
+```cron
+* * * * * cd /home/u237933956/domains/retailpos.biz/retailpos-platform && /opt/alt/php84/usr/bin/php artisan schedule:run >> /dev/null 2>&1
+```
+
+Queue fallback:
+
+```cron
+* * * * * cd /home/u237933956/domains/retailpos.biz/retailpos-platform && /opt/alt/php84/usr/bin/php artisan queue:work --stop-when-empty --sleep=1 --tries=3 --timeout=90 >> /dev/null 2>&1
+```
+
+Hostinger shared hosting may not support a persistent queue worker. The cron fallback is suitable for staging/demo operations. Do not configure multiple aggressive queue-worker cron jobs on shared hosting. For real production scale, use a VPS with a supervised worker.
+
+## Live backup checklist
+
+Before every deployment or migration:
+
+- Export the database through hPanel `Databases` backup tooling or phpMyAdmin Export.
+- Back up the live `.env` privately. Do not place it in Git, a shared archive, or a browser-accessible folder.
+- Back up `storage/app/public` when uploaded media exists.
+- Record the deployed Git commit alongside the backup.
+- Remember that GitHub is source-code backup only; it is not a database or uploaded-media backup.
+
+Hostinger manual backup paths are hPanel `Databases` backup/export controls and hPanel `Files` backup or a private download of the relevant storage folder. An optional SSH database-export template is:
+
+```bash
+mysqldump -h DB_HOST -u DB_USERNAME -p DB_DATABASE > ~/backups/retailpos_YYYYMMDD_HHMM.sql
+```
+
+Use placeholders only and enter the password interactively. `~/backups` is preferred for server-managed exports; `storage/app/backups` is acceptable only when it remains private. Do not commit SQL dumps, `.env` files, or backup archives. Do not automate database backups with passwords in cron until a separately reviewed secret-management approach exists.
+
+## Local asset build and upload
+
+Node/npm is not available on the Hostinger server. Build assets locally from the deployment commit:
+
+```bash
+cd "/Users/andrew/Downloads/retailpos-platform"
+git pull --ff-only origin main
+npm ci
+npm run build
+```
+
+Ensure the target directories exist, then upload the built asset contents to both the private Laravel public directory and the public subdomain directory:
+
+```bash
+ssh -p 65002 u237933956@82.112.239.90 "mkdir -p domains/retailpos.biz/retailpos-platform/public/build domains/retailpos.biz/public_html/app/build"
+scp -P 65002 -r public/build/. u237933956@82.112.239.90:domains/retailpos.biz/retailpos-platform/public/build/
+scp -P 65002 -r public/build/. u237933956@82.112.239.90:domains/retailpos.biz/public_html/app/build/
+```
+
+Then rebuild Laravel caches on the server:
+
+```bash
+ssh -p 65002 u237933956@82.112.239.90 "cd domains/retailpos.biz/retailpos-platform && /opt/alt/php84/usr/bin/php artisan optimize:clear && /opt/alt/php84/usr/bin/php artisan config:cache && /opt/alt/php84/usr/bin/php artisan route:cache && /opt/alt/php84/usr/bin/php artisan view:cache && /opt/alt/php84/usr/bin/php artisan event:cache"
+```
+
+The committed source does not contain `public/build`; deploy the build from the same commit as the PHP application. Confirm `public_html/app/.htaccess` is the standard Laravel public `.htaccess` file. Do not add rewrite rules that expose the private Laravel root.
+
+## Live smoke-test checklist
+
+Complete this checklist with a real HTTPS browser session after deployment and before a client demo:
+
+1. Open `https://app.retailpos.biz/login`.
+2. Sign in as the Administrator whose password has been rotated.
+3. Confirm the Command Center dashboard opens.
+4. Open `/pos`.
+5. Open `/pos/terminal`.
+6. Create a clearly labelled demo bill.
+7. Open the Checkout payment modal.
+8. Complete a cash payment.
+9. View and browser-print the receipt.
+10. Open `/pos/mobile` on a phone-sized browser.
+11. Confirm the POS manifest and service worker load over HTTPS.
+12. In DevTools, set Network to Offline and create a permitted offline cash bill.
+13. Confirm the bill is marked Pending Sync, restore network access, and confirm it syncs.
+14. Open `/pos/offline` as an Administrator or Manager and inspect the sync record.
+15. Open `/customers`, `/inventory`, `/promotions`, and `/cms`.
+16. Verify an intended storage image/media upload when the demo requires it.
+17. Confirm there are no 500 responses or browser mixed-content errors.
+18. Review `storage/logs/laravel.log` for new critical errors.
+19. Run `retailpos:live-check` and resolve every `FAIL`.
+
+## Security and log monitoring additions
+
+In addition to the earlier security checklist, verify that the Laravel root is outside `public_html`, `.env` is not in `public_html/app`, only public files are present in `public_html/app`, and its `index.php` points to the private Laravel root. Verify no phpinfo, debug toolbar, test, or local-only route is installed. Confirm failed-login behavior is acceptable without revealing sensitive information.
+
+Useful production-safe diagnostics:
+
+```bash
+ssh -p 65002 u237933956@82.112.239.90 "cd domains/retailpos.biz/retailpos-platform && tail -n 120 storage/logs/laravel.log"
+ssh -p 65002 u237933956@82.112.239.90 "cd domains/retailpos.biz/retailpos-platform && /opt/alt/php84/usr/bin/php artisan optimize:clear"
+ssh -p 65002 u237933956@82.112.239.90 "cd domains/retailpos.biz/retailpos-platform && /opt/alt/php84/usr/bin/php artisan route:list --name=pos"
+ssh -p 65002 u237933956@82.112.239.90 "cd domains/retailpos.biz/retailpos-platform && /opt/alt/php84/usr/bin/php artisan schedule:list"
+```
+
+See `DEMO_READINESS.md` for the client-demo checklist and flow.

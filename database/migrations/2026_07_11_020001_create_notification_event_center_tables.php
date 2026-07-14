@@ -53,6 +53,26 @@ return new class extends Migration
             $table->index(['company_id', 'event_key', 'channel', 'locale']);
         });
 
+        Schema::create('domain_event_logs', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('company_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->string('event_key');
+            $table->string('event_class');
+            $table->string('aggregate_type')->nullable();
+            $table->unsignedBigInteger('aggregate_id')->nullable();
+            $table->string('correlation_id')->unique();
+            $table->string('causation_id')->nullable();
+            $table->json('payload')->nullable();
+            $table->timestamp('occurred_at');
+            $table->timestamp('processed_at')->nullable();
+            $table->string('status')->default('recorded');
+            $table->text('failure_reason')->nullable();
+            $table->timestamps();
+            $table->index(['company_id', 'event_key', 'status']);
+            $table->index(['aggregate_type', 'aggregate_id']);
+        });
+
         Schema::create('notification_deliveries', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
@@ -78,26 +98,6 @@ return new class extends Migration
             $table->index(['company_id', 'event_key', 'channel', 'status']);
             $table->index(['company_id', 'user_id']);
             $table->index(['domain_event_log_id']);
-        });
-
-        Schema::create('domain_event_logs', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('company_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('event_key');
-            $table->string('event_class');
-            $table->string('aggregate_type')->nullable();
-            $table->unsignedBigInteger('aggregate_id')->nullable();
-            $table->string('correlation_id')->unique();
-            $table->string('causation_id')->nullable();
-            $table->json('payload')->nullable();
-            $table->timestamp('occurred_at');
-            $table->timestamp('processed_at')->nullable();
-            $table->string('status')->default('recorded');
-            $table->text('failure_reason')->nullable();
-            $table->timestamps();
-            $table->index(['company_id', 'event_key', 'status']);
-            $table->index(['aggregate_type', 'aggregate_id']);
         });
 
         Schema::create('webhook_endpoints', function (Blueprint $table): void {
@@ -141,8 +141,8 @@ return new class extends Migration
     {
         Schema::dropIfExists('webhook_deliveries');
         Schema::dropIfExists('webhook_endpoints');
-        Schema::dropIfExists('domain_event_logs');
         Schema::dropIfExists('notification_deliveries');
+        Schema::dropIfExists('domain_event_logs');
         Schema::dropIfExists('notification_templates');
         Schema::dropIfExists('notification_preferences');
         Schema::dropIfExists('notifications');

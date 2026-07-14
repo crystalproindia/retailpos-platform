@@ -50,7 +50,7 @@ return new class extends Migration
             $table->unsignedInteger('version')->default(1);
             $table->timestamps();
             $table->softDeletes();
-            $table->index(['company_id', 'event_key', 'channel', 'locale']);
+            $table->index(['company_id', 'event_key', 'channel', 'locale'], 'notif_tmpl_company_event_channel_locale_idx');
         });
 
         Schema::create('domain_event_logs', function (Blueprint $table): void {
@@ -95,7 +95,7 @@ return new class extends Migration
             $table->timestamp('failed_at')->nullable();
             $table->timestamp('next_retry_at')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'event_key', 'channel', 'status']);
+            $table->index(['company_id', 'event_key', 'channel', 'status'], 'notif_deliv_company_event_channel_status_idx');
             $table->index(['company_id', 'user_id']);
             $table->index(['domain_event_log_id']);
         });

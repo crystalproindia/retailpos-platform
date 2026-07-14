@@ -22,8 +22,10 @@ class CmsSettingsService
                     'key' => $key,
                 ],
                 [
+                    'group' => $definition['group'] ?? 'general',
                     'label' => $definition['label'],
                     'value_type' => $definition['type'],
+                    'is_public' => $definition['is_public'] ?? true,
                 ],
             );
         });
@@ -44,10 +46,12 @@ class CmsSettingsService
                     'key' => $key,
                 ],
                 [
+                    'group' => $definition['group'] ?? 'general',
                     'label' => $definition['label'],
                     'media_id' => $isMedia ? ($values[$key] ?? null) : null,
                     'value' => $isMedia ? null : ($values[$key] ?? null),
                     'value_type' => $definition['type'],
+                    'is_public' => $definition['is_public'] ?? true,
                 ],
             );
         })->values();

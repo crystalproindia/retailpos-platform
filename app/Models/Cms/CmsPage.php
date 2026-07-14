@@ -23,6 +23,8 @@ class CmsPage extends Model
 
     public const STATUS_SCHEDULED = 'scheduled';
 
+    public const STATUS_ARCHIVED = 'archived';
+
     protected function casts(): array
     {
         return [
@@ -55,5 +57,10 @@ class CmsPage extends Model
     public function revisions(): HasMany
     {
         return $this->hasMany(CmsPageRevision::class, 'page_id')->latest('revision_number');
+    }
+
+    public function sections(): HasMany
+    {
+        return $this->hasMany(CmsPageSection::class, 'page_id')->orderBy('sort_order');
     }
 }

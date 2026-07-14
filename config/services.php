@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'retailpos' => [
+        'public_lead_token' => env('RETAILPOS_PUBLIC_LEAD_TOKEN'),
+        'public_lead_company_id' => env('RETAILPOS_PUBLIC_LEAD_COMPANY_ID'),
+        'public_lead_assignee_id' => env('RETAILPOS_PUBLIC_LEAD_ASSIGNEE_ID'),
+        'public_lead_rate_limit' => env('RETAILPOS_PUBLIC_LEAD_RATE_LIMIT', 30),
+        'public_lead_max_payload_kb' => env('RETAILPOS_PUBLIC_LEAD_MAX_PAYLOAD_KB', 64),
+    ],
+
 ];

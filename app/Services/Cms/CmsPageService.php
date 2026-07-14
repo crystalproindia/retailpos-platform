@@ -143,6 +143,7 @@ class CmsPageService
         if (($payload['status'] ?? CmsPage::STATUS_DRAFT) === CmsPage::STATUS_PUBLISHED) {
             $payload['published_at'] = now();
             $payload['scheduled_for'] = null;
+            $payload['is_active'] = true;
         }
 
         if (($payload['status'] ?? null) === CmsPage::STATUS_SCHEDULED) {
@@ -152,6 +153,12 @@ class CmsPageService
         if (($payload['status'] ?? null) === CmsPage::STATUS_DRAFT) {
             $payload['published_at'] = null;
             $payload['scheduled_for'] = null;
+        }
+
+        if (($payload['status'] ?? null) === CmsPage::STATUS_ARCHIVED) {
+            $payload['published_at'] = null;
+            $payload['scheduled_for'] = null;
+            $payload['is_active'] = false;
         }
 
         return $payload;

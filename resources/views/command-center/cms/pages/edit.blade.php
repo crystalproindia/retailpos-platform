@@ -40,6 +40,8 @@
             @include('command-center.cms.pages._form', ['method' => 'PUT'])
         </form>
 
+        @include('command-center.cms.pages._sections')
+
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 class="text-base font-semibold text-slate-950 dark:text-white">Revision History</h2>
             <div class="mt-4 space-y-3">

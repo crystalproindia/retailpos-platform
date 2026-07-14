@@ -3,6 +3,7 @@
 namespace App\Repositories\Cms;
 
 use App\Models\Cms\CmsMenu;
+use App\Models\Cms\CmsMenuItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -44,5 +45,10 @@ class CmsMenuRepository
             ->where('company_id', $companyId)
             ->when($withTrashed, fn ($query) => $query->withTrashed())
             ->findOrFail($menuId);
+    }
+
+    public function findItemForMenu(CmsMenu $menu, int $itemId): CmsMenuItem
+    {
+        return $menu->items()->findOrFail($itemId);
     }
 }

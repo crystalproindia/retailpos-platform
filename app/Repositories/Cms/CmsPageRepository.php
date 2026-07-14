@@ -32,7 +32,7 @@ class CmsPageRepository
     public function findForCompany(int $companyId, int $pageId, bool $withTrashed = false): CmsPage
     {
         return CmsPage::query()
-            ->with(['seo', 'revisions.user'])
+            ->with(['seo', 'revisions.user', 'sections'])
             ->where('company_id', $companyId)
             ->when($withTrashed, fn ($query) => $query->withTrashed())
             ->findOrFail($pageId);

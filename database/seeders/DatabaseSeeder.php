@@ -18,6 +18,7 @@ use App\Models\Cms\CmsCtaBlock;
 use App\Models\Cms\CmsMenu;
 use App\Models\Cms\CmsMenuItem;
 use App\Models\Cms\CmsPage;
+use App\Models\Cms\CmsPageSection;
 use App\Models\Cms\CmsTestimonial;
 use App\Models\Cms\CmsThemeSetting;
 use App\Models\Cms\CmsTrustMetric;
@@ -391,6 +392,7 @@ class DatabaseSeeder extends Seeder
                     'key' => $key,
                 ],
                 [
+                    'group' => $definition['group'] ?? 'general',
                     'label' => $definition['label'],
                     'value' => match ($key) {
                         'website_name' => 'RetailPOS',
@@ -402,6 +404,7 @@ class DatabaseSeeder extends Seeder
                         default => null,
                     },
                     'value_type' => $definition['type'],
+                    'is_public' => $definition['is_public'] ?? true,
                 ],
             );
         });
@@ -442,8 +445,10 @@ class DatabaseSeeder extends Seeder
         collect([
             ['label' => 'Home', 'url' => '/', 'sort_order' => 1],
             ['label' => 'Products', 'url' => '/products', 'sort_order' => 2],
-            ['label' => 'Pricing', 'url' => '/pricing', 'sort_order' => 3],
-            ['label' => 'Contact', 'url' => '/contact', 'sort_order' => 4],
+            ['label' => 'Industries', 'url' => '/industries', 'sort_order' => 3],
+            ['label' => 'Solutions', 'url' => '/solutions', 'sort_order' => 4],
+            ['label' => 'Pricing', 'url' => '/pricing', 'sort_order' => 5],
+            ['label' => 'Contact', 'url' => '/contact', 'sort_order' => 6],
         ])->each(fn (array $item) => CmsMenuItem::updateOrCreate(
             [
                 'menu_id' => $headerMenu->id,
@@ -453,6 +458,27 @@ class DatabaseSeeder extends Seeder
                 'is_enabled' => true,
             ],
         ));
+
+        collect([
+            ['name' => 'Footer Navigation', 'location' => 'footer'],
+            ['name' => 'Mobile Navigation', 'location' => 'mobile'],
+        ])->each(function (array $menuData) use ($company): void {
+            $menu = CmsMenu::updateOrCreate(
+                ['company_id' => $company->id, 'location' => $menuData['location'], 'name' => $menuData['name']],
+                ['is_enabled' => true],
+            );
+
+            collect([
+                ['label' => 'Products', 'url' => '/products', 'sort_order' => 1],
+                ['label' => 'Solutions', 'url' => '/solutions', 'sort_order' => 2],
+                ['label' => 'Pricing', 'url' => '/pricing', 'sort_order' => 3],
+                ['label' => 'Contact', 'url' => '/contact', 'sort_order' => 4],
+                ['label' => 'Book Demo', 'url' => '/book-demo', 'sort_order' => 5],
+            ])->each(fn (array $item) => CmsMenuItem::updateOrCreate(
+                ['menu_id' => $menu->id, 'label' => $item['label']],
+                $item + ['is_enabled' => true],
+            ));
+        });
 
         collect([
             'brand_name' => 'RetailPOS',
@@ -536,7 +562,15 @@ class DatabaseSeeder extends Seeder
         ])->each(fn (array $faq) => CmsFaq::updateOrCreate(['company_id' => $company->id, 'question' => $faq['question']], $faq + ['company_id' => $company->id]));
 
         collect([
-            ['slug' => 'products', 'title' => 'RetailPOS Products', 'page_type' => 'product', 'subtitle' => 'Connected retail operations', 'body_content' => 'Demo page copy: explore the operational tools that help retail teams work with clearer information and steadier routines.', 'cta_label' => 'Book a demo', 'cta_url' => '/contact', 'sort_order' => 1],
+            ['slug' => 'home', 'title' => 'Home', 'page_type' => 'landing', 'subtitle' => 'Retail operations, connected', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Book a demo', 'cta_url' => '/book-demo', 'sort_order' => 0],
+            ['slug' => 'about', 'title' => 'About', 'page_type' => 'standard', 'subtitle' => 'About RetailPOS', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Contact us', 'cta_url' => '/contact', 'sort_order' => 1],
+            ['slug' => 'products', 'title' => 'Products', 'page_type' => 'product', 'subtitle' => 'Retail operations products', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Book a demo', 'cta_url' => '/book-demo', 'sort_order' => 2],
+            ['slug' => 'industries', 'title' => 'Industries', 'page_type' => 'industry', 'subtitle' => 'Retail teams we support', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Explore solutions', 'cta_url' => '/solutions', 'sort_order' => 3],
+            ['slug' => 'solutions', 'title' => 'Solutions', 'page_type' => 'solution', 'subtitle' => 'Connected retail workflows', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Explore products', 'cta_url' => '/products', 'sort_order' => 4],
+            ['slug' => 'pricing', 'title' => 'Pricing', 'page_type' => 'standard', 'subtitle' => 'Plan your RetailPOS rollout', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Talk to our team', 'cta_url' => '/contact', 'sort_order' => 5],
+            ['slug' => 'contact', 'title' => 'Contact', 'page_type' => 'standard', 'subtitle' => 'Talk with RetailPOS', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Book a demo', 'cta_url' => '/book-demo', 'sort_order' => 6],
+            ['slug' => 'book-demo', 'title' => 'Book Demo', 'page_type' => 'landing', 'subtitle' => 'See RetailPOS in action', 'body_content' => 'Demo page content. Replace with approved public website content before publishing.', 'cta_label' => 'Contact us', 'cta_url' => '/contact', 'sort_order' => 7],
+            ['slug' => 'retailpos-products', 'title' => 'RetailPOS Products', 'page_type' => 'product', 'subtitle' => 'Connected retail operations', 'body_content' => 'Demo page copy: explore the operational tools that help retail teams work with clearer information and steadier routines.', 'cta_label' => 'Book a demo', 'cta_url' => '/contact', 'sort_order' => 1],
             ['slug' => 'retail-solutions', 'title' => 'Retail Solutions', 'page_type' => 'solution', 'subtitle' => 'Solutions for growing teams', 'body_content' => 'Demo page copy: connect the workflows that matter now, then extend your platform as your retail operation grows.', 'cta_label' => 'Explore solutions', 'cta_url' => '/products', 'sort_order' => 2],
             ['slug' => 'retail-industry', 'title' => 'Retail Industry', 'page_type' => 'industry', 'subtitle' => 'Built for modern retail', 'body_content' => 'Demo page copy: adapt the RetailPOS story for the retail teams, categories, and locations you serve.', 'cta_label' => 'Talk to our team', 'cta_url' => '/contact', 'sort_order' => 3],
         ])->each(function (array $pageData) use ($company, $admin): void {
@@ -545,6 +579,13 @@ class DatabaseSeeder extends Seeder
                 $pageData + ['company_id' => $company->id, 'author_user_id' => $admin->id, 'status' => CmsPage::STATUS_PUBLISHED, 'is_active' => true, 'published_at' => now()],
             );
             $page->seo()->updateOrCreate([], ['meta_title' => $page->title.' | RetailPOS', 'meta_description' => 'Demo SEO content managed from the RetailPOS CMS.', 'canonical_url' => '/'.$page->slug, 'og_type' => 'website', 'twitter_card' => 'summary_large_image']);
+
+            if ($page->slug === 'home') {
+                CmsPageSection::updateOrCreate(
+                    ['page_id' => $page->id, 'section_key' => 'hero'],
+                    ['company_id' => $company->id, 'section_type' => 'hero', 'title' => 'Retail operations, connected', 'content' => 'Demo section content. Replace with approved public website content before publishing.', 'sort_order' => 1, 'is_active' => true],
+                );
+            }
         });
 
         $sources = collect([

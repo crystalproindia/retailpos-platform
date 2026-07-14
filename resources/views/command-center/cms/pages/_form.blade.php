@@ -45,7 +45,7 @@
                 <div>
                     <label for="status" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
                     <select id="status" name="status" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none focus:border-slate-950 focus:ring-4 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-slate-800">
-                        @foreach (['draft' => 'Draft', 'published' => 'Published', 'scheduled' => 'Scheduled'] as $value => $label)
+                        @foreach (['draft' => 'Draft', 'published' => 'Published', 'scheduled' => 'Scheduled', 'archived' => 'Archived'] as $value => $label)
                             <option value="{{ $value }}" @selected(old('status', $page->status) === $value)>{{ $label }}</option>
                         @endforeach
                     </select>

@@ -28,7 +28,13 @@ class ModuleRegistryTest extends TestCase
         $this->assertTrue($groups->has('Administration'));
         $this->assertSame('Dashboard', $groups->get('Overview')->first()->name);
         $this->assertTrue($registry->sidebar(UserRole::Administrator)->contains('id', 'settings'));
-        $this->assertFalse($registry->sidebar(UserRole::Administrator)->contains('id', 'website-cms'));
+        $website = $registry->sidebar(UserRole::Administrator)->firstWhere('id', 'website-cms');
+
+        $this->assertNotNull($website);
+        $this->assertSame('Website', $website->name);
+        $this->assertContains('website-pages', collect($website->children)->pluck('id'));
+        $this->assertContains('website-navigation', collect($website->children)->pluck('id'));
+        $this->assertContains('website-settings', collect($website->children)->pluck('id'));
     }
 
     public function test_role_filtering_returns_only_allowed_modules(): void

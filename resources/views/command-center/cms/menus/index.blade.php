@@ -95,6 +95,7 @@
                                         <th class="px-4 py-3">URL</th>
                                         <th class="px-4 py-3">Order</th>
                                         <th class="px-4 py-3">State</th>
+                                        <th class="px-4 py-3"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -104,9 +105,33 @@
                                             <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ $item->url }}</td>
                                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $item->sort_order }}</td>
                                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $item->is_enabled ? 'Enabled' : 'Disabled' }}</td>
+                                            <td class="px-4 py-3 text-right">
+                                                <details class="inline-block text-left">
+                                                    <summary class="cursor-pointer text-sm font-semibold text-teal-700 dark:text-teal-300">Edit</summary>
+                                                    <form method="POST" action="{{ route('cms.menus.items.update', [$menu, $item]) }}" class="mt-3 grid w-80 gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-950">
+                                                        @csrf
+                                                        @method('PUT')
+                                                        <input name="label" value="{{ $item->label }}" required class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                                                        <input name="url" value="{{ $item->url }}" required class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                                                        <select name="parent_id" class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                                                            <option value="">No parent</option>
+                                                            @foreach ($menu->items->where('id', '!=', $item->id) as $parent)
+                                                                <option value="{{ $parent->id }}" @selected($item->parent_id === $parent->id)>{{ $parent->label }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <div class="grid grid-cols-2 gap-2">
+                                                            <input name="icon" value="{{ $item->icon }}" placeholder="Icon" class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                                                            <input type="number" name="sort_order" value="{{ $item->sort_order }}" min="0" class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                                                        </div>
+                                                        <label class="text-sm text-slate-600 dark:text-slate-300"><input type="hidden" name="opens_new_tab" value="0"><input type="checkbox" name="opens_new_tab" value="1" @checked($item->opens_new_tab) class="rounded border-slate-300"> New tab</label>
+                                                        <label class="text-sm text-slate-600 dark:text-slate-300"><input type="hidden" name="is_enabled" value="0"><input type="checkbox" name="is_enabled" value="1" @checked($item->is_enabled) class="rounded border-slate-300"> Enabled</label>
+                                                        <button class="rounded bg-slate-950 px-3 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Save item</button>
+                                                    </form>
+                                                </details>
+                                            </td>
                                         </tr>
                                     @empty
-                                        <tr><td colspan="4" class="px-4 py-6 text-center text-slate-500">No menu items.</td></tr>
+                                        <tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No menu items.</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
@@ -117,11 +142,17 @@
                             <p class="font-semibold text-slate-950 dark:text-white">Add Menu Item</p>
                             <input name="label" placeholder="Label" required class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                             <input name="url" placeholder="URL or external link" required class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                            <select name="parent_id" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                                <option value="">No parent</option>
+                                @foreach ($menu->items as $parent)
+                                    <option value="{{ $parent->id }}">{{ $parent->label }}</option>
+                                @endforeach
+                            </select>
                             <div class="grid gap-3 md:grid-cols-2">
                                 <input name="icon" placeholder="Icon" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                                 <input type="number" name="sort_order" value="0" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                             </div>
-                            <input type="hidden" name="opens_new_tab" value="0">
+                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="hidden" name="opens_new_tab" value="0"><input type="checkbox" name="opens_new_tab" value="1" class="rounded border-slate-300"> Open in new tab</label>
                             <input type="hidden" name="is_enabled" value="1">
                             <button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Add item</button>
                         </form>

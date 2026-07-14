@@ -40,7 +40,7 @@ class UpdateCmsPageRequest extends FormRequest
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'featured_image_id' => ['nullable', 'integer', 'exists:cms_media,id'],
-            'status' => ['required', Rule::in([CmsPage::STATUS_DRAFT, CmsPage::STATUS_PUBLISHED, CmsPage::STATUS_SCHEDULED])],
+            'status' => ['required', Rule::in([CmsPage::STATUS_DRAFT, CmsPage::STATUS_PUBLISHED, CmsPage::STATUS_SCHEDULED, CmsPage::STATUS_ARCHIVED])],
             'scheduled_for' => ['nullable', 'date', 'required_if:status,scheduled'],
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string'],

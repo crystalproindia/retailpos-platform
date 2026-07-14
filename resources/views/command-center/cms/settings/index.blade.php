@@ -21,8 +21,12 @@
                 <h1 class="text-xl font-semibold text-slate-950 dark:text-white">Global Website Settings</h1>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Default website identity and contact content consumed by the public site.</p>
 
-                <div class="mt-5 grid gap-4 md:grid-cols-2">
-                    @foreach ($definitions as $key => $definition)
+                <div class="mt-5 space-y-6">
+                    @foreach (collect($definitions)->groupBy(fn (array $definition) => $definition['group'] ?? 'general') as $group => $groupDefinitions)
+                        <section>
+                            <h2 class="text-sm font-semibold text-slate-950 dark:text-white">{{ str($group)->headline() }}</h2>
+                            <div class="mt-3 grid gap-4 md:grid-cols-2">
+                    @foreach ($groupDefinitions as $key => $definition)
                         @php
                             $setting = $settings->get($key);
                             $value = old($key, $setting?->value ?? $setting?->media_id);
@@ -38,6 +42,9 @@
                                 <input id="{{ $key }}" name="{{ $key }}" value="{{ $value }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                             @endif
                         </div>
+                    @endforeach
+                            </div>
+                        </section>
                     @endforeach
                 </div>
 

@@ -229,6 +229,9 @@ Route::middleware('auth')->group(function (): void {
         Route::post('pages/{page}/restore', [CmsPageController::class, 'restore'])->name('pages.restore');
         Route::post('pages/{page}/publish', [CmsPageController::class, 'publish'])->name('pages.publish');
         Route::post('pages/{page}/unpublish', [CmsPageController::class, 'unpublish'])->name('pages.unpublish');
+        Route::post('pages/{page}/sections', [CmsPageController::class, 'storeSection'])->name('pages.sections.store');
+        Route::put('pages/{page}/sections/{section}', [CmsPageController::class, 'updateSection'])->name('pages.sections.update');
+        Route::delete('pages/{page}/sections/{section}', [CmsPageController::class, 'destroySection'])->name('pages.sections.destroy');
 
         Route::get('homepage', [CmsHomepageController::class, 'index'])->middleware('can:cms.homepage.manage')->name('homepage.index');
         Route::put('homepage/{section}', [CmsHomepageController::class, 'update'])->middleware('can:cms.homepage.manage')->name('homepage.update');
@@ -239,6 +242,7 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('menus/{menu}', [CmsMenuController::class, 'destroy'])->name('menus.destroy');
         Route::post('menus/{menu}/restore', [CmsMenuController::class, 'restore'])->name('menus.restore');
         Route::post('menus/{menu}/items', [CmsMenuController::class, 'storeItem'])->name('menus.items.store');
+        Route::put('menus/{menu}/items/{item}', [CmsMenuController::class, 'updateItem'])->name('menus.items.update');
 
         Route::get('media', [CmsMediaController::class, 'index'])->middleware('can:cms.media.manage')->name('media.index');
         Route::post('media', [CmsMediaController::class, 'store'])->name('media.store');
@@ -292,6 +296,22 @@ Route::middleware('auth')->group(function (): void {
         Route::put('ctas/{cta}', [CmsCtaController::class, 'update'])->middleware('can:cms.cta.manage')->name('ctas.update');
         Route::delete('ctas/{cta}', [CmsCtaController::class, 'destroy'])->middleware('can:cms.cta.manage')->name('ctas.destroy');
         Route::post('ctas/{cta}/restore', [CmsCtaController::class, 'restore'])->middleware('can:cms.cta.manage')->name('ctas.restore');
+    });
+
+    Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('website')->name('website.')->group(function (): void {
+        Route::get('pages', [CmsPageController::class, 'index'])->middleware('can:website.pages.view')->name('pages.index');
+        Route::get('pages/create', [CmsPageController::class, 'create'])->middleware('can:website.pages.create')->name('pages.create');
+        Route::post('pages', [CmsPageController::class, 'store'])->middleware('can:website.pages.create')->name('pages.store');
+        Route::get('pages/{page}/edit', [CmsPageController::class, 'edit'])->middleware('can:website.pages.update')->name('pages.edit');
+        Route::put('pages/{page}', [CmsPageController::class, 'update'])->middleware('can:website.pages.update')->name('pages.update');
+        Route::delete('pages/{page}', [CmsPageController::class, 'destroy'])->middleware('can:website.pages.delete')->name('pages.destroy');
+        Route::get('navigation', [CmsMenuController::class, 'index'])->middleware('can:website.navigation.view')->name('navigation.index');
+        Route::post('navigation', [CmsMenuController::class, 'store'])->middleware('can:website.navigation.update')->name('navigation.store');
+        Route::put('navigation/{menu}', [CmsMenuController::class, 'update'])->middleware('can:website.navigation.update')->name('navigation.update');
+        Route::post('navigation/{menu}/items', [CmsMenuController::class, 'storeItem'])->middleware('can:website.navigation.update')->name('navigation.items.store');
+        Route::put('navigation/{menu}/items/{item}', [CmsMenuController::class, 'updateItem'])->middleware('can:website.navigation.update')->name('navigation.items.update');
+        Route::get('settings', [CmsAdminSettingsController::class, 'index'])->middleware('can:website.settings.view')->name('settings.index');
+        Route::put('settings', [CmsAdminSettingsController::class, 'update'])->middleware('can:website.settings.update')->name('settings.update');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:notifications.view'])->prefix('notifications')->name('notifications.')->group(function (): void {

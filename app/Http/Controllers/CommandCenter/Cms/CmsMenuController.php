@@ -55,4 +55,12 @@ class CmsMenuController extends Controller
 
         return back()->with('status', 'CMS menu item added.');
     }
+
+    public function updateItem(StoreCmsMenuItemRequest $request, CmsMenuRepository $menuRepository, CmsMenuService $menuService, int $menu, int $item): RedirectResponse
+    {
+        $cmsMenu = $menuRepository->findForCompany($request->user()->company_id, $menu);
+        $menuService->updateItem($cmsMenu, $menuRepository->findItemForMenu($cmsMenu, $item), $request->validated());
+
+        return back()->with('status', 'CMS menu item updated.');
+    }
 }

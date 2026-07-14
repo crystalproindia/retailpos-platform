@@ -23,12 +23,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
 
-    document.querySelectorAll('[data-sidebar-open]').forEach((button) => {
-        button.addEventListener('click', () => body.classList.add('sidebar-mobile-open'));
+    const sidebarOpenButtons = [...document.querySelectorAll('[data-sidebar-open]')];
+    const sidebarCloseButtons = [...document.querySelectorAll('[data-sidebar-close], [data-sidebar-overlay]')];
+    const mobileNavigation = window.matchMedia('(max-width: 1023px)');
+    let sidebarTrigger = null;
+
+    const setSidebarExpanded = (expanded) => {
+        sidebarOpenButtons.forEach((button) => button.setAttribute('aria-expanded', String(expanded)));
+    };
+
+    const closeSidebar = ({ restoreFocus = true } = {}) => {
+        const wasOpen = body.classList.contains('sidebar-mobile-open');
+
+        body.classList.remove('sidebar-mobile-open');
+        setSidebarExpanded(false);
+
+        if (wasOpen && restoreFocus && sidebarTrigger instanceof HTMLElement) {
+            sidebarTrigger.focus();
+        }
+
+        sidebarTrigger = null;
+    };
+
+    const openSidebar = (trigger) => {
+        if (!mobileNavigation.matches) {
+            return;
+        }
+
+        sidebarTrigger = trigger;
+        body.classList.add('sidebar-mobile-open');
+        setSidebarExpanded(true);
+
+        window.requestAnimationFrame(() => document.querySelector('[data-sidebar-close]')?.focus());
+    };
+
+    sidebarOpenButtons.forEach((button) => {
+        button.addEventListener('click', () => openSidebar(button));
     });
 
-    document.querySelectorAll('[data-sidebar-close], [data-sidebar-overlay]').forEach((button) => {
-        button.addEventListener('click', () => body.classList.remove('sidebar-mobile-open'));
+    sidebarCloseButtons.forEach((button) => {
+        button.addEventListener('click', () => closeSidebar());
+    });
+
+    mobileNavigation.addEventListener('change', (event) => {
+        if (!event.matches) {
+            closeSidebar({ restoreFocus: false });
+        }
     });
 
     document.querySelectorAll('[data-sidebar-collapse]').forEach((button) => {
@@ -78,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', () => closeDropdowns());
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-            body.classList.remove('sidebar-mobile-open');
+            closeSidebar();
             closeDropdowns();
         }
     });

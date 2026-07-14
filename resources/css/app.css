@@ -585,12 +585,18 @@
     .pos-split-row input[data-pos-split-reference] { grid-column: span 2 / span 2; }
 }
 
-body.sidebar-mobile-open [data-sidebar] {
-    transform: translateX(0);
-}
+@media (max-width: 1023px) {
+    body.sidebar-mobile-open {
+        overflow: hidden;
+    }
 
-body.sidebar-mobile-open [data-sidebar-overlay] {
-    display: block;
+    body.sidebar-mobile-open [data-sidebar] {
+        translate: 0;
+    }
+
+    body.sidebar-mobile-open [data-sidebar-overlay] {
+        display: block;
+    }
 }
 
 @media (min-width: 1024px) {

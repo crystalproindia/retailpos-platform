@@ -20,7 +20,7 @@
         <div class="min-h-screen lg:grid lg:grid-cols-[auto_1fr]">
             <div class="fixed inset-0 z-30 hidden bg-slate-950/50 backdrop-blur-sm lg:hidden" data-sidebar-overlay></div>
 
-            <aside class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white transition-all duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 dark:border-slate-800 dark:bg-slate-900" data-sidebar>
+            <aside id="command-center-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white transition-all duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 dark:border-slate-800 dark:bg-slate-900" data-sidebar>
                 <div class="flex h-16 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800" data-sidebar-brand>
                     <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-3">
                         <span class="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">RP</span>
@@ -90,7 +90,7 @@
                 <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
                     <div class="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                         <div class="flex min-w-0 items-center gap-3">
-                            <button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white" data-sidebar-open aria-label="Open sidebar">
+                            <button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 lg:hidden dark:hover:bg-slate-800 dark:hover:text-white" data-sidebar-open aria-controls="command-center-sidebar" aria-expanded="false" aria-label="Open sidebar">
                                 <x-icon name="menu" class="size-5" />
                             </button>
                             <button type="button" class="hidden rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 lg:inline-flex dark:hover:bg-slate-800 dark:hover:text-white" data-sidebar-collapse aria-label="Collapse sidebar">

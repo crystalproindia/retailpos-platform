@@ -26,13 +26,20 @@ class LeadController extends Controller
     public function index(Request $request, LeadRepository $leadRepository): View
     {
         return view('command-center.crm.leads.index', [
-            'leads' => $leadRepository->paginateForUser($request->user(), $request->only(['search', 'status_id', 'source_id', 'priority', 'assigned_user_id', 'trashed'])),
+            'leads' => $leadRepository->paginateForUser($request->user(), $request->only(['search', 'status_id', 'source_id', 'priority', 'assigned_user_id', 'demo_requests', 'trashed'])),
             'statuses' => $leadRepository->statusesForCompany($request->user()->company_id),
             'sources' => $leadRepository->sourcesForCompany($request->user()->company_id),
             'tags' => $leadRepository->tagsForCompany($request->user()->company_id),
             'users' => $this->usersForCompany($request->user()->company_id),
             'priorities' => LeadPriority::cases(),
         ]);
+    }
+
+    public function demoRequests(Request $request, LeadRepository $leadRepository): View
+    {
+        $request->merge(['demo_requests' => true]);
+
+        return $this->index($request, $leadRepository);
     }
 
     public function create(Request $request, LeadRepository $leadRepository, CrmCompanyRepository $companyRepository, ContactRepository $contactRepository): View

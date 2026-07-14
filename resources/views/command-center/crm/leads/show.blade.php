@@ -38,11 +38,19 @@
                         'Priority' => $lead->priority?->label(),
                         'Source' => $lead->source?->name,
                         'Owner' => $lead->assignedUser?->name,
+                        'Lead Name' => $lead->contact_name,
                         'Email' => $lead->email,
                         'Phone' => $lead->phone,
-                        'Expected Value' => '₹'.number_format((float) $lead->expected_value, 0),
-                        'Next Follow-up' => $lead->next_follow_up_at?->format('d M Y, h:i A'),
+                        'Location' => collect([$lead->city, $lead->country])->filter()->join(', '),
+                        'Business Type' => $lead->business_type ?? $lead->industry,
+                        'Estimated Budget' => $lead->expected_value !== null ? '₹'.number_format((float) $lead->expected_value, 0) : null,
+                        'Expected Timeline' => $lead->expected_timeline,
+                        'Follow-up Date' => $lead->next_follow_up_at?->format('d M Y, h:i A'),
+                        'Last Contacted' => $lead->last_contacted_at?->format('d M Y, h:i A'),
                         'Converted' => $lead->converted_at?->format('d M Y, h:i A') ?? 'No',
+                        'Won At' => $lead->won_at?->format('d M Y, h:i A'),
+                        'Lost At' => $lead->lost_at?->format('d M Y, h:i A'),
+                        'Lost Reason' => $lead->lost_reason,
                     ] as $label => $value)
                         <div class="flex justify-between gap-4 border-b border-slate-100 pb-3 dark:border-slate-800">
                             <dt class="text-slate-500 dark:text-slate-400">{{ $label }}</dt>
@@ -50,16 +58,28 @@
                         </div>
                     @endforeach
                 </dl>
+                <div class="mt-5 border-t border-slate-100 pt-5 dark:border-slate-800">
+                    <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Requirement</p>
+                    <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $lead->description ?: 'No requirement recorded yet.' }}</p>
+                </div>
             </article>
 
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <h2 class="text-base font-semibold text-slate-950 dark:text-white">Timeline</h2>
+                <h2 class="text-base font-semibold text-slate-950 dark:text-white">Activity & Notes</h2>
                 <form method="POST" action="{{ route('crm.leads.notes.store', $lead) }}" class="mt-5">
                     @csrf
                     <textarea name="body" rows="3" required placeholder="Add a note" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"></textarea>
                     <button class="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Add note</button>
                 </form>
                 <div class="mt-6 space-y-3">
+                    @forelse ($lead->auditLogs as $auditLog)
+                        <div class="rounded-lg border border-slate-200 px-4 py-3 dark:border-slate-800">
+                            <p class="text-sm font-medium text-slate-950 dark:text-white">{{ $auditLog->description }}</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $auditLog->created_at?->format('d M Y, h:i A') }} by {{ $auditLog->user?->name ?? 'System' }}</p>
+                        </div>
+                    @empty
+                        <p class="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No activity has been recorded yet.</p>
+                    @endforelse
                     @foreach ($lead->notes as $note)
                         <div class="rounded-lg border border-slate-200 px-4 py-3 dark:border-slate-800">
                             <p class="text-sm text-slate-700 dark:text-slate-200">{{ $note->body }}</p>

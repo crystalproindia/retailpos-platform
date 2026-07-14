@@ -33,6 +33,7 @@ class LeadRepository
             })
             ->when($filters['status_id'] ?? null, fn (Builder $query, int|string $statusId) => $query->where('status_id', $statusId))
             ->when($filters['source_id'] ?? null, fn (Builder $query, int|string $sourceId) => $query->where('source_id', $sourceId))
+            ->when($filters['demo_requests'] ?? null, fn (Builder $query) => $query->whereHas('source', fn (Builder $source) => $source->where('slug', 'book-demo')))
             ->when($filters['priority'] ?? null, fn (Builder $query, string $priority) => $query->where('priority', $priority))
             ->when($filters['assigned_user_id'] ?? null, fn (Builder $query, int|string $userId) => $query->where('assigned_user_id', $userId))
             ->latest()
@@ -43,7 +44,7 @@ class LeadRepository
     public function findForUser(User $user, int $leadId, bool $withTrashed = false): CrmLead
     {
         return $this->queryForUser($user, $withTrashed)
-            ->with(['activities.assignedUser', 'notes.user', 'tags', 'crmCompany', 'contact'])
+            ->with(['activities.assignedUser', 'notes.user', 'auditLogs.user', 'tags', 'crmCompany', 'contact'])
             ->findOrFail($leadId);
     }
 
@@ -90,6 +91,34 @@ class LeadRepository
             'leads_by_source' => $sourceBreakdown,
             'recent_leads' => $this->queryForUser($user)->limit(6)->get(),
             'upcoming_activities' => (clone $activityQuery)->with(['lead', 'assignedUser'])->where('scheduled_at', '>=', now()->startOfDay())->oldest('scheduled_at')->limit(6)->get(),
+        ];
+    }
+
+    /**
+     * @return array{total_leads: int, new_leads: int, demo_requests: int, follow_up_pending: int}
+     */
+    public function commandCenterMetrics(User $user): array
+    {
+        if (! $user->can('crm.leads.view')) {
+            return [
+                'total_leads' => 0,
+                'new_leads' => 0,
+                'demo_requests' => 0,
+                'follow_up_pending' => 0,
+            ];
+        }
+
+        $base = $this->baseQueryForUser($user);
+
+        return [
+            'total_leads' => (clone $base)->count(),
+            'new_leads' => (clone $base)->whereHas('status', fn (Builder $query) => $query->where('stage_type', LeadStageType::New->value))->count(),
+            'demo_requests' => (clone $base)->whereHas('source', fn (Builder $query) => $query->where('slug', 'book-demo'))->count(),
+            'follow_up_pending' => (clone $base)
+                ->whereNotNull('next_follow_up_at')
+                ->where('next_follow_up_at', '<=', now())
+                ->whereHas('status', fn (Builder $query) => $query->where('is_won', false)->where('is_lost', false))
+                ->count(),
         ];
     }
 

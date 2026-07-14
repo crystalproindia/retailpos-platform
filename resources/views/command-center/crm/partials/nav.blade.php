@@ -2,6 +2,7 @@
     $links = [
         ['label' => 'Overview', 'route' => 'crm.dashboard'],
         ['label' => 'Leads', 'route' => 'crm.leads.index'],
+        ['label' => 'Demo Requests', 'route' => 'crm.demo-requests.index'],
         ['label' => 'Companies', 'route' => 'crm.companies.index'],
         ['label' => 'Contacts', 'route' => 'crm.contacts.index'],
         ['label' => 'Pipeline', 'route' => 'crm.pipeline.index'],

@@ -9,8 +9,10 @@ enum LeadStageType: string
     case Qualified = 'qualified';
     case DemoScheduled = 'demo_scheduled';
     case Proposal = 'proposal';
+    case FollowUp = 'follow_up';
     case Won = 'won';
     case Lost = 'lost';
+    case Spam = 'spam';
 
     public function label(): string
     {

@@ -38,6 +38,7 @@ class CrmFoundationTest extends TestCase
         $this->assertTrue($salesSidebar->contains('id', 'crm'));
         $this->assertFalse($staffSidebar->contains('id', 'crm'));
         $this->assertContains('leads', collect($salesCrm->children)->pluck('id'));
+        $this->assertContains('demo-requests', collect($salesCrm->children)->pluck('id'));
         $this->assertContains('crm-pipeline', collect($salesCrm->children)->pluck('id'));
     }
 
@@ -69,6 +70,11 @@ class CrmFoundationTest extends TestCase
             ->assertRedirect();
 
         $lead = CrmLead::query()->where('title', 'Enterprise CRM Discovery')->firstOrFail();
+
+        $this->assertDatabaseHas('crm_activities', [
+            'crm_lead_id' => $lead->id,
+            'subject' => 'Lead created',
+        ]);
 
         $this->actingAs($manager)
             ->get('/crm/leads?search=Discovery&status_id='.$fixtures['new']->id)
@@ -118,6 +124,60 @@ class CrmFoundationTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'crm.lead.created']);
         $this->assertDatabaseHas('audit_logs', ['event' => 'crm.lead.note_added']);
         $this->assertDatabaseHas('audit_logs', ['event' => 'crm.lead.bulk_assigned']);
+    }
+
+    public function test_demo_requests_dashboard_metrics_and_lifecycle_changes_are_recorded(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->crmFixtures($manager);
+        $bookDemo = CrmLeadSource::create([
+            'company_id' => $manager->company_id,
+            'name' => 'Book Demo',
+            'slug' => 'book-demo',
+            'is_active' => true,
+        ]);
+        $lost = $this->crmStatus($manager, 'Lost', LeadStageType::Lost, 5, false, true);
+
+        $demoLead = $this->lead($manager, $fixtures, [
+            'title' => 'Website Demo Request',
+            'source_id' => $bookDemo->id,
+            'next_follow_up_at' => now()->subHour(),
+            'city' => 'Bengaluru',
+            'country' => 'India',
+            'business_type' => 'Retail',
+            'expected_timeline' => 'This quarter',
+            'metadata' => ['form' => 'book_demo'],
+        ]);
+        $this->lead($manager, $fixtures, ['title' => 'Manual Lead']);
+
+        $this->actingAs($manager)
+            ->get('/crm/demo-requests')
+            ->assertOk()
+            ->assertSee('Website Demo Request')
+            ->assertDontSee('Manual Lead');
+
+        $this->actingAs($manager)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Lead Intake')
+            ->assertSeeInOrder(['Total Leads', '2', 'New Leads', '2', 'Demo Requests', '1', 'Follow-up Pending', '1']);
+
+        $this->actingAs($manager)
+            ->put("/crm/leads/{$demoLead->id}", $this->leadPayload($fixtures, [
+                'source_id' => $bookDemo->id,
+                'status_id' => $lost->id,
+                'title' => $demoLead->title,
+                'city' => 'Bengaluru',
+                'country' => 'India',
+                'business_type' => 'Retail',
+                'expected_timeline' => 'This quarter',
+                'metadata' => ['form' => 'book_demo'],
+            ]))
+            ->assertRedirect();
+
+        $this->assertNotNull($demoLead->refresh()->lost_at);
+        $this->assertSame(['form' => 'book_demo'], $demoLead->metadata);
+        $this->assertDatabaseHas('audit_logs', ['event' => 'crm.lead.status_changed']);
     }
 
     public function test_sales_user_only_sees_assigned_or_created_leads_and_tenant_isolation_blocks_other_companies(): void
@@ -300,7 +360,9 @@ class CrmFoundationTest extends TestCase
             'role' => UserRole::Sales->value,
         ]);
         $this->assertDatabaseHas('crm_lead_sources', ['slug' => 'website-demo']);
+        $this->assertDatabaseHas('crm_lead_sources', ['slug' => 'book-demo']);
         $this->assertDatabaseHas('crm_lead_statuses', ['slug' => 'qualified']);
+        $this->assertDatabaseHas('crm_lead_statuses', ['slug' => 'follow-up']);
         $this->assertDatabaseCount('crm_leads', 20);
         $this->assertDatabaseHas('crm_activities', ['type' => ActivityType::Call->value]);
     }
@@ -331,7 +393,7 @@ class CrmFoundationTest extends TestCase
         return compact('source', 'new', 'qualified', 'proposal', 'won', 'tag');
     }
 
-    private function crmStatus(User $user, string $name, LeadStageType $stage, int $sortOrder, bool $isWon = false): CrmLeadStatus
+    private function crmStatus(User $user, string $name, LeadStageType $stage, int $sortOrder, bool $isWon = false, bool $isLost = false): CrmLeadStatus
     {
         return CrmLeadStatus::create([
             'company_id' => $user->company_id,
@@ -340,6 +402,7 @@ class CrmFoundationTest extends TestCase
             'stage_type' => $stage->value,
             'probability' => $isWon ? 100 : 25,
             'is_won' => $isWon,
+            'is_lost' => $isLost,
             'is_active' => true,
             'sort_order' => $sortOrder,
         ]);

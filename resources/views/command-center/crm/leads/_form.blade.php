@@ -18,11 +18,11 @@
 
         <div class="grid gap-5 md:grid-cols-2">
             <div>
-                <label for="business_name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Business Name</label>
+                <label for="business_name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Company Name</label>
                 <input id="business_name" name="business_name" value="{{ old('business_name', $lead->business_name) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
             </div>
             <div>
-                <label for="contact_name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Contact Name</label>
+                <label for="contact_name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Lead Name</label>
                 <input id="contact_name" name="contact_name" value="{{ old('contact_name', $lead->contact_name) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
             </div>
             <div>
@@ -34,17 +34,33 @@
                 <input id="phone" name="phone" value="{{ old('phone', $lead->phone) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
             </div>
             <div>
+                <label for="business_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Business Type</label>
+                <input id="business_type" name="business_type" value="{{ old('business_type', $lead->business_type ?? $lead->industry) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+            </div>
+            <div>
                 <label for="industry" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Industry</label>
                 <input id="industry" name="industry" value="{{ old('industry', $lead->industry) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
             </div>
             <div>
-                <label for="expected_value" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Expected Value</label>
+                <label for="expected_value" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Estimated Budget</label>
                 <input id="expected_value" type="number" step="0.01" name="expected_value" value="{{ old('expected_value', $lead->expected_value) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+            </div>
+            <div>
+                <label for="expected_timeline" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Expected Timeline</label>
+                <input id="expected_timeline" name="expected_timeline" value="{{ old('expected_timeline', $lead->expected_timeline) }}" placeholder="e.g. This quarter" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+            </div>
+            <div>
+                <label for="city" class="block text-sm font-medium text-slate-700 dark:text-slate-300">City</label>
+                <input id="city" name="city" value="{{ old('city', $lead->city) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+            </div>
+            <div>
+                <label for="country" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Country</label>
+                <input id="country" name="country" value="{{ old('country', $lead->country) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
             </div>
         </div>
 
         <div>
-            <label for="description" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
+            <label for="description" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Requirement</label>
             <textarea id="description" name="description" rows="6" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">{{ old('description', $lead->description) }}</textarea>
         </div>
     </section>
@@ -105,7 +121,18 @@
                         <option value="{{ $contact->id }}" @selected((int) old('crm_contact_id', $lead->crm_contact_id) === $contact->id)>{{ $contact->fullName() }}</option>
                     @endforeach
                 </select>
-                <input type="datetime-local" name="next_follow_up_at" value="{{ old('next_follow_up_at', $lead->next_follow_up_at?->format('Y-m-d\TH:i')) }}" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                <div>
+                    <label for="next_follow_up_at" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Follow-up Date</label>
+                    <input id="next_follow_up_at" type="datetime-local" name="next_follow_up_at" value="{{ old('next_follow_up_at', $lead->next_follow_up_at?->format('Y-m-d\TH:i')) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                </div>
+                <div>
+                    <label for="last_contacted_at" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Last Contacted</label>
+                    <input id="last_contacted_at" type="datetime-local" name="last_contacted_at" value="{{ old('last_contacted_at', $lead->last_contacted_at?->format('Y-m-d\TH:i')) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                </div>
+                <div>
+                    <label for="lost_reason" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Lost Reason</label>
+                    <input id="lost_reason" name="lost_reason" value="{{ old('lost_reason', $lead->lost_reason) }}" class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                </div>
                 <select name="tag_ids[]" multiple class="block min-h-28 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     @foreach ($tags as $tag)
                         <option value="{{ $tag->id }}" @selected(in_array($tag->id, $selectedTags, true))>{{ $tag->name }}</option>

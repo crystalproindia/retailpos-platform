@@ -548,10 +548,17 @@ class DatabaseSeeder extends Seeder
         });
 
         $sources = collect([
-            ['name' => 'Website Demo', 'description' => 'Inbound website demo request.', 'tone' => 'success', 'sort_order' => 1],
-            ['name' => 'WhatsApp', 'description' => 'WhatsApp enquiry.', 'tone' => 'info', 'sort_order' => 2],
-            ['name' => 'Referral', 'description' => 'Partner or customer referral.', 'tone' => 'neutral', 'sort_order' => 3],
-            ['name' => 'Retail Expo', 'description' => 'Event and booth conversations.', 'tone' => 'warning', 'sort_order' => 4],
+            ['name' => 'Website Contact', 'description' => 'Inbound website contact enquiry.', 'tone' => 'success', 'sort_order' => 1],
+            ['name' => 'Book Demo', 'description' => 'Inbound request to schedule a product demo.', 'tone' => 'info', 'sort_order' => 2],
+            ['name' => 'Pricing Enquiry', 'description' => 'Pricing and commercial enquiry.', 'tone' => 'warning', 'sort_order' => 3],
+            ['name' => 'WhatsApp', 'description' => 'WhatsApp enquiry.', 'tone' => 'info', 'sort_order' => 4],
+            ['name' => 'Google Business Profile', 'description' => 'Google Business Profile enquiry.', 'tone' => 'neutral', 'sort_order' => 5],
+            ['name' => 'Landing Page', 'description' => 'Campaign or landing page submission.', 'tone' => 'success', 'sort_order' => 6],
+            ['name' => 'Manual Entry', 'description' => 'Lead captured by a Command Center user.', 'tone' => 'neutral', 'sort_order' => 7],
+            ['name' => 'Other', 'description' => 'Unclassified inbound source.', 'tone' => 'neutral', 'sort_order' => 8],
+            ['name' => 'Website Demo', 'description' => 'Legacy inbound website demo request.', 'tone' => 'success', 'sort_order' => 9],
+            ['name' => 'Referral', 'description' => 'Partner or customer referral.', 'tone' => 'neutral', 'sort_order' => 10],
+            ['name' => 'Retail Expo', 'description' => 'Event and booth conversations.', 'tone' => 'warning', 'sort_order' => 11],
         ])->mapWithKeys(fn (array $source): array => [
             Str::slug($source['name']) => CrmLeadSource::updateOrCreate(
                 [
@@ -571,9 +578,11 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Contacted', 'stage_type' => LeadStageType::Contacted, 'tone' => 'info', 'probability' => 25, 'sort_order' => 2],
             ['name' => 'Qualified', 'stage_type' => LeadStageType::Qualified, 'tone' => 'success', 'probability' => 45, 'sort_order' => 3],
             ['name' => 'Demo Scheduled', 'stage_type' => LeadStageType::DemoScheduled, 'tone' => 'warning', 'probability' => 60, 'sort_order' => 4],
-            ['name' => 'Proposal', 'stage_type' => LeadStageType::Proposal, 'tone' => 'info', 'probability' => 75, 'sort_order' => 5],
-            ['name' => 'Won', 'stage_type' => LeadStageType::Won, 'tone' => 'success', 'probability' => 100, 'is_won' => true, 'sort_order' => 6],
-            ['name' => 'Lost', 'stage_type' => LeadStageType::Lost, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 7],
+            ['name' => 'Proposal Sent', 'stage_type' => LeadStageType::Proposal, 'tone' => 'info', 'probability' => 75, 'sort_order' => 5],
+            ['name' => 'Follow Up', 'stage_type' => LeadStageType::FollowUp, 'tone' => 'warning', 'probability' => 55, 'sort_order' => 6],
+            ['name' => 'Won', 'stage_type' => LeadStageType::Won, 'tone' => 'success', 'probability' => 100, 'is_won' => true, 'sort_order' => 7],
+            ['name' => 'Lost', 'stage_type' => LeadStageType::Lost, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 8],
+            ['name' => 'Spam', 'stage_type' => LeadStageType::Spam, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 9],
         ])->mapWithKeys(fn (array $status): array => [
             Str::slug($status['name']) => CrmLeadStatus::updateOrCreate(
                 [
@@ -697,15 +706,22 @@ class DatabaseSeeder extends Seeder
                     'email' => $contact->email,
                     'phone' => $contact->phone,
                     'industry' => $account->industry,
+                    'city' => $account->city,
+                    'country' => $account->country,
+                    'business_type' => $account->industry,
                     'interested_modules' => ['crm', 'pos', 'inventory'],
                     'expected_value' => 125000 + ($index * 17500),
+                    'expected_timeline' => ['This month', '30 days', 'This quarter'][$index % 3],
                     'currency' => 'INR',
                     'priority' => [LeadPriority::Medium, LeadPriority::High, LeadPriority::Urgent, LeadPriority::Low][$index % 4]->value,
                     'lead_score' => min(95, 35 + ($index * 3)),
                     'next_follow_up_at' => now()->addDays(($index % 8) - 2)->setTime(11, 0),
                     'last_contacted_at' => now()->subDays($index % 5),
                     'description' => 'Seeded CRM opportunity for Phase 2 dashboard, pipeline, and follow-up workflows.',
+                    'metadata' => ['seeded' => true, 'intake_version' => 'v1'],
                     'converted_at' => $status->is_won ? now()->subDays(3) : null,
+                    'won_at' => $status->is_won ? now()->subDays(3) : null,
+                    'lost_at' => $status->is_lost ? now()->subDays(2) : null,
                 ],
             );
 

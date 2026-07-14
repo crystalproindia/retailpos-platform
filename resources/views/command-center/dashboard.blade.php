@@ -26,13 +26,16 @@
                         'danger' => 'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100',
                         default => 'border-slate-200 bg-white text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-white',
                     };
+                    $displayValue = $metric->key === 'leads' && auth()->user()->can('crm.leads.view')
+                        ? $leadMetrics['total_leads']
+                        : $metric->value;
                 @endphp
 
                 <article class="rounded-lg border p-5 shadow-sm {{ $tone }}">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-sm font-medium opacity-75">{{ $metric->label }}</p>
-                            <p class="mt-3 text-3xl font-semibold tracking-normal">{{ $metric->value }}</p>
+                            <p class="mt-3 text-3xl font-semibold tracking-normal">{{ $displayValue }}</p>
                         </div>
                         <div class="grid size-10 place-items-center rounded-lg bg-white/70 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                             <x-icon :name="$metric->key" class="size-5" />
@@ -44,6 +47,31 @@
                 </article>
             @endforeach
         </section>
+
+        @can('crm.leads.view')
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-950 dark:text-white">Lead Intake</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Current CRM enquiries, demo requests, and follow-up commitments.</p>
+                    </div>
+                    <a href="{{ route('crm.leads.index') }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Open leads</a>
+                </div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    @foreach ([
+                        ['label' => 'Total Leads', 'value' => $leadMetrics['total_leads'], 'tone' => 'bg-slate-50 dark:bg-slate-950'],
+                        ['label' => 'New Leads', 'value' => $leadMetrics['new_leads'], 'tone' => 'bg-sky-50 dark:bg-sky-950/30'],
+                        ['label' => 'Demo Requests', 'value' => $leadMetrics['demo_requests'], 'tone' => 'bg-violet-50 dark:bg-violet-950/30'],
+                        ['label' => 'Follow-up Pending', 'value' => $leadMetrics['follow_up_pending'], 'tone' => 'bg-amber-50 dark:bg-amber-950/30'],
+                    ] as $leadCard)
+                        <a href="{{ $leadCard['label'] === 'Demo Requests' ? route('crm.demo-requests.index') : route('crm.leads.index') }}" class="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:hover:border-slate-700 {{ $leadCard['tone'] }}">
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $leadCard['label'] }}</p>
+                            <p class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $leadCard['value'] }}</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endcan
 
         <section class="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -62,7 +90,7 @@
                     </div>
                     <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
                         <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Leads</p>
-                        <p class="mt-2 text-xl font-semibold text-slate-950 dark:text-white">{{ $metrics->firstWhere('key', 'leads')?->value ?? '0' }}</p>
+                        <p class="mt-2 text-xl font-semibold text-slate-950 dark:text-white">{{ auth()->user()->can('crm.leads.view') ? $leadMetrics['total_leads'] : '0' }}</p>
                     </div>
                     <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
                         <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Branches</p>

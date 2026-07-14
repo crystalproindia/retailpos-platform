@@ -2,16 +2,20 @@
 
 namespace App\Services\Crm;
 
+use App\Enums\Crm\ActivityType;
 use App\Enums\UserRole;
 use App\Events\Domain\Crm\LeadAssigned;
 use App\Events\Domain\Crm\LeadCreated;
 use App\Events\Domain\Crm\LeadStatusChanged;
+use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmLead;
+use App\Models\Crm\CrmLeadStatus;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 
 class LeadService
 {
@@ -25,7 +29,9 @@ class LeadService
      */
     public function create(User $user, array $data): CrmLead
     {
-        $lead = CrmLead::create($this->payload($data) + [
+        $payload = $this->payload($data);
+
+        $lead = CrmLead::create($payload + $this->lifecycleTimestamps((int) $data['status_id']) + [
             'company_id' => $user->company_id,
             'branch_id' => $data['branch_id'] ?? $user->branch_id,
             'created_by' => $user->id,
@@ -33,6 +39,7 @@ class LeadService
         ]);
 
         $this->syncTags($lead, $data['tag_ids'] ?? []);
+        $this->recordCreatedActivity($lead, $user);
         $this->auditLogger->record('crm.lead.created', $lead, 'CRM lead created');
         $this->domainEvents->dispatch(new LeadCreated(
             companyId: $lead->company_id,
@@ -50,11 +57,68 @@ class LeadService
      */
     public function update(CrmLead $lead, User $user, array $data): CrmLead
     {
-        $lead->update($this->payload($data));
+        $originalStatusId = $lead->status_id;
+        $originalAssigneeId = $lead->assigned_user_id;
+        $originalPriority = $lead->priority?->value ?? $lead->priority;
+        $originalFollowUpAt = $lead->next_follow_up_at?->toDateTimeString();
+        $payload = $this->payload($data);
+
+        if (array_key_exists('status_id', $payload) && (int) $payload['status_id'] !== (int) $originalStatusId) {
+            $payload += $this->lifecycleTimestamps((int) $payload['status_id'], $lead);
+        }
+
+        $lead->update($payload);
         $this->syncTags($lead, $data['tag_ids'] ?? null);
         $this->auditLogger->record('crm.lead.updated', $lead, 'CRM lead updated', [
             'updated_by' => $user->id,
         ]);
+
+        if (isset($payload['status_id']) && (int) $payload['status_id'] !== (int) $originalStatusId) {
+            $this->auditLogger->record('crm.lead.status_changed', $lead, 'CRM lead status changed', [
+                'from_status_id' => $originalStatusId,
+                'to_status_id' => $payload['status_id'],
+                'changed_by' => $user->id,
+            ]);
+            $this->domainEvents->dispatch(new LeadStatusChanged(
+                companyId: $lead->company_id,
+                actorId: $user->id,
+                aggregateType: CrmLead::class,
+                aggregateId: $lead->id,
+                payload: $this->eventPayload($lead, [
+                    'from_status_id' => $originalStatusId,
+                    'to_status_id' => $payload['status_id'],
+                ]),
+            ));
+        }
+
+        if (array_key_exists('assigned_user_id', $payload) && (int) $payload['assigned_user_id'] !== (int) $originalAssigneeId) {
+            $this->auditLogger->record('crm.lead.assigned', $lead, 'CRM lead assigned', [
+                'assigned_user_id' => $payload['assigned_user_id'],
+                'assigned_by' => $user->id,
+            ]);
+            $this->domainEvents->dispatch(new LeadAssigned(
+                companyId: $lead->company_id,
+                actorId: $user->id,
+                aggregateType: CrmLead::class,
+                aggregateId: $lead->id,
+                payload: $this->eventPayload($lead, ['assigned_by' => $user->id]),
+            ));
+        }
+
+        if (array_key_exists('priority', $payload) && $payload['priority'] !== $originalPriority) {
+            $this->auditLogger->record('crm.lead.priority_changed', $lead, 'CRM lead priority changed', [
+                'from_priority' => $originalPriority,
+                'to_priority' => $payload['priority'],
+                'changed_by' => $user->id,
+            ]);
+        }
+
+        if (array_key_exists('next_follow_up_at', $payload) && $this->dateTimeString($payload['next_follow_up_at']) !== $originalFollowUpAt) {
+            $this->auditLogger->record('crm.lead.follow_up_updated', $lead, 'CRM lead follow-up updated', [
+                'follow_up_at' => $payload['next_follow_up_at'],
+                'updated_by' => $user->id,
+            ]);
+        }
 
         return $lead->refresh()->load(['source', 'status', 'assignedUser', 'tags']);
     }
@@ -76,7 +140,7 @@ class LeadService
     public function updateStatus(CrmLead $lead, int $statusId, User $user): CrmLead
     {
         $oldStatusId = $lead->status_id;
-        $lead->update(['status_id' => $statusId]);
+        $lead->update(['status_id' => $statusId] + $this->lifecycleTimestamps($statusId, $lead));
 
         $this->auditLogger->record('crm.lead.status_changed', $lead, 'CRM lead status changed', [
             'from_status_id' => $oldStatusId,
@@ -186,8 +250,12 @@ class LeadService
             'phone',
             'alternate_phone',
             'industry',
+            'city',
+            'country',
+            'business_type',
             'interested_modules',
             'expected_value',
+            'expected_timeline',
             'currency',
             'priority',
             'lead_score',
@@ -195,6 +263,7 @@ class LeadService
             'last_contacted_at',
             'lost_reason',
             'description',
+            'metadata',
         ]);
     }
 
@@ -251,5 +320,44 @@ class LeadService
             'expected_value' => $lead->expected_value,
             'priority' => $lead->priority?->value ?? $lead->priority,
         ], $overrides);
+    }
+
+    private function recordCreatedActivity(CrmLead $lead, User $user): void
+    {
+        CrmActivity::create([
+            'company_id' => $lead->company_id,
+            'crm_lead_id' => $lead->id,
+            'assigned_user_id' => $lead->assigned_user_id,
+            'created_by' => $user->id,
+            'type' => ActivityType::Note,
+            'subject' => 'Lead created',
+            'description' => 'Lead captured'.($lead->source?->name ? ' from '.$lead->source->name.'.' : '.'),
+            'scheduled_at' => now(),
+            'completed_at' => now(),
+            'priority' => $lead->priority,
+        ]);
+    }
+
+    /**
+     * @return array<string, Carbon>
+     */
+    private function lifecycleTimestamps(int $statusId, ?CrmLead $lead = null): array
+    {
+        $status = CrmLeadStatus::query()->find($statusId);
+
+        if ($status?->is_won && ! $lead?->won_at) {
+            return ['won_at' => now()];
+        }
+
+        if ($status?->is_lost && ! $lead?->lost_at) {
+            return ['lost_at' => now()];
+        }
+
+        return [];
+    }
+
+    private function dateTimeString(mixed $value): ?string
+    {
+        return $value ? Carbon::parse($value)->toDateTimeString() : null;
     }
 }

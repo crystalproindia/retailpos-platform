@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/', CrmDashboardController::class)->name('dashboard');
 
         Route::get('leads', [LeadController::class, 'index'])->middleware('can:crm.leads.view')->name('leads.index');
+        Route::get('demo-requests', [LeadController::class, 'demoRequests'])->middleware('can:crm.leads.view')->name('demo-requests.index');
         Route::get('leads/create', [LeadController::class, 'create'])->middleware('can:crm.leads.create')->name('leads.create');
         Route::post('leads', [LeadController::class, 'store'])->middleware('can:crm.leads.create')->name('leads.store');
         Route::post('leads/bulk', [LeadController::class, 'bulk'])->middleware('can:crm.leads.update')->name('leads.bulk');

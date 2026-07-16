@@ -41,6 +41,14 @@ return [
         'public_lead_assignee_id' => env('RETAILPOS_PUBLIC_LEAD_ASSIGNEE_ID'),
         'public_lead_rate_limit' => env('RETAILPOS_PUBLIC_LEAD_RATE_LIMIT', 30),
         'public_lead_max_payload_kb' => env('RETAILPOS_PUBLIC_LEAD_MAX_PAYLOAD_KB', 64),
+        'lead_notifications' => [
+            'lead_notifications_enabled' => true,
+            'lead_email_notifications_enabled' => env('RETAILPOS_LEAD_EMAIL_NOTIFICATIONS', false),
+            'lead_notification_email' => env('RETAILPOS_LEAD_NOTIFY_EMAIL'),
+            'notify_admins_on_new_lead' => true,
+            'notify_sales_on_new_lead' => true,
+            'followup_reminders_enabled' => true,
+        ],
     ],
 
 ];

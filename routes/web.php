@@ -317,6 +317,8 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware(['role:administrator,manager,sales', 'can:notifications.view'])->prefix('notifications')->name('notifications.')->group(function (): void {
         Route::get('/', [NotificationInboxController::class, 'index'])->middleware('can:notifications.manage_own')->name('index');
+        Route::post('read-all', [NotificationInboxController::class, 'markAllRead'])->middleware('can:notifications.manage_own')->name('read-all');
+        Route::post('{notification}/read', [NotificationInboxController::class, 'markRead'])->middleware('can:notifications.manage_own')->name('read');
         Route::post('inbox/{notification}/read', [NotificationInboxController::class, 'markRead'])->middleware('can:notifications.manage_own')->name('inbox.read');
         Route::post('inbox/{notification}/unread', [NotificationInboxController::class, 'markUnread'])->middleware('can:notifications.manage_own')->name('inbox.unread');
         Route::post('inbox/read-all', [NotificationInboxController::class, 'markAllRead'])->middleware('can:notifications.manage_own')->name('inbox.read-all');

@@ -9,6 +9,8 @@ use Illuminate\Support\Collection;
 
 class RecipientResolver
 {
+    public function __construct(private readonly LeadNotificationSettings $settings) {}
+
     /**
      * @return Collection<int, User>
      */
@@ -24,12 +26,24 @@ class RecipientResolver
             ->where('company_id', $event->companyId())
             ->where('is_active', true);
 
+        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed'], true)
+            && ! $this->settings->leadAlertsEnabled($event->companyId())) {
+            return collect();
+        }
+
+        if (in_array($event->eventKey(), ['crm.follow_up.due', 'crm.follow_up.overdue'], true)
+            && ! $this->settings->followUpRemindersEnabled($event->companyId())) {
+            return collect();
+        }
+
         $users = match ($event->eventKey()) {
             'pos.sale.held', 'pos.sale.completed', 'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => $this->managers($event->companyId()),
             'crm.lead.assigned' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
-            'crm.follow_up.due', 'crm.follow_up.overdue' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
-            'crm.lead.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+            'crm.lead.status_changed' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
+            'crm.follow_up.due', 'crm.follow_up.overdue' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+                ->merge($this->managers($event->companyId())),
+            'crm.lead.created' => $this->leadCreatedRecipients($event, $query),
             'cms.page.published', 'cms.page.unpublished', 'cms.media.uploaded', 'cms.branding.updated', 'cms.theme.updated', 'cms.client_logo.created', 'cms.client_logo.updated', 'cms.case_study.created', 'cms.case_study.published', 'cms.case_study.unpublished', 'cms.testimonial.created', 'cms.trust_metric.updated', 'cms.cta.updated', 'cms.seo.updated', 'system.settings.updated' => $this->managers($event->companyId()),
             'inventory.stock.low',
             'inventory.stock.out',
@@ -96,6 +110,49 @@ class RecipientResolver
             ->where('company_id', $companyId)
             ->where('is_active', true)
             ->whereIn('role', [UserRole::Administrator->value, UserRole::Manager->value])
+            ->get();
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
+     * @return Collection<int, User>
+     */
+    private function leadCreatedRecipients(DomainEvent $event, $query): Collection
+    {
+        $payload = $event->payload();
+
+        if (($payload['channel'] ?? null) !== 'public_website') {
+            return $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+                ->merge($this->managers($event->companyId()));
+        }
+
+        $recipients = collect();
+
+        if ($this->settings->notifyAdministrators($event->companyId())) {
+            $recipients = $recipients->merge($this->managers($event->companyId()));
+        }
+
+        if (! $this->settings->notifySales($event->companyId())) {
+            return $recipients;
+        }
+
+        $assignedSalesUser = $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+            ->filter(fn (User $user): bool => ($user->role instanceof UserRole ? $user->role : UserRole::tryFrom((string) $user->role)) === UserRole::Sales);
+
+        return $recipients->merge($assignedSalesUser->isNotEmpty()
+            ? $assignedSalesUser
+            : $this->salesUsers($event->companyId()));
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function salesUsers(int $companyId): Collection
+    {
+        return User::query()
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where('role', UserRole::Sales->value)
             ->get();
     }
 }

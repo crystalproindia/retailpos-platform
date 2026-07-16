@@ -113,7 +113,7 @@ This creates the intended `public/storage` link to `storage/app/public`. Confirm
 
 ## Queue and scheduler
 
-The project includes database queue tables and scheduled notification/operations tasks. After migrations, use:
+The project includes database queue tables and scheduled notification/operations tasks, including lead follow-up alerts from `next_follow_up_at`. After migrations, use:
 
 ```bash
 php artisan queue:work --sleep=3 --tries=3 --timeout=90

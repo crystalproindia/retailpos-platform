@@ -114,24 +114,32 @@
                                         <span class="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-teal-500 px-1 text-[0.62rem] font-bold leading-none text-white">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
                                     @endif
                                 </button>
-                                <div id="notifications-menu" class="absolute right-0 z-30 mt-2 hidden w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                                <div id="notifications-menu" class="absolute right-0 z-30 mt-2 hidden w-[calc(100vw-2rem)] max-w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                                     <div class="flex items-center justify-between px-3 py-2">
                                         <p class="text-sm font-semibold text-slate-950 dark:text-white">Notifications</p>
                                         <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">View all</a>
                                     </div>
                                     <div class="space-y-1">
                                         @forelse ($recentNotifications as $notification)
-                                            <a href="{{ $notification->data['action_url'] ?? route('notifications.index') }}" class="block rounded-md px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                                            <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
+                                                @csrf
+                                                <input type="hidden" name="redirect_to" value="{{ $notification->data['action_url'] ?? route('notifications.index') }}">
+                                                <button type="submit" class="block w-full rounded-md px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
                                                 <div class="flex items-start gap-2">
                                                     @unless ($notification->read_at)
                                                         <span class="mt-1.5 size-2 shrink-0 rounded-full bg-teal-500"></span>
                                                     @endunless
                                                     <span class="min-w-0">
-                                                        <span class="block truncate text-sm font-medium">{{ $notification->data['title'] ?? str($notification->data['event_key'] ?? 'Notification')->replace('.', ' ')->headline() }}</span>
+                                                        <span class="flex items-center justify-between gap-2">
+                                                            <span class="block truncate text-sm font-medium">{{ $notification->data['title'] ?? str($notification->data['event_key'] ?? 'Notification')->replace('.', ' ')->headline() }}</span>
+                                                            <span class="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-300">{{ $notification->data['severity'] ?? 'info' }}</span>
+                                                        </span>
                                                         <span class="mt-1 block line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{{ $notification->data['message'] ?? 'Open Command Center for details.' }}</span>
+                                                        <span class="mt-1 block text-[0.68rem] text-slate-400 dark:text-slate-500">{{ $notification->created_at->diffForHumans() }}</span>
                                                     </span>
                                                 </div>
-                                            </a>
+                                                </button>
+                                            </form>
                                         @empty
                                             <div class="rounded-md px-3 py-4 text-sm text-slate-500 dark:text-slate-400">No notifications yet.</div>
                                         @endforelse

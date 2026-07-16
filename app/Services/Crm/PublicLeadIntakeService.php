@@ -101,9 +101,23 @@ class PublicLeadIntakeService
                 aggregateType: CrmLead::class,
                 aggregateId: $lead->id,
                 payload: [
+                    'notification_type' => match ($data['source']) {
+                        'book_demo' => 'demo_request_received',
+                        'pricing_enquiry' => 'pricing_enquiry_received',
+                        default => 'new_lead_received',
+                    },
                     'lead_id' => $lead->id,
                     'lead_title' => $lead->title,
+                    'business_name' => $lead->business_name,
+                    'contact_name' => $lead->contact_name,
+                    'email' => $lead->email,
+                    'phone' => $lead->phone,
+                    'business_type' => $lead->business_type,
+                    'requirement' => $lead->description,
                     'source' => $sourceDefinition['slug'],
+                    'source_name' => $sourceDefinition['name'],
+                    'lead_type' => $data['source'],
+                    'assigned_user_id' => $lead->assigned_user_id,
                     'channel' => 'public_website',
                 ],
             ));

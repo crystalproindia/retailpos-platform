@@ -21,11 +21,15 @@ class SettingsRepository
      */
     public function valuesFor(User $user, string $section): array
     {
-        return Setting::query()
+        $storedValues = Setting::query()
             ->where('company_id', $user->company_id)
             ->where('group', $section)
             ->get()
             ->mapWithKeys(fn (Setting $setting) => [$setting->key => $setting->value['value'] ?? null])
+            ->all();
+
+        return collect($this->sections()[$section]['fields'] ?? [])
+            ->mapWithKeys(fn (array $field, string $key): array => [$key => $storedValues[$key] ?? ($field['default'] ?? null)])
             ->all();
     }
 

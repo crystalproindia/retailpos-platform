@@ -3,10 +3,6 @@
 namespace App\Providers;
 
 use App\Enums\UserRole;
-use App\Events\Domain\DomainEventOccurred;
-use App\Listeners\Notifications\DispatchDomainEventNotifications;
-use App\Listeners\Notifications\DispatchDomainEventWebhooks;
-use App\Listeners\Notifications\FinalizeDomainEventLog;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
@@ -47,10 +43,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(CrmCompany::class, CrmCompanyPolicy::class);
         Gate::policy(CrmContact::class, CrmContactPolicy::class);
         Gate::policy(CrmActivity::class, CrmActivityPolicy::class);
-
-        Event::listen(DomainEventOccurred::class, DispatchDomainEventNotifications::class);
-        Event::listen(DomainEventOccurred::class, DispatchDomainEventWebhooks::class);
-        Event::listen(DomainEventOccurred::class, FinalizeDomainEventLog::class);
 
         collect(config('permissions.capabilities', []))->each(function (array $roles, string $capability): void {
             Gate::define($capability, function (User $user) use ($roles): bool {

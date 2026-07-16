@@ -6,6 +6,7 @@ use App\Models\NotificationDelivery;
 use App\Notifications\PlatformNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 class SendNotificationDeliveryJob implements ShouldQueue
@@ -30,10 +31,10 @@ class SendNotificationDeliveryJob implements ShouldQueue
     {
         $delivery = NotificationDelivery::query()->with('user')->findOrFail($this->deliveryId);
 
-        if (! $delivery->user || $delivery->channel !== 'email') {
+        if ($delivery->channel !== 'email' || ! $delivery->recipient) {
             $delivery->update([
                 'status' => 'failed',
-                'failure_reason' => 'Email delivery requires a valid recipient user.',
+                'failure_reason' => 'Email delivery requires a valid recipient address.',
                 'failed_at' => now(),
             ]);
 
@@ -47,7 +48,7 @@ class SendNotificationDeliveryJob implements ShouldQueue
         ]);
 
         $payload = $delivery->payload ?? [];
-        $delivery->user->notify(new PlatformNotification(
+        Notification::route('mail', $delivery->recipient)->notify(new PlatformNotification(
             channel: 'email',
             eventKey: $delivery->event_key,
             title: $payload['title'] ?? str($delivery->event_key)->replace('.', ' ')->headline()->toString(),

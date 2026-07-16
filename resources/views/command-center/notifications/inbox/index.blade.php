@@ -17,7 +17,7 @@
                     <h1 class="text-xl font-semibold text-slate-950 dark:text-white">Inbox</h1>
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $unreadCount }} unread notification{{ $unreadCount === 1 ? '' : 's' }} for your account.</p>
                 </div>
-                <form method="POST" action="{{ route('notifications.inbox.read-all') }}">
+                <form method="POST" action="{{ route('notifications.read-all') }}">
                     @csrf
                     <button class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">Mark all read</button>
                 </form>

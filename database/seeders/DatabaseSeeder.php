@@ -260,6 +260,12 @@ class DatabaseSeeder extends Seeder
                 'low_stock_alerts' => true,
                 'daily_sales_digest' => true,
                 'lead_alerts' => true,
+                'lead_notifications_enabled' => true,
+                'lead_email_notifications_enabled' => false,
+                'lead_notification_email' => null,
+                'notify_admins_on_new_lead' => true,
+                'notify_sales_on_new_lead' => true,
+                'followup_reminders_enabled' => true,
             ],
             'theme' => [
                 'mode' => 'system',

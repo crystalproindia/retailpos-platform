@@ -315,10 +315,14 @@ class LeadService
             'contact_name' => $lead->contact_name,
             'email' => $lead->email,
             'phone' => $lead->phone,
+            'business_type' => $lead->business_type,
+            'requirement' => $lead->description,
             'assigned_user_id' => $lead->assigned_user_id,
             'status_id' => $lead->status_id,
             'expected_value' => $lead->expected_value,
             'priority' => $lead->priority?->value ?? $lead->priority,
+            'source' => $lead->source?->slug,
+            'source_name' => $lead->source?->name,
         ], $overrides);
     }
 

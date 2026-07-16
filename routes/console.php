@@ -12,6 +12,7 @@ Schedule::useCache('file');
 Schedule::command('notifications:retry-failed-deliveries')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-due')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-overdue')->hourly()->withoutOverlapping();
+Schedule::command('retailpos:lead-followup-reminders')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:prune-domain-events')->dailyAt('02:30')->withoutOverlapping();
 Schedule::command('operations:health-check')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('operations:capture-queue-snapshot')->everyFifteenMinutes()->withoutOverlapping();

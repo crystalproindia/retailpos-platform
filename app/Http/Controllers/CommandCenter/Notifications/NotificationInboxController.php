@@ -22,11 +22,20 @@ class NotificationInboxController extends Controller
     public function markRead(Request $request, NotificationInboxRepository $notificationRepository, AuditLogger $auditLogger, string $notification): RedirectResponse
     {
         $model = $notificationRepository->findForUser($request->user(), $notification);
-        $model->markAsRead();
-        $auditLogger->record('notification.marked_read', null, 'Notification marked read', [
-            'company_id' => $request->user()->company_id,
-            'notification_id' => $notification,
-        ]);
+
+        if (! $model->read_at) {
+            $model->markAsRead();
+            $auditLogger->record('notification.marked_read', null, 'Notification marked read', [
+                'company_id' => $request->user()->company_id,
+                'notification_id' => $notification,
+            ]);
+        }
+
+        $redirectTo = $request->string('redirect_to')->toString();
+
+        if ($redirectTo !== '' && str_starts_with($redirectTo, url('/'))) {
+            return redirect()->to($redirectTo);
+        }
 
         return back()->with('status', 'Notification marked as read.');
     }

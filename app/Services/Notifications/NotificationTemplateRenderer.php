@@ -29,8 +29,8 @@ class NotificationTemplateRenderer
             ->latest('version')
             ->first();
 
-        $title = $template?->subject ?: ($definition['name'] ?? str($event->eventKey())->replace('.', ' ')->headline()->toString());
-        $message = $template?->body ?: $this->fallbackMessage($event, $definition);
+        $title = $template?->subject ?: $this->fallbackTitle($event, $definition, $channel);
+        $message = $template?->body ?: $this->fallbackMessage($event, $definition, $channel);
 
         return [
             'title' => $this->interpolate($title, $payload),
@@ -42,6 +42,7 @@ class NotificationTemplateRenderer
             'metadata' => [
                 'category' => $definition['category'] ?? 'System',
                 'correlation_id' => $event->correlationId(),
+                'notification_type' => $this->notificationType($event),
             ],
         ];
     }
@@ -63,9 +64,79 @@ class NotificationTemplateRenderer
     /**
      * @param  array<string, mixed>  $definition
      */
-    private function fallbackMessage(DomainEvent $event, array $definition): string
+    private function fallbackMessage(DomainEvent $event, array $definition, string $channel): string
     {
+        if ($event->eventKey() === 'crm.lead.created') {
+            $payload = $event->payload();
+            $contact = $payload['contact_name'] ?? 'A prospect';
+            $business = filled($payload['business_name'] ?? null) ? ' from '.$payload['business_name'] : '';
+
+            $message = match ($this->notificationType($event)) {
+                'demo_request_received' => "{$contact}{$business} requested a product demo.",
+                'pricing_enquiry_received' => "{$contact}{$business} submitted a pricing enquiry.",
+                default => "{$contact}{$business} submitted a new lead.",
+            };
+
+            if ($channel !== 'email') {
+                return $message;
+            }
+
+            return $message."\n\n".implode("\n", array_filter([
+                'Name: '.($payload['contact_name'] ?? 'Not provided'),
+                'Company: '.($payload['business_name'] ?? 'Not provided'),
+                'Phone: '.($payload['phone'] ?? 'Not provided'),
+                'Email: '.($payload['email'] ?? 'Not provided'),
+                'Business type: '.($payload['business_type'] ?? 'Not provided'),
+                'Source: '.($payload['source_name'] ?? $payload['source'] ?? 'Not provided'),
+                filled($payload['requirement'] ?? null) ? 'Requirement: '.$payload['requirement'] : null,
+            ]));
+        }
+
+        if ($event->eventKey() === 'crm.follow_up.due' && ($event->payload()['lead_title'] ?? null)) {
+            return 'Follow up with '.$event->payload()['lead_title'].' now.';
+        }
+
         return ($definition['description'] ?? 'A platform event occurred.').' Event: '.$event->eventKey().'.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     */
+    private function fallbackTitle(DomainEvent $event, array $definition, string $channel): string
+    {
+        if ($event->eventKey() === 'crm.lead.created' && $channel === 'email') {
+            return match ($this->notificationType($event)) {
+                'demo_request_received' => 'New RetailPOS Demo Request',
+                'pricing_enquiry_received' => 'New RetailPOS Pricing Enquiry',
+                default => 'New RetailPOS Lead: '.($event->payload()['source_name'] ?? 'Website Contact'),
+            };
+        }
+
+        return match ($this->notificationType($event)) {
+            'demo_request_received' => 'New demo request',
+            'pricing_enquiry_received' => 'New pricing enquiry',
+            'new_lead_received' => 'New lead received',
+            'follow_up_due' => 'Lead follow-up due',
+            default => $definition['name'] ?? str($event->eventKey())->replace('.', ' ')->headline()->toString(),
+        };
+    }
+
+    private function notificationType(DomainEvent $event): string
+    {
+        if ($event->eventKey() === 'crm.lead.created') {
+            return match ($event->payload()['lead_type'] ?? null) {
+                'book_demo' => 'demo_request_received',
+                'pricing_enquiry' => 'pricing_enquiry_received',
+                default => 'new_lead_received',
+            };
+        }
+
+        return match ($event->eventKey()) {
+            'crm.follow_up.due' => 'follow_up_due',
+            'crm.lead.assigned' => 'lead_assigned',
+            'crm.lead.status_changed' => 'lead_status_changed',
+            default => $event->eventKey(),
+        };
     }
 
     private function actionUrl(DomainEvent $event): ?string
@@ -75,7 +146,9 @@ class NotificationTemplateRenderer
             'pos.sale.completed' => $event->aggregateId() ? route('pos.receipts.show', $event->aggregateId()) : route('pos.index'),
             'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => route('pos.offline.index'),
             'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
-            'crm.follow_up.due', 'crm.follow_up.overdue' => route('crm.followups.index'),
+            'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
+                ? route('crm.leads.show', $event->payload()['lead_id'])
+                : route('crm.followups.index'),
             'cms.page.published', 'cms.page.unpublished' => $event->aggregateId() ? route('cms.pages.edit', $event->aggregateId()) : null,
             'cms.branding.updated' => route('cms.branding.index'),
             'cms.theme.updated' => route('cms.theme.index'),

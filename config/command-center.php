@@ -40,11 +40,17 @@ return [
         ],
         'notifications' => [
             'label' => 'Notifications',
-            'description' => 'Operational alerts and channel preferences.',
+            'description' => 'Operational alerts, lead routing, and channel preferences.',
             'fields' => [
                 'low_stock_alerts' => ['label' => 'Low stock alerts', 'type' => 'checkbox'],
                 'daily_sales_digest' => ['label' => 'Daily sales digest', 'type' => 'checkbox'],
                 'lead_alerts' => ['label' => 'Lead alerts', 'type' => 'checkbox'],
+                'lead_notifications_enabled' => ['label' => 'In-app lead notifications', 'type' => 'checkbox', 'default' => true],
+                'lead_email_notifications_enabled' => ['label' => 'Email lead notifications', 'type' => 'checkbox', 'default' => (bool) env('RETAILPOS_LEAD_EMAIL_NOTIFICATIONS', false)],
+                'lead_notification_email' => ['label' => 'Lead notification email', 'type' => 'email', 'default' => env('RETAILPOS_LEAD_NOTIFY_EMAIL')],
+                'notify_admins_on_new_lead' => ['label' => 'Notify administrators on new leads', 'type' => 'checkbox', 'default' => true],
+                'notify_sales_on_new_lead' => ['label' => 'Notify sales on new leads', 'type' => 'checkbox', 'default' => true],
+                'followup_reminders_enabled' => ['label' => 'Follow-up reminders', 'type' => 'checkbox', 'default' => true],
             ],
         ],
         'theme' => [

@@ -14,6 +14,8 @@ use App\Services\Notifications\Channels\UnsupportedNotificationChannel;
 use App\Support\Events\EventCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class NotificationService
 {
@@ -21,6 +23,7 @@ class NotificationService
         private readonly EventCatalog $eventCatalog,
         private readonly RecipientResolver $recipientResolver,
         private readonly NotificationTemplateRenderer $templateRenderer,
+        private readonly LeadNotificationSettings $leadSettings,
     ) {}
 
     public function dispatchForEvent(DomainEvent $event, DomainEventLog $eventLog): void
@@ -41,9 +44,24 @@ class NotificationService
                     'payload' => $message,
                 ]);
 
-                $this->channel($channel)->send($recipient, $event, $message, $delivery);
+                try {
+                    $this->channel($channel)->send($recipient, $event, $message, $delivery);
+                } catch (Throwable $exception) {
+                    $delivery->update([
+                        'status' => 'failed',
+                        'failure_reason' => str($exception->getMessage())->limit(500)->toString(),
+                        'failed_at' => now(),
+                    ]);
+
+                    Log::warning('Notification delivery failed without interrupting the domain action.', [
+                        'event_key' => $event->eventKey(),
+                        'delivery_id' => $delivery->id,
+                    ]);
+                }
             });
         });
+
+        $this->dispatchConfiguredLeadEmail($event, $eventLog);
     }
 
     /**
@@ -66,6 +84,10 @@ class NotificationService
         }
 
         if ($preference && $preference->quiet_hours_enabled && $this->inQuietHours($preference)) {
+            $channels = $channels->reject(fn (string $channel): bool => $channel === 'email');
+        }
+
+        if ($this->isLeadAlertEvent($event) && ! $this->leadSettings->emailEnabled($recipient->company_id)) {
             $channels = $channels->reject(fn (string $channel): bool => $channel === 'email');
         }
 
@@ -117,5 +139,64 @@ class NotificationService
         return $preference->quiet_hours_start <= $preference->quiet_hours_end
             ? $now >= $preference->quiet_hours_start && $now <= $preference->quiet_hours_end
             : $now >= $preference->quiet_hours_start || $now <= $preference->quiet_hours_end;
+    }
+
+    private function dispatchConfiguredLeadEmail(DomainEvent $event, DomainEventLog $eventLog): void
+    {
+        if (! $this->isLeadAlertEvent($event) || ! $event->companyId() || ! $this->leadSettings->emailEnabled($event->companyId())) {
+            return;
+        }
+
+        if (in_array($event->eventKey(), ['crm.follow_up.due', 'crm.follow_up.overdue'], true)
+            && ! $this->leadSettings->followUpRemindersEnabled($event->companyId())) {
+            return;
+        }
+
+        $email = $this->leadSettings->emailAddress($event->companyId());
+
+        if (! $email) {
+            return;
+        }
+
+        $message = $this->templateRenderer->render($event, 'email');
+        $recipient = new User([
+            'company_id' => $event->companyId(),
+            'email' => $email,
+        ]);
+        $delivery = NotificationDelivery::create([
+            'company_id' => $event->companyId(),
+            'domain_event_log_id' => $eventLog->id,
+            'event_key' => $event->eventKey(),
+            'channel' => 'email',
+            'recipient' => $email,
+            'status' => 'pending',
+            'payload' => $message,
+        ]);
+
+        try {
+            $this->channel('email')->send($recipient, $event, $message, $delivery);
+        } catch (Throwable $exception) {
+            $delivery->update([
+                'status' => 'failed',
+                'failure_reason' => str($exception->getMessage())->limit(500)->toString(),
+                'failed_at' => now(),
+            ]);
+
+            Log::warning('Configured lead-alert email could not be queued.', [
+                'event_key' => $event->eventKey(),
+                'delivery_id' => $delivery->id,
+            ]);
+        }
+    }
+
+    private function isLeadAlertEvent(DomainEvent $event): bool
+    {
+        return in_array($event->eventKey(), [
+            'crm.lead.created',
+            'crm.lead.assigned',
+            'crm.lead.status_changed',
+            'crm.follow_up.due',
+            'crm.follow_up.overdue',
+        ], true);
     }
 }

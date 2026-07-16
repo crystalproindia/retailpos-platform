@@ -60,6 +60,11 @@ class CrmQuotation extends Model
         return $this->hasMany(CrmQuotationShare::class, 'quotation_id')->latest('created_at');
     }
 
+    public function proformas(): HasMany
+    {
+        return $this->hasMany(CrmProformaInvoice::class, 'quotation_id')->latest('created_at');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

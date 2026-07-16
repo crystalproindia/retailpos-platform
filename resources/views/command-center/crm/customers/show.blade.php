@@ -28,6 +28,7 @@
                 <span class="inline-flex w-fit rounded-full bg-sky-100 px-3 py-1.5 text-sm font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-200">{{ $customer->status?->label() }}</span>
             </div>
         </section>
+        <div class="flex justify-end"><a href="{{ route('crm.proformas.create-from-customer', $customer) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create Proforma Invoice</a></div>
 
         <section class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

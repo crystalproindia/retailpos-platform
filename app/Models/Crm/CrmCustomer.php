@@ -48,6 +48,11 @@ class CrmCustomer extends Model
         return $this->hasMany(CrmCustomerContact::class, 'customer_id');
     }
 
+    public function proformas(): HasMany
+    {
+        return $this->hasMany(CrmProformaInvoice::class, 'customer_id')->latest('created_at');
+    }
+
     public function primaryContact(): HasOne
     {
         return $this->hasOne(CrmCustomerContact::class, 'customer_id')->where('is_primary', true);

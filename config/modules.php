@@ -134,6 +134,7 @@ return [
             'license_key' => null,
             'parent_id' => 'crm',
         ],
+        'crm-proformas' => ['name'=>'Proforma Invoices','description'=>'Client proformas and advance payment tracking.','icon'=>'sales','route'=>'crm.proformas.index','route_params'=>[],'sort_order'=>124,'category'=>'Sales & CRM','enabled'=>true,'visible_in_sidebar'=>true,'roles'=>$crmRoles,'badge'=>null,'license_key'=>null,'parent_id'=>'crm'],
         'crm-companies' => [
             'name' => 'Companies',
             'description' => 'CRM account records, owners, timelines, and related leads.',

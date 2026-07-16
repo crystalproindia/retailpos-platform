@@ -1,0 +1,2 @@
+<?php
+namespace App\Enums\Crm; enum ProformaStatus:string { case Draft='draft'; case Sent='sent'; case PartiallyPaid='partially_paid'; case Paid='paid'; case Overdue='overdue'; case Cancelled='cancelled'; case Converted='converted'; public function label():string{return str($this->value)->replace('_',' ')->headline()->toString();} public function tone():string{return match($this){self::Paid=>'success',self::PartiallyPaid=>'info',self::Overdue,self::Cancelled=>'danger',default=>'neutral'};} }

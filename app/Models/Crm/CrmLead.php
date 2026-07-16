@@ -112,6 +112,11 @@ class CrmLead extends Model
         return $this->hasMany(CrmQuotation::class, 'lead_id')->latest('created_at');
     }
 
+    public function proformas(): HasMany
+    {
+        return $this->hasMany(CrmProformaInvoice::class, 'lead_id')->latest('created_at');
+    }
+
     public function latestQuotation(): HasOne
     {
         return $this->hasOne(CrmQuotation::class, 'lead_id')->latestOfMany('created_at');

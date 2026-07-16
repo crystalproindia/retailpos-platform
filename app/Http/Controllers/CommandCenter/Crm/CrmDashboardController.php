@@ -7,12 +7,13 @@ use App\Repositories\Crm\DemoScheduleRepository;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
+use App\Repositories\Crm\ProformaRepository;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CrmDashboardController extends Controller
 {
-    public function __invoke(Request $request, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, QuotationRepository $quotationRepository, CrmCustomerRepository $customerRepository): View
+    public function __invoke(Request $request, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, QuotationRepository $quotationRepository, CrmCustomerRepository $customerRepository, ProformaRepository $proformas): View
     {
         return view('command-center.crm.dashboard', [
             'metrics' => $leadRepository->dashboardMetrics($request->user()),
@@ -20,6 +21,7 @@ class CrmDashboardController extends Controller
             'upcomingDemos' => $demoScheduleRepository->upcomingForUser($request->user()),
             'quotationMetrics' => $quotationRepository->dashboardMetrics($request->user()),
             'customerMetrics' => $customerRepository->dashboardMetrics($request->user()),
+            'proformaMetrics' => $proformas->metrics($request->user()),
         ]);
     }
 }

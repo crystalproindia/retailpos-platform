@@ -1,0 +1,2 @@
+<?php
+namespace App\Models\Crm; use App\Models\User; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo; #[Fillable(['proforma_invoice_id','amount','payment_date','payment_mode','reference_number','notes','recorded_by'])] class CrmProformaPayment extends Model { protected function casts():array{return ['amount'=>'decimal:2','payment_date'=>'date'];} public function recorder():BelongsTo{return $this->belongsTo(User::class,'recorded_by');} }

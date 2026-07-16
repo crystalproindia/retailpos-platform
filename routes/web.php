@@ -40,6 +40,8 @@ use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
+use App\Http\Controllers\CommandCenter\Crm\ProformaController;
+use App\Http\Controllers\PublicProformaController;
 use App\Http\Controllers\CommandCenter\DashboardController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodePrintBatchController;
@@ -101,6 +103,7 @@ Route::get('/', function () {
 });
 
 Route::get('q/{publicToken}', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
+Route::get('pi/{publicToken}', [PublicProformaController::class, 'show'])->name('proformas.public.show');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -158,6 +161,16 @@ Route::middleware('auth')->group(function (): void {
         Route::get('quotations/{quotation}/email/create', [QuotationShareController::class, 'createEmail'])->middleware('can:crm.quotations.send')->name('quotations.email.create');
         Route::post('quotations/{quotation}/email/send', [QuotationShareController::class, 'sendEmail'])->middleware('can:crm.quotations.send')->name('quotations.email.send');
         Route::get('quotations/{quotation}/whatsapp', [QuotationShareController::class, 'whatsapp'])->middleware('can:crm.quotations.send')->name('quotations.whatsapp');
+        Route::get('proforma-invoices', [ProformaController::class, 'index'])->middleware('can:crm.proformas.view')->name('proformas.index');
+        Route::get('quotations/{quotation}/proforma/create', [ProformaController::class, 'createFromQuotation'])->middleware('can:crm.proformas.create')->name('proformas.create-from-quotation');
+        Route::get('customers/{customer}/proforma/create', [ProformaController::class, 'createFromCustomer'])->middleware('can:crm.proformas.create')->name('proformas.create-from-customer');
+        Route::post('proforma-invoices', [ProformaController::class, 'store'])->middleware('can:crm.proformas.create')->name('proformas.store');
+        Route::get('proforma-invoices/{proforma}/pdf', [ProformaController::class, 'pdf'])->middleware('can:crm.proformas.view')->name('proformas.pdf');
+        Route::get('proforma-invoices/{proforma}/pdf/preview', [ProformaController::class, 'preview'])->middleware('can:crm.proformas.view')->name('proformas.pdf.preview');
+        Route::post('proforma-invoices/{proforma}/payments', [ProformaController::class, 'payment'])->middleware('can:crm.proformas.record_payment')->name('proformas.payments.store');
+        Route::post('proforma-invoices/{proforma}/sent', [ProformaController::class, 'sent'])->middleware('can:crm.proformas.send')->name('proformas.sent');
+        Route::post('proforma-invoices/{proforma}/public-link', [ProformaController::class, 'link'])->middleware('can:crm.proformas.send')->name('proformas.public-link');
+        Route::get('proforma-invoices/{proforma}', [ProformaController::class, 'show'])->middleware('can:crm.proformas.view')->name('proformas.show');
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->middleware('can:crm.quotations.view')->name('quotations.show');
         Route::get('customers', [CrmCustomerController::class, 'index'])->middleware('can:crm.customers.view')->name('customers.index');
         Route::get('customers/{customer}', [CrmCustomerController::class, 'show'])->middleware('can:crm.customers.view')->name('customers.show');

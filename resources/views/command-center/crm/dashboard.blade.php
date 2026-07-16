@@ -75,6 +75,8 @@
             'emptyMessage' => 'Schedule a demo from a lead to keep the next customer conversations visible here.',
         ])
 
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">@foreach ([['label'=>'Total Proforma Value','value'=>'INR '.number_format($proformaMetrics['total_value'],0)],['label'=>'Pending Payment','value'=>'INR '.number_format($proformaMetrics['pending_value'],0)],['label'=>'Paid This Month','value'=>'INR '.number_format($proformaMetrics['paid_month'],0)],['label'=>'Overdue Proformas','value'=>$proformaMetrics['overdue']],['label'=>'Partially Paid','value'=>$proformaMetrics['partial']]] as $card)<article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><p class="text-sm text-slate-500">{{$card['label']}}</p><p class="mt-3 text-2xl font-semibold">{{$card['value']}}</p></article>@endforeach</section>
+
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach ([
                 ['label' => 'Total Customers', 'value' => $customerMetrics['total'], 'tone' => 'bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100'],

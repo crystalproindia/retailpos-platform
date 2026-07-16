@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 #[Fillable(['lead_id', 'company_id', 'quotation_number', 'title', 'customer_name', 'customer_company', 'customer_email', 'customer_phone', 'billing_address', 'currency', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'valid_until', 'status', 'notes', 'terms_conditions', 'internal_remarks', 'public_token', 'public_url', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at', 'created_by', 'updated_by'])]
@@ -47,6 +48,11 @@ class CrmQuotation extends Model
     public function items(): HasMany
     {
         return $this->hasMany(CrmQuotationItem::class, 'quotation_id')->orderBy('sort_order');
+    }
+
+    public function crmCustomer(): HasOne
+    {
+        return $this->hasOne(CrmCustomer::class, 'quotation_id');
     }
 
     public function creator(): BelongsTo

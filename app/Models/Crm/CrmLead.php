@@ -117,6 +117,11 @@ class CrmLead extends Model
         return $this->hasOne(CrmQuotation::class, 'lead_id')->latestOfMany('created_at');
     }
 
+    public function crmCustomer(): HasOne
+    {
+        return $this->hasOne(CrmCustomer::class, 'lead_id');
+    }
+
     public function isConverted(): bool
     {
         return $this->converted_at !== null;

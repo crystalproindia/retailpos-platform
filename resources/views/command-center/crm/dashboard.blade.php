@@ -75,6 +75,36 @@
             'emptyMessage' => 'Schedule a demo from a lead to keep the next customer conversations visible here.',
         ])
 
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach ([
+                ['label' => 'Total Customers', 'value' => $customerMetrics['total'], 'tone' => 'bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100'],
+                ['label' => 'New This Month', 'value' => $customerMetrics['new_this_month'], 'tone' => 'bg-sky-50 text-sky-950 dark:bg-sky-950/30 dark:text-sky-100'],
+                ['label' => 'Customers Onboarding', 'value' => $customerMetrics['onboarding'], 'tone' => 'bg-amber-50 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'],
+                ['label' => 'Active Customers', 'value' => $customerMetrics['active'], 'tone' => 'bg-teal-50 text-teal-950 dark:bg-teal-950/30 dark:text-teal-100'],
+            ] as $card)
+                <article class="rounded-lg border border-slate-200 p-5 shadow-sm dark:border-slate-800 {{ $card['tone'] }}">
+                    <p class="text-sm font-medium opacity-70">{{ $card['label'] }}</p>
+                    <p class="mt-3 text-3xl font-semibold">{{ $card['value'] }}</p>
+                </article>
+            @endforeach
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-4">
+                <div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Latest CRM Customers</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Recently converted accounts from the CRM pipeline.</p></div>
+                <a href="{{ route('crm.customers.index') }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">View all</a>
+            </div>
+            <div class="mt-5 grid gap-3 lg:grid-cols-2">
+                @forelse ($customerMetrics['latest'] as $customer)
+                    <a href="{{ route('crm.customers.show', $customer) }}" class="rounded-lg border border-slate-200 p-4 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800">
+                        <div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-950 dark:text-white">{{ $customer->company_name }}</p><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $customer->customer_code }} · {{ $customer->primaryContact?->name ?? $customer->display_name }}</p></div><span class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $customer->status?->label() }}</span></div>
+                    </a>
+                @empty
+                    <p class="lg:col-span-2 rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No CRM customers have been created yet.</p>
+                @endforelse
+            </div>
+        </section>
+
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div class="flex items-center justify-between"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Latest Quotations</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Recent proposals across the CRM pipeline.</p></div><a href="{{ route('crm.quotations.index') }}" class="text-sm font-semibold text-slate-700 dark:text-slate-300">View all</a></div><div class="mt-5 grid gap-3 lg:grid-cols-2">@forelse($quotationMetrics['latest'] as $quotation)<a href="{{ route('crm.quotations.show', $quotation) }}" class="rounded-lg border border-slate-200 p-4 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"><div class="flex justify-between gap-3"><div><p class="font-semibold text-slate-950 dark:text-white">{{ $quotation->quotation_number }}</p><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $quotation->lead?->business_name ?? $quotation->lead?->title }}</p></div><span class="text-xs font-semibold text-slate-500 dark:text-slate-400">{{ $quotation->status?->label() }}</span></div><p class="mt-3 text-sm font-semibold text-slate-950 dark:text-white">{{ $quotation->currency }} {{ number_format((float) $quotation->grand_total, 2) }}</p></a>@empty<p class="lg:col-span-2 rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No quotations have been created yet.</p>@endforelse</div></section>
 
         <section class="grid gap-6 xl:grid-cols-2">

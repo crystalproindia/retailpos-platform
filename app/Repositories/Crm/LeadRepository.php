@@ -54,7 +54,7 @@ class LeadRepository
     public function findForUser(User $user, int $leadId, bool $withTrashed = false): CrmLead
     {
         return $this->queryForUser($user, $withTrashed)
-            ->with(['activities.assignedUser', 'notes.user', 'auditLogs.user', 'tags', 'crmCompany', 'contact', 'demoSchedules.assignedTo', 'demoSchedules.scheduledBy', 'quotations.items', 'quotations.creator'])
+            ->with(['activities.assignedUser', 'notes.user', 'auditLogs.user', 'tags', 'crmCompany', 'contact', 'demoSchedules.assignedTo', 'demoSchedules.scheduledBy', 'quotations.items', 'quotations.creator', 'crmCustomer.primaryContact'])
             ->findOrFail($leadId);
     }
 

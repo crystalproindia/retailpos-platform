@@ -39,6 +39,7 @@ class CrmFoundationTest extends TestCase
         $this->assertFalse($staffSidebar->contains('id', 'crm'));
         $this->assertContains('leads', collect($salesCrm->children)->pluck('id'));
         $this->assertContains('demo-requests', collect($salesCrm->children)->pluck('id'));
+        $this->assertContains('crm-customers', collect($salesCrm->children)->pluck('id'));
         $this->assertContains('crm-pipeline', collect($salesCrm->children)->pluck('id'));
     }
 

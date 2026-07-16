@@ -100,12 +100,11 @@ class QuotationController extends Controller
         return redirect()->route('crm.quotations.show', $updated)->with('status', 'Quotation marked as rejected.');
     }
 
-    public function convert(Request $request, QuotationRepository $quotationRepository, QuotationService $quotationService, int $quotation): RedirectResponse
+    public function convert(Request $request, QuotationRepository $quotationRepository, int $quotation): RedirectResponse
     {
-        abort_unless($request->user()->can('crm.quotations.update'), 403);
-        $updated = $quotationService->markConverted($quotationRepository->findForUser($request->user(), $quotation), $request->user());
+        abort_unless($request->user()->can('crm.customers.convert'), 403);
 
-        return redirect()->route('crm.quotations.show', $updated)->with('status', 'Quotation prepared for the customer conversion workflow.');
+        return redirect()->route('crm.customers.create-for-quotation', $quotationRepository->findForUser($request->user(), $quotation));
     }
 
     public function publicLink(Request $request, QuotationRepository $quotationRepository, QuotationService $quotationService, int $quotation): RedirectResponse

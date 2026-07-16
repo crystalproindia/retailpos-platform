@@ -6,6 +6,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
+use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmQuotation;
 use App\Models\Customers\Customer;
@@ -81,6 +82,11 @@ class Company extends Model
     public function crmQuotations(): HasMany
     {
         return $this->hasMany(CrmQuotation::class);
+    }
+
+    public function crmCustomers(): HasMany
+    {
+        return $this->hasMany(CrmCustomer::class);
     }
 
     public function crmActivities(): HasMany

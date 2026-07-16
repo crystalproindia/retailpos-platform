@@ -122,6 +122,10 @@ class NotificationTemplateRenderer
             };
         }
 
+        if ($event->eventKey() === 'crm.customer.created') {
+            return 'Lead '.($event->payload()['lead_title'] ?? 'record').' was converted to customer '.($event->payload()['customer_code'] ?? $event->payload()['customer_name'] ?? 'account').'.';
+        }
+
         return ($definition['description'] ?? 'A platform event occurred.').' Event: '.$event->eventKey().'.';
     }
 
@@ -150,6 +154,7 @@ class NotificationTemplateRenderer
             'quotation_sent' => 'Quotation sent',
             'quotation_accepted' => 'Quotation accepted',
             'quotation_rejected' => 'Quotation rejected',
+            'crm_customer_created' => 'CRM customer created',
             default => $definition['name'] ?? str($event->eventKey())->replace('.', ' ')->headline()->toString(),
         };
     }
@@ -173,6 +178,7 @@ class NotificationTemplateRenderer
             'crm.quotation.sent' => 'quotation_sent',
             'crm.quotation.accepted' => 'quotation_accepted',
             'crm.quotation.rejected' => 'quotation_rejected',
+            'crm.customer.created' => 'crm_customer_created',
             'crm.lead.assigned' => 'lead_assigned',
             'crm.lead.status_changed' => 'lead_status_changed',
             default => $event->eventKey(),
@@ -188,6 +194,7 @@ class NotificationTemplateRenderer
             'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed' => ($event->payload()['lead_id'] ?? null) ? route('crm.leads.show', $event->payload()['lead_id']) : null,
             'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
+            'crm.customer.created' => $event->aggregateId() ? route('crm.customers.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
                 ? route('crm.leads.show', $event->payload()['lead_id'])
                 : route('crm.followups.index'),

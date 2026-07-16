@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
+use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -95,6 +96,11 @@ class User extends Authenticatable
     public function createdCrmActivities(): HasMany
     {
         return $this->hasMany(CrmActivity::class, 'created_by');
+    }
+
+    public function createdCrmCustomers(): HasMany
+    {
+        return $this->hasMany(CrmCustomer::class, 'created_by');
     }
 
     public function notificationPreferences(): HasMany

@@ -26,11 +26,12 @@
                         <a href="{{ route('crm.demos.create', $lead) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Schedule Demo</a>
                     @endcan
                     <a href="{{ route('crm.leads.edit', $lead) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Edit</a>
-                    @if (! $lead->converted_at)
-                        <form method="POST" action="{{ route('crm.leads.convert', $lead) }}">
-                            @csrf
-                            <button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Convert</button>
-                        </form>
+                    @if ($lead->crmCustomer)
+                        <a href="{{ route('crm.customers.show', $lead->crmCustomer) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">View customer</a>
+                    @else
+                        @can('crm.customers.convert')
+                            <a href="{{ route('crm.customers.create-for-lead', $lead) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Convert to customer</a>
+                        @endcan
                     @endif
                 </div>
             </div>
@@ -68,6 +69,12 @@
                     <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Requirement</p>
                     <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $lead->description ?: 'No requirement recorded yet.' }}</p>
                 </div>
+                @if ($lead->crmCustomer)
+                    <div class="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 dark:border-teal-900/70 dark:bg-teal-950/30">
+                        <p class="text-xs font-semibold uppercase text-teal-800 dark:text-teal-200">Converted customer</p>
+                        <a href="{{ route('crm.customers.show', $lead->crmCustomer) }}" class="mt-1 block text-sm font-semibold text-slate-950 hover:underline dark:text-white">{{ $lead->crmCustomer->customer_code }} · {{ $lead->crmCustomer->display_name }}</a>
+                    </div>
+                @endif
             </article>
 
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

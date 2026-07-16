@@ -15,6 +15,7 @@ class CrmDashboardController extends Controller
         return view('command-center.crm.dashboard', [
             'metrics' => $leadRepository->dashboardMetrics($request->user()),
             'demoMetrics' => $demoScheduleRepository->dashboardMetrics($request->user()),
+            'upcomingDemos' => $demoScheduleRepository->upcomingForUser($request->user()),
         ]);
     }
 }

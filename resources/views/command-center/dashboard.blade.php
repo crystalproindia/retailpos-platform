@@ -73,6 +73,37 @@
             </section>
         @endcan
 
+        @can('crm.demos.view')
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-950 dark:text-white">Demo Schedule</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Keep scheduled sales conversations visible from the Command Center.</p>
+                    </div>
+                    <a href="{{ route('crm.demo-requests.index') }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Open demo requests</a>
+                </div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    @foreach ([
+                        ['label' => 'Demos Today', 'value' => $demoMetrics['demos_today'], 'tone' => 'bg-sky-50 dark:bg-sky-950/30'],
+                        ['label' => 'Upcoming Demos', 'value' => $demoMetrics['upcoming_demos'], 'tone' => 'bg-teal-50 dark:bg-teal-950/30'],
+                        ['label' => 'Demo Scheduled', 'value' => $demoMetrics['scheduled_demos'], 'tone' => 'bg-violet-50 dark:bg-violet-950/30'],
+                        ['label' => 'Overdue Demo Follow-ups', 'value' => $demoMetrics['overdue_demos'], 'tone' => 'bg-amber-50 dark:bg-amber-950/30'],
+                    ] as $demoCard)
+                        <a href="{{ route('crm.demo-requests.index') }}" class="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:hover:border-slate-700 {{ $demoCard['tone'] }}">
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $demoCard['label'] }}</p>
+                            <p class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $demoCard['value'] }}</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+
+            @include('command-center.crm.partials.upcoming-demos', [
+                'heading' => 'Upcoming Demo Schedule',
+                'emptyHeading' => 'No upcoming demos',
+                'emptyMessage' => 'Scheduled demos will appear here as soon as your team confirms them.',
+            ])
+        @endcan
+
         <section class="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-4">

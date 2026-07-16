@@ -32,20 +32,42 @@ class DemoScheduleRepository
     }
 
     /**
-     * @return array{demos_today: int, upcoming_demos: int, overdue_demos: int}
+     * @return array{scheduled_demos: int, demos_today: int, upcoming_demos: int, overdue_demos: int, completed_demos: int, cancelled_demos: int}
      */
     public function dashboardMetrics(User $user): array
     {
-        $base = $this->queryForUser($user)->whereIn('status', [
+        $all = $this->queryForUser($user);
+        $active = $this->activeQuery($user);
+
+        return [
+            'scheduled_demos' => (clone $active)->count(),
+            'demos_today' => (clone $active)->whereDate('scheduled_date', today())->count(),
+            'upcoming_demos' => (clone $active)->where('starts_at', '>', now())->count(),
+            'overdue_demos' => (clone $active)->where('starts_at', '<', now())->count(),
+            'completed_demos' => (clone $all)->where('status', DemoScheduleStatus::Completed->value)->count(),
+            'cancelled_demos' => (clone $all)->where('status', DemoScheduleStatus::Cancelled->value)->count(),
+        ];
+    }
+
+    /**
+     * @return Collection<int, DemoSchedule>
+     */
+    public function upcomingForUser(User $user, int $limit = 6): Collection
+    {
+        return $this->activeQuery($user)
+            ->where('starts_at', '>=', now())
+            ->with(['lead', 'assignedTo'])
+            ->oldest('starts_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    private function activeQuery(User $user): Builder
+    {
+        return $this->queryForUser($user)->whereIn('status', [
             DemoScheduleStatus::Scheduled->value,
             DemoScheduleStatus::Rescheduled->value,
         ]);
-
-        return [
-            'demos_today' => (clone $base)->whereDate('scheduled_date', today())->count(),
-            'upcoming_demos' => (clone $base)->where('starts_at', '>', now())->count(),
-            'overdue_demos' => (clone $base)->where('starts_at', '<', now())->count(),
-        ];
     }
 
     private function queryForUser(User $user): Builder

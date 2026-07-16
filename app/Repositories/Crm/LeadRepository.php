@@ -9,6 +9,7 @@ use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmLeadSource;
 use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmTag;
+use App\Models\Crm\DemoSchedule;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,7 +37,16 @@ class LeadRepository
             ->when($filters['demo_requests'] ?? null, fn (Builder $query) => $query->whereHas('source', fn (Builder $source) => $source->where('slug', 'book-demo')))
             ->when($filters['priority'] ?? null, fn (Builder $query, string $priority) => $query->where('priority', $priority))
             ->when($filters['assigned_user_id'] ?? null, fn (Builder $query, int|string $userId) => $query->where('assigned_user_id', $userId))
-            ->latest()
+            ->when($filters['scheduled_date'] ?? null, fn (Builder $query, string $date) => $query->whereHas('latestDemoSchedule', fn (Builder $schedule) => $schedule->whereDate('scheduled_date', $date)))
+            ->when(
+                ($filters['sort'] ?? null) === 'scheduled_date',
+                fn (Builder $query) => $query->orderBy(DemoSchedule::query()
+                    ->select('starts_at')
+                    ->whereColumn('demo_schedules.lead_id', 'crm_leads.id')
+                    ->latest('starts_at')
+                    ->limit(1)),
+                fn (Builder $query) => $query->latest(),
+            )
             ->paginate(10)
             ->withQueryString();
     }

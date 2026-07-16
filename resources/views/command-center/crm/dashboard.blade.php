@@ -41,11 +41,14 @@
             @endforeach
         </section>
 
-        <section class="grid gap-4 sm:grid-cols-3">
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach ([
+                ['label' => 'Scheduled Demos', 'value' => $demoMetrics['scheduled_demos'], 'tone' => 'bg-violet-50 text-violet-950 dark:bg-violet-950/30 dark:text-violet-100'],
                 ['label' => 'Demos Today', 'value' => $demoMetrics['demos_today'], 'tone' => 'bg-sky-50 text-sky-950 dark:bg-sky-950/30 dark:text-sky-100'],
                 ['label' => 'Upcoming Demos', 'value' => $demoMetrics['upcoming_demos'], 'tone' => 'bg-teal-50 text-teal-950 dark:bg-teal-950/30 dark:text-teal-100'],
-                ['label' => 'Overdue Demos', 'value' => $demoMetrics['overdue_demos'], 'tone' => 'bg-amber-50 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'],
+                ['label' => 'Completed Demos', 'value' => $demoMetrics['completed_demos'], 'tone' => 'bg-emerald-50 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100'],
+                ['label' => 'Cancelled Demos', 'value' => $demoMetrics['cancelled_demos'], 'tone' => 'bg-rose-50 text-rose-950 dark:bg-rose-950/30 dark:text-rose-100'],
+                ['label' => 'Overdue Demo Follow-ups', 'value' => $demoMetrics['overdue_demos'], 'tone' => 'bg-amber-50 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'],
             ] as $card)
                 <article class="rounded-lg border border-slate-200 p-5 shadow-sm dark:border-slate-800 {{ $card['tone'] }}">
                     <p class="text-sm font-medium opacity-70">{{ $card['label'] }}</p>
@@ -53,6 +56,12 @@
                 </article>
             @endforeach
         </section>
+
+        @include('command-center.crm.partials.upcoming-demos', [
+            'heading' => 'Upcoming Demo Schedule',
+            'emptyHeading' => 'No upcoming demos',
+            'emptyMessage' => 'Schedule a demo from a lead to keep the next customer conversations visible here.',
+        ])
 
         <section class="grid gap-6 xl:grid-cols-2">
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

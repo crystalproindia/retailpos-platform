@@ -20,7 +20,7 @@
                 <a href="{{ route('crm.leads.create') }}" class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">New lead</a>
             </div>
 
-            <form method="GET" action="{{ route('crm.leads.index') }}" class="mt-5 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_150px_150px_135px_160px_130px_auto]">
+            <form method="GET" action="{{ request()->boolean('demo_requests') ? route('crm.demo-requests.index') : route('crm.leads.index') }}" class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 @if (request()->boolean('demo_requests'))
                     <input type="hidden" name="demo_requests" value="1">
                 @endif
@@ -49,6 +49,13 @@
                         <option value="{{ $user->id }}" @selected((int) request('assigned_user_id') === $user->id)>{{ $user->name }}</option>
                     @endforeach
                 </select>
+                @if (request()->boolean('demo_requests'))
+                    <input type="date" name="scheduled_date" value="{{ request('scheduled_date') }}" aria-label="Scheduled demo date" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    <select name="sort" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        <option value="">Newest leads</option>
+                        <option value="scheduled_date" @selected(request('sort') === 'scheduled_date')>Scheduled date</option>
+                    </select>
+                @endif
                 <select name="trashed" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     <option value="">Active</option>
                     <option value="with" @selected(request('trashed') === 'with')>With trash</option>

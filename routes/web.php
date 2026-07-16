@@ -33,6 +33,7 @@ use App\Http\Controllers\CommandCenter\Crm\ContactController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCompanyController;
 use App\Http\Controllers\CommandCenter\Crm\CrmDashboardController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
+use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
@@ -55,6 +56,7 @@ use App\Http\Controllers\CommandCenter\Inventory\StockAdjustmentController;
 use App\Http\Controllers\CommandCenter\Inventory\StockLedgerController;
 use App\Http\Controllers\CommandCenter\Inventory\StockLocationController;
 use App\Http\Controllers\CommandCenter\Inventory\WarehouseController;
+use App\Http\Controllers\CommandCenter\Integrations\GoogleCalendarIntegrationController;
 use App\Http\Controllers\CommandCenter\ModuleController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
@@ -111,6 +113,15 @@ Route::middleware('auth')->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
 
+    Route::prefix('integrations/google')->name('integrations.google.')->group(function (): void {
+        Route::get('/', [GoogleCalendarIntegrationController::class, 'index'])->middleware('can:integrations.google.view')->name('index');
+        Route::get('connect', [GoogleCalendarIntegrationController::class, 'connect'])->middleware('can:integrations.google.connect')->name('connect');
+        Route::get('callback', [GoogleCalendarIntegrationController::class, 'callback'])->middleware('can:integrations.google.connect')->name('callback');
+        Route::post('disconnect', [GoogleCalendarIntegrationController::class, 'disconnect'])->middleware('can:integrations.google.disconnect')->name('disconnect');
+        Route::post('test', [GoogleCalendarIntegrationController::class, 'test'])->middleware('can:integrations.google.connect')->name('test');
+        Route::put('settings', [GoogleCalendarIntegrationController::class, 'updateSettings'])->middleware('can:integrations.google.connect')->name('settings.update');
+    });
+
     Route::middleware(['role:administrator,manager,sales', 'can:crm.view'])->prefix('crm')->name('crm.')->group(function (): void {
         Route::get('/', CrmDashboardController::class)->name('dashboard');
 
@@ -125,6 +136,7 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('demos/{demo}/reschedule', [DemoScheduleController::class, 'reschedule'])->middleware('can:crm.demos.update')->name('demos.reschedule');
         Route::post('demos/{demo}/complete', [DemoScheduleController::class, 'complete'])->middleware('can:crm.demos.complete')->name('demos.complete');
         Route::post('demos/{demo}/cancel', [DemoScheduleController::class, 'cancel'])->middleware('can:crm.demos.cancel')->name('demos.cancel');
+        Route::post('demos/{demo}/sync-google-calendar', DemoGoogleCalendarSyncController::class)->middleware('can:crm.demos.sync_calendar')->name('demos.sync-google-calendar');
         Route::get('leads/{lead}', [LeadController::class, 'show'])->middleware('can:crm.leads.view')->name('leads.show');
         Route::get('leads/{lead}/edit', [LeadController::class, 'edit'])->middleware('can:crm.leads.update')->name('leads.edit');
         Route::put('leads/{lead}', [LeadController::class, 'update'])->middleware('can:crm.leads.update')->name('leads.update');

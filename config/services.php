@@ -51,4 +51,10 @@ return [
         ],
     ],
 
+    'google_calendar' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect_uri' => env('GOOGLE_REDIRECT_URI', 'https://app.retailpos.biz/integrations/google/callback'),
+    ],
+
 ];

@@ -115,6 +115,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.querySelectorAll('[data-demo-schedule-form]').forEach((form) => {
+        const meetingMode = form.querySelector('[data-demo-meeting-mode]');
+        const googleMeet = form.querySelector('[data-google-meet-checkbox]');
+
+        if (!meetingMode || !googleMeet) {
+            return;
+        }
+
+        const updateGoogleMeetAvailability = () => {
+            const enabled = meetingMode.value === 'google_meet_later';
+
+            googleMeet.disabled = !enabled;
+            if (!enabled) {
+                googleMeet.checked = false;
+            }
+        };
+
+        meetingMode.addEventListener('change', updateGoogleMeetAvailability);
+        updateGoogleMeetAvailability();
+    });
+
     document.addEventListener('click', () => closeDropdowns());
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {

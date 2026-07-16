@@ -86,6 +86,30 @@
 }
 
 @layer components {
+    .pipeline-card {
+        cursor: grab;
+    }
+
+    .pipeline-card:active {
+        cursor: grabbing;
+    }
+
+    .pipeline-card.is-dragging {
+        opacity: 0.45;
+    }
+
+    .pipeline-card.is-moving {
+        pointer-events: none;
+        opacity: 0.65;
+    }
+
+    .pipeline-dropzone.is-drag-over {
+        outline: 2px solid rgb(20 184 166);
+        outline-offset: 2px;
+    }
+}
+
+@layer components {
     .form-section {
         @apply rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900;
     }

@@ -136,6 +136,124 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGoogleMeetAvailability();
     });
 
+    const pipelineBoard = document.querySelector('[data-pipeline-board]');
+
+    if (pipelineBoard) {
+        const feedback = pipelineBoard.querySelector('[data-pipeline-feedback]');
+        let draggedCard = null;
+        let originCards = null;
+        let originNextSibling = null;
+
+        const showPipelineFeedback = (message, isError = false) => {
+            if (!feedback) return;
+
+            feedback.textContent = message;
+            feedback.classList.remove('hidden', 'border-emerald-200', 'text-emerald-800', 'dark:border-emerald-950', 'dark:text-emerald-200', 'border-rose-200', 'text-rose-800', 'dark:border-rose-950', 'dark:text-rose-200');
+            feedback.classList.add(...(isError
+                ? ['border-rose-200', 'text-rose-800', 'dark:border-rose-950', 'dark:text-rose-200']
+                : ['border-emerald-200', 'text-emerald-800', 'dark:border-emerald-950', 'dark:text-emerald-200']));
+
+            window.clearTimeout(Number(feedback.dataset.timeout));
+            feedback.dataset.timeout = String(window.setTimeout(() => feedback.classList.add('hidden'), 3200));
+        };
+
+        const refreshColumn = (cards) => {
+            const column = cards.closest('[data-pipeline-dropzone]');
+            const count = column?.querySelector('[data-pipeline-count]');
+            const cardCount = cards.querySelectorAll('[data-pipeline-card]').length;
+
+            if (count) count.textContent = String(cardCount);
+
+            let empty = cards.querySelector('[data-pipeline-empty]');
+            if (cardCount === 0 && !empty) {
+                empty = document.createElement('p');
+                empty.dataset.pipelineEmpty = 'true';
+                empty.className = 'rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400';
+                empty.textContent = 'Drop a deal here or use Move stage.';
+                cards.appendChild(empty);
+            }
+            if (cardCount > 0 && empty) empty.remove();
+        };
+
+        const restoreCard = () => {
+            if (!draggedCard || !originCards) return;
+
+            if (originNextSibling?.parentElement === originCards) {
+                originCards.insertBefore(draggedCard, originNextSibling);
+            } else {
+                originCards.appendChild(draggedCard);
+            }
+        };
+
+        pipelineBoard.querySelectorAll('[data-pipeline-card]').forEach((card) => {
+            card.addEventListener('dragstart', (event) => {
+                draggedCard = card;
+                originCards = card.closest('[data-pipeline-cards]');
+                originNextSibling = card.nextElementSibling;
+                card.classList.add('is-dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', card.dataset.leadId || '');
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('is-dragging');
+                pipelineBoard.querySelectorAll('[data-pipeline-dropzone]').forEach((zone) => zone.classList.remove('is-drag-over'));
+            });
+        });
+
+        pipelineBoard.querySelectorAll('[data-pipeline-dropzone]').forEach((zone) => {
+            zone.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                zone.classList.add('is-drag-over');
+            });
+
+            zone.addEventListener('dragleave', (event) => {
+                if (!zone.contains(event.relatedTarget)) zone.classList.remove('is-drag-over');
+            });
+
+            zone.addEventListener('drop', async (event) => {
+                event.preventDefault();
+                zone.classList.remove('is-drag-over');
+                if (!draggedCard || !originCards) return;
+
+                const targetStage = zone.dataset.stage;
+                const targetCards = zone.querySelector('[data-pipeline-cards]');
+                if (!targetStage || !targetCards || targetStage === draggedCard.dataset.stage) return;
+
+                targetCards.appendChild(draggedCard);
+                draggedCard.classList.add('is-moving');
+                refreshColumn(originCards);
+                refreshColumn(targetCards);
+
+                try {
+                    const response = await fetch(pipelineBoard.dataset.moveUrl.replace('__lead__', draggedCard.dataset.leadId), {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': pipelineBoard.dataset.csrf,
+                        },
+                        body: JSON.stringify({ target_stage: targetStage }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'The pipeline move could not be saved.');
+
+                    draggedCard.dataset.stage = targetStage;
+                    showPipelineFeedback(result.message || 'Pipeline updated.');
+                    window.setTimeout(() => window.location.reload(), 650);
+                } catch (error) {
+                    restoreCard();
+                    refreshColumn(originCards);
+                    refreshColumn(targetCards);
+                    showPipelineFeedback(error.message || 'The pipeline move could not be saved. Your card was restored.', true);
+                } finally {
+                    draggedCard?.classList.remove('is-moving');
+                }
+            });
+        });
+    }
+
     document.querySelectorAll('[data-quotation-form]').forEach((form) => {
         const items = form.querySelector('[data-quotation-items]');
         const template = form.querySelector('[data-quotation-item-template]');

@@ -102,6 +102,12 @@ class NotificationTemplateRenderer
             return 'Demo scheduled for '.$name.' on '.($event->payload()['scheduled_at'] ?? 'the selected time').'.';
         }
 
+        if ($event->eventKey() === 'crm.pipeline.stage_changed') {
+            $name = $event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead';
+
+            return $name.' moved to '.($event->payload()['to_stage'] ?? 'a new pipeline stage').'.';
+        }
+
         if ($event->eventKey() === 'crm.demo.google_calendar_synced') {
             return 'Demo synced to Google Calendar for '.($event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead').'.';
         }
@@ -203,6 +209,7 @@ class NotificationTemplateRenderer
             'crm.customer.created' => 'crm_customer_created',
             'crm.lead.assigned' => 'lead_assigned',
             'crm.lead.status_changed' => 'lead_status_changed',
+            'crm.pipeline.stage_changed' => 'pipeline_stage_changed',
             default => $event->eventKey(),
         };
     }
@@ -213,7 +220,7 @@ class NotificationTemplateRenderer
             'pos.sale.held' => route('pos.index'),
             'pos.sale.completed' => $event->aggregateId() ? route('pos.receipts.show', $event->aggregateId()) : route('pos.index'),
             'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => route('pos.offline.index'),
-            'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
+            'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.pipeline.stage_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed' => ($event->payload()['lead_id'] ?? null) ? route('crm.leads.show', $event->payload()['lead_id']) : null,
             'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
             'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed' => $event->aggregateId() ? route('crm.proformas.show', $event->aggregateId()) : null,

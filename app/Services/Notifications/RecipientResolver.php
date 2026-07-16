@@ -26,7 +26,7 @@ class RecipientResolver
             ->where('company_id', $event->companyId())
             ->where('is_active', true);
 
-        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created'], true)
+        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.pipeline.stage_changed', 'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created'], true)
             && ! $this->settings->leadAlertsEnabled($event->companyId())) {
             return collect();
         }
@@ -43,6 +43,9 @@ class RecipientResolver
                 ->merge($this->managers($event->companyId())),
             'crm.lead.status_changed' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
+            'crm.pipeline.stage_changed' => ($payload['notify'] ?? false)
+                ? $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])->merge($this->managers($event->companyId()))
+                : collect(),
             'crm.follow_up.due', 'crm.follow_up.overdue' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
             'crm.lead.created' => $this->leadCreatedRecipients($event, $query),

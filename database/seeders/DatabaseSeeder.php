@@ -626,10 +626,12 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Qualified', 'stage_type' => LeadStageType::Qualified, 'tone' => 'success', 'probability' => 45, 'sort_order' => 3],
             ['name' => 'Demo Scheduled', 'stage_type' => LeadStageType::DemoScheduled, 'tone' => 'warning', 'probability' => 60, 'sort_order' => 4],
             ['name' => 'Proposal Sent', 'stage_type' => LeadStageType::Proposal, 'tone' => 'info', 'probability' => 75, 'sort_order' => 5],
-            ['name' => 'Follow Up', 'stage_type' => LeadStageType::FollowUp, 'tone' => 'warning', 'probability' => 55, 'sort_order' => 6],
-            ['name' => 'Won', 'stage_type' => LeadStageType::Won, 'tone' => 'success', 'probability' => 100, 'is_won' => true, 'sort_order' => 7],
-            ['name' => 'Lost', 'stage_type' => LeadStageType::Lost, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 8],
-            ['name' => 'Spam', 'stage_type' => LeadStageType::Spam, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 9],
+            ['name' => 'Proforma Sent', 'stage_type' => LeadStageType::ProformaSent, 'tone' => 'warning', 'probability' => 80, 'sort_order' => 6],
+            ['name' => 'Partially Paid', 'stage_type' => LeadStageType::PartiallyPaid, 'tone' => 'info', 'probability' => 90, 'sort_order' => 7],
+            ['name' => 'Follow Up', 'stage_type' => LeadStageType::FollowUp, 'tone' => 'warning', 'probability' => 55, 'sort_order' => 8],
+            ['name' => 'Won', 'stage_type' => LeadStageType::Won, 'tone' => 'success', 'probability' => 100, 'is_won' => true, 'sort_order' => 9],
+            ['name' => 'Lost', 'stage_type' => LeadStageType::Lost, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 10],
+            ['name' => 'Spam', 'stage_type' => LeadStageType::Spam, 'tone' => 'danger', 'probability' => 0, 'is_lost' => true, 'sort_order' => 11],
         ])->mapWithKeys(fn (array $status): array => [
             Str::slug($status['name']) => CrmLeadStatus::updateOrCreate(
                 [

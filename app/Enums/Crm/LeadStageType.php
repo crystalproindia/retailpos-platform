@@ -9,6 +9,8 @@ enum LeadStageType: string
     case Qualified = 'qualified';
     case DemoScheduled = 'demo_scheduled';
     case Proposal = 'proposal';
+    case ProformaSent = 'proforma_sent';
+    case PartiallyPaid = 'partially_paid';
     case FollowUp = 'follow_up';
     case Won = 'won';
     case Lost = 'lost';

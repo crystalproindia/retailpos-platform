@@ -122,6 +122,16 @@ class CrmLead extends Model
         return $this->hasOne(CrmQuotation::class, 'lead_id')->latestOfMany('created_at');
     }
 
+    public function latestProforma(): HasOne
+    {
+        return $this->hasOne(CrmProformaInvoice::class, 'lead_id')->latestOfMany('created_at');
+    }
+
+    public function latestActivity(): HasOne
+    {
+        return $this->hasOne(CrmActivity::class, 'crm_lead_id')->latestOfMany('scheduled_at');
+    }
+
     public function crmCustomer(): HasOne
     {
         return $this->hasOne(CrmCustomer::class, 'lead_id');

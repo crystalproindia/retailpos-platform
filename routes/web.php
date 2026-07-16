@@ -210,6 +210,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('contacts/{contact}/restore', [ContactController::class, 'restore'])->middleware('can:crm.contacts.manage')->name('contacts.restore');
 
         Route::get('pipeline', [PipelineController::class, 'index'])->middleware('can:crm.pipeline.manage')->name('pipeline.index');
+        Route::post('pipeline/cards/{lead}/move', [PipelineController::class, 'move'])->middleware('can:crm.pipeline.manage')->name('pipeline.cards.move');
         Route::patch('pipeline/{lead}', [PipelineController::class, 'transition'])->middleware('can:crm.pipeline.manage')->name('pipeline.transition');
 
         Route::get('activities', [ActivityController::class, 'index'])->middleware('can:crm.activities.manage')->name('activities.index');

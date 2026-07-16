@@ -122,6 +122,18 @@ class NotificationTemplateRenderer
             };
         }
 
+        if (in_array($event->eventKey(), ['crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed'], true)) {
+            $number = $event->payload()['proforma_number'] ?? 'this proforma invoice';
+
+            return match ($event->eventKey()) {
+                'crm.proforma.created' => "Proforma invoice {$number} created.",
+                'crm.proforma.sent' => "Proforma invoice {$number} sent to customer.",
+                'crm.proforma.payment_recorded' => 'Payment of '.($event->payload()['currency'] ?? 'INR').' '.number_format((float) ($event->payload()['amount'] ?? 0), 2)." recorded for {$number}.",
+                'crm.proforma.fully_paid' => "Proforma invoice {$number} is fully paid.",
+                default => "Email sending failed for {$number}.",
+            };
+        }
+
         if ($event->eventKey() === 'crm.customer.created') {
             return 'Lead '.($event->payload()['lead_title'] ?? 'record').' was converted to customer '.($event->payload()['customer_code'] ?? $event->payload()['customer_name'] ?? 'account').'.';
         }
@@ -154,6 +166,11 @@ class NotificationTemplateRenderer
             'quotation_sent' => 'Quotation sent',
             'quotation_accepted' => 'Quotation accepted',
             'quotation_rejected' => 'Quotation rejected',
+            'proforma_created' => 'Proforma invoice created',
+            'proforma_sent' => 'Proforma invoice sent',
+            'proforma_payment_recorded' => 'Proforma payment recorded',
+            'proforma_fully_paid' => 'Proforma invoice fully paid',
+            'proforma_share_failed' => 'Proforma sharing failed',
             'crm_customer_created' => 'CRM customer created',
             default => $definition['name'] ?? str($event->eventKey())->replace('.', ' ')->headline()->toString(),
         };
@@ -178,6 +195,11 @@ class NotificationTemplateRenderer
             'crm.quotation.sent' => 'quotation_sent',
             'crm.quotation.accepted' => 'quotation_accepted',
             'crm.quotation.rejected' => 'quotation_rejected',
+            'crm.proforma.created' => 'proforma_created',
+            'crm.proforma.sent' => 'proforma_sent',
+            'crm.proforma.payment_recorded' => 'proforma_payment_recorded',
+            'crm.proforma.fully_paid' => 'proforma_fully_paid',
+            'crm.proforma.share_failed' => 'proforma_share_failed',
             'crm.customer.created' => 'crm_customer_created',
             'crm.lead.assigned' => 'lead_assigned',
             'crm.lead.status_changed' => 'lead_status_changed',
@@ -194,6 +216,7 @@ class NotificationTemplateRenderer
             'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed' => ($event->payload()['lead_id'] ?? null) ? route('crm.leads.show', $event->payload()['lead_id']) : null,
             'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
+            'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed' => $event->aggregateId() ? route('crm.proformas.show', $event->aggregateId()) : null,
             'crm.customer.created' => $event->aggregateId() ? route('crm.customers.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
                 ? route('crm.leads.show', $event->payload()['lead_id'])

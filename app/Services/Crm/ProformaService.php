@@ -1,3 +1,158 @@
 <?php
-namespace App\Services\Crm; use App\Enums\Crm\ActivityType; use App\Enums\Crm\LeadPriority; use App\Enums\Crm\ProformaStatus; use App\Models\Crm\CrmActivity; use App\Models\Crm\CrmProformaInvoice; use App\Models\User; use App\Services\AuditLogger; use Illuminate\Support\Facades\DB; use Illuminate\Support\Str; use Illuminate\Validation\ValidationException;
-class ProformaService { public function __construct(private readonly AuditLogger $audit){} public function create(User $u,array $d,?int $leadId=null,?int $customerId=null,?int $quoteId=null):CrmProformaInvoice{return DB::transaction(function()use($u,$d,$leadId,$customerId,$quoteId){$c=$this->calc($d['items']);$p=CrmProformaInvoice::create(array_merge(collect($d)->except('items')->all(),$c,['company_id'=>$u->company_id,'lead_id'=>$leadId,'customer_id'=>$customerId,'quotation_id'=>$quoteId,'proforma_number'=>$this->number($u->company_id),'status'=>ProformaStatus::Draft,'paid_amount'=>0,'balance_amount'=>$c['grand_total'],'created_by'=>$u->id,'updated_by'=>$u->id]));$p->items()->createMany($c['items']);$this->activity($p,$u,"Proforma invoice {$p->proforma_number} created.");$this->audit->record('crm.proforma.created',$p,'Proforma invoice created',['company_id'=>$u->company_id]);return $p->load('items');});} public function markSent(CrmProformaInvoice $p,User $u):CrmProformaInvoice{if($p->status!==ProformaStatus::Draft)throw ValidationException::withMessages(['proforma'=>'Only draft proformas can be sent.']);$p->update(['status'=>ProformaStatus::Sent,'sent_at'=>now(),'updated_by'=>$u->id]);$this->activity($p,$u,'Proforma invoice sent.');$this->audit->record('crm.proforma.sent',$p,'Proforma invoice sent',['company_id'=>$p->company_id]);return $p->refresh();} public function payment(CrmProformaInvoice $p,User $u,array $d):CrmProformaInvoice{if((float)$d['amount']>(float)$p->balance_amount)throw ValidationException::withMessages(['amount'=>'Payment cannot exceed the outstanding balance.']);return DB::transaction(function()use($p,$u,$d){$p->payments()->create($d+['recorded_by'=>$u->id]);$paid=(float)$p->payments()->sum('amount');$balance=max(0,(float)$p->grand_total-$paid);$status=$paid>=(float)$p->grand_total?ProformaStatus::Paid:($paid>0?ProformaStatus::PartiallyPaid:$p->status);$p->update(['paid_amount'=>$paid,'balance_amount'=>$balance,'status'=>$status,'paid_at'=>$status===ProformaStatus::Paid?now():null,'updated_by'=>$u->id]);$this->activity($p,$u,'Payment of '.$p->currency.' '.number_format((float)$d['amount'],2).' recorded.');if($status===ProformaStatus::Paid)$this->activity($p,$u,'Proforma invoice fully paid.');$this->audit->record('crm.proforma.payment_recorded',$p,'Proforma payment recorded',['amount'=>$d['amount'],'company_id'=>$p->company_id]);return $p->refresh();});} public function link(CrmProformaInvoice $p,User $u,bool $regen=false):CrmProformaInvoice{if(!$p->public_token||$regen){do{$t=Str::random(48);}while(CrmProformaInvoice::where('public_token',$t)->exists());$p->update(['public_token'=>$t,'public_url'=>route('proformas.public.show',$t),'updated_by'=>$u->id]);}return $p->refresh();} private function calc(array $items):array{$s=$d=$t=0;$out=[];foreach(array_values($items)as$i=>$x){$q=(float)$x['quantity'];$u=(float)$x['unit_price'];$g=$q*$u;$di=min((float)($x['discount_amount']??0),$g);$r=(float)($x['tax_rate']??0);$ta=round(($g-$di)*$r/100,2);$l=round($g-$di+$ta,2);$s+=$g;$d+=$di;$t+=$ta;$out[]=['name'=>$x['name'],'description'=>$x['description']??null,'quantity'=>$q,'unit_price'=>$u,'discount_amount'=>$di,'tax_rate'=>$r,'tax_amount'=>$ta,'line_total'=>$l,'sort_order'=>$i+1];}return ['subtotal'=>$s,'discount_total'=>$d,'tax_total'=>$t,'grand_total'=>round($s-$d+$t,2),'items'=>$out];} private function number(int $c):string{$y=now()->format('Y');$last=CrmProformaInvoice::where('company_id',$c)->where('proforma_number','like',"RPI-$y-%")->lockForUpdate()->latest('id')->value('proforma_number');return "RPI-$y-".str_pad((string)((int)substr((string)$last,-6)+1),6,'0',STR_PAD_LEFT);} private function activity(CrmProformaInvoice $p,User $u,string $s):void{CrmActivity::create(['company_id'=>$p->company_id,'crm_lead_id'=>$p->lead_id,'created_by'=>$u->id,'assigned_user_id'=>$p->lead?->assigned_user_id,'type'=>ActivityType::Note,'subject'=>$s,'description'=>$s,'scheduled_at'=>now(),'completed_at'=>now(),'priority'=>$p->lead?->priority??LeadPriority::Medium]);} }
+namespace App\Services\Crm;
+
+use App\Enums\Crm\ActivityType;
+use App\Enums\Crm\LeadPriority;
+use App\Enums\Crm\ProformaStatus;
+use App\Events\Domain\Crm\ProformaEvent;
+use App\Models\Crm\CrmActivity;
+use App\Models\Crm\CrmProformaInvoice;
+use App\Models\User;
+use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
+class ProformaService
+{
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly DomainEventDispatcher $domainEvents,
+    ) {}
+
+    /** @param array<string, mixed> $data */
+    public function create(User $user, array $data, ?int $leadId = null, ?int $customerId = null, ?int $quotationId = null): CrmProformaInvoice
+    {
+        return DB::transaction(function () use ($user, $data, $leadId, $customerId, $quotationId): CrmProformaInvoice {
+            $calculation = $this->calc($data['items']);
+            $proforma = CrmProformaInvoice::create(array_merge(collect($data)->except('items')->all(), $calculation, [
+                'company_id' => $user->company_id,
+                'lead_id' => $leadId,
+                'customer_id' => $customerId,
+                'quotation_id' => $quotationId,
+                'proforma_number' => $this->number($user->company_id),
+                'status' => ProformaStatus::Draft,
+                'paid_amount' => 0,
+                'balance_amount' => $calculation['grand_total'],
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]));
+            $proforma->items()->createMany($calculation['items']);
+            $this->activity($proforma, $user, "Proforma invoice {$proforma->proforma_number} created.");
+            $this->audit->record('crm.proforma.created', $proforma, 'Proforma invoice created', ['company_id' => $user->company_id]);
+            $this->dispatch('crm.proforma.created', $proforma, $user);
+
+            return $proforma->load(['lead', 'items']);
+        });
+    }
+
+    public function markSent(CrmProformaInvoice $proforma, User $user): CrmProformaInvoice
+    {
+        if ($proforma->status !== ProformaStatus::Draft) {
+            throw ValidationException::withMessages(['proforma' => 'Only draft proformas can be sent.']);
+        }
+
+        $proforma->update(['status' => ProformaStatus::Sent, 'sent_at' => $proforma->sent_at ?: now(), 'updated_by' => $user->id]);
+        $this->activity($proforma, $user, 'Proforma invoice sent.');
+        $this->audit->record('crm.proforma.sent', $proforma, 'Proforma invoice sent', ['company_id' => $proforma->company_id]);
+        $this->dispatch('crm.proforma.sent', $proforma, $user);
+
+        return $proforma->refresh();
+    }
+
+    /** @param array<string, mixed> $data */
+    public function payment(CrmProformaInvoice $proforma, User $user, array $data): CrmProformaInvoice
+    {
+        if ((float) $data['amount'] > (float) $proforma->balance_amount) {
+            throw ValidationException::withMessages(['amount' => 'Payment cannot exceed the outstanding balance.']);
+        }
+
+        return DB::transaction(function () use ($proforma, $user, $data): CrmProformaInvoice {
+            $proforma->payments()->create($data + ['recorded_by' => $user->id]);
+            $paid = (float) $proforma->payments()->sum('amount');
+            $balance = max(0, (float) $proforma->grand_total - $paid);
+            $status = $paid >= (float) $proforma->grand_total
+                ? ProformaStatus::Paid
+                : ($paid > 0 ? ProformaStatus::PartiallyPaid : $proforma->status);
+            $proforma->update([
+                'paid_amount' => $paid,
+                'balance_amount' => $balance,
+                'status' => $status,
+                'paid_at' => $status === ProformaStatus::Paid ? ($proforma->paid_at ?: now()) : null,
+                'updated_by' => $user->id,
+            ]);
+            $this->activity($proforma, $user, 'Payment of '.$proforma->currency.' '.number_format((float) $data['amount'], 2).' recorded.');
+            if ($status === ProformaStatus::Paid) {
+                $this->activity($proforma, $user, 'Proforma invoice fully paid.');
+            }
+            $this->audit->record('crm.proforma.payment_recorded', $proforma, 'Proforma payment recorded', ['amount' => $data['amount'], 'company_id' => $proforma->company_id]);
+            $this->dispatch('crm.proforma.payment_recorded', $proforma, $user, ['amount' => $data['amount'], 'currency' => $proforma->currency]);
+            if ($status === ProformaStatus::Paid) {
+                $this->dispatch('crm.proforma.fully_paid', $proforma, $user, ['amount' => $data['amount'], 'currency' => $proforma->currency]);
+            }
+
+            return $proforma->refresh();
+        });
+    }
+
+    public function link(CrmProformaInvoice $proforma, User $user, bool $regenerate = false): CrmProformaInvoice
+    {
+        if (! $proforma->public_token || $regenerate) {
+            do {
+                $token = Str::random(48);
+            } while (CrmProformaInvoice::where('public_token', $token)->exists());
+            $proforma->update(['public_token' => $token, 'public_url' => route('proformas.public.show', $token), 'updated_by' => $user->id]);
+        }
+
+        return $proforma->refresh();
+    }
+
+    /** @param array<int, array<string, mixed>> $items
+     * @return array<string, mixed>
+     */
+    private function calc(array $items): array
+    {
+        $subtotal = $discountTotal = $taxTotal = 0;
+        $normalized = [];
+        foreach (array_values($items) as $index => $item) {
+            $quantity = (float) $item['quantity'];
+            $unitPrice = (float) $item['unit_price'];
+            $gross = $quantity * $unitPrice;
+            $discount = min((float) ($item['discount_amount'] ?? 0), $gross);
+            $taxRate = (float) ($item['tax_rate'] ?? 0);
+            $tax = round(($gross - $discount) * $taxRate / 100, 2);
+            $lineTotal = round($gross - $discount + $tax, 2);
+            $subtotal += $gross;
+            $discountTotal += $discount;
+            $taxTotal += $tax;
+            $normalized[] = ['name' => $item['name'], 'description' => $item['description'] ?? null, 'quantity' => $quantity, 'unit_price' => $unitPrice, 'discount_amount' => $discount, 'tax_rate' => $taxRate, 'tax_amount' => $tax, 'line_total' => $lineTotal, 'sort_order' => $index + 1];
+        }
+
+        return ['subtotal' => $subtotal, 'discount_total' => $discountTotal, 'tax_total' => $taxTotal, 'grand_total' => round($subtotal - $discountTotal + $taxTotal, 2), 'items' => $normalized];
+    }
+
+    private function number(int $companyId): string
+    {
+        $year = now()->format('Y');
+        $last = CrmProformaInvoice::where('company_id', $companyId)->where('proforma_number', 'like', "RPI-{$year}-%")->lockForUpdate()->latest('id')->value('proforma_number');
+
+        return "RPI-{$year}-".str_pad((string) ((int) substr((string) $last, -6) + 1), 6, '0', STR_PAD_LEFT);
+    }
+
+    private function activity(CrmProformaInvoice $proforma, User $user, string $subject): void
+    {
+        CrmActivity::create(['company_id' => $proforma->company_id, 'crm_lead_id' => $proforma->lead_id, 'created_by' => $user->id, 'assigned_user_id' => $proforma->lead?->assigned_user_id, 'type' => ActivityType::Note, 'subject' => $subject, 'description' => $subject, 'scheduled_at' => now(), 'completed_at' => now(), 'priority' => $proforma->lead?->priority ?? LeadPriority::Medium]);
+    }
+
+    /** @param array<string, mixed> $extra */
+    private function dispatch(string $key, CrmProformaInvoice $proforma, User $user, array $extra = []): void
+    {
+        $this->domainEvents->dispatch(new ProformaEvent($key, $proforma->company_id, $user->id, CrmProformaInvoice::class, $proforma->id, array_merge([
+            'proforma_id' => $proforma->id,
+            'proforma_number' => $proforma->proforma_number,
+            'lead_id' => $proforma->lead_id,
+            'assigned_user_id' => $proforma->lead?->assigned_user_id,
+        ], $extra)));
+    }
+}

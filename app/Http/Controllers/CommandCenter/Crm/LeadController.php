@@ -15,6 +15,7 @@ use App\Repositories\Crm\ContactRepository;
 use App\Repositories\Crm\CrmCompanyRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Services\Crm\LeadConversionService;
+use App\Services\Crm\CrmLeadScoringService;
 use App\Services\Crm\LeadService;
 use App\Services\Integrations\GoogleCalendarService;
 use Illuminate\Http\RedirectResponse;
@@ -70,11 +71,15 @@ class LeadController extends Controller
         return redirect()->route('crm.leads.show', $lead)->with('status', 'CRM lead created.');
     }
 
-    public function show(Request $request, LeadRepository $leadRepository, GoogleCalendarService $googleCalendar, int $lead): View
+    public function show(Request $request, LeadRepository $leadRepository, GoogleCalendarService $googleCalendar, CrmLeadScoringService $scoring, int $lead): View
     {
+        $lead = $leadRepository->findForUser($request->user(), $lead);
+
         return view('command-center.crm.leads.show', [
-            'lead' => $leadRepository->findForUser($request->user(), $lead),
+            'lead' => $lead,
             'priorities' => LeadPriority::cases(),
+            'aiScore' => $scoring->latestFor($lead),
+            'aiFollowUp' => session('aiFollowUp'),
             'googleCalendarConnected' => $googleCalendar->isConfigured() && $googleCalendar->connectionForCompany($request->user()->company_id)?->isConnected(),
         ]);
     }

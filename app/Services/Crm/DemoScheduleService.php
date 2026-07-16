@@ -24,6 +24,7 @@ class DemoScheduleService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly CrmLeadScoringService $leadScoring,
     ) {}
 
     /**
@@ -60,6 +61,7 @@ class DemoScheduleService
                 aggregateId: $schedule->id,
                 payload: $this->eventPayload($schedule, $lead),
             ));
+            $this->leadScoring->refresh($lead, $user);
 
             return $schedule->load(['assignedTo', 'scheduledBy']);
         });
@@ -90,6 +92,7 @@ class DemoScheduleService
                 'company_id' => $lead->company_id,
                 'lead_id' => $lead->id,
             ]);
+            $this->leadScoring->refresh($lead, $user);
 
             return $schedule->refresh()->load(['assignedTo', 'scheduledBy']);
         });
@@ -109,6 +112,7 @@ class DemoScheduleService
             'company_id' => $lead->company_id,
             'lead_id' => $lead->id,
         ]);
+        $this->leadScoring->refresh($lead, $user);
 
         return $schedule->refresh()->load(['assignedTo', 'scheduledBy']);
     }
@@ -127,6 +131,7 @@ class DemoScheduleService
             'company_id' => $lead->company_id,
             'lead_id' => $lead->id,
         ]);
+        $this->leadScoring->refresh($lead, $user);
 
         return $schedule->refresh()->load(['assignedTo', 'scheduledBy']);
     }

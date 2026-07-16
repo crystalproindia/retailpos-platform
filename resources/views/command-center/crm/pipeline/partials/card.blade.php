@@ -30,6 +30,14 @@
         @endif
     </div>
 
+    @if ($card['ai_score'])
+        <div class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs dark:bg-slate-950">
+            <span class="font-semibold text-slate-700 dark:text-slate-200">AI {{ $card['ai_score']->score }}/100</span>
+            <span class="rounded-full px-2 py-0.5 font-semibold {{ match($card['ai_score']->category->value) { 'hot', 'at_risk' => 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200', 'warm' => 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200', 'won' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200', default => 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200' } }}">{{ $card['ai_score']->category->label() }}</span>
+        </div>
+        <p class="mt-2 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{{ $card['ai_score']->next_best_action }}</p>
+    @endif
+
     @if ($lead->assignedUser || $lead->next_follow_up_at || $card['latest_activity'])
         <div class="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
             @if ($lead->assignedUser)

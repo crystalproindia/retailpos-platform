@@ -28,6 +28,7 @@ class QuotationService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly CrmLeadScoringService $leadScoring,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -55,6 +56,7 @@ class QuotationService
                 aggregateId: $quotation->id,
                 payload: $this->eventPayload($quotation, $lead),
             ));
+            $this->leadScoring->refresh($lead, $user);
 
             return $quotation->load(['lead', 'items', 'creator']);
         });
@@ -71,8 +73,10 @@ class QuotationService
                 'updated_by' => $user->id,
             ]);
             $this->replaceItems($quotation, $calculation['items']);
-            $this->recordActivity($quotation->lead()->firstOrFail(), $user, "Quotation {$quotation->quotation_number} updated.");
+            $lead = $quotation->lead()->firstOrFail();
+            $this->recordActivity($lead, $user, "Quotation {$quotation->quotation_number} updated.");
             $this->auditLogger->record('crm.quotation.updated', $quotation, 'Quotation updated', ['company_id' => $quotation->company_id, 'lead_id' => $quotation->lead_id]);
+            $this->leadScoring->refresh($lead, $user);
 
             return $quotation->refresh()->load(['lead', 'items', 'creator', 'updater']);
         });
@@ -101,8 +105,10 @@ class QuotationService
 
         return DB::transaction(function () use ($quotation, $user): CrmQuotation {
             $quotation->update(['status' => QuotationStatus::Converted, 'converted_at' => now(), 'updated_by' => $user->id]);
-            $this->recordActivity($quotation->lead()->firstOrFail(), $user, 'Quotation prepared for customer conversion.');
+            $lead = $quotation->lead()->firstOrFail();
+            $this->recordActivity($lead, $user, 'Quotation prepared for customer conversion.');
             $this->auditLogger->record('crm.quotation.converted', $quotation, 'Quotation prepared for customer conversion', ['company_id' => $quotation->company_id, 'lead_id' => $quotation->lead_id]);
+            $this->leadScoring->refresh($lead, $user);
 
             return $quotation->refresh()->load(['lead', 'items', 'creator', 'updater']);
         });
@@ -228,6 +234,7 @@ class QuotationService
             $this->updateLeadWorkflow($lead, $to);
             $this->auditLogger->record('crm.quotation.'.$to->value, $quotation, rtrim($activity, '.'), ['company_id' => $quotation->company_id, 'lead_id' => $lead->id]);
             $this->domainEvents->dispatch($this->eventFor($to, $quotation, $lead, $user));
+            $this->leadScoring->refresh($lead, $user);
 
             return $quotation->refresh()->load(['lead.status', 'lead.assignedUser', 'items', 'creator', 'updater']);
         });

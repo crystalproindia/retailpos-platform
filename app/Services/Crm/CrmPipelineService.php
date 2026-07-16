@@ -24,7 +24,7 @@ class CrmPipelineService
     {
         $statuses = $this->stageService->statusesForCompany($user->company_id);
         $leads = $this->filteredQuery($user, $filters)
-            ->with(['latestQuotation', 'latestProforma', 'latestActivity', 'crmCustomer'])
+            ->with(['latestQuotation', 'latestProforma', 'latestActivity', 'crmCustomer', 'leadScore'])
             ->latest('updated_at')
             ->get();
 
@@ -103,7 +103,9 @@ class CrmPipelineService
                 if ($statuses !== []) {
                     $query->whereHas('proformas', fn (Builder $proformas) => $proformas->whereIn('status', $statuses));
                 }
-            });
+            })
+            ->when($filters['ai_category'] ?? null, fn (Builder $query, string $category) => $query->whereHas('leadScore', fn (Builder $score) => $score->where('category', $category)))
+            ->when($filters['ai_priority'] ?? null, fn (Builder $query, string $priority) => $query->whereHas('leadScore', fn (Builder $score) => $score->where('priority', $priority)));
     }
 
     /**
@@ -132,6 +134,7 @@ class CrmPipelineService
             'payment_label' => $proforma?->status === ProformaStatus::PartiallyPaid
                 ? 'Partial payment'
                 : ($proforma?->status === ProformaStatus::Paid ? 'Paid' : null),
+            'ai_score' => $lead->leadScore,
         ];
     }
 }

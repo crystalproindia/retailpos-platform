@@ -20,6 +20,7 @@ class PipelineService
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly PipelineStageService $stageService,
+        private readonly CrmLeadScoringService $leadScoring,
     ) {}
 
     public function transition(CrmLead $lead, int $statusId, User $user): CrmLead
@@ -121,6 +122,7 @@ class PipelineService
                 payload: $payload,
             ));
         }
+        $this->leadScoring->refresh($lead, $user);
 
         return $lead->refresh()->load('status');
     }

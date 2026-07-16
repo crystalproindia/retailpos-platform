@@ -37,6 +37,10 @@
             </div>
         </section>
 
+        @can('crm.ai.view')
+            @include('command-center.crm.leads.partials.ai-assistant')
+        @endcan
+
         <section class="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Lead Details</h2>

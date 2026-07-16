@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\Crm\SalesMessageGeneratorInterface;
 use App\Enums\UserRole;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
@@ -13,6 +14,7 @@ use App\Policies\Crm\CrmCompanyPolicy;
 use App\Policies\Crm\CrmContactPolicy;
 use App\Policies\Crm\CrmLeadPolicy;
 use App\Services\AuditLogger;
+use App\Services\Crm\TemplateSalesMessageGenerator;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -28,7 +30,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(SalesMessageGeneratorInterface::class, TemplateSalesMessageGenerator::class);
     }
 
     /**

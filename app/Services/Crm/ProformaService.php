@@ -6,6 +6,7 @@ use App\Enums\Crm\LeadPriority;
 use App\Enums\Crm\ProformaStatus;
 use App\Events\Domain\Crm\ProformaEvent;
 use App\Models\Crm\CrmActivity;
+use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmProformaInvoice;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -19,6 +20,7 @@ class ProformaService
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly CrmLeadScoringService $leadScoring,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -42,6 +44,7 @@ class ProformaService
             $this->activity($proforma, $user, "Proforma invoice {$proforma->proforma_number} created.");
             $this->audit->record('crm.proforma.created', $proforma, 'Proforma invoice created', ['company_id' => $user->company_id]);
             $this->dispatch('crm.proforma.created', $proforma, $user);
+            $this->refreshLeadScore($proforma, $user);
 
             return $proforma->load(['lead', 'items']);
         });
@@ -57,6 +60,7 @@ class ProformaService
         $this->activity($proforma, $user, 'Proforma invoice sent.');
         $this->audit->record('crm.proforma.sent', $proforma, 'Proforma invoice sent', ['company_id' => $proforma->company_id]);
         $this->dispatch('crm.proforma.sent', $proforma, $user);
+        $this->refreshLeadScore($proforma, $user);
 
         return $proforma->refresh();
     }
@@ -86,6 +90,7 @@ class ProformaService
             if ($status === ProformaStatus::Paid) {
                 $this->activity($proforma, $user, 'Proforma invoice fully paid.');
             }
+            $this->refreshLeadScore($proforma, $user);
             $this->audit->record('crm.proforma.payment_recorded', $proforma, 'Proforma payment recorded', ['amount' => $data['amount'], 'company_id' => $proforma->company_id]);
             $this->dispatch('crm.proforma.payment_recorded', $proforma, $user, ['amount' => $data['amount'], 'currency' => $proforma->currency]);
             if ($status === ProformaStatus::Paid) {
@@ -143,6 +148,13 @@ class ProformaService
     private function activity(CrmProformaInvoice $proforma, User $user, string $subject): void
     {
         CrmActivity::create(['company_id' => $proforma->company_id, 'crm_lead_id' => $proforma->lead_id, 'created_by' => $user->id, 'assigned_user_id' => $proforma->lead?->assigned_user_id, 'type' => ActivityType::Note, 'subject' => $subject, 'description' => $subject, 'scheduled_at' => now(), 'completed_at' => now(), 'priority' => $proforma->lead?->priority ?? LeadPriority::Medium]);
+    }
+
+    private function refreshLeadScore(CrmProformaInvoice $proforma, User $user): void
+    {
+        if ($proforma->lead_id) {
+            $this->leadScoring->refresh(CrmLead::query()->findOrFail($proforma->lead_id), $user);
+        }
     }
 
     /** @param array<string, mixed> $extra */

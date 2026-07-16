@@ -108,6 +108,17 @@ class NotificationTemplateRenderer
             return $name.' moved to '.($event->payload()['to_stage'] ?? 'a new pipeline stage').'.';
         }
 
+        if (in_array($event->eventKey(), ['crm.lead_score.hot', 'crm.lead_score.at_risk', 'crm.lead_followup_overdue', 'crm.payment_followup_required'], true)) {
+            $name = $event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead';
+
+            return match ($event->eventKey()) {
+                'crm.lead_score.hot' => "{$name} is now a hot lead (".($event->payload()['score'] ?? '—').'/100).',
+                'crm.lead_score.at_risk' => "{$name} is a high-value lead at risk. ".($event->payload()['next_best_action'] ?? ''),
+                'crm.lead_followup_overdue' => "{$name} needs an overdue follow-up. ".($event->payload()['next_best_action'] ?? ''),
+                default => "{$name} has a partial-payment follow-up to complete.",
+            };
+        }
+
         if ($event->eventKey() === 'crm.demo.google_calendar_synced') {
             return 'Demo synced to Google Calendar for '.($event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead').'.';
         }
@@ -210,6 +221,10 @@ class NotificationTemplateRenderer
             'crm.lead.assigned' => 'lead_assigned',
             'crm.lead.status_changed' => 'lead_status_changed',
             'crm.pipeline.stage_changed' => 'pipeline_stage_changed',
+            'crm.lead_score.hot' => 'lead_score_hot',
+            'crm.lead_score.at_risk' => 'lead_score_at_risk',
+            'crm.lead_followup_overdue' => 'lead_followup_overdue',
+            'crm.payment_followup_required' => 'payment_followup_required',
             default => $event->eventKey(),
         };
     }
@@ -220,7 +235,7 @@ class NotificationTemplateRenderer
             'pos.sale.held' => route('pos.index'),
             'pos.sale.completed' => $event->aggregateId() ? route('pos.receipts.show', $event->aggregateId()) : route('pos.index'),
             'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => route('pos.offline.index'),
-            'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.pipeline.stage_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
+            'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.pipeline.stage_changed', 'crm.lead.converted', 'crm.lead_score.hot', 'crm.lead_score.at_risk', 'crm.lead_followup_overdue', 'crm.payment_followup_required' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed' => ($event->payload()['lead_id'] ?? null) ? route('crm.leads.show', $event->payload()['lead_id']) : null,
             'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
             'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed' => $event->aggregateId() ? route('crm.proformas.show', $event->aggregateId()) : null,

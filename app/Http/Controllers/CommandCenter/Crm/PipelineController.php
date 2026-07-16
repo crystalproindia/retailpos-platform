@@ -18,7 +18,7 @@ class PipelineController extends Controller
 {
     public function index(Request $request, CrmPipelineService $pipeline, LeadRepository $leadRepository): View
     {
-        $filters = $request->only(['search', 'stage', 'assigned_user_id', 'source_id', 'created_from', 'created_to', 'activity_from', 'activity_to', 'follow_up', 'payment_status', 'min_value', 'max_value']);
+        $filters = $request->only(['search', 'stage', 'assigned_user_id', 'source_id', 'created_from', 'created_to', 'activity_from', 'activity_to', 'follow_up', 'payment_status', 'min_value', 'max_value', 'ai_category', 'ai_priority']);
         $view = $request->string('view')->value() === 'list' ? 'list' : 'board';
 
         return view('command-center.crm.pipeline.index', $pipeline->forUser($request->user(), $filters) + [

@@ -132,6 +132,11 @@ class CrmLead extends Model
         return $this->hasOne(CrmActivity::class, 'crm_lead_id')->latestOfMany('scheduled_at');
     }
 
+    public function leadScore(): HasOne
+    {
+        return $this->hasOne(CrmLeadScore::class, 'lead_id');
+    }
+
     public function crmCustomer(): HasOne
     {
         return $this->hasOne(CrmCustomer::class, 'lead_id');

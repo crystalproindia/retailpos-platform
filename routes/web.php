@@ -29,6 +29,7 @@ use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\Crm\ActivityController;
+use App\Http\Controllers\CommandCenter\Crm\AiLeadAssistantController;
 use App\Http\Controllers\CommandCenter\Crm\ContactController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCompanyController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCustomerController;
@@ -140,6 +141,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('leads/create', [LeadController::class, 'create'])->middleware('can:crm.leads.create')->name('leads.create');
         Route::post('leads', [LeadController::class, 'store'])->middleware('can:crm.leads.create')->name('leads.store');
         Route::post('leads/bulk', [LeadController::class, 'bulk'])->middleware('can:crm.leads.update')->name('leads.bulk');
+        Route::post('leads/{lead}/ai/analyze', [AiLeadAssistantController::class, 'analyze'])->middleware('can:crm.ai.refresh_score')->name('leads.ai.analyze');
+        Route::post('leads/{lead}/ai/follow-up', [AiLeadAssistantController::class, 'generate'])->middleware('can:crm.ai.generate')->name('leads.ai.follow-up');
         Route::get('leads/{lead}/demos/create', [DemoScheduleController::class, 'create'])->middleware('can:crm.demos.create')->name('demos.create');
         Route::post('leads/{lead}/demos', [DemoScheduleController::class, 'store'])->middleware('can:crm.demos.create')->name('demos.store');
         Route::get('demos/{demo}/reschedule', [DemoScheduleController::class, 'edit'])->middleware('can:crm.demos.update')->name('demos.edit');

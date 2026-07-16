@@ -22,6 +22,7 @@ class LeadService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly CrmLeadScoringService $leadScoring,
     ) {}
 
     /**
@@ -48,8 +49,9 @@ class LeadService
             aggregateId: $lead->id,
             payload: $this->eventPayload($lead),
         ));
+        $this->leadScoring->refresh($lead, $user);
 
-        return $lead->load(['source', 'status', 'assignedUser', 'tags']);
+        return $lead->load(['source', 'status', 'assignedUser', 'tags', 'leadScore']);
     }
 
     /**
@@ -119,6 +121,7 @@ class LeadService
                 'updated_by' => $user->id,
             ]);
         }
+        $this->leadScoring->refresh($lead, $user);
 
         return $lead->refresh()->load(['source', 'status', 'assignedUser', 'tags']);
     }
@@ -157,6 +160,7 @@ class LeadService
                 'to_status_id' => $statusId,
             ]),
         ));
+        $this->leadScoring->refresh($lead, $user);
 
         return $lead->refresh()->load('status');
     }
@@ -179,6 +183,7 @@ class LeadService
                 'assigned_by' => $user->id,
             ]),
         ));
+        $this->leadScoring->refresh($lead, $user);
 
         return $lead->refresh()->load('assignedUser');
     }

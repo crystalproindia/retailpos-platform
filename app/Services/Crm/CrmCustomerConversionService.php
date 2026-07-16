@@ -24,6 +24,7 @@ class CrmCustomerConversionService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly CrmLeadScoringService $leadScoring,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -96,6 +97,7 @@ class CrmCustomerConversionService
                     'assigned_user_id' => $lead->assigned_user_id,
                 ],
             ));
+            $this->leadScoring->refresh($lead, $user);
 
             return $customer->load(['primaryContact', 'lead', 'quotation']);
         });

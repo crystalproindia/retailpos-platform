@@ -55,6 +55,11 @@ class CrmQuotation extends Model
         return $this->hasOne(CrmCustomer::class, 'quotation_id');
     }
 
+    public function shares(): HasMany
+    {
+        return $this->hasMany(CrmQuotationShare::class, 'quotation_id')->latest('created_at');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

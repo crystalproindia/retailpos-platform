@@ -35,7 +35,7 @@ class QuotationRepository
     public function findForUser(User $user, int $quotationId): CrmQuotation
     {
         return $this->queryForUser($user)
-            ->with(['lead.status', 'lead.assignedUser', 'items', 'creator', 'updater', 'auditLogs.user', 'crmCustomer.primaryContact'])
+            ->with(['lead.status', 'lead.assignedUser', 'items', 'creator', 'updater', 'auditLogs.user', 'crmCustomer.primaryContact', 'shares.creator'])
             ->findOrFail($quotationId);
     }
 

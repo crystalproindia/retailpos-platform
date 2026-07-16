@@ -9,6 +9,7 @@ use App\Http\Requests\Crm\UpdateQuotationRequest;
 use App\Models\Crm\CrmQuotation;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
+use App\Services\Crm\QuotationShareService;
 use App\Services\Crm\QuotationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,10 +51,13 @@ class QuotationController extends Controller
         return redirect()->route('crm.quotations.show', $quotation)->with('status', 'Quotation created.');
     }
 
-    public function show(Request $request, QuotationRepository $quotationRepository, int $quotation): View
+    public function show(Request $request, QuotationRepository $quotationRepository, QuotationShareService $quotationShareService, int $quotation): View
     {
+        $crmQuotation = $quotationRepository->findForUser($request->user(), $quotation);
+
         return view('command-center.crm.quotations.show', [
-            'quotation' => $quotationRepository->findForUser($request->user(), $quotation),
+            'quotation' => $crmQuotation,
+            'whatsappShare' => $quotationShareService->whatsappPayload($crmQuotation),
         ]);
     }
 
@@ -110,9 +114,13 @@ class QuotationController extends Controller
     public function publicLink(Request $request, QuotationRepository $quotationRepository, QuotationService $quotationService, int $quotation): RedirectResponse
     {
         abort_unless($request->user()->can('crm.quotations.update'), 403);
-        $updated = $quotationService->generatePublicLink($quotationRepository->findForUser($request->user(), $quotation), $request->user());
+        $updated = $quotationService->generatePublicLink(
+            $quotationRepository->findForUser($request->user(), $quotation),
+            $request->user(),
+            $request->boolean('regenerate'),
+        );
 
-        return redirect()->route('crm.quotations.show', $updated)->with('status', 'Secure public quotation link is ready.');
+        return redirect()->route('crm.quotations.show', $updated)->with('status', $request->boolean('regenerate') ? 'Secure public quotation link regenerated.' : 'Secure public quotation link is ready.');
     }
 
     /** @return array<string, int|float|string|null> */

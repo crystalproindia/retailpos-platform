@@ -108,10 +108,10 @@ class QuotationService
         });
     }
 
-    public function generatePublicLink(CrmQuotation $quotation, User $user): CrmQuotation
+    public function generatePublicLink(CrmQuotation $quotation, User $user, bool $regenerate = false): CrmQuotation
     {
-        return DB::transaction(function () use ($quotation, $user): CrmQuotation {
-            if (! $quotation->public_token) {
+        return DB::transaction(function () use ($quotation, $user, $regenerate): CrmQuotation {
+            if (! $quotation->public_token || $regenerate) {
                 do {
                     $token = Str::random(48);
                 } while (CrmQuotation::query()->where('public_token', $token)->exists());
@@ -121,8 +121,9 @@ class QuotationService
                     'public_url' => route('quotations.public.show', $token),
                     'updated_by' => $user->id,
                 ]);
-                $this->recordActivity($quotation->lead()->firstOrFail(), $user, "Public link generated for quotation {$quotation->quotation_number}.");
-                $this->auditLogger->record('crm.quotation.public_link_generated', $quotation, 'Quotation public link generated', ['company_id' => $quotation->company_id, 'lead_id' => $quotation->lead_id]);
+                $activity = ($regenerate ? 'Public link regenerated for quotation ' : 'Public link generated for quotation ').$quotation->quotation_number.'.';
+                $this->recordActivity($quotation->lead()->firstOrFail(), $user, $activity);
+                $this->auditLogger->record('crm.quotation.'.($regenerate ? 'public_link_regenerated' : 'public_link_generated'), $quotation, rtrim($activity, '.'), ['company_id' => $quotation->company_id, 'lead_id' => $quotation->lead_id]);
             }
 
             return $quotation->refresh()->load(['lead', 'items', 'creator', 'updater']);

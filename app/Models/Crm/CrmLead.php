@@ -107,6 +107,16 @@ class CrmLead extends Model
         return $this->hasOne(DemoSchedule::class, 'lead_id')->latestOfMany('starts_at');
     }
 
+    public function quotations(): HasMany
+    {
+        return $this->hasMany(CrmQuotation::class, 'lead_id')->latest('created_at');
+    }
+
+    public function latestQuotation(): HasOne
+    {
+        return $this->hasOne(CrmQuotation::class, 'lead_id')->latestOfMany('created_at');
+    }
+
     public function isConverted(): bool
     {
         return $this->converted_at !== null;

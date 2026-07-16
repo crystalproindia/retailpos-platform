@@ -7,6 +7,7 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmLead;
+use App\Models\Crm\CrmQuotation;
 use App\Models\Customers\Customer;
 use App\Models\Customers\CustomerGroup;
 use App\Models\Customers\CustomerSetting;
@@ -75,6 +76,11 @@ class Company extends Model
     public function crmLeads(): HasMany
     {
         return $this->hasMany(CrmLead::class);
+    }
+
+    public function crmQuotations(): HasMany
+    {
+        return $this->hasMany(CrmQuotation::class);
     }
 
     public function crmActivities(): HasMany

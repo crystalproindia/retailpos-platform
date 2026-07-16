@@ -19,6 +19,9 @@
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $lead->business_name ?? $lead->contact_name ?? 'Unlinked lead' }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    @can('crm.quotations.create')
+                        <a href="{{ route('crm.quotations.create', $lead) }}" class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create quotation</a>
+                    @endcan
                     @can('crm.demos.create')
                         <a href="{{ route('crm.demos.create', $lead) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Schedule Demo</a>
                     @endcan
@@ -173,6 +176,11 @@
                     <p class="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No demos have been scheduled for this lead.</p>
                 @endforelse
             </div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-4"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Related Quotations</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Proposal history linked to this lead.</p></div>@can('crm.quotations.create')<a href="{{ route('crm.quotations.create', $lead) }}" class="text-sm font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">Create quotation</a>@endcan</div>
+            <div class="mt-5 space-y-3">@forelse($lead->quotations as $quotation)<a href="{{ route('crm.quotations.show', $quotation) }}" class="flex flex-col justify-between gap-3 rounded-lg border border-slate-200 p-4 hover:bg-slate-50 sm:flex-row sm:items-center dark:border-slate-800 dark:hover:bg-slate-800"><div><p class="font-semibold text-slate-950 dark:text-white">{{ $quotation->quotation_number }}</p><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $quotation->title }} · {{ $quotation->created_at?->format('d M Y') }}</p></div><div class="flex items-center gap-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $quotation->status?->label() }}</span><strong class="text-sm text-slate-950 dark:text-white">{{ $quotation->currency }} {{ number_format((float) $quotation->grand_total, 2) }}</strong></div></a>@empty<p class="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No quotations have been created for this lead.</p>@endforelse</div>
         </section>
     </div>
 @endsection

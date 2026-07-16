@@ -37,6 +37,7 @@ use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
+use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\DashboardController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodePrintBatchController;
@@ -88,6 +89,7 @@ use App\Http\Controllers\CommandCenter\Promotions\PromotionSettingsController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionSimulatorController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionUsageController;
 use App\Http\Controllers\CommandCenter\SettingsController;
+use App\Http\Controllers\PublicQuotationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -95,6 +97,8 @@ Route::get('/', function () {
         ? redirect()->route('dashboard')
         : redirect()->route('login');
 });
+
+Route::get('q/{publicToken}', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -137,6 +141,17 @@ Route::middleware('auth')->group(function (): void {
         Route::post('demos/{demo}/complete', [DemoScheduleController::class, 'complete'])->middleware('can:crm.demos.complete')->name('demos.complete');
         Route::post('demos/{demo}/cancel', [DemoScheduleController::class, 'cancel'])->middleware('can:crm.demos.cancel')->name('demos.cancel');
         Route::post('demos/{demo}/sync-google-calendar', DemoGoogleCalendarSyncController::class)->middleware('can:crm.demos.sync_calendar')->name('demos.sync-google-calendar');
+        Route::get('quotations', [QuotationController::class, 'index'])->middleware('can:crm.quotations.view')->name('quotations.index');
+        Route::get('leads/{lead}/quotations/create', [QuotationController::class, 'create'])->middleware('can:crm.quotations.create')->name('quotations.create');
+        Route::post('leads/{lead}/quotations', [QuotationController::class, 'store'])->middleware('can:crm.quotations.create')->name('quotations.store');
+        Route::get('quotations/{quotation}/edit', [QuotationController::class, 'edit'])->middleware('can:crm.quotations.update')->name('quotations.edit');
+        Route::put('quotations/{quotation}', [QuotationController::class, 'update'])->middleware('can:crm.quotations.update')->name('quotations.update');
+        Route::post('quotations/{quotation}/send', [QuotationController::class, 'send'])->middleware('can:crm.quotations.send')->name('quotations.send');
+        Route::post('quotations/{quotation}/accept', [QuotationController::class, 'accept'])->middleware('can:crm.quotations.accept')->name('quotations.accept');
+        Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject'])->middleware('can:crm.quotations.reject')->name('quotations.reject');
+        Route::post('quotations/{quotation}/convert', [QuotationController::class, 'convert'])->middleware('can:crm.quotations.update')->name('quotations.convert');
+        Route::post('quotations/{quotation}/public-link', [QuotationController::class, 'publicLink'])->middleware('can:crm.quotations.update')->name('quotations.public-link');
+        Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->middleware('can:crm.quotations.view')->name('quotations.show');
         Route::get('leads/{lead}', [LeadController::class, 'show'])->middleware('can:crm.leads.view')->name('leads.show');
         Route::get('leads/{lead}/edit', [LeadController::class, 'edit'])->middleware('can:crm.leads.update')->name('leads.edit');
         Route::put('leads/{lead}', [LeadController::class, 'update'])->middleware('can:crm.leads.update')->name('leads.update');

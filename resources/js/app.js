@@ -136,6 +136,31 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGoogleMeetAvailability();
     });
 
+    document.querySelectorAll('[data-quotation-form]').forEach((form) => {
+        const items = form.querySelector('[data-quotation-items]');
+        const template = form.querySelector('[data-quotation-item-template]');
+        const addButton = form.querySelector('[data-quotation-add-item]');
+        if (!items || !template || !addButton) return;
+        const number = (value) => Number.parseFloat(value || '0') || 0;
+        const renderTotals = () => {
+            let subtotal = 0; let discount = 0; let tax = 0;
+            items.querySelectorAll('[data-quotation-item]').forEach((item) => {
+                const gross = number(item.querySelector('[data-quotation-quantity]')?.value) * number(item.querySelector('[data-quotation-unit-price]')?.value);
+                const itemDiscount = Math.min(number(item.querySelector('[data-quotation-discount]')?.value), gross);
+                subtotal += gross; discount += itemDiscount; tax += (gross - itemDiscount) * number(item.querySelector('[data-quotation-tax-rate]')?.value) / 100;
+            });
+            const put = (selector, value) => form.querySelectorAll(selector).forEach((node) => { node.textContent = value.toFixed(2); });
+            put('[data-quotation-subtotal]', subtotal); put('[data-quotation-discount-total]', discount); put('[data-quotation-tax-total]', tax); put('[data-quotation-grand-total]', subtotal - discount + tax);
+        };
+        const bindItem = (item) => {
+            item.querySelectorAll('input').forEach((input) => input.addEventListener('input', renderTotals));
+            item.querySelector('[data-quotation-remove-item]')?.addEventListener('click', () => { if (items.querySelectorAll('[data-quotation-item]').length > 1) { item.remove(); renderTotals(); } });
+        };
+        items.querySelectorAll('[data-quotation-item]').forEach(bindItem);
+        addButton.addEventListener('click', () => { const index = items.querySelectorAll('[data-quotation-item]').length; const fragment = template.content.cloneNode(true); fragment.querySelectorAll('[name]').forEach((input) => { input.name = input.name.replaceAll('__INDEX__', index); }); items.appendChild(fragment); bindItem(items.lastElementChild); renderTotals(); });
+        renderTotals();
+    });
+
     document.addEventListener('click', () => closeDropdowns());
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {

@@ -110,6 +110,18 @@ class NotificationTemplateRenderer
             return 'Google Calendar sync needs attention for '.($event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead').'.';
         }
 
+        if (in_array($event->eventKey(), ['crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected'], true)) {
+            $number = $event->payload()['quotation_number'] ?? 'this quotation';
+            $name = $event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead';
+
+            return match ($event->eventKey()) {
+                'crm.quotation.created' => "Quotation {$number} was created for {$name}.",
+                'crm.quotation.sent' => "Quotation {$number} was marked as sent for {$name}.",
+                'crm.quotation.accepted' => "Quotation {$number} was accepted by {$name}.",
+                default => "Quotation {$number} was rejected for {$name}.",
+            };
+        }
+
         return ($definition['description'] ?? 'A platform event occurred.').' Event: '.$event->eventKey().'.';
     }
 
@@ -134,6 +146,10 @@ class NotificationTemplateRenderer
             'demo_scheduled' => 'Demo scheduled',
             'demo_google_calendar_synced' => 'Demo synced to Google Calendar',
             'demo_google_calendar_sync_failed' => 'Google Calendar sync failed',
+            'quotation_created' => 'Quotation created',
+            'quotation_sent' => 'Quotation sent',
+            'quotation_accepted' => 'Quotation accepted',
+            'quotation_rejected' => 'Quotation rejected',
             default => $definition['name'] ?? str($event->eventKey())->replace('.', ' ')->headline()->toString(),
         };
     }
@@ -153,6 +169,10 @@ class NotificationTemplateRenderer
             'crm.demo.scheduled' => 'demo_scheduled',
             'crm.demo.google_calendar_synced' => 'demo_google_calendar_synced',
             'crm.demo.google_calendar_sync_failed' => 'demo_google_calendar_sync_failed',
+            'crm.quotation.created' => 'quotation_created',
+            'crm.quotation.sent' => 'quotation_sent',
+            'crm.quotation.accepted' => 'quotation_accepted',
+            'crm.quotation.rejected' => 'quotation_rejected',
             'crm.lead.assigned' => 'lead_assigned',
             'crm.lead.status_changed' => 'lead_status_changed',
             default => $event->eventKey(),
@@ -167,6 +187,7 @@ class NotificationTemplateRenderer
             'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => route('pos.offline.index'),
             'crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.lead.converted' => $event->aggregateId() ? route('crm.leads.show', $event->aggregateId()) : null,
             'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed' => ($event->payload()['lead_id'] ?? null) ? route('crm.leads.show', $event->payload()['lead_id']) : null,
+            'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
                 ? route('crm.leads.show', $event->payload()['lead_id'])
                 : route('crm.followups.index'),

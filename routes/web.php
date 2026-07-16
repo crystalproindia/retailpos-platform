@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CommandCenter\Cms\CmsBrandingController;
+use App\Http\Controllers\CommandCenter\Cms\CmsArticleController;
 use App\Http\Controllers\CommandCenter\Cms\CmsClientLogoController;
 use App\Http\Controllers\CommandCenter\Cms\CmsDashboardController;
 use App\Http\Controllers\CommandCenter\Cms\CmsHeaderController;
@@ -15,10 +16,13 @@ use App\Http\Controllers\CommandCenter\Cms\CmsTestimonialController;
 use App\Http\Controllers\CommandCenter\Cms\CmsTrustMetricController;
 use App\Http\Controllers\CommandCenter\Cms\CmsFaqController;
 use App\Http\Controllers\CommandCenter\Cms\CmsCtaController;
+use App\Http\Controllers\CommandCenter\Cms\CmsLandingPageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsHomepageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsMediaController;
 use App\Http\Controllers\CommandCenter\Cms\CmsMenuController;
 use App\Http\Controllers\CommandCenter\Cms\CmsPageController;
+use App\Http\Controllers\CommandCenter\Cms\CmsRedirectController;
+use App\Http\Controllers\CommandCenter\Cms\CmsSeoPageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsSeoController;
 use App\Http\Controllers\CommandCenter\Cms\CmsSettingsController as CmsAdminSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerController;
@@ -326,6 +330,38 @@ Route::middleware('auth')->group(function (): void {
         Route::get('seo', [CmsSeoController::class, 'index'])->middleware('can:cms.seo.manage')->name('seo.index');
         Route::put('seo', [CmsSeoController::class, 'update'])->name('seo.update');
         Route::post('seo/redirects', [CmsSeoController::class, 'storeRedirect'])->name('seo.redirects.store');
+
+        Route::get('seo-pages', [CmsSeoPageController::class, 'index'])->middleware('can:cms.pages.manage')->name('seo-pages.index');
+        Route::get('seo-pages/create', [CmsSeoPageController::class, 'create'])->middleware('can:cms.pages.manage')->name('seo-pages.create');
+        Route::post('seo-pages', [CmsSeoPageController::class, 'store'])->middleware('can:cms.pages.manage')->name('seo-pages.store');
+        Route::get('seo-pages/{page}/edit', [CmsSeoPageController::class, 'edit'])->middleware('can:cms.pages.manage')->name('seo-pages.edit');
+        Route::put('seo-pages/{page}', [CmsSeoPageController::class, 'update'])->middleware('can:cms.pages.manage')->name('seo-pages.update');
+        Route::post('seo-pages/{page}/publish', [CmsSeoPageController::class, 'publish'])->middleware('can:cms.pages.manage')->name('seo-pages.publish');
+        Route::post('seo-pages/{page}/unpublish', [CmsSeoPageController::class, 'unpublish'])->middleware('can:cms.pages.manage')->name('seo-pages.unpublish');
+        Route::post('seo-pages/{page}/archive', [CmsSeoPageController::class, 'archive'])->middleware('can:cms.pages.manage')->name('seo-pages.archive');
+
+        Route::get('landing-pages', [CmsLandingPageController::class, 'index'])->middleware('can:cms.pages.manage')->name('landing-pages.index');
+        Route::get('landing-pages/create', [CmsLandingPageController::class, 'create'])->middleware('can:cms.pages.manage')->name('landing-pages.create');
+        Route::post('landing-pages', [CmsLandingPageController::class, 'store'])->middleware('can:cms.pages.manage')->name('landing-pages.store');
+        Route::get('landing-pages/{page}/edit', [CmsLandingPageController::class, 'edit'])->middleware('can:cms.pages.manage')->name('landing-pages.edit');
+        Route::put('landing-pages/{page}', [CmsLandingPageController::class, 'update'])->middleware('can:cms.pages.manage')->name('landing-pages.update');
+        Route::post('landing-pages/{page}/publish', [CmsLandingPageController::class, 'publish'])->middleware('can:cms.pages.manage')->name('landing-pages.publish');
+        Route::post('landing-pages/{page}/unpublish', [CmsLandingPageController::class, 'unpublish'])->middleware('can:cms.pages.manage')->name('landing-pages.unpublish');
+        Route::post('landing-pages/{page}/archive', [CmsLandingPageController::class, 'archive'])->middleware('can:cms.pages.manage')->name('landing-pages.archive');
+
+        Route::get('articles', [CmsArticleController::class, 'index'])->middleware('can:cms.pages.manage')->name('articles.index');
+        Route::get('articles/create', [CmsArticleController::class, 'create'])->middleware('can:cms.pages.manage')->name('articles.create');
+        Route::post('articles', [CmsArticleController::class, 'store'])->middleware('can:cms.pages.manage')->name('articles.store');
+        Route::get('articles/{article}/edit', [CmsArticleController::class, 'edit'])->middleware('can:cms.pages.manage')->name('articles.edit');
+        Route::put('articles/{article}', [CmsArticleController::class, 'update'])->middleware('can:cms.pages.manage')->name('articles.update');
+        Route::post('articles/{article}/publish', [CmsArticleController::class, 'publish'])->middleware('can:cms.pages.manage')->name('articles.publish');
+        Route::post('articles/{article}/unpublish', [CmsArticleController::class, 'unpublish'])->middleware('can:cms.pages.manage')->name('articles.unpublish');
+        Route::post('articles/{article}/archive', [CmsArticleController::class, 'archive'])->middleware('can:cms.pages.manage')->name('articles.archive');
+
+        Route::get('redirects', [CmsRedirectController::class, 'index'])->middleware('can:cms.redirects.manage')->name('redirects.index');
+        Route::post('redirects', [CmsRedirectController::class, 'store'])->middleware('can:cms.redirects.manage')->name('redirects.store');
+        Route::put('redirects/{redirect}', [CmsRedirectController::class, 'update'])->middleware('can:cms.redirects.manage')->name('redirects.update');
+        Route::delete('redirects/{redirect}', [CmsRedirectController::class, 'destroy'])->middleware('can:cms.redirects.manage')->name('redirects.destroy');
 
         Route::get('client-logos', [CmsLegacyRouteRedirectController::class, 'clientLogos'])->middleware('can:cms.client_logos.manage')->name('client-logos.index');
         Route::post('client-logos', [CmsClientLogoController::class, 'store'])->middleware('can:cms.client_logos.manage')->name('client-logos.store');

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'source_url', 'target_url', 'status_code', 'is_enabled', 'hit_count'])]
+#[Fillable(['company_id', 'source_url', 'target_url', 'status_code', 'is_enabled', 'notes', 'hit_count', 'last_hit_at'])]
 class CmsRedirect extends Model
 {
     use Auditable, SoftDeletes;
@@ -20,6 +20,7 @@ class CmsRedirect extends Model
             'status_code' => 'integer',
             'is_enabled' => 'boolean',
             'hit_count' => 'integer',
+            'last_hit_at' => 'datetime',
         ];
     }
 

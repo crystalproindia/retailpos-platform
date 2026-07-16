@@ -1,0 +1,19 @@
+@extends('layouts.admin')
+
+@section('title', $kind === 'seo' ? 'SEO Pages' : 'Landing Pages')
+@section('page-title', $kind === 'seo' ? 'SEO Pages' : 'Landing Pages')
+
+@section('content')
+    @php($base = $kind === 'seo' ? 'cms.seo-pages' : 'cms.landing-pages')
+    <div class="space-y-6">
+        @include('command-center.cms.partials.nav')
+        <section class="flex flex-col justify-between gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-end dark:border-slate-800 dark:bg-slate-900">
+            <div><p class="text-sm font-medium text-teal-700 dark:text-teal-300">Website growth</p><h1 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $kind === 'seo' ? 'SEO Pages' : 'Landing Pages' }}</h1><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $kind === 'seo' ? 'Manage indexable route metadata and search appearance.' : 'Manage structured product, industry, solution, and campaign pages.' }}</p></div>
+            <a href="{{ route($base.'.create') }}" class="rounded-lg bg-slate-950 px-4 py-2.5 text-center text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create {{ $kind === 'seo' ? 'SEO page' : 'landing page' }}</a>
+        </section>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <form class="grid gap-3 md:grid-cols-4"><input name="search" value="{{ request('search') }}" placeholder="Search title or route"><select name="status"><option value="">All statuses</option>@foreach(['draft','published','archived'] as $status)<option value="{{ $status }}" @selected(request('status') === $status)>{{ str($status)->headline() }}</option>@endforeach</select><select name="page_type"><option value="">All types</option>@foreach(['seo','landing','product','industry','module','solution','location','comparison'] as $type)<option value="{{ $type }}" @selected(request('page_type') === $type)>{{ str($type)->headline() }}</option>@endforeach</select><button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Filter</button></form>
+        </section>
+        <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><div class="overflow-x-auto"><table class="min-w-[780px] w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950"><tr><th class="px-5 py-3">Page</th><th class="px-5 py-3">Route</th><th class="px-5 py-3">SEO health</th><th class="px-5 py-3">Status</th><th class="px-5 py-3"></th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-800">@forelse($pages as $page)<tr><td class="px-5 py-4"><p class="font-semibold text-slate-950 dark:text-white">{{ $page->title }}</p><p class="mt-1 text-xs text-slate-500">{{ str($page->page_type)->headline() }}</p></td><td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ $page->route_path }}</td><td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ blank($page->seo?->meta_title) ? 'Missing meta title' : (blank($page->seo?->meta_description) ? 'Missing meta description' : 'Ready') }}</td><td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ str($page->status)->headline() }}</span></td><td class="px-5 py-4 text-right"><a href="{{ route($base.'.edit', $page) }}" class="font-semibold text-teal-700 dark:text-teal-300">Edit</a></td></tr>@empty<tr><td colspan="5" class="px-5 py-12 text-center text-slate-500">No {{ $kind === 'seo' ? 'SEO pages' : 'landing pages' }} yet.</td></tr>@endforelse</tbody></table></div><div class="border-t border-slate-100 p-4 dark:border-slate-800">{{ $pages->links() }}</div></section>
+    </div>
+@endsection

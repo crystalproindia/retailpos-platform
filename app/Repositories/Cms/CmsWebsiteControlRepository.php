@@ -23,6 +23,7 @@ class CmsWebsiteControlRepository
             'client_logos' => CmsClientLogo::query()->where('company_id', $companyId)->count(), 'case_studies' => CmsCaseStudy::query()->where('company_id', $companyId)->count(), 'testimonials' => CmsTestimonial::query()->where('company_id', $companyId)->count(),
             'trust_metrics' => CmsTrustMetric::query()->where('company_id', $companyId)->count(), 'faqs' => CmsFaq::query()->where('company_id', $companyId)->count(), 'cta_blocks' => CmsCtaBlock::query()->where('company_id', $companyId)->count(),
             'media' => CmsMedia::query()->where('company_id', $companyId)->count(), 'redirects' => CmsRedirect::query()->where('company_id', $companyId)->count(),
+            'articles' => \App\Models\Cms\CmsArticle::query()->where('company_id', $companyId)->count(), 'published_articles' => \App\Models\Cms\CmsArticle::query()->where('company_id', $companyId)->where('status', \App\Models\Cms\CmsArticle::STATUS_PUBLISHED)->count(),
         ];
     }
 

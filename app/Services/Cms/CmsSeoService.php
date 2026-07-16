@@ -16,6 +16,11 @@ class CmsSeoService
      */
     public function updateSettings(CmsSeoSetting $settings, User $user, array $data): CmsSeoSetting
     {
+        foreach (['same_as_social_links', 'default_schema_organization'] as $key) {
+            if (is_string($data[$key] ?? null)) {
+                $data[$key] = json_decode($data[$key], true, flags: JSON_THROW_ON_ERROR);
+            }
+        }
         $settings->update($data);
 
         $this->auditLogger->record('cms.seo.updated', $settings, 'CMS SEO settings updated');

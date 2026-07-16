@@ -23,7 +23,7 @@
                 </div>
             </div>
             <div class="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
-                @foreach (['Total pages' => $dashboard['counts']['pages'], 'Published' => $dashboard['counts']['published_pages'], 'Drafts' => $dashboard['counts']['draft_pages'], 'Scheduled' => $dashboard['counts']['scheduled_pages'], 'Client logos' => $dashboard['counts']['client_logos'], 'Case studies' => $dashboard['counts']['case_studies'], 'Testimonials' => $dashboard['counts']['testimonials'], 'Media files' => $dashboard['counts']['media']] as $label => $value)
+                @foreach (['Total pages' => $dashboard['counts']['pages'], 'Published' => $dashboard['counts']['published_pages'], 'Drafts' => $dashboard['counts']['draft_pages'], 'Scheduled' => $dashboard['counts']['scheduled_pages'], 'Articles' => $dashboard['counts']['articles'], 'Client logos' => $dashboard['counts']['client_logos'], 'Case studies' => $dashboard['counts']['case_studies'], 'Testimonials' => $dashboard['counts']['testimonials'], 'Media files' => $dashboard['counts']['media']] as $label => $value)
                     <article class="bg-white px-5 py-4">
                         <p class="text-sm font-medium text-slate-500">{{ $label }}</p>
                         <p class="mt-1 text-3xl font-semibold text-slate-900">{{ $value }}</p>

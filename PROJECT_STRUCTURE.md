@@ -2894,3 +2894,34 @@ Phase 6.4 adds deployment-safe operational tooling and documentation only. It pr
 ### Live Safety Boundaries
 
 The live environment remains staging/demo first. Password rotation, cron creation, backups, asset uploads, server cache rebuilds, and browser smoke tests are deliberate Hostinger operator actions; they are not automated by the application. Database backups remain private, `.env` remains outside public paths and Git, and no destructive deployment command or unattended database-backup cron is introduced.
+
+## Website CMS + SEO Admin Foundation
+
+This foundation extends the Command Center CMS without changing the separate public website application. `CmsPage` remains the canonical page record for both route-specific SEO pages and structured landing pages; `CmsArticle` is the dedicated, independently publishable article record. Existing CMS pages, menus, media, homepage sections, and settings remain intact.
+
+### Admin Areas and Routes
+
+- `/cms/seo-pages`: route-specific SEO content with title, H1, intro and footer copy, canonical and social metadata, JSON-LD schema validation, robots controls, sitemap controls, draft/published/scheduled/archived state, and revision history.
+- `/cms/landing-pages`: structured campaign, product, industry, module, solution, location, and comparison pages. Content sections, FAQs, related product keys, related industry keys, and CTA fields are stored as validated structured JSON where flexible page composition is required.
+- `/cms/articles`: publishable articles with excerpts, content, category, tags, canonical and schema metadata, publication lifecycle, and sitemap controls.
+- `/cms/seo`: global defaults, robots, sitemap URL, public business contact details, social links, organization schema, and analytics/verification settings.
+- `/cms/redirects`: company-scoped 301/302 redirect management with enablement and internal notes.
+
+The CMS navigation and Module Registry expose SEO Pages, Landing Pages, Articles, and Redirects. The Command Center dashboard shows a compact Website Publishing widget for CMS-authorized users, while the existing Website Control Center adds article counts.
+
+### Data Model and Services
+
+Migration `2026_07_17_020001_add_marketing_seo_fields_to_cms_tables.php` extends `cms_pages`, `cms_seo_settings`, and `cms_redirects` with MySQL-safe indexes and fields needed for public website delivery. Migration `2026_07_17_020002_create_cms_articles_table.php` creates `cms_articles` with company-scoped slug uniqueness, status/published-date lookup, category lookup, media/user relationships, and soft deletes.
+
+`CmsMarketingRepository`, `CmsMarketingPageService`, `CmsArticleService`, and `CmsRedirectService` keep command-center controllers small and company-scoped. Page service operations write a revision snapshot for each content lifecycle change and record CMS audit entries. Existing `AuditLogger` remains the audit system of record.
+
+### Public Read API Contract
+
+`PublicCmsService` and `PublicCmsController` expose a future public-site read surface under `/api/public/cms`. Available endpoints are SEO page lookup by path, landing page by slug, article list/detail, public settings, sitemap entries, enabled redirects, and robots settings. The API returns published content only and deliberately omits company, user, audit, and internal administration fields. It is rate-limited by the dedicated `public-cms` limiter and cached for ten minutes outside the testing environment.
+
+### Current Limitations
+
+- The public Next.js website is intentionally unchanged; a later integration will consume these read endpoints.
+- Structured landing-page sections and FAQ payloads are stored as validated JSON because the supported section set is intentionally extensible. Static website settings remain normalized existing CMS settings.
+- Scheduled pages persist their requested publish time and remain private until published. The automated scheduled-publishing runner is a future operational job.
+- Sitemap and robots endpoints provide delivery data only. XML rendering, crawler-based broken-link detection, Search Console ingestion, and redirect-hit middleware remain future website or infrastructure integrations.

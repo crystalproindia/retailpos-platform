@@ -6,6 +6,9 @@
         ['label' => 'Navigation', 'route' => 'website.navigation.index'],
         ['label' => 'Homepage', 'route' => 'cms.homepage.index'],
         ['label' => 'Pages', 'route' => 'cms.pages.index'],
+        ['label' => 'SEO Pages', 'route' => 'cms.seo-pages.index'],
+        ['label' => 'Landing Pages', 'route' => 'cms.landing-pages.index'],
+        ['label' => 'Articles', 'route' => 'cms.articles.index'],
         ['label' => 'Case Studies', 'route' => 'cms.case-studies.index'],
         ['label' => 'Client Logos (Coming Soon)', 'route' => 'website.settings.index'],
         ['label' => 'Testimonials', 'route' => 'cms.testimonials.index'],
@@ -14,6 +17,7 @@
         ['label' => 'CTAs', 'route' => 'cms.ctas.index'],
         ['label' => 'Media', 'route' => 'cms.media.index'],
         ['label' => 'SEO', 'route' => 'cms.seo.index'],
+        ['label' => 'Redirects', 'route' => 'cms.redirects.index'],
         ['label' => 'Footer', 'route' => 'cms.footer.index'],
         ['label' => 'Settings', 'route' => 'cms.settings.index'],
     ];

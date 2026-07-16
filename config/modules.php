@@ -1019,6 +1019,18 @@ return [
         'cms-seo-center' => [
             'name' => 'SEO Center', 'description' => 'Website SEO defaults, redirects, sitemap, robots, and verification settings.', 'icon' => 'seo', 'route' => 'cms.seo.index', 'route_params' => [], 'sort_order' => 526, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
         ],
+        'cms-seo-pages' => [
+            'name' => 'SEO Pages', 'description' => 'Route-specific SEO content, index controls, schemas, and sitemap settings.', 'icon' => 'seo', 'route' => 'cms.seo-pages.index', 'route_params' => [], 'sort_order' => 527, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-landing-pages' => [
+            'name' => 'Landing Pages', 'description' => 'Structured campaign, product, industry, and solution landing pages.', 'icon' => 'layout', 'route' => 'cms.landing-pages.index', 'route_params' => [], 'sort_order' => 528, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-articles' => [
+            'name' => 'Articles', 'description' => 'SEO-ready article publishing with a future blog delivery surface.', 'icon' => 'blog', 'route' => 'cms.articles.index', 'route_params' => [], 'sort_order' => 529, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
+        'cms-redirects' => [
+            'name' => 'Redirects', 'description' => 'Managed public redirect rules and migration notes.', 'icon' => 'link', 'route' => 'cms.redirects.index', 'route_params' => [], 'sort_order' => 530, 'category' => 'Content Management', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'badge' => null, 'license_key' => null, 'parent_id' => 'cms',
+        ],
         'blog' => [
             'name' => 'Blog',
             'description' => 'Blog content module foundation retained from Phase 1 navigation.',

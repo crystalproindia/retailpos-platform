@@ -104,6 +104,31 @@
             ])
         @endcan
 
+        @if ($cmsDashboard)
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-950 dark:text-white">Website Publishing</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">A concise view of the content and SEO work ready for the public site.</p>
+                    </div>
+                    <a href="{{ route('cms.dashboard') }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Open CMS</a>
+                </div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    @foreach ([
+                        ['label' => 'Published Pages', 'value' => $cmsDashboard['counts']['published_pages'], 'route' => 'cms.seo-pages.index'],
+                        ['label' => 'Draft Pages', 'value' => $cmsDashboard['counts']['draft_pages'], 'route' => 'cms.seo-pages.index'],
+                        ['label' => 'Published Articles', 'value' => $cmsDashboard['counts']['published_articles'], 'route' => 'cms.articles.index'],
+                        ['label' => 'Active Redirects', 'value' => $cmsDashboard['counts']['redirects'], 'route' => 'cms.redirects.index'],
+                    ] as $cmsCard)
+                        <a href="{{ route($cmsCard['route']) }}" class="rounded-lg border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ $cmsCard['label'] }}</p>
+                            <p class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $cmsCard['value'] }}</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         <section class="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-4">

@@ -41,6 +41,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public-leads', fn ($request) => Limit::perMinute((int) config('services.retailpos.public_lead_rate_limit', 30))
             ->by('public-leads:'.$request->ip()));
 
+        RateLimiter::for('public-cms', fn ($request) => Limit::perMinute(120)
+            ->by('public-cms:'.$request->ip()));
+
         Gate::policy(CrmLead::class, CrmLeadPolicy::class);
         Gate::policy(CrmCompany::class, CrmCompanyPolicy::class);
         Gate::policy(CrmContact::class, CrmContactPolicy::class);

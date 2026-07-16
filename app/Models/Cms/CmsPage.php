@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'author_user_id', 'featured_image_id', 'slug', 'title', 'page_type', 'subtitle', 'hero_content', 'body_content', 'cta_label', 'cta_url', 'status', 'is_active', 'sort_order', 'published_at', 'scheduled_for'])]
+#[Fillable(['company_id', 'author_user_id', 'updated_by', 'featured_image_id', 'slug', 'route_path', 'title', 'h1', 'page_type', 'subtitle', 'hero_content', 'intro_content', 'body_content', 'footer_seo_content', 'cta_label', 'cta_url', 'primary_cta_label', 'primary_cta_url', 'secondary_cta_label', 'secondary_cta_url', 'content_sections', 'faq_items', 'related_product_keys', 'related_industry_keys', 'status', 'is_active', 'robots_index', 'robots_follow', 'schema_json', 'include_in_sitemap', 'sitemap_priority', 'sitemap_changefreq', 'sort_order', 'published_at', 'scheduled_for'])]
 class CmsPage extends Model
 {
     use Auditable, SoftDeletes;
@@ -31,6 +31,14 @@ class CmsPage extends Model
             'published_at' => 'datetime',
             'scheduled_for' => 'datetime',
             'is_active' => 'boolean',
+            'robots_index' => 'boolean',
+            'robots_follow' => 'boolean',
+            'include_in_sitemap' => 'boolean',
+            'content_sections' => 'array',
+            'faq_items' => 'array',
+            'related_product_keys' => 'array',
+            'related_industry_keys' => 'array',
+            'sitemap_priority' => 'decimal:1',
         ];
     }
 
@@ -42,6 +50,11 @@ class CmsPage extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_user_id');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function featuredImage(): BelongsTo

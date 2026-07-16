@@ -103,7 +103,7 @@
             <div class="flex items-center justify-between gap-4">
                 <div>
                     <h2 class="text-base font-semibold text-slate-950 dark:text-white">Demo Schedule History</h2>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Internal schedules are ready for a future calendar provider connection.</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track internal schedules and their Google Calendar sync state.</p>
                 </div>
                 @can('crm.demos.create')
                     <a href="{{ route('crm.demos.create', $lead) }}" class="text-sm font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">Schedule demo</a>
@@ -118,19 +118,51 @@
                             'danger' => 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-100',
                             default => 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100',
                         };
+                        $calendarSyncClass = match ($demo->calendar_sync_status) {
+                            'synced' => 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-100',
+                            'failed' => 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-100',
+                            'pending' => 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
+                            'cancelled' => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                            default => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                        };
+                        $calendarSyncLabel = match ($demo->calendar_sync_status) {
+                            'synced' => 'Calendar synced',
+                            'failed' => 'Calendar sync failed',
+                            'pending' => 'Calendar sync pending',
+                            'cancelled' => 'Calendar event cancelled',
+                            default => 'Not synced',
+                        };
                     @endphp
                     <article class="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 md:flex-row md:items-start md:justify-between dark:border-slate-800">
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="font-medium text-slate-950 dark:text-white">{{ $demo->starts_at?->setTimezone($demo->timezone)->format('d M Y, h:i A') }}</p>
                                 <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $statusClass }}">{{ $demo->status?->label() }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $calendarSyncClass }}">{{ $calendarSyncLabel }}</span>
                             </div>
                             <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ $demo->meeting_mode?->label() }} · {{ $demo->assignedTo?->name ?? 'Unassigned' }}</p>
-                            @if ($demo->meeting_link)<a href="{{ $demo->meeting_link }}" target="_blank" rel="noreferrer" class="mt-2 inline-block text-sm font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">Open meeting link</a>@endif
+                            <div class="mt-2 flex flex-wrap gap-3">
+                                @if ($demo->meeting_link)<a href="{{ $demo->meeting_link }}" target="_blank" rel="noreferrer" class="text-sm font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">Open meeting link</a>@endif
+                                @if ($demo->external_meeting_link)<button type="button" data-copy-text="{{ $demo->external_meeting_link }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Copy meeting link</button>@endif
+                                @if ($demo->external_calendar_event_url)<a href="{{ $demo->external_calendar_event_url }}" target="_blank" rel="noreferrer" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Open Google Calendar event</a>@endif
+                            </div>
                             @if ($demo->notes)<p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $demo->notes }}</p>@endif
                         </div>
                         @if ($demo->isActive())
                             <div class="flex flex-wrap gap-2">
+                                @can('crm.demos.sync_calendar')
+                                @if ($googleCalendarConnected)
+                                    <form method="POST" action="{{ route('crm.demos.sync-google-calendar', $demo) }}" class="flex items-center gap-2">
+                                        @csrf
+                                        @if ($demo->meeting_mode?->value === 'google_meet_later')
+                                            <label class="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"><input type="checkbox" name="create_google_meet" value="1" class="rounded border-slate-300"> Meet</label>
+                                        @endif
+                                        <button class="rounded-lg border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 dark:border-sky-900 dark:text-sky-300 dark:hover:bg-sky-950">{{ $demo->external_calendar_event_id ? 'Re-sync calendar' : 'Sync to Google Calendar' }}</button>
+                                    </form>
+                                @else
+                                    <span class="self-center text-xs font-medium text-slate-500 dark:text-slate-400">Google Calendar not connected</span>
+                                @endif
+                                @endcan
                                 @can('crm.demos.update')<a href="{{ route('crm.demos.edit', $demo) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Reschedule</a>@endcan
                                 @can('crm.demos.complete')<form method="POST" action="{{ route('crm.demos.complete', $demo) }}">@csrf<button class="rounded-lg border border-teal-200 px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 dark:border-teal-900 dark:text-teal-300 dark:hover:bg-teal-950">Complete</button></form>@endcan
                                 @can('crm.demos.cancel')<form method="POST" action="{{ route('crm.demos.cancel', $demo) }}">@csrf<button class="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950">Cancel</button></form>@endcan

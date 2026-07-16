@@ -26,7 +26,7 @@ class RecipientResolver
             ->where('company_id', $event->companyId())
             ->where('is_active', true);
 
-        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.demo.scheduled'], true)
+        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed'], true)
             && ! $this->settings->leadAlertsEnabled($event->companyId())) {
             return collect();
         }
@@ -39,7 +39,7 @@ class RecipientResolver
         $users = match ($event->eventKey()) {
             'pos.sale.held', 'pos.sale.completed', 'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => $this->managers($event->companyId()),
             'crm.lead.assigned' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
-            'crm.demo.scheduled' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+            'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
             'crm.lead.status_changed' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),

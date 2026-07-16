@@ -16,6 +16,7 @@ use App\Repositories\Crm\CrmCompanyRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Services\Crm\LeadConversionService;
 use App\Services\Crm\LeadService;
+use App\Services\Integrations\GoogleCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -69,11 +70,12 @@ class LeadController extends Controller
         return redirect()->route('crm.leads.show', $lead)->with('status', 'CRM lead created.');
     }
 
-    public function show(Request $request, LeadRepository $leadRepository, int $lead): View
+    public function show(Request $request, LeadRepository $leadRepository, GoogleCalendarService $googleCalendar, int $lead): View
     {
         return view('command-center.crm.leads.show', [
             'lead' => $leadRepository->findForUser($request->user(), $lead),
             'priorities' => LeadPriority::cases(),
+            'googleCalendarConnected' => $googleCalendar->isConfigured() && $googleCalendar->connectionForCompany($request->user()->company_id)?->isConnected(),
         ]);
     }
 

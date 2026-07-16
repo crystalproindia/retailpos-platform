@@ -31,6 +31,8 @@ class StoreDemoScheduleRequest extends FormRequest
             'customer_email' => ['nullable', 'email', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'sync_to_google' => ['nullable', 'boolean'],
+            'create_google_meet' => ['nullable', 'boolean'],
         ];
     }
 }

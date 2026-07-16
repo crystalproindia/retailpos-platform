@@ -41,6 +41,19 @@
             @endforeach
         </section>
 
+        <section class="grid gap-4 sm:grid-cols-3">
+            @foreach ([
+                ['label' => 'Demos Today', 'value' => $demoMetrics['demos_today'], 'tone' => 'bg-sky-50 text-sky-950 dark:bg-sky-950/30 dark:text-sky-100'],
+                ['label' => 'Upcoming Demos', 'value' => $demoMetrics['upcoming_demos'], 'tone' => 'bg-teal-50 text-teal-950 dark:bg-teal-950/30 dark:text-teal-100'],
+                ['label' => 'Overdue Demos', 'value' => $demoMetrics['overdue_demos'], 'tone' => 'bg-amber-50 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'],
+            ] as $card)
+                <article class="rounded-lg border border-slate-200 p-5 shadow-sm dark:border-slate-800 {{ $card['tone'] }}">
+                    <p class="text-sm font-medium opacity-70">{{ $card['label'] }}</p>
+                    <p class="mt-3 text-3xl font-semibold">{{ $card['value'] }}</p>
+                </article>
+            @endforeach
+        </section>
+
         <section class="grid gap-6 xl:grid-cols-2">
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Leads by Status</h2>

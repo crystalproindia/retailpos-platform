@@ -95,6 +95,12 @@
                             <span>{{ $lead->assignedUser?->name ?? 'Unassigned' }}</span>
                             <span>₹{{ number_format((float) $lead->expected_value, 0) }}</span>
                         </div>
+                        @if (request()->boolean('demo_requests') && $lead->latestDemoSchedule)
+                            <div class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                <span class="font-semibold">{{ $lead->latestDemoSchedule->starts_at?->setTimezone($lead->latestDemoSchedule->timezone)->format('d M, h:i A') }}</span>
+                                · {{ $lead->latestDemoSchedule->assignedTo?->name ?? 'Unassigned' }} · {{ $lead->latestDemoSchedule->meeting_mode?->label() }} · {{ $lead->latestDemoSchedule->status?->label() }}
+                            </div>
+                        @endif
                     </article>
                 @empty
                     <p class="px-5 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No CRM leads found.</p>
@@ -110,6 +116,7 @@
                             <th class="px-5 py-3">Priority</th>
                             <th class="px-5 py-3">Source</th>
                             <th class="px-5 py-3">Owner</th>
+                            @if (request()->boolean('demo_requests'))<th class="px-5 py-3">Scheduled Demo</th>@endif
                             <th class="px-5 py-3">Value</th>
                             <th class="px-5 py-3"></th>
                         </tr>
@@ -126,6 +133,17 @@
                                 <td class="px-5 py-4"><span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-100">{{ $lead->priority?->label() }}</span></td>
                                 <td class="px-5 py-4"><span class="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-900 dark:text-sky-100">{{ $lead->source?->name ?? 'Unclassified' }}</span></td>
                                 <td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ $lead->assignedUser?->name ?? 'Unassigned' }}</td>
+                                @if (request()->boolean('demo_requests'))
+                                    <td class="px-5 py-4 text-xs text-slate-600 dark:text-slate-300">
+                                        @if ($lead->latestDemoSchedule)
+                                            <p class="font-semibold text-slate-800 dark:text-slate-100">{{ $lead->latestDemoSchedule->starts_at?->setTimezone($lead->latestDemoSchedule->timezone)->format('d M Y, h:i A') }}</p>
+                                            <p class="mt-1">{{ $lead->latestDemoSchedule->assignedTo?->name ?? 'Unassigned' }} · {{ $lead->latestDemoSchedule->meeting_mode?->label() }}</p>
+                                            <p class="mt-1">{{ $lead->latestDemoSchedule->status?->label() }}</p>
+                                        @else
+                                            Not scheduled
+                                        @endif
+                                    </td>
+                                @endif
                                 <td class="px-5 py-4 text-slate-600 dark:text-slate-300">₹{{ number_format((float) $lead->expected_value, 0) }}</td>
                                 <td class="px-5 py-4 text-right">
                                     @if ($lead->trashed())
@@ -137,7 +155,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-5 py-10 text-center text-slate-500 dark:text-slate-400">No CRM leads found.</td>
+                                <td colspan="{{ request()->boolean('demo_requests') ? 9 : 8 }}" class="px-5 py-10 text-center text-slate-500 dark:text-slate-400">No CRM leads found.</td>
                             </tr>
                         @endforelse
                     </tbody>

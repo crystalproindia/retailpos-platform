@@ -44,7 +44,7 @@ class LeadRepository
     public function findForUser(User $user, int $leadId, bool $withTrashed = false): CrmLead
     {
         return $this->queryForUser($user, $withTrashed)
-            ->with(['activities.assignedUser', 'notes.user', 'auditLogs.user', 'tags', 'crmCompany', 'contact'])
+            ->with(['activities.assignedUser', 'notes.user', 'auditLogs.user', 'tags', 'crmCompany', 'contact', 'demoSchedules.assignedTo', 'demoSchedules.scheduledBy'])
             ->findOrFail($leadId);
     }
 
@@ -161,7 +161,7 @@ class LeadRepository
     public function queryForUser(User $user, bool $withTrashed = false): Builder
     {
         return $this->baseQueryForUser($user, $withTrashed)
-            ->with(['source', 'status', 'assignedUser', 'crmCompany', 'contact', 'tags']);
+            ->with(['source', 'status', 'assignedUser', 'crmCompany', 'contact', 'tags', 'latestDemoSchedule.assignedTo']);
     }
 
     private function baseQueryForUser(User $user, bool $withTrashed = false): Builder

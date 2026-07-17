@@ -16,6 +16,7 @@ class CmsPageService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly WebsiteRevalidationService $revalidation,
     ) {}
 
     /**
@@ -32,6 +33,8 @@ class CmsPageService
         $page->seo()->create($this->seoPayload($data));
         $this->createRevision($page, $user);
 
+        if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidation->trigger($this->path($page));
+
         return $page->load('seo');
     }
 
@@ -46,6 +49,8 @@ class CmsPageService
 
         $page->seo()->updateOrCreate(['page_id' => $page->id], $this->seoPayload($data));
         $this->createRevision($page->refresh(), $user);
+
+        if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidation->trigger($this->path($page));
 
         return $page->load('seo');
     }
@@ -67,6 +72,7 @@ class CmsPageService
             aggregateId: $page->id,
             payload: $this->eventPayload($page),
         ));
+        $this->revalidation->trigger($this->path($page));
 
         return $page;
     }
@@ -88,6 +94,7 @@ class CmsPageService
             aggregateId: $page->id,
             payload: $this->eventPayload($page),
         ));
+        $this->revalidation->trigger($this->path($page));
 
         return $page;
     }
@@ -189,6 +196,11 @@ class CmsPageService
     private function slug(string $value): string
     {
         return Str::slug($value);
+    }
+
+    private function path(CmsPage $page): string
+    {
+        return $page->route_path ?: '/'.$page->slug;
     }
 
     /**

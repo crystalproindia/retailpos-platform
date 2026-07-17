@@ -32,7 +32,7 @@ class CmsPageSectionRequest extends FormRequest
     {
         return [
             'section_key' => ['required', 'string', 'max:100', 'regex:/^[a-z0-9_-]+$/'],
-            'section_type' => ['required', Rule::in(['hero', 'feature_grid', 'trust_metrics', 'client_logos', 'faq', 'cta', 'custom'])],
+            'section_type' => ['required', Rule::in(['hero', 'feature_grid', 'trust_metrics', 'client_logos', 'case_study_grid', 'product_grid', 'module_grid', 'industry_grid', 'solution_grid', 'faq', 'testimonial', 'pricing', 'cta', 'rich_text', 'stats', 'image_text', 'custom_json'])],
             'title' => ['nullable', 'string', 'max:255'],
             'subtitle' => ['nullable', 'string', 'max:255'],
             'content' => ['nullable', 'string'],

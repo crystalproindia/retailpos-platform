@@ -14,6 +14,11 @@ class PublicCmsController extends Controller
     public function articles(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->articles()]); }
     public function article(string $slug, PublicCmsService $cms): JsonResponse { $data = $cms->article($slug); abort_unless($data, 404); return response()->json(['data' => $data]); }
     public function settings(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->settings()]); }
+    public function pages(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->pages()]); }
+    public function page(string $slug, PublicCmsService $cms): JsonResponse { $data = $cms->pageBySlug($slug); abort_unless($data, 404); return response()->json(['data' => $data]); }
+    public function navigation(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->navigation()]); }
+    public function caseStudies(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->caseStudies()]); }
+    public function caseStudy(string $slug, PublicCmsService $cms): JsonResponse { $data = $cms->caseStudy($slug); abort_unless($data, 404); return response()->json(['data' => $data]); }
     public function sitemap(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->sitemap()]); }
     public function redirects(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->redirects()]); }
     public function robots(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->robots()]); }

@@ -36,6 +36,8 @@ return [
     ],
 
     'retailpos' => [
+        'website_revalidate_url' => env('RETAILPOS_WEBSITE_REVALIDATE_URL'),
+        'website_revalidate_token' => env('RETAILPOS_WEBSITE_REVALIDATE_TOKEN'),
         'public_lead_token' => env('RETAILPOS_PUBLIC_LEAD_TOKEN'),
         'public_lead_company_id' => env('RETAILPOS_PUBLIC_LEAD_COMPANY_ID'),
         'public_lead_assignee_id' => env('RETAILPOS_PUBLIC_LEAD_ASSIGNEE_ID'),

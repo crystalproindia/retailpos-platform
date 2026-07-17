@@ -17,7 +17,7 @@ class StoreCmsMediaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'max:20480'],
+            'file' => ['required', 'file', 'max:20480', 'mimes:jpg,jpeg,png,webp,gif,svg,pdf,mp4,webm,mov'],
             'name' => ['nullable', 'string', 'max:255'],
             'folder_id' => ['nullable', 'integer', 'exists:cms_media_folders,id'],
             'alt_text' => ['nullable', 'string', 'max:255'],

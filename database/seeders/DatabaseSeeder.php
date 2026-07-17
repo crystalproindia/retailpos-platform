@@ -582,6 +582,17 @@ class DatabaseSeeder extends Seeder
         ])->each(fn (array $section) => CmsCaseStudySection::updateOrCreate(['case_study_id' => $caseStudy->id, 'section_type' => $section['section_type']], $section + ['company_id' => $company->id, 'case_study_id' => $caseStudy->id]));
 
         collect([
+            ['title' => 'Supermarket & Grocery Retail', 'slug' => 'supermarket-grocery-retail', 'industry' => 'Grocery Retail'],
+            ['title' => 'Fashion & Apparel Store', 'slug' => 'fashion-apparel-store', 'industry' => 'Fashion Retail'],
+            ['title' => 'Multi-Store Retail Chain', 'slug' => 'multi-store-retail-chain', 'industry' => 'Retail'],
+            ['title' => 'Pharmacy / Healthcare Retail', 'slug' => 'pharmacy-healthcare-retail', 'industry' => 'Healthcare Retail'],
+            ['title' => 'Newrie London', 'slug' => 'newrie-london', 'industry' => null],
+        ])->each(fn (array $study) => CmsCaseStudy::updateOrCreate(
+            ['company_id' => $company->id, 'slug' => $study['slug']],
+            $study + ['company_id' => $company->id, 'client_name' => '', 'short_summary' => 'Draft case study framework. Optional claims must be approved before publication.', 'status' => 'draft', 'sort_order' => 50],
+        ));
+
+        collect([
             ['client_name' => 'Demo Retail Operations Lead', 'company_name' => 'Demo Retail Group', 'designation' => 'Operations Lead', 'testimonial_text' => 'Demo quote: RetailPOS gives our team a clearer daily view of the work that matters. Replace this with approved customer copy before publication.', 'rating' => 5, 'industry' => 'Retail', 'is_featured' => true, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 1],
             ['client_name' => 'Demo Store Director', 'company_name' => 'Demo Lifestyle Stores', 'designation' => 'Store Director', 'testimonial_text' => 'Demo quote: we can review branch activity with more confidence and less manual follow-up. Replace this with approved customer copy before publication.', 'rating' => 5, 'industry' => 'Lifestyle', 'is_featured' => false, 'show_on_homepage' => true, 'is_active' => true, 'sort_order' => 2],
         ])->each(fn (array $testimonial) => CmsTestimonial::updateOrCreate(['company_id' => $company->id, 'client_name' => $testimonial['client_name']], $testimonial + ['company_id' => $company->id, 'case_study_id' => $caseStudy->id]));

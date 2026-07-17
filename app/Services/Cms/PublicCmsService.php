@@ -4,6 +4,7 @@ namespace App\Services\Cms;
 
 use App\Models\Company;
 use App\Models\Cms\CmsArticle;
+use App\Models\Cms\CmsCaseStudy;
 use App\Models\Cms\CmsContentPage;
 use App\Models\Cms\CmsContentSection;
 use App\Models\Cms\CmsFooterBlock;
@@ -11,6 +12,7 @@ use App\Models\Cms\CmsMedia;
 use App\Models\Cms\CmsNavigationItem;
 use App\Models\Cms\CmsPage;
 use App\Models\Cms\CmsRedirect;
+use App\Models\Cms\CmsSetting;
 use App\Models\Cms\CmsSeoSetting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -58,7 +60,40 @@ class PublicCmsService
                 'company_logo_url' => $settings->company_logo_url, 'contact_phone_india' => $settings->contact_phone_india,
                 'contact_phone_singapore' => $settings->contact_phone_singapore, 'contact_phone_malaysia' => $settings->contact_phone_malaysia,
                 'contact_email' => $settings->contact_email, 'address' => $settings->address, 'same_as_social_links' => $settings->same_as_social_links,
+                'website_settings' => CmsSetting::query()->with('media')->where('company_id', $companyId)->where('is_public', true)->get()->mapWithKeys(fn (CmsSetting $setting) => [$setting->key => $setting->media ? $this->mediaUrl($setting->media) : $setting->value])->all(),
             ];
+        });
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function pages(): array
+    {
+        return $this->remember('pages', fn (int $companyId) => CmsPage::query()->where('company_id', $companyId)->where('status', CmsPage::STATUS_PUBLISHED)->where('is_active', true)->orderBy('sort_order')->get()->map(fn (CmsPage $page) => ['slug' => $page->slug, 'route_path' => $page->route_path, 'title' => $page->title, 'page_type' => $page->page_type, 'published_at' => $page->published_at?->toIso8601String()])->all()) ?? [];
+    }
+
+    public function pageBySlug(string $slug): ?array
+    {
+        return $this->remember('page:'.$slug, function (int $companyId) use ($slug): ?array {
+            $page = CmsPage::query()->with(['seo.ogImage', 'seo.twitterImage', 'sections' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])->where('company_id', $companyId)->where('slug', $slug)->where('status', CmsPage::STATUS_PUBLISHED)->where('is_active', true)->first();
+            if (! $page) return null;
+            return $this->page($page) + ['slug' => $page->slug, 'page_type' => $page->page_type, 'sections' => $page->sections->map(fn ($section) => ['section_key' => $section->section_key, 'section_type' => $section->section_type, 'title' => $section->title, 'subtitle' => $section->subtitle, 'content' => $section->content, 'settings' => $section->settings ?? [], 'sort_order' => $section->sort_order])->values()->all()];
+        });
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function navigation(): array { return $this->contentNavigation(); }
+
+    /** @return array<int, array<string, mixed>> */
+    public function caseStudies(): array
+    {
+        return $this->remember('case-studies', fn (int $companyId) => CmsCaseStudy::query()->with(['featuredImageMedia', 'ogImageMedia'])->where('company_id', $companyId)->where('status', 'published')->whereNotNull('published_at')->orderBy('sort_order')->get()->map(fn (CmsCaseStudy $study) => $this->caseStudyPayload($study))->all()) ?? [];
+    }
+
+    public function caseStudy(string $slug): ?array
+    {
+        return $this->remember('case-study:'.$slug, function (int $companyId) use ($slug): ?array {
+            $study = CmsCaseStudy::query()->with(['featuredImageMedia', 'ogImageMedia', 'sections' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])->where('company_id', $companyId)->where('slug', $slug)->where('status', 'published')->whereNotNull('published_at')->first();
+            return $study ? $this->caseStudyPayload($study, true) : null;
         });
     }
 
@@ -239,6 +274,12 @@ class PublicCmsService
     private function articlePayload(CmsArticle $article, bool $withContent = false): array
     {
         return array_filter(['title' => $article->title, 'slug' => $article->slug, 'excerpt' => $article->excerpt, 'content' => $withContent ? $article->content : null, 'cover_image_url' => $this->mediaUrl($article->coverImage), 'author_name' => $article->author_name, 'category' => $article->category, 'tags' => $article->tags, 'published_at' => $article->published_at?->toIso8601String(), 'seo' => ['title' => $article->meta_title, 'description' => $article->meta_description, 'canonical_url' => $article->canonical_url, 'schema_json' => $article->schema_json]], fn ($value) => $value !== null);
+    }
+
+    /** @return array<string, mixed> */
+    private function caseStudyPayload(CmsCaseStudy $study, bool $withDetail = false): array
+    {
+        return array_filter(['slug' => $study->slug, 'title' => $study->title, 'client_name' => $study->client_name, 'industry' => $study->industry, 'location' => $study->location, 'business_type' => $study->project_type, 'summary' => $study->short_summary, 'cover_image_url' => $this->mediaUrl($study->featuredImageMedia), 'published_at' => $study->published_at?->toIso8601String(), 'seo' => ['title' => $study->seo_title, 'description' => $study->seo_description, 'image_url' => $this->mediaUrl($study->ogImageMedia)], 'challenge' => $withDetail ? $study->challenge : null, 'solution' => $withDetail ? $study->solution : null, 'results' => $withDetail ? $study->results : null, 'outcome_metrics' => $withDetail ? ($study->metrics ?? []) : null, 'sections' => $withDetail ? $study->sections->map(fn ($section) => ['section_type' => $section->section_type, 'title' => $section->title, 'subtitle' => $section->subtitle, 'content' => $section->content, 'settings' => $section->settings ?? []])->values()->all() : null], fn ($value) => $value !== null);
     }
 
     private function mediaUrl(?CmsMedia $media): ?string

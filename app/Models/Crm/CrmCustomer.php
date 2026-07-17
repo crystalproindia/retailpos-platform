@@ -63,6 +63,16 @@ class CrmCustomer extends Model
         return $this->hasMany(CrmSupportTicket::class, 'customer_id')->latest('updated_at');
     }
 
+    public function portalUsers(): HasMany
+    {
+        return $this->hasMany(CrmCustomerPortalUser::class, 'customer_id')->latest('created_at');
+    }
+
+    public function serviceRequests(): HasMany
+    {
+        return $this->hasMany(CrmLead::class, 'customer_id')->latest('created_at');
+    }
+
     public function activeOnboarding(): HasOne
     {
         return $this->hasOne(CrmCustomerOnboarding::class, 'customer_id')

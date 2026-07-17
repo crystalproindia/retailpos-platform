@@ -44,6 +44,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public-cms', fn ($request) => Limit::perMinute(120)
             ->by('public-cms:'.$request->ip()));
 
+        RateLimiter::for('portal-access', fn ($request) => Limit::perMinute(10)
+            ->by('portal-access:'.$request->ip()));
+
+        RateLimiter::for('portal-support', fn ($request) => Limit::perMinute(5)
+            ->by('portal-support:'.($request->session()->get('customer_portal_user_id') ?? $request->ip())));
+
+        RateLimiter::for('portal-service-requests', fn ($request) => Limit::perMinute(3)
+            ->by('portal-service-requests:'.($request->session()->get('customer_portal_user_id') ?? $request->ip())));
+
         Gate::policy(CrmLead::class, CrmLeadPolicy::class);
         Gate::policy(CrmCompany::class, CrmCompanyPolicy::class);
         Gate::policy(CrmContact::class, CrmContactPolicy::class);

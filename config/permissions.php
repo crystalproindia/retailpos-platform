@@ -116,6 +116,7 @@ return [
         'crm.customers.update' => $crmUserRoles,
         'crm.customers.convert' => $crmUserRoles,
         'crm.customers.delete' => $crmManagementRoles,
+        'crm.customers.portal.manage' => $crmManagementRoles,
         'crm.proformas.view' => $crmUserRoles,
         'crm.proformas.create' => $crmUserRoles,
         'crm.proformas.update' => $crmUserRoles,

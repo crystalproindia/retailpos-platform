@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'crm_company_id', 'crm_contact_id', 'source_id', 'status_id', 'assigned_user_id', 'created_by', 'title', 'business_name', 'contact_name', 'email', 'phone', 'alternate_phone', 'industry', 'city', 'country', 'business_type', 'interested_modules', 'expected_value', 'expected_timeline', 'currency', 'priority', 'lead_score', 'next_follow_up_at', 'last_contacted_at', 'lost_reason', 'description', 'metadata', 'converted_at', 'won_at', 'lost_at'])]
+#[Fillable(['company_id', 'branch_id', 'crm_company_id', 'crm_contact_id', 'customer_id', 'source_id', 'status_id', 'assigned_user_id', 'created_by', 'title', 'business_name', 'contact_name', 'email', 'phone', 'alternate_phone', 'industry', 'city', 'country', 'business_type', 'interested_modules', 'expected_value', 'expected_timeline', 'currency', 'priority', 'lead_score', 'next_follow_up_at', 'last_contacted_at', 'lost_reason', 'description', 'metadata', 'converted_at', 'won_at', 'lost_at'])]
 class CrmLead extends Model
 {
     use Auditable, SoftDeletes;
@@ -55,6 +55,11 @@ class CrmLead extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(CrmContact::class, 'crm_contact_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(CrmCustomer::class, 'customer_id');
     }
 
     public function source(): BelongsTo

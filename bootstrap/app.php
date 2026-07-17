@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsurePublicLeadToken;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\EnsureCustomerPortalAccess;
+use App\Http\Middleware\RedirectIfCustomerPortalAuthenticated;
 use App\Http\Middleware\RejectOversizedPublicLeadPayload;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
             'public.lead.token' => EnsurePublicLeadToken::class,
             'public.lead.payload' => RejectOversizedPublicLeadPayload::class,
+            'portal.auth' => EnsureCustomerPortalAccess::class,
+            'portal.guest' => RedirectIfCustomerPortalAuthenticated::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

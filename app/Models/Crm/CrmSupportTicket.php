@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['company_id', 'customer_id', 'lead_id', 'onboarding_id', 'proforma_invoice_id', 'ticket_number', 'subject', 'description', 'category', 'priority', 'status', 'source', 'assigned_to', 'reported_by_name', 'reported_by_email', 'reported_by_phone', 'due_at', 'first_response_due_at', 'resolved_at', 'closed_at', 'reopened_at', 'resolution_summary', 'internal_remarks', 'created_by', 'updated_by'])]
+#[Fillable(['company_id', 'customer_id', 'customer_portal_user_id', 'lead_id', 'onboarding_id', 'proforma_invoice_id', 'ticket_number', 'subject', 'description', 'category', 'priority', 'status', 'source', 'assigned_to', 'reported_by_name', 'reported_by_email', 'reported_by_phone', 'due_at', 'first_response_due_at', 'resolved_at', 'closed_at', 'reopened_at', 'resolution_summary', 'internal_remarks', 'created_by', 'updated_by'])]
 class CrmSupportTicket extends Model
 {
     use Auditable;
@@ -22,6 +22,7 @@ class CrmSupportTicket extends Model
     protected function casts(): array { return ['category' => SupportTicketCategory::class, 'priority' => SupportTicketPriority::class, 'status' => SupportTicketStatus::class, 'source' => SupportTicketSource::class, 'due_at' => 'datetime', 'first_response_due_at' => 'datetime', 'resolved_at' => 'datetime', 'closed_at' => 'datetime', 'reopened_at' => 'datetime']; }
     public function company(): BelongsTo { return $this->belongsTo(Company::class); }
     public function customer(): BelongsTo { return $this->belongsTo(CrmCustomer::class, 'customer_id'); }
+    public function portalUser(): BelongsTo { return $this->belongsTo(CrmCustomerPortalUser::class, 'customer_portal_user_id'); }
     public function lead(): BelongsTo { return $this->belongsTo(CrmLead::class, 'lead_id'); }
     public function onboarding(): BelongsTo { return $this->belongsTo(CrmCustomerOnboarding::class, 'onboarding_id'); }
     public function proforma(): BelongsTo { return $this->belongsTo(CrmProformaInvoice::class, 'proforma_invoice_id'); }

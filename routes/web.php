@@ -40,6 +40,7 @@ use App\Http\Controllers\CommandCenter\Crm\AiLeadAssistantController;
 use App\Http\Controllers\CommandCenter\Crm\ContactController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCompanyController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCustomerController;
+use App\Http\Controllers\CommandCenter\Crm\CustomerPortalAccessController as CrmCustomerPortalAccessController;
 use App\Http\Controllers\CommandCenter\Crm\CrmDashboardController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
@@ -53,6 +54,8 @@ use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaShareController;
 use App\Http\Controllers\PublicProformaController;
+use App\Http\Controllers\Portal\CustomerPortalAccessController;
+use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\CommandCenter\DashboardController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodePrintBatchController;
@@ -115,6 +118,35 @@ Route::get('/', function () {
 
 Route::get('q/{publicToken}', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
 Route::get('pi/{publicToken}', [PublicProformaController::class, 'show'])->name('proformas.public.show');
+
+Route::prefix('portal')->name('portal.')->group(function (): void {
+    Route::middleware(['portal.guest'])->group(function (): void {
+        Route::get('login', [CustomerPortalAccessController::class, 'login'])->name('login');
+        Route::get('access/{token}', [CustomerPortalAccessController::class, 'access'])->middleware('throttle:portal-access')->name('access');
+    });
+
+    Route::middleware('portal.auth')->group(function (): void {
+        Route::post('logout', [CustomerPortalAccessController::class, 'logout'])->name('logout');
+        Route::get('/', [CustomerPortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('dashboard', [CustomerPortalController::class, 'dashboard']);
+        Route::get('quotations', [CustomerPortalController::class, 'quotations'])->name('quotations.index');
+        Route::get('quotations/{quotation}', [CustomerPortalController::class, 'quotation'])->whereNumber('quotation')->name('quotations.show');
+        Route::get('proformas', [CustomerPortalController::class, 'proformas'])->name('proformas.index');
+        Route::get('proformas/{proforma}', [CustomerPortalController::class, 'proforma'])->whereNumber('proforma')->name('proformas.show');
+        Route::get('onboarding', [CustomerPortalController::class, 'onboardings'])->name('onboarding.index');
+        Route::get('onboarding/{onboarding}', [CustomerPortalController::class, 'onboarding'])->whereNumber('onboarding')->name('onboarding.show');
+        Route::get('support', [CustomerPortalController::class, 'support'])->name('support.index');
+        Route::get('support/create', [CustomerPortalController::class, 'createSupport'])->name('support.create');
+        Route::post('support', [CustomerPortalController::class, 'storeSupport'])->middleware('throttle:portal-support')->name('support.store');
+        Route::get('support/{ticket}', [CustomerPortalController::class, 'showSupport'])->whereNumber('ticket')->name('support.show');
+        Route::post('support/{ticket}/replies', [CustomerPortalController::class, 'replySupport'])->whereNumber('ticket')->middleware('throttle:portal-support')->name('support.replies.store');
+        Route::get('services', [CustomerPortalController::class, 'services'])->name('services');
+        Route::get('services/request', [CustomerPortalController::class, 'createServiceRequest'])->name('services.request');
+        Route::post('services/request', [CustomerPortalController::class, 'storeServiceRequest'])->middleware('throttle:portal-service-requests')->name('services.request.store');
+        Route::get('profile', [CustomerPortalController::class, 'profile'])->name('profile');
+        Route::put('profile', [CustomerPortalController::class, 'updateProfile'])->name('profile.update');
+    });
+});
 
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -191,6 +223,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->middleware('can:crm.quotations.view')->name('quotations.show');
         Route::get('customers', [CrmCustomerController::class, 'index'])->middleware('can:crm.customers.view')->name('customers.index');
         Route::get('customers/{customer}', [CrmCustomerController::class, 'show'])->middleware('can:crm.customers.view')->name('customers.show');
+        Route::post('customers/{customer}/portal-users', [CrmCustomerPortalAccessController::class, 'invite'])->middleware('can:crm.customers.portal.manage')->name('customers.portal-users.invite');
+        Route::post('customers/{customer}/portal-users/{portalUser}/link', [CrmCustomerPortalAccessController::class, 'refresh'])->middleware('can:crm.customers.portal.manage')->name('customers.portal-users.link');
+        Route::patch('customers/{customer}/portal-users/{portalUser}/status', [CrmCustomerPortalAccessController::class, 'status'])->middleware('can:crm.customers.portal.manage')->name('customers.portal-users.status');
         Route::post('customers/{customer}/onboarding', [CrmOnboardingController::class, 'startFromCustomer'])->middleware('can:crm.onboarding.create')->name('customers.onboarding.start');
         Route::get('leads/{lead}/customer-conversion', [CrmCustomerController::class, 'createForLead'])->middleware('can:crm.customers.convert')->name('customers.create-for-lead');
         Route::post('leads/{lead}/customer-conversion', [CrmCustomerController::class, 'storeForLead'])->middleware('can:crm.customers.convert')->name('customers.store-for-lead');

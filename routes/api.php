@@ -16,4 +16,9 @@ Route::prefix('public/cms')->middleware('throttle:public-cms')->group(function (
     Route::get('sitemap', [PublicCmsController::class, 'sitemap']);
     Route::get('redirects', [PublicCmsController::class, 'redirects']);
     Route::get('robots', [PublicCmsController::class, 'robots']);
+    Route::get('content/pages', [PublicCmsController::class, 'contentPages']);
+    Route::get('content/page', [PublicCmsController::class, 'contentPageByPath']);
+    Route::get('content/page/{pageKey}', [PublicCmsController::class, 'contentPage']);
+    Route::get('content/navigation', [PublicCmsController::class, 'contentNavigation']);
+    Route::get('content/footer', [PublicCmsController::class, 'contentFooter']);
 });

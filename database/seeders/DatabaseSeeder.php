@@ -9,8 +9,12 @@ use App\Enums\Crm\PreferredContactMethod;
 use App\Enums\UserRole;
 use App\Models\Branch;
 use App\Models\Cms\CmsFooterProfile;
+use App\Models\Cms\CmsFooterBlock;
 use App\Models\Cms\CmsFaq;
 use App\Models\Cms\CmsHomepageSection;
+use App\Models\Cms\CmsContentPage;
+use App\Models\Cms\CmsContentSection;
+use App\Models\Cms\CmsNavigationItem;
 use App\Models\Cms\CmsCaseStudy;
 use App\Models\Cms\CmsCaseStudySection;
 use App\Models\Cms\CmsClientLogo;
@@ -390,6 +394,38 @@ class DatabaseSeeder extends Seeder
                 ],
             );
         });
+
+        $contentHomepage = CmsContentPage::updateOrCreate(
+            ['company_id' => $company->id, 'page_key' => 'home'],
+            ['route_path' => '/', 'page_type' => 'home', 'title' => 'RetailPOS Home', 'status' => CmsContentPage::STATUS_DRAFT, 'created_by' => $admin->id, 'updated_by' => $admin->id],
+        );
+
+        collect([
+            ['home_hero', 'hero', 'Run retail operations with confidence'],
+            ['product_highlights', 'product_highlights', 'Built for modern retail teams'],
+            ['features', 'feature_grid', 'Everything your team needs'],
+            ['industries', 'industry_use_cases', 'Made for your retail business'],
+            ['ai_powered', 'benefits', 'Work smarter with RetailPOS'],
+            ['testimonials', 'testimonials', 'Trusted by growing teams'],
+            ['faq', 'faq', 'Frequently asked questions'],
+            ['home_cta', 'cta', 'Ready to simplify your retail operations?'],
+            ['footer_seo', 'footer_seo', 'RetailPOS business software'],
+        ])->each(fn (array $section, int $index) => CmsContentSection::updateOrCreate(
+            ['content_page_id' => $contentHomepage->id, 'section_key' => $section[0]],
+            ['section_type' => $section[1], 'title' => $section[2], 'sort_order' => ($index + 1) * 10, 'is_enabled' => true],
+        ));
+
+        collect([
+            ['Home', '/', 'header', 10], ['Products', '/products', 'header', 20], ['Pricing', '/pricing', 'header', 30], ['Contact', '/contact', 'header', 40],
+        ])->each(fn (array $item) => CmsNavigationItem::updateOrCreate(
+            ['company_id' => $company->id, 'label' => $item[0], 'location' => $item[2]],
+            ['url' => $item[1], 'sort_order' => $item[3], 'is_enabled' => true, 'opens_new_tab' => false],
+        ));
+
+        CmsFooterBlock::updateOrCreate(
+            ['company_id' => $company->id, 'block_key' => 'company_description'],
+            ['title' => 'RetailPOS', 'content' => 'A connected retail operations platform for growing teams.', 'links' => [['label' => 'Contact', 'url' => '/contact']], 'sort_order' => 10, 'is_enabled' => true],
+        );
 
         collect(config('cms.settings'))->each(function (array $definition, string $key) use ($company): void {
             CmsSetting::updateOrCreate(

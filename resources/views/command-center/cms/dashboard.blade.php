@@ -34,6 +34,10 @@
 
         <div class="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
             <section class="cms-panel">
+                <div class="flex flex-wrap items-start justify-between gap-4"><div><p class="cms-kicker">Website Content</p><h2 class="mt-2 text-lg font-semibold text-slate-900">Content editor</h2><p class="mt-1 text-sm leading-6 text-slate-600">Manage simple, reusable website pages and sections without editing code.</p></div><a href="{{ route('cms.content.index') }}" class="text-sm font-semibold text-teal-700 hover:text-teal-800">Open editor</a></div>
+                <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">@foreach(['Pages' => $contentEditor['pages'], 'Published' => $contentEditor['published'], 'Drafts' => $contentEditor['drafts'], 'Hidden sections' => $contentEditor['disabled_sections']] as $label => $value)<div class="cms-subtle-panel"><p class="text-xs font-medium text-slate-500">{{ $label }}</p><p class="mt-1 text-2xl font-semibold text-slate-900">{{ $value }}</p></div>@endforeach</div>
+            </section>
+            <section class="cms-panel">
                 <div class="flex items-start justify-between gap-4">
                     <div><p class="cms-kicker">Publishing readiness</p><h2 class="mt-2 text-lg font-semibold text-slate-900">Your website essentials</h2></div>
                     <a href="{{ route('cms.homepage.index') }}" class="text-sm font-semibold text-teal-700 hover:text-teal-800">Open builder</a>

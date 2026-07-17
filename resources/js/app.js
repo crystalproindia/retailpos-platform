@@ -115,6 +115,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    const updateContentItemFields = (container) => {
+        const type = container.querySelector('[data-content-section-type]')?.value;
+        const group = type === 'faq' ? 'faq' : type === 'testimonials' ? 'testimonials' : type === 'stats' ? 'stats' : 'standard';
+
+        container.querySelectorAll('[data-content-item]').forEach((item) => {
+            item.querySelectorAll('[data-item-fields]').forEach((fields) => {
+                fields.classList.toggle('hidden', fields.dataset.itemFields !== group);
+            });
+        });
+    };
+
+    document.querySelectorAll('[data-repeatable-items]').forEach((container) => {
+        const list = container.querySelector('[data-items-list]');
+        const template = container.querySelector('[data-item-template]');
+        const form = container.closest('form');
+
+        if (!list || !template || !form) return;
+
+        container.querySelector('[data-add-item]')?.addEventListener('click', () => {
+            const index = `${Date.now()}${list.children.length}`;
+            list.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', index));
+            updateContentItemFields(form);
+        });
+
+        list.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-remove-item]');
+            if (button) button.closest('[data-content-item]')?.remove();
+        });
+
+        form.querySelector('[data-content-section-type]')?.addEventListener('change', () => updateContentItemFields(form));
+        updateContentItemFields(form);
+    });
+
+    document.querySelectorAll('[data-content-preview]').forEach((preview) => {
+        const form = preview.closest('form');
+        if (!form) return;
+
+        const update = () => {
+            const value = (name, fallback) => form.querySelector(`[name="${name}"]`)?.value.trim() || fallback;
+            preview.querySelector('[data-preview-eyebrow]').textContent = value('eyebrow', 'Optional small heading');
+            preview.querySelector('[data-preview-title]').textContent = value('title', 'Your section title');
+            preview.querySelector('[data-preview-subtitle]').textContent = value('subtitle', 'Supporting text will appear here.');
+            preview.querySelector('[data-preview-button]').textContent = value('primary_cta_label', 'Primary button');
+        };
+
+        form.querySelectorAll('[name="eyebrow"], [name="title"], [name="subtitle"], [name="primary_cta_label"]').forEach((input) => input.addEventListener('input', update));
+        update();
+    });
+
     document.querySelectorAll('[data-demo-schedule-form]').forEach((form) => {
         const meetingMode = form.querySelector('[data-demo-meeting-mode]');
         const googleMeet = form.querySelector('[data-google-meet-checkbox]');

@@ -4,7 +4,11 @@ namespace App\Services\Cms;
 
 use App\Models\Company;
 use App\Models\Cms\CmsArticle;
+use App\Models\Cms\CmsContentPage;
+use App\Models\Cms\CmsContentSection;
+use App\Models\Cms\CmsFooterBlock;
 use App\Models\Cms\CmsMedia;
+use App\Models\Cms\CmsNavigationItem;
 use App\Models\Cms\CmsPage;
 use App\Models\Cms\CmsRedirect;
 use App\Models\Cms\CmsSeoSetting;
@@ -84,6 +88,89 @@ class PublicCmsService
         });
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function contentPages(): array
+    {
+        return $this->remember('content-pages', fn (int $companyId) => CmsContentPage::query()
+            ->where('company_id', $companyId)
+            ->where('status', CmsContentPage::STATUS_PUBLISHED)
+            ->orderBy('route_path')
+            ->get()
+            ->map(fn (CmsContentPage $page) => ['page_key' => $page->page_key, 'route_path' => $page->route_path, 'page_type' => $page->page_type, 'title' => $page->title])
+            ->all()) ?? [];
+    }
+
+    public function contentPageByPath(string $path): ?array
+    {
+        return $this->remember('content-path:'.$this->path($path), function (int $companyId) use ($path): ?array {
+            $page = CmsContentPage::query()
+                ->with(['sections' => fn ($query) => $query->where('is_enabled', true)->orderBy('sort_order')])
+                ->where('company_id', $companyId)
+                ->where('route_path', $this->path($path))
+                ->where('status', CmsContentPage::STATUS_PUBLISHED)
+                ->first();
+
+            return $page ? $this->contentPagePayload($page) : null;
+        });
+    }
+
+    public function contentPage(string $pageKey): ?array
+    {
+        return $this->remember("content-key:{$pageKey}", function (int $companyId) use ($pageKey): ?array {
+            $page = CmsContentPage::query()
+                ->with(['sections' => fn ($query) => $query->where('is_enabled', true)->orderBy('sort_order')])
+                ->where('company_id', $companyId)
+                ->where('page_key', $pageKey)
+                ->where('status', CmsContentPage::STATUS_PUBLISHED)
+                ->first();
+
+            return $page ? $this->contentPagePayload($page) : null;
+        });
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function contentNavigation(): array
+    {
+        return $this->remember('content-navigation', fn (int $companyId) => CmsNavigationItem::query()
+            ->with('parent:id,label')
+            ->where('company_id', $companyId)
+            ->where('is_enabled', true)
+            ->orderBy('location')
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (CmsNavigationItem $item) => [
+                'label' => $item->label,
+                'url' => $item->url,
+                'location' => $item->location,
+                'parent_label' => $item->parent?->label,
+                'opens_new_tab' => $item->opens_new_tab,
+            ])
+            ->all()) ?? [];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function contentFooter(): array
+    {
+        return $this->remember('content-footer', fn (int $companyId) => CmsFooterBlock::query()
+            ->where('company_id', $companyId)
+            ->where('is_enabled', true)
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (CmsFooterBlock $block) => [
+                'block_key' => $block->block_key,
+                'title' => $block->title,
+                'content' => $block->content,
+                'links' => $block->links ?? [],
+            ])
+            ->all()) ?? [];
+    }
+
+    /** @return array<string, mixed> */
+    public function contentPreview(CmsContentPage $page): array
+    {
+        return $this->contentPagePayload($page->load(['sections' => fn ($query) => $query->where('is_enabled', true)->orderBy('sort_order')]));
+    }
+
     private function remember(string $key, callable $callback): mixed
     {
         $companyId = (int) (config('services.retailpos.public_lead_company_id') ?: Company::query()->where('is_active', true)->oldest('id')->value('id'));
@@ -103,6 +190,35 @@ class PublicCmsService
     private function page(CmsPage $page): array
     {
         return ['route_path' => $page->route_path, 'title' => $page->title, 'h1' => $page->h1, 'subtitle' => $page->subtitle, 'hero_content' => $page->hero_content, 'intro_content' => $page->intro_content, 'body_content' => $page->body_content, 'footer_seo_content' => $page->footer_seo_content, 'primary_cta' => ['label' => $page->primary_cta_label, 'url' => $page->primary_cta_url], 'secondary_cta' => ['label' => $page->secondary_cta_label, 'url' => $page->secondary_cta_url], 'content_sections' => $page->content_sections, 'faq_items' => $page->faq_items, 'seo' => ['title' => $page->seo?->meta_title, 'description' => $page->seo?->meta_description, 'canonical_url' => $page->seo?->canonical_url, 'robots_index' => $page->robots_index, 'robots_follow' => $page->robots_follow, 'schema_json' => $page->schema_json, 'open_graph' => ['title' => $page->seo?->og_title, 'description' => $page->seo?->og_description, 'image_url' => $this->mediaUrl($page->seo?->ogImage), 'type' => $page->seo?->og_type], 'twitter' => ['title' => $page->seo?->twitter_title, 'description' => $page->seo?->twitter_description, 'image_url' => $this->mediaUrl($page->seo?->twitterImage), 'card' => $page->seo?->twitter_card]]];
+    }
+
+    /** @return array<string, mixed> */
+    private function contentPagePayload(CmsContentPage $page): array
+    {
+        return [
+            'page_key' => $page->page_key,
+            'route_path' => $page->route_path,
+            'page_type' => $page->page_type,
+            'title' => $page->title,
+            'sections' => $page->sections->map(fn (CmsContentSection $section) => array_filter([
+                'section_key' => $section->section_key,
+                'section_type' => $section->section_type,
+                'eyebrow' => $section->eyebrow,
+                'title' => $section->title,
+                'subtitle' => $section->subtitle,
+                'body' => $section->body,
+                'image_url' => $section->image_url,
+                'primary_cta' => $this->button($section->primary_cta_label, $section->primary_cta_url),
+                'secondary_cta' => $this->button($section->secondary_cta_label, $section->secondary_cta_url),
+                'items' => $section->items ?? [],
+            ], fn ($value) => $value !== null && $value !== []))->values()->all(),
+        ];
+    }
+
+    /** @return array<string, string>|null */
+    private function button(?string $label, ?string $url): ?array
+    {
+        return filled($label) || filled($url) ? ['label' => $label ?? '', 'url' => $url ?? ''] : null;
     }
 
     /** @return array<string, mixed> */

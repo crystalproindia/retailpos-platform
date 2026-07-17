@@ -17,4 +17,9 @@ class PublicCmsController extends Controller
     public function sitemap(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->sitemap()]); }
     public function redirects(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->redirects()]); }
     public function robots(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->robots()]); }
+    public function contentPages(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->contentPages()]); }
+    public function contentPageByPath(Request $request, PublicCmsService $cms): JsonResponse { $data = $cms->contentPageByPath((string) $request->query('path', '/')); abort_unless($data, 404); return response()->json(['data' => $data]); }
+    public function contentPage(string $pageKey, PublicCmsService $cms): JsonResponse { $data = $cms->contentPage($pageKey); abort_unless($data, 404); return response()->json(['data' => $data]); }
+    public function contentNavigation(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->contentNavigation()]); }
+    public function contentFooter(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->contentFooter()]); }
 }

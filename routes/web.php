@@ -6,6 +6,9 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CommandCenter\Cms\CmsBrandingController;
 use App\Http\Controllers\CommandCenter\Cms\CmsArticleController;
 use App\Http\Controllers\CommandCenter\Cms\CmsClientLogoController;
+use App\Http\Controllers\CommandCenter\Cms\CmsContentEditorController;
+use App\Http\Controllers\CommandCenter\Cms\CmsContentFooterController;
+use App\Http\Controllers\CommandCenter\Cms\CmsContentNavigationController;
 use App\Http\Controllers\CommandCenter\Cms\CmsDashboardController;
 use App\Http\Controllers\CommandCenter\Cms\CmsHeaderController;
 use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
@@ -306,6 +309,28 @@ Route::middleware('auth')->group(function (): void {
         Route::put('header', [CmsHeaderController::class, 'update'])->middleware('can:cms.header.manage')->name('header.update');
         Route::get('footer', [CmsFooterBuilderController::class, 'index'])->middleware('can:cms.footer.manage')->name('footer.index');
         Route::put('footer', [CmsFooterBuilderController::class, 'update'])->middleware('can:cms.footer.manage')->name('footer.update');
+
+        Route::get('content', [CmsContentEditorController::class, 'index'])->middleware('can:cms.content.view')->name('content.index');
+        Route::get('content/pages', [CmsContentEditorController::class, 'index'])->middleware('can:cms.content.view')->name('content.pages.index');
+        Route::get('content/blocks', [CmsContentEditorController::class, 'index'])->middleware('can:cms.content.view')->name('content.blocks.index');
+        Route::post('content/pages', [CmsContentEditorController::class, 'store'])->middleware('can:cms.content.create')->name('content.pages.store');
+        Route::get('content/pages/{page}', [CmsContentEditorController::class, 'show'])->middleware('can:cms.content.view')->name('content.pages.show');
+        Route::put('content/pages/{page}', [CmsContentEditorController::class, 'update'])->middleware('can:cms.content.update')->name('content.pages.update');
+        Route::post('content/pages/{page}/publish', [CmsContentEditorController::class, 'publish'])->middleware('can:cms.content.publish')->name('content.pages.publish');
+        Route::post('content/pages/{page}/unpublish', [CmsContentEditorController::class, 'unpublish'])->middleware('can:cms.content.publish')->name('content.pages.unpublish');
+        Route::post('content/pages/{page}/archive', [CmsContentEditorController::class, 'archive'])->middleware('can:cms.content.delete')->name('content.pages.archive');
+        Route::get('content/pages/{page}/preview', [CmsContentEditorController::class, 'preview'])->middleware('can:cms.content.view')->name('content.pages.preview');
+        Route::post('content/pages/{page}/sections', [CmsContentEditorController::class, 'storeSection'])->middleware('can:cms.content.update')->name('content.sections.store');
+        Route::put('content/pages/{page}/sections/{section}', [CmsContentEditorController::class, 'updateSection'])->middleware('can:cms.content.update')->name('content.sections.update');
+        Route::post('content/pages/{page}/sections/{section}/toggle', [CmsContentEditorController::class, 'toggleSection'])->middleware('can:cms.content.update')->name('content.sections.toggle');
+        Route::post('content/pages/{page}/sections/{section}/move', [CmsContentEditorController::class, 'moveSection'])->middleware('can:cms.content.update')->name('content.sections.move');
+        Route::delete('content/pages/{page}/sections/{section}', [CmsContentEditorController::class, 'destroySection'])->middleware('can:cms.content.delete')->name('content.sections.destroy');
+        Route::get('content/navigation', [CmsContentNavigationController::class, 'index'])->middleware('can:cms.navigation.manage')->name('content.navigation.index');
+        Route::post('content/navigation', [CmsContentNavigationController::class, 'store'])->middleware('can:cms.navigation.manage')->name('content.navigation.store');
+        Route::put('content/navigation/{item}', [CmsContentNavigationController::class, 'update'])->middleware('can:cms.navigation.manage')->name('content.navigation.update');
+        Route::get('content/footer', [CmsContentFooterController::class, 'index'])->middleware('can:cms.footer.manage')->name('content.footer.index');
+        Route::post('content/footer', [CmsContentFooterController::class, 'store'])->middleware('can:cms.footer.manage')->name('content.footer.store');
+        Route::put('content/footer/{block}', [CmsContentFooterController::class, 'update'])->middleware('can:cms.footer.manage')->name('content.footer.update');
 
         Route::get('pages', [CmsPageController::class, 'index'])->middleware('can:cms.pages.manage')->name('pages.index');
         Route::get('pages/create', [CmsPageController::class, 'create'])->name('pages.create');

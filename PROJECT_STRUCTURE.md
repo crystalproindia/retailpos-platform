@@ -2925,3 +2925,32 @@ Migration `2026_07_17_020001_add_marketing_seo_fields_to_cms_tables.php` extends
 - Structured landing-page sections and FAQ payloads are stored as validated JSON because the supported section set is intentionally extensible. Static website settings remain normalized existing CMS settings.
 - Scheduled pages persist their requested publish time and remain private until published. The automated scheduled-publishing runner is a future operational job.
 - Sitemap and robots endpoints provide delivery data only. XML rendering, crawler-based broken-link detection, Search Console ingestion, and redirect-hit middleware remain future website or infrastructure integrations.
+
+## Website Content Editor Lite
+
+Website Content Editor Lite is an additive, tenant-scoped CMS surface for simple public website content. It deliberately does not replace the established `CmsPage`, landing-page, SEO, menu, or homepage-builder workflows. Those records remain in place for their current consumers; the Lite editor owns the dedicated `cms_content_*` tables and gives non-technical administrators a guided alternative for future website delivery.
+
+### Editor Architecture
+
+`CmsContentPage`, `CmsContentSection`, `CmsNavigationItem`, and `CmsFooterBlock` are the dedicated content records. Migration `2026_07_17_040001_create_cms_content_editor_tables.php` creates the normalized page, section, navigation, and footer tables with tenant, route, publication, ordering, and public-read indexes. Flexible repeatable content such as FAQ rows, testimonials, feature cards, statistics, and footer links uses validated JSON arrays only behind friendly repeatable forms; no editor screen exposes raw JSON or code fields.
+
+`CmsContentPageRepository` and `CmsContentNavigationRepository` keep company-scoped queries out of controllers. `CmsContentEditorService` owns page lifecycle, default homepage sections, section ordering, enable/disable behavior, navigation/footer saves, human-readable content-health warnings, and audit entries. The existing `AuditLogger` remains the audit system of record.
+
+### Admin Routes and Permissions
+
+The CMS group exposes `/cms/content`, `/cms/content/pages`, `/cms/content/blocks`, `/cms/content/navigation`, and `/cms/content/footer`. Page detail supplies friendly page details, content-health warnings, guided section forms, repeatable item cards, section move/enable controls, archive confirmation, and an internal API preview. Navigation and footer screens use the same form-first approach. The CMS navigation includes direct links to Website Content, Content Navigation, and Content Footer.
+
+`cms.content.view`, `cms.content.create`, `cms.content.update`, `cms.content.publish`, `cms.content.delete`, and `cms.navigation.manage` use the existing Administrator/Manager CMS role boundary. Footer management continues to use `cms.footer.manage`. Staff remain denied by the current CMS middleware and gates.
+
+### Content and Delivery Contract
+
+Supported page types are Home, Product, Solution, Industry, Module, Pricing, Contact, About, and Custom Landing. Supported section types include Hero, Feature Grid, Benefits, Product Highlights, Industry Use Cases, Module Details, FAQ, CTA, Testimonials, Statistics, Comparison, Footer SEO Content, and Custom Content. The demo seeder provides a draft home page with Hero, Product Highlights, Features, Industries, AI-Powered Benefits, Testimonials, FAQ, CTA, and Footer SEO sections, together with starter navigation and a company-description footer block.
+
+`PublicCmsService` remains the single published-only public read model. The new rate-limited endpoints are `/api/public/cms/content/pages`, `/api/public/cms/content/page?path=/`, `/api/public/cms/content/page/{pageKey}`, `/api/public/cms/content/navigation`, and `/api/public/cms/content/footer`. They expose only published pages, enabled sections, and enabled navigation/footer records; they omit company IDs, user IDs, audit data, and internal record IDs, and retain the existing ten-minute non-test cache policy.
+
+### Current Limitations
+
+- The Lite editor prepares data for a future public-site adapter; it does not change the separate public website or render public web pages itself.
+- Media URLs are currently entered as validated HTTPS or internal paths. Selecting assets directly from the existing Media Library is a future editor enhancement.
+- Nested navigation is represented by parent links and ordered records, but drag-and-drop and mega-menu rendering are intentionally deferred.
+- There is no visual WYSIWYG page renderer in this phase. The internal API preview shows the exact safe content shape a future website client will consume.

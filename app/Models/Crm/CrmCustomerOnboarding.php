@@ -36,5 +36,6 @@ class CrmCustomerOnboarding extends Model
     public function tasks(): HasMany { return $this->hasMany(CrmOnboardingTask::class, 'onboarding_id')->orderBy('sort_order'); }
     public function onboardingNotes(): HasMany { return $this->hasMany(CrmOnboardingNote::class, 'onboarding_id')->latest(); }
     public function documents(): HasMany { return $this->hasMany(CrmOnboardingDocument::class, 'onboarding_id')->latest(); }
+    public function supportTickets(): HasMany { return $this->hasMany(CrmSupportTicket::class, 'onboarding_id')->latest('updated_at'); }
     public function auditLogs(): MorphMany { return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at'); }
 }

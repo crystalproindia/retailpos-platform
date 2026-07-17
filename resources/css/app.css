@@ -107,6 +107,72 @@
         outline: 2px solid rgb(20 184 166);
         outline-offset: 2px;
     }
+
+    .support-summary-card,
+    .support-ticket-row {
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    }
+
+    .support-summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px rgb(15 23 42 / 0.09);
+    }
+
+    .support-ticket-row:hover {
+        border-color: rgb(148 163 184);
+        box-shadow: 0 5px 14px rgb(15 23 42 / 0.06);
+    }
+
+    .support-status-badge {
+        transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .support-timeline-entry {
+        animation: support-timeline-in 220ms ease-out both;
+    }
+
+    .support-sla-track {
+        height: 0.45rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgb(226 232 240);
+    }
+
+    .support-sla-bar {
+        height: 100%;
+        border-radius: inherit;
+        background: rgb(14 165 233);
+        transition: width 300ms ease, background-color 180ms ease;
+    }
+
+    .support-sla-bar.is-risk { background: rgb(245 158 11); }
+    .support-sla-bar.is-overdue { background: rgb(225 29 72); }
+
+    .support-status-history:not(:last-child)::after {
+        position: absolute;
+        top: 1.15rem;
+        bottom: -1.35rem;
+        left: 0.32rem;
+        width: 1px;
+        background: rgb(203 213 225);
+        content: '';
+    }
+
+    @keyframes support-timeline-in {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .support-summary-card,
+        .support-ticket-row,
+        .support-status-badge,
+        .support-sla-bar {
+            transition: none;
+        }
+
+        .support-timeline-entry { animation: none; }
+    }
 }
 
 @layer components {

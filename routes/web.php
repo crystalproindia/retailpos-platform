@@ -47,6 +47,7 @@ use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\CrmOnboardingController;
+use App\Http\Controllers\CommandCenter\Crm\CrmSupportTicketController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
@@ -236,6 +237,15 @@ Route::middleware('auth')->group(function (): void {
         Route::post('onboarding/{onboarding}/documents', [CrmOnboardingController::class, 'document'])->middleware('can:crm.onboarding.manage_documents')->name('onboarding.documents.store');
         Route::put('onboarding/{onboarding}/documents/{document}', [CrmOnboardingController::class, 'updateDocument'])->middleware('can:crm.onboarding.manage_documents')->name('onboarding.documents.update');
         Route::post('proforma-invoices/{proforma}/onboarding', [CrmOnboardingController::class, 'startFromProforma'])->middleware('can:crm.onboarding.create')->name('proformas.onboarding.start');
+
+        Route::get('support', fn () => redirect()->route('crm.support.tickets.index'))->middleware('can:crm.support.view')->name('support.index');
+        Route::get('support/tickets', [CrmSupportTicketController::class, 'index'])->middleware('can:crm.support.view')->name('support.tickets.index');
+        Route::get('support/tickets/create', [CrmSupportTicketController::class, 'create'])->middleware('can:crm.support.create')->name('support.tickets.create');
+        Route::post('support/tickets', [CrmSupportTicketController::class, 'store'])->middleware('can:crm.support.create')->name('support.tickets.store');
+        Route::get('support/tickets/{ticket}', [CrmSupportTicketController::class, 'show'])->middleware('can:crm.support.view')->name('support.tickets.show');
+        Route::put('support/tickets/{ticket}', [CrmSupportTicketController::class, 'update'])->middleware('can:crm.support.update')->name('support.tickets.update');
+        Route::post('support/tickets/{ticket}/messages', [CrmSupportTicketController::class, 'message'])->middleware('can:crm.support.reply')->name('support.tickets.messages.store');
+        Route::post('support/tickets/{ticket}/attachments', [CrmSupportTicketController::class, 'attachment'])->middleware('can:crm.support.update')->name('support.tickets.attachments.store');
 
         Route::get('activities', [ActivityController::class, 'index'])->middleware('can:crm.activities.manage')->name('activities.index');
         Route::post('activities', [ActivityController::class, 'store'])->middleware('can:crm.activities.manage')->name('activities.store');

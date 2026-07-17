@@ -17,6 +17,7 @@ use App\Models\Crm\CrmProformaInvoice;
 use App\Models\User;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Repositories\Crm\CrmOnboardingRepository;
+use App\Repositories\Crm\CrmSupportTicketRepository;
 use App\Repositories\Crm\ProformaRepository;
 use App\Services\Crm\CrmOnboardingService;
 use Illuminate\Http\RedirectResponse;
@@ -28,7 +29,7 @@ use Illuminate\View\View;
 class CrmOnboardingController extends Controller
 {
     public function index(Request $request, CrmOnboardingRepository $onboardings): View { return view('command-center.crm.onboarding.index', ['onboardings' => $onboardings->paginate($request->user(), $request->only(['search', 'status', 'priority', 'owner_id', 'overdue', 'target_from', 'target_to'])), 'owners' => User::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(['id', 'name'])]); }
-    public function show(Request $request, CrmOnboardingRepository $onboardings, int $onboarding): View { return view('command-center.crm.onboarding.show', ['onboarding' => $onboardings->find($request->user(), $onboarding), 'owners' => User::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(['id', 'name'])]); }
+    public function show(Request $request, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, int $onboarding): View { $record = $onboardings->find($request->user(), $onboarding); return view('command-center.crm.onboarding.show', ['onboarding' => $record, 'owners' => User::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(['id', 'name']), 'supportSummary' => $request->user()->can('crm.support.view') ? $supportTickets->onboardingSummary($record->company_id, $record->id) : null]); }
     public function edit(Request $request, CrmOnboardingRepository $onboardings, int $onboarding): View { return view('command-center.crm.onboarding.edit', ['onboarding' => $onboardings->find($request->user(), $onboarding), 'owners' => User::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(['id', 'name'])]); }
     public function update(UpdateCrmOnboardingRequest $request, CrmOnboardingRepository $onboardings, CrmOnboardingService $service, int $onboarding): RedirectResponse { $record = $onboardings->find($request->user(), $onboarding); $data = $request->validated(); if (($data['assigned_to'] ?? null) != $record->assigned_to || ($data['implementation_owner_id'] ?? null) != $record->implementation_owner_id) { abort_unless($request->user()->can('crm.onboarding.assign'), 403); } $service->update($record, $request->user(), $data); return redirect()->route('crm.onboarding.show', $onboarding)->with('status', 'Onboarding updated.'); }
     public function startFromCustomer(StartCrmOnboardingRequest $request, CrmCustomerRepository $customers, CrmOnboardingService $service, int $customer): RedirectResponse { $onboarding = $service->start($customers->findForUser($request->user(), $customer), $request->user(), $request->validated()); return redirect()->route('crm.onboarding.show', $onboarding)->with('status', 'Customer onboarding started.'); }

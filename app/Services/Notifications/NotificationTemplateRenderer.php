@@ -155,6 +155,22 @@ class NotificationTemplateRenderer
             return 'Lead '.($event->payload()['lead_title'] ?? 'record').' was converted to customer '.($event->payload()['customer_code'] ?? $event->payload()['customer_name'] ?? 'account').'.';
         }
 
+        if (str($event->eventKey())->startsWith('crm.support_ticket_')) {
+            $number = $event->payload()['ticket_number'] ?? 'this support ticket';
+            $subject = $event->payload()['ticket_subject'] ?? 'Support request';
+
+            return match ($event->eventKey()) {
+                'crm.support_ticket_created' => "Support ticket {$number} was created: {$subject}.",
+                'crm.support_ticket_assigned' => "Support ticket {$number} was assigned to you.",
+                'crm.support_ticket_urgent' => "Urgent support ticket {$number} needs attention: {$subject}.",
+                'crm.support_ticket_overdue' => "Support ticket {$number} missed its SLA deadline.",
+                'crm.support_ticket_resolved' => "Support ticket {$number} was resolved.",
+                'crm.support_ticket_reopened' => "Support ticket {$number} was reopened.",
+                'crm.support_ticket_waiting_internal' => "Support ticket {$number} is waiting for the internal team.",
+                default => "Support ticket {$number} was updated.",
+            };
+        }
+
         if (str($event->eventKey())->startsWith('crm.onboarding.')) {
             $number = $event->payload()['onboarding_number'] ?? 'this onboarding';
             $name = $event->payload()['customer_name'] ?? 'the customer';
@@ -208,6 +224,14 @@ class NotificationTemplateRenderer
             'proforma_fully_paid' => 'Proforma invoice fully paid',
             'proforma_share_failed' => 'Proforma sharing failed',
             'crm_customer_created' => 'CRM customer created',
+            'support_ticket_created' => 'Support ticket created',
+            'support_ticket_assigned' => 'Support ticket assigned',
+            'support_ticket_urgent' => 'Urgent support ticket',
+            'support_ticket_overdue' => 'Support ticket overdue',
+            'support_ticket_resolved' => 'Support ticket resolved',
+            'support_ticket_reopened' => 'Support ticket reopened',
+            'support_ticket_waiting_internal' => 'Support ticket waiting internally',
+            'support_ticket_status_changed' => 'Support ticket status changed',
             default => $definition['name'] ?? str($event->eventKey())->replace('.', ' ')->headline()->toString(),
         };
     }
@@ -237,6 +261,14 @@ class NotificationTemplateRenderer
             'crm.proforma.fully_paid' => 'proforma_fully_paid',
             'crm.proforma.share_failed' => 'proforma_share_failed',
             'crm.customer.created' => 'crm_customer_created',
+            'crm.support_ticket_created' => 'support_ticket_created',
+            'crm.support_ticket_assigned' => 'support_ticket_assigned',
+            'crm.support_ticket_urgent' => 'support_ticket_urgent',
+            'crm.support_ticket_overdue' => 'support_ticket_overdue',
+            'crm.support_ticket_resolved' => 'support_ticket_resolved',
+            'crm.support_ticket_reopened' => 'support_ticket_reopened',
+            'crm.support_ticket_waiting_internal' => 'support_ticket_waiting_internal',
+            'crm.support_ticket_status_changed' => 'support_ticket_status_changed',
             'crm.onboarding.started' => 'onboarding_started',
             'crm.onboarding.task_assigned' => 'onboarding_task_assigned',
             'crm.onboarding.task_overdue' => 'onboarding_task_overdue',
@@ -269,6 +301,7 @@ class NotificationTemplateRenderer
             'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
             'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed' => $event->aggregateId() ? route('crm.proformas.show', $event->aggregateId()) : null,
             'crm.customer.created' => $event->aggregateId() ? route('crm.customers.show', $event->aggregateId()) : null,
+            'crm.support_ticket_created', 'crm.support_ticket_assigned', 'crm.support_ticket_urgent', 'crm.support_ticket_overdue', 'crm.support_ticket_resolved', 'crm.support_ticket_reopened', 'crm.support_ticket_waiting_internal', 'crm.support_ticket_status_changed' => $event->aggregateId() ? route('crm.support.tickets.show', $event->aggregateId()) : null,
             'crm.onboarding.started', 'crm.onboarding.task_assigned', 'crm.onboarding.task_overdue', 'crm.onboarding.target_go_live_missed', 'crm.onboarding.document_pending', 'crm.onboarding.blocked', 'crm.onboarding.go_live_ready', 'crm.onboarding.live', 'crm.onboarding.on_hold', 'crm.onboarding.cancelled', 'crm.onboarding.updated' => $event->aggregateId() ? route('crm.onboarding.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
                 ? route('crm.leads.show', $event->payload()['lead_id'])

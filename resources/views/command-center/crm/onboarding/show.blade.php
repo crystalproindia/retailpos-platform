@@ -16,6 +16,9 @@
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <span class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $onboarding->status->label() }}</span>
+                    @can('crm.support.create')
+                        <a href="{{ route('crm.support.tickets.create', ['onboarding' => $onboarding->id]) }}" class="rounded-lg border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/30">Create Support Ticket</a>
+                    @endcan
                     @can('crm.onboarding.update')
                         <a href="{{ route('crm.onboarding.edit', $onboarding) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Edit</a>
                     @endcan
@@ -97,6 +100,12 @@
             </div>
 
             <aside class="space-y-6">
+                @if ($supportSummary)
+                    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="flex items-start justify-between gap-3"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Support</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $supportSummary['open'] }} open ticket{{ $supportSummary['open'] === 1 ? '' : 's' }}.</p></div><a href="{{ route('crm.support.tickets.index', ['search' => $onboarding->onboarding_number]) }}" class="text-xs font-semibold text-sky-700 dark:text-sky-300">View all</a></div>
+                        <div class="mt-4 space-y-3">@forelse ($supportSummary['recent'] as $ticket)<a href="{{ route('crm.support.tickets.show', $ticket) }}" class="support-ticket-row block rounded-lg border border-slate-200 p-3 dark:border-slate-800"><p class="text-xs font-semibold text-slate-500">{{ $ticket->ticket_number }}</p><p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{{ $ticket->subject }}</p><p class="mt-2 text-xs text-slate-500">{{ $ticket->status->label() }} · {{ $ticket->updated_at->diffForHumans() }}</p></a>@empty<p class="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-700">No support tickets are linked to this onboarding.</p>@endforelse</div>
+                    </section>
+                @endif
                 <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <h2 class="text-base font-semibold text-slate-950 dark:text-white">Documents</h2>
                     @can('crm.onboarding.manage_documents')

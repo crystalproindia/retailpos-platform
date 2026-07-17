@@ -2954,3 +2954,29 @@ Supported page types are Home, Product, Solution, Industry, Module, Pricing, Con
 - Media URLs are currently entered as validated HTTPS or internal paths. Selecting assets directly from the existing Media Library is a future editor enhancement.
 - Nested navigation is represented by parent links and ordered records, but drag-and-drop and mega-menu rendering are intentionally deferred.
 - There is no visual WYSIWYG page renderer in this phase. The internal API preview shows the exact safe content shape a future website client will consume.
+
+## CRM Support Ticket Foundation
+
+The CRM Support Ticket foundation adds a tenant-scoped helpdesk without changing the existing lead, customer, onboarding, quotation, proforma, POS, inventory, or public-site flows. The CRM entry point is `/crm/support/tickets`; the main CRM navigation, Command Center dashboard, CRM dashboard, customer profile, and onboarding detail can now surface the same support records.
+
+### Data Model and Ownership
+
+Migration `2026_07_17_050001_create_crm_support_ticket_tables.php` creates `crm_support_tickets`, `crm_support_ticket_messages`, `crm_support_ticket_attachments`, and `crm_support_ticket_status_histories`. Tickets have an auditable, globally unique `TKT-YYYY-######` number and can link to a CRM customer, lead, onboarding, or proforma invoice. Company, status, priority, assignee, due date, created date, reporter email, and reporter phone lookup indexes support the ticket list and SLA monitor.
+
+`CrmSupportTicketRepository` is the company-scoped read boundary for ticket lists, ticket details, customer/onboarding summaries, dashboard counts, filters, and sales-user visibility. `CrmSupportTicketService` owns ticket numbering, context validation, SLA deadline assignment, assignee validation, state changes, messages, external attachment links, CRM lead activity entries where a lead is linked, domain events, and audit logging. `CrmSupportSlaService` keeps V1 SLA bands in `config/crm-support.php`: urgent 2 hours/1 day, high 4 hours/2 days, normal 24 hours/5 days, and low 48 hours/7 days for first response/resolution.
+
+### Lifecycle, Security, and Notifications
+
+The allowed lifecycle is New to Open; Open to In Progress; In Progress to Waiting for Customer, Waiting for Internal Team, or Resolved; either waiting state to In Progress or Resolved; Resolved to Closed or Reopened; Closed to Reopened; and Reopened to In Progress. Resolving requires a resolution summary. Every transition adds a durable status-history entry, a timeline message, an audit record, and the relevant CRM domain event.
+
+`crm.support.view` and `crm.support.create` are available to the existing Administrator, Manager, and Sales roles. Update, assignment, replies, resolution, closure, and deletion capabilities remain Administrator/Manager actions. Sales visibility is restricted to tickets they created, are assigned, or can reach through their assigned lead/customer relationship. Staff have no CRM Support access. Messages are explicitly internal or customer-safe, and the V1 attachment surface accepts validated external HTTPS/internal URLs only; no raw filesystem upload or customer portal is added.
+
+Support events are catalogued and feed the established Notification Center for creation, assignment, urgent tickets, overdue tickets, resolution, reopening, waiting for internal team, and status changes. `retailpos:support-ticket-reminders`, scheduled hourly, emits idempotent first-response, resolution-due, and internal-wait reminders. It does not introduce WhatsApp, SMS, customer email automation, or an external ticketing provider.
+
+### UI and Current Limitations
+
+The Support Tickets list uses responsive ticket rows, mobile-friendly filters, SLA-aware summaries, color-coded status/priority badges, clean empty states, and reduced-motion-aware hover/timeline/progress feedback. Ticket detail separates customer-safe replies from private notes, shows status history, ownership, SLA state, resolution, and external links. Dashboard cards cover open, urgent, overdue, waiting-for-customer, and resolved-this-month counts.
+
+- There is no public customer portal, inbound email parser, live chat, WhatsApp automation, external helpdesk sync, file storage upload, customer satisfaction survey, or full-text search engine in this foundation.
+- Attachment records intentionally provide safe external-link metadata only. A future Media Library adapter can add managed file storage without changing the ticket lifecycle.
+- SLA bands are configurable application defaults, not contractual service guarantees; per-company policy administration is deferred.

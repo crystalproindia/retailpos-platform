@@ -10,6 +10,7 @@ use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmQuotation;
 use App\Repositories\Crm\CrmCustomerRepository;
+use App\Repositories\Crm\CrmSupportTicketRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
 use App\Services\Crm\CrmCustomerConversionService;
@@ -29,9 +30,16 @@ class CrmCustomerController extends Controller
         ]);
     }
 
-    public function show(Request $request, CrmCustomerRepository $customers, int $customer): View
+    public function show(Request $request, CrmCustomerRepository $customers, CrmSupportTicketRepository $supportTickets, int $customer): View
     {
-        return view('command-center.crm.customers.show', ['customer' => $customers->findForUser($request->user(), $customer)]);
+        $record = $customers->findForUser($request->user(), $customer);
+
+        return view('command-center.crm.customers.show', [
+            'customer' => $record,
+            'supportSummary' => $request->user()->can('crm.support.view')
+                ? $supportTickets->customerSummary($record->company_id, $record->id)
+                : null,
+        ]);
     }
 
     public function createForLead(Request $request, LeadRepository $leads, int $lead): View

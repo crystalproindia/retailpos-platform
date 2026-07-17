@@ -113,6 +113,129 @@
         transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
     }
 
+    .support-desk-header {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .support-desk-header::before {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 3px;
+        background: rgb(14 165 233);
+        content: '';
+    }
+
+    .support-live-dot {
+        display: inline-block;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: rgb(20 184 166);
+        box-shadow: 0 0 0 4px rgb(204 251 241);
+    }
+
+    .support-desk-health {
+        display: inline-flex;
+        min-height: 2.75rem;
+        align-items: center;
+        gap: 0.7rem;
+        border: 1px solid rgb(226 232 240);
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.8rem;
+        color: rgb(51 65 85);
+        background: rgb(248 250 252);
+    }
+
+    .support-desk-health strong,
+    .support-desk-health small {
+        display: block;
+        line-height: 1.2;
+    }
+
+    .support-desk-health strong { font-size: 0.75rem; }
+    .support-desk-health small { margin-top: 0.1rem; font-size: 0.7rem; color: rgb(100 116 139); }
+
+    .support-metric-card {
+        min-height: 8.25rem;
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    .support-metric-card:hover {
+        transform: translateY(-2px);
+        border-color: rgb(148 163 184);
+        box-shadow: 0 10px 22px rgb(15 23 42 / 0.08);
+    }
+
+    .support-filter-link {
+        display: flex;
+        min-height: 2.55rem;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-radius: 0.45rem;
+        padding: 0.45rem 0.55rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: rgb(71 85 105);
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .support-filter-link:hover,
+    .support-filter-link.is-active {
+        color: rgb(15 23 42);
+        background: rgb(241 245 249);
+    }
+
+    .support-inbox-row {
+        position: relative;
+        transition: background-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .support-inbox-row::before {
+        position: absolute;
+        top: 0.85rem;
+        bottom: 0.85rem;
+        left: 0;
+        width: 3px;
+        border-radius: 0 999px 999px 0;
+        background: rgb(148 163 184);
+        content: '';
+        opacity: 0;
+        transition: opacity 160ms ease;
+    }
+
+    .support-inbox-row.urgent::before { background: rgb(225 29 72); }
+    .support-inbox-row.high::before { background: rgb(245 158 11); }
+    .support-inbox-row.normal::before { background: rgb(14 165 233); }
+    .support-inbox-row.low::before { background: rgb(100 116 139); }
+
+    .support-inbox-row:hover {
+        background: rgb(248 250 252);
+        box-shadow: inset 0 1px 0 rgb(226 232 240), inset 0 -1px 0 rgb(226 232 240);
+    }
+
+    .support-inbox-row:hover::before { opacity: 1; }
+
+    .support-customer-avatar {
+        display: grid;
+        width: 2.55rem;
+        height: 2.55rem;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 0.55rem;
+        color: rgb(15 23 42);
+        background: rgb(226 232 240);
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+
+    .support-customer-avatar.urgent { color: rgb(159 18 57); background: rgb(255 228 230); }
+    .support-customer-avatar.high { color: rgb(146 64 14); background: rgb(254 243 199); }
+    .support-customer-avatar.normal { color: rgb(3 105 161); background: rgb(224 242 254); }
+
     .support-summary-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 10px 22px rgb(15 23 42 / 0.09);
@@ -158,6 +281,64 @@
         content: '';
     }
 
+    .support-ticket-detail .support-detail-header {
+        position: relative;
+        overflow: hidden;
+        border-color: rgb(186 230 253);
+        box-shadow: 0 12px 28px rgb(15 23 42 / 0.07);
+    }
+
+    .support-ticket-detail .support-detail-header::before {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 4px;
+        background: rgb(14 165 233);
+        content: '';
+    }
+
+    .support-ticket-detail .support-thread {
+        border-color: rgb(203 213 225);
+        box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+    }
+
+    .support-ticket-detail .support-thread-message {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .support-ticket-detail .support-thread-message::before {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 3px;
+        background: rgb(139 92 246);
+        content: '';
+    }
+
+    .support-ticket-detail .support-thread-message.customer-safe::before { background: rgb(14 165 233); }
+
+    .support-ticket-detail .support-manage-panel {
+        position: sticky;
+        top: 5.5rem;
+        border-color: rgb(186 230 253);
+        box-shadow: 0 12px 28px rgb(15 23 42 / 0.07);
+    }
+
+    .dark .support-desk-health { border-color: rgb(51 65 85); color: rgb(226 232 240); background: rgb(15 23 42); }
+    .dark .support-desk-health small { color: rgb(148 163 184); }
+    .dark .support-live-dot { box-shadow: 0 0 0 4px rgb(19 78 74); }
+    .dark .support-filter-link { color: rgb(203 213 225); }
+    .dark .support-filter-link:hover,
+    .dark .support-filter-link.is-active { color: rgb(255 255 255); background: rgb(30 41 59); }
+    .dark .support-inbox-row:hover { background: rgb(15 23 42); box-shadow: inset 0 1px 0 rgb(51 65 85), inset 0 -1px 0 rgb(51 65 85); }
+    .dark .support-customer-avatar { color: rgb(226 232 240); background: rgb(51 65 85); }
+    .dark .support-customer-avatar.urgent { color: rgb(254 205 211); background: rgb(76 5 25); }
+    .dark .support-customer-avatar.high { color: rgb(253 230 138); background: rgb(69 26 3); }
+    .dark .support-customer-avatar.normal { color: rgb(186 230 253); background: rgb(12 74 110); }
+
     @keyframes support-timeline-in {
         from { opacity: 0; transform: translateY(4px); }
         to { opacity: 1; transform: translateY(0); }
@@ -168,6 +349,12 @@
         .support-ticket-row,
         .support-status-badge,
         .support-sla-bar {
+            transition: none;
+        }
+
+        .support-metric-card,
+        .support-inbox-row,
+        .support-filter-link {
             transition: none;
         }
 

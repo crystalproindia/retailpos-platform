@@ -4,6 +4,7 @@ namespace App\Repositories\Cms;
 
 use App\Models\Cms\CmsContentPage;
 use App\Models\Cms\CmsContentSection;
+use App\Models\Cms\CmsNavigationItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class CmsContentPageRepository
@@ -32,7 +33,7 @@ class CmsContentPageRepository
         return $page->sections()->findOrFail($sectionId);
     }
 
-    /** @return array{pages: int, published: int, drafts: int, disabled_sections: int} */
+    /** @return array{pages: int, published: int, drafts: int, disabled_sections: int, active_navigation_items: int, recent: \Illuminate\Support\Collection<int, CmsContentPage>} */
     public function dashboard(int $companyId): array
     {
         $pages = CmsContentPage::query()->where('company_id', $companyId);
@@ -45,6 +46,11 @@ class CmsContentPageRepository
                 ->where('is_enabled', false)
                 ->whereHas('page', fn ($query) => $query->where('company_id', $companyId))
                 ->count(),
+            'active_navigation_items' => CmsNavigationItem::query()
+                ->where('company_id', $companyId)
+                ->where('is_enabled', true)
+                ->count(),
+            'recent' => (clone $pages)->latest('updated_at')->limit(3)->get(),
         ];
     }
 }

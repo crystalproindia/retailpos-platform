@@ -87,6 +87,13 @@ class CmsContentEditorTest extends TestCase
             'section_key' => 'hidden_feature', 'section_type' => 'feature_grid', 'is_enabled' => 0,
         ]))->assertRedirect();
 
+        $this->actingAs($manager)->post("/cms/content/pages/{$page->id}/sections", $this->sectionPayload([
+            'section_key' => 'benefits', 'section_type' => 'benefits', 'title' => 'Benefits',
+        ]))->assertRedirect();
+        $benefits = $page->refresh()->sections()->where('section_key', 'benefits')->firstOrFail();
+        $this->actingAs($manager)->post("/cms/content/pages/{$page->id}/sections/{$benefits->id}/move", ['direction' => 'up'])->assertRedirect();
+        $this->actingAs($manager)->post("/cms/content/pages/{$page->id}/sections/{$benefits->id}/move", ['direction' => 'up'])->assertRedirect();
+
         $this->getJson('/api/public/cms/content/page?path=/retail-operations')->assertNotFound();
         $this->actingAs($manager)->post("/cms/content/pages/{$page->id}/publish")->assertRedirect();
 
@@ -96,10 +103,16 @@ class CmsContentEditorTest extends TestCase
         $this->getJson('/api/public/cms/content/page?path=/retail-operations')
             ->assertOk()
             ->assertJsonPath('data.page_key', 'retail-operations')
-            ->assertJsonCount(1, 'data.sections')
+            ->assertJsonCount(2, 'data.sections')
+            ->assertJsonPath('data.sections.0.section_key', 'benefits')
             ->assertJsonMissingPath('data.company_id')
             ->assertJsonMissingPath('data.sections.0.id');
-        $this->getJson('/api/public/cms/content/page/retail-operations')->assertOk()->assertJsonPath('data.sections.0.title', 'Operate with clarity');
+        $this->getJson('/api/public/cms/content/page/retail-operations')->assertOk()->assertJsonPath('data.sections.1.title', 'Operate with clarity');
+
+        $this->actingAs($manager)->post("/cms/content/pages/{$page->id}/unpublish")->assertRedirect();
+        $this->getJson('/api/public/cms/content/page?path=/retail-operations')->assertNotFound();
+        $this->assertDatabaseHas('audit_logs', ['event' => 'cms.content_section.reordered', 'auditable_id' => $benefits->id]);
+        $this->assertDatabaseHas('audit_logs', ['event' => 'cms.content_page.unpublished', 'auditable_id' => $page->id]);
     }
 
     public function test_navigation_footer_and_dashboard_are_tenant_scoped_and_public_safe(): void
@@ -108,14 +121,17 @@ class CmsContentEditorTest extends TestCase
         config()->set('services.retailpos.public_lead_company_id', $manager->company_id);
 
         $this->actingAs($manager)->post('/cms/content/navigation', [
-            'label' => 'Pricing', 'url' => '/pricing', 'location' => 'header', 'is_enabled' => 1, 'opens_new_tab' => 0,
+            'label' => 'Pricing', 'url' => '/pricing', 'location' => 'header', 'sort_order' => 5, 'is_enabled' => 1, 'opens_new_tab' => 0,
         ])->assertRedirect();
         $this->actingAs($manager)->post('/cms/content/navigation', [
-            'label' => 'Hidden', 'url' => '/internal', 'location' => 'header', 'is_enabled' => 0, 'opens_new_tab' => 0,
+            'label' => 'Hidden', 'url' => '/internal', 'location' => 'header', 'sort_order' => 10, 'is_enabled' => 0, 'opens_new_tab' => 0,
         ])->assertRedirect();
+        $this->actingAs($manager)->from('/cms/content/navigation')->post('/cms/content/navigation', [
+            'label' => 'Unsafe', 'url' => 'javascript:alert(1)', 'location' => 'header', 'is_enabled' => 1, 'opens_new_tab' => 0,
+        ])->assertRedirect('/cms/content/navigation')->assertSessionHasErrors('url');
         $this->actingAs($manager)->post('/cms/content/footer', [
             'block_key' => 'company_description', 'title' => 'RetailPOS', 'content' => 'Retail operations software.',
-            'links' => [['label' => 'Privacy', 'url' => '/privacy']], 'is_enabled' => 1,
+            'links' => [['label' => 'Privacy', 'url' => '/privacy']], 'sort_order' => 5, 'is_enabled' => 1,
         ])->assertRedirect();
 
         $this->getJson('/api/public/cms/content/navigation')

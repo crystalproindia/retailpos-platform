@@ -13,13 +13,14 @@ use Illuminate\Validation\ValidationException;
 
 class CmsContentEditorService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(private readonly AuditLogger $auditLogger, private readonly PublicCmsService $publicCms) {}
 
     /** @param array<string, mixed> $data */
     public function createPage(User $user, array $data): CmsContentPage
     {
         $page = CmsContentPage::create(Arr::only($data, ['page_key', 'route_path', 'page_type', 'title']) + ['company_id' => $user->company_id, 'status' => CmsContentPage::STATUS_DRAFT, 'created_by' => $user->id, 'updated_by' => $user->id]);
         $this->auditLogger->record('cms.content_page.created', $page, 'Website content page created');
+        $this->forgetPublicContent($page->company_id);
         return $page;
     }
 
@@ -28,6 +29,7 @@ class CmsContentEditorService
     {
         $page->update(Arr::only($data, ['page_key', 'route_path', 'page_type', 'title']) + ['updated_by' => $user->id]);
         $this->auditLogger->record('cms.content_page.updated', $page, 'Website content page updated');
+        $this->forgetPublicContent($page->company_id);
         return $page->refresh();
     }
 
@@ -35,6 +37,7 @@ class CmsContentEditorService
     {
         $page->update(['status' => CmsContentPage::STATUS_PUBLISHED, 'published_at' => now(), 'updated_by' => $user->id]);
         $this->auditLogger->record('cms.content_page.published', $page, 'Website content page published');
+        $this->forgetPublicContent($page->company_id);
         return $page->refresh();
     }
 
@@ -42,6 +45,7 @@ class CmsContentEditorService
     {
         $page->update(['status' => CmsContentPage::STATUS_DRAFT, 'published_at' => null, 'updated_by' => $user->id]);
         $this->auditLogger->record('cms.content_page.unpublished', $page, 'Website content page moved to draft');
+        $this->forgetPublicContent($page->company_id);
         return $page->refresh();
     }
 
@@ -49,6 +53,7 @@ class CmsContentEditorService
     {
         $page->update(['status' => CmsContentPage::STATUS_ARCHIVED, 'published_at' => null, 'updated_by' => $user->id]);
         $this->auditLogger->record('cms.content_page.archived', $page, 'Website content page archived');
+        $this->forgetPublicContent($page->company_id);
         return $page->refresh();
     }
 
@@ -58,6 +63,7 @@ class CmsContentEditorService
         $this->ensureUniqueSectionKey($page, $data['section_key']);
         $section = $page->sections()->create($this->sectionPayload($data) + ['sort_order' => ((int) $page->sections()->max('sort_order')) + 10]);
         $this->auditLogger->record('cms.content_section.created', $section, 'Website content section added');
+        $this->forgetPublicContent($page->company_id);
         return $section;
     }
 
@@ -67,6 +73,7 @@ class CmsContentEditorService
         $this->ensureUniqueSectionKey($section->page, $data['section_key'], $section->id);
         $section->update($this->sectionPayload($data));
         $this->auditLogger->record('cms.content_section.updated', $section, 'Website content section updated');
+        $this->forgetPublicContent($section->page->company_id);
         return $section->refresh();
     }
 
@@ -74,6 +81,7 @@ class CmsContentEditorService
     {
         $section->update(['is_enabled' => $enabled]);
         $this->auditLogger->record($enabled ? 'cms.content_section.enabled' : 'cms.content_section.disabled', $section, $enabled ? 'Website content section enabled' : 'Website content section disabled');
+        $this->forgetPublicContent($section->page->company_id);
         return $section->refresh();
     }
 
@@ -88,6 +96,7 @@ class CmsContentEditorService
             $section->update(['sort_order' => $neighbourOrder]);
             $neighbour->update(['sort_order' => $sectionOrder]);
             $this->auditLogger->record('cms.content_section.reordered', $section, 'Website content section reordered');
+            $this->forgetPublicContent($section->page->company_id);
         }
         return $section->refresh();
     }
@@ -95,6 +104,7 @@ class CmsContentEditorService
     public function deleteSection(CmsContentSection $section): void
     {
         $this->auditLogger->record('cms.content_section.deleted', $section, 'Website content section deleted');
+        $this->forgetPublicContent($section->page->company_id);
         $section->delete();
     }
 
@@ -105,10 +115,12 @@ class CmsContentEditorService
             $parent = CmsNavigationItem::query()->where('company_id', $user->company_id)->find($data['parent_id']);
             if (! $parent || ($item && $parent->id === $item->id)) throw ValidationException::withMessages(['parent_id' => 'Choose a navigation item from this website.']);
         }
-        $payload = Arr::only($data, ['label', 'url', 'parent_id', 'location', 'is_enabled', 'opens_new_tab']);
-        if ($item) { $item->update($payload); $this->auditLogger->record('cms.navigation.updated', $item, 'Website navigation item updated'); return $item->refresh(); }
-        $item = CmsNavigationItem::create($payload + ['company_id' => $user->company_id, 'sort_order' => ((int) CmsNavigationItem::query()->where('company_id', $user->company_id)->where('location', $data['location'])->max('sort_order')) + 10]);
+        $payload = Arr::only($data, ['label', 'url', 'parent_id', 'location', 'sort_order', 'is_enabled', 'opens_new_tab']);
+        $payload['sort_order'] = $payload['sort_order'] ?? ((int) CmsNavigationItem::query()->where('company_id', $user->company_id)->where('location', $data['location'])->max('sort_order')) + 10;
+        if ($item) { $item->update($payload); $this->auditLogger->record('cms.navigation.updated', $item, 'Website navigation item updated'); $this->forgetPublicContent($user->company_id); return $item->refresh(); }
+        $item = CmsNavigationItem::create($payload + ['company_id' => $user->company_id]);
         $this->auditLogger->record('cms.navigation.created', $item, 'Website navigation item created');
+        $this->forgetPublicContent($user->company_id);
         return $item;
     }
 
@@ -124,11 +136,13 @@ class CmsContentEditorService
             throw ValidationException::withMessages(['block_key' => 'This footer area already exists. Edit the existing block instead.']);
         }
 
-        $payload = Arr::only($data, ['block_key', 'title', 'content', 'links', 'is_enabled']);
+        $payload = Arr::only($data, ['block_key', 'title', 'content', 'links', 'sort_order', 'is_enabled']);
+        $payload['sort_order'] = $payload['sort_order'] ?? ((int) CmsFooterBlock::query()->where('company_id', $user->company_id)->max('sort_order')) + 10;
         $payload['links'] = $this->cleanItems($payload['links'] ?? []);
-        if ($block) { $block->update($payload); $this->auditLogger->record('cms.footer.updated', $block, 'Website footer block updated'); return $block->refresh(); }
-        $block = CmsFooterBlock::create($payload + ['company_id' => $user->company_id, 'sort_order' => ((int) CmsFooterBlock::query()->where('company_id', $user->company_id)->max('sort_order')) + 10]);
+        if ($block) { $block->update($payload); $this->auditLogger->record('cms.footer.updated', $block, 'Website footer block updated'); $this->forgetPublicContent($user->company_id); return $block->refresh(); }
+        $block = CmsFooterBlock::create($payload + ['company_id' => $user->company_id]);
         $this->auditLogger->record('cms.footer.created', $block, 'Website footer block created');
+        $this->forgetPublicContent($user->company_id);
         return $block;
     }
 
@@ -149,10 +163,11 @@ class CmsContentEditorService
         $warnings = [];
         $hero = $sections->firstWhere('section_type', 'hero');
         if (! $hero || blank($hero->title)) $warnings[] = 'Hero title is missing';
+        if ($hero && blank($hero->image_url)) $warnings[] = 'Hero image link is missing';
         if (! $sections->contains(fn (CmsContentSection $section) => filled($section->primary_cta_label) && filled($section->primary_cta_url))) $warnings[] = 'CTA button is missing';
         if (! $sections->contains('section_type', 'faq')) $warnings[] = 'FAQ section is missing';
         if (! $sections->contains('section_type', 'footer_seo')) $warnings[] = 'Footer SEO content is missing';
-        if ($sections->where('is_enabled', true)->isEmpty()) $warnings[] = 'No sections are currently visible';
+        if ($page->status === CmsContentPage::STATUS_PUBLISHED && $sections->where('is_enabled', true)->isEmpty()) $warnings[] = 'No published sections are available';
         if ($page->status !== CmsContentPage::STATUS_PUBLISHED) $warnings[] = 'This page is still draft';
         if ($sections->contains('is_enabled', false)) $warnings[] = 'This page has a disabled section';
         return $warnings;
@@ -176,5 +191,10 @@ class CmsContentEditorService
     {
         $exists = $page->sections()->where('section_key', $key)->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))->exists();
         if ($exists) throw ValidationException::withMessages(['section_key' => 'Use a unique section name on this page.']);
+    }
+
+    private function forgetPublicContent(int $companyId): void
+    {
+        $this->publicCms->forgetContentForCompany($companyId);
     }
 }

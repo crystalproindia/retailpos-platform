@@ -165,6 +165,16 @@ class PublicCmsService
             ->all()) ?? [];
     }
 
+    public function forgetContentForCompany(int $companyId): void
+    {
+        if (app()->environment('testing')) {
+            return;
+        }
+
+        $versionKey = "public-cms:{$companyId}:content-version";
+        Cache::forever($versionKey, ((int) Cache::get($versionKey, 1)) + 1);
+    }
+
     /** @return array<string, mixed> */
     public function contentPreview(CmsContentPage $page): array
     {
@@ -183,7 +193,11 @@ class PublicCmsService
             return $callback($companyId);
         }
 
-        return Cache::remember("public-cms:{$companyId}:{$key}", now()->addMinutes(10), fn () => $callback($companyId));
+        $contentKey = str_starts_with($key, 'content-')
+            ? ':content-v'.((int) Cache::get("public-cms:{$companyId}:content-version", 1))
+            : '';
+
+        return Cache::remember("public-cms:{$companyId}{$contentKey}:{$key}", now()->addMinutes(10), fn () => $callback($companyId));
     }
 
     /** @return array<string, mixed> */

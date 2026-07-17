@@ -2934,7 +2934,7 @@ Website Content Editor Lite is an additive, tenant-scoped CMS surface for simple
 
 `CmsContentPage`, `CmsContentSection`, `CmsNavigationItem`, and `CmsFooterBlock` are the dedicated content records. Migration `2026_07_17_040001_create_cms_content_editor_tables.php` creates the normalized page, section, navigation, and footer tables with tenant, route, publication, ordering, and public-read indexes. Flexible repeatable content such as FAQ rows, testimonials, feature cards, statistics, and footer links uses validated JSON arrays only behind friendly repeatable forms; no editor screen exposes raw JSON or code fields.
 
-`CmsContentPageRepository` and `CmsContentNavigationRepository` keep company-scoped queries out of controllers. `CmsContentEditorService` owns page lifecycle, default homepage sections, section ordering, enable/disable behavior, navigation/footer saves, human-readable content-health warnings, and audit entries. The existing `AuditLogger` remains the audit system of record.
+`CmsContentPageRepository` and `CmsContentNavigationRepository` keep company-scoped queries out of controllers. `CmsContentEditorService` owns page lifecycle, default homepage sections, section ordering, enable/disable behavior, navigation/footer saves, human-readable content-health warnings, and audit entries. Navigation and footer blocks expose a simple numeric display order in addition to their automatic ordering. The existing `AuditLogger` remains the audit system of record.
 
 ### Admin Routes and Permissions
 
@@ -2946,7 +2946,7 @@ The CMS group exposes `/cms/content`, `/cms/content/pages`, `/cms/content/blocks
 
 Supported page types are Home, Product, Solution, Industry, Module, Pricing, Contact, About, and Custom Landing. Supported section types include Hero, Feature Grid, Benefits, Product Highlights, Industry Use Cases, Module Details, FAQ, CTA, Testimonials, Statistics, Comparison, Footer SEO Content, and Custom Content. The demo seeder provides a draft home page with Hero, Product Highlights, Features, Industries, AI-Powered Benefits, Testimonials, FAQ, CTA, and Footer SEO sections, together with starter navigation and a company-description footer block.
 
-`PublicCmsService` remains the single published-only public read model. The new rate-limited endpoints are `/api/public/cms/content/pages`, `/api/public/cms/content/page?path=/`, `/api/public/cms/content/page/{pageKey}`, `/api/public/cms/content/navigation`, and `/api/public/cms/content/footer`. They expose only published pages, enabled sections, and enabled navigation/footer records; they omit company IDs, user IDs, audit data, and internal record IDs, and retain the existing ten-minute non-test cache policy.
+`PublicCmsService` remains the single published-only public read model. The new rate-limited endpoints are `/api/public/cms/content/pages`, `/api/public/cms/content/page?path=/`, `/api/public/cms/content/page/{pageKey}`, `/api/public/cms/content/navigation`, and `/api/public/cms/content/footer`. They expose only published pages, enabled sections, and enabled navigation/footer records; they omit company IDs, user IDs, audit data, and internal record IDs. CMS content writes advance a content-only cache version, so those endpoints reflect publication, unpublication, reordering, enablement, navigation, and footer changes immediately instead of waiting for their existing ten-minute non-test cache entries to expire.
 
 ### Current Limitations
 

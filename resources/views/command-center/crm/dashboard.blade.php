@@ -75,6 +75,10 @@
             'emptyMessage' => 'Schedule a demo from a lead to keep the next customer conversations visible here.',
         ])
 
+        @if ($onboardingMetrics)
+            @include('command-center.crm.partials.onboarding-dashboard')
+        @endif
+
         <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
             <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between gap-3"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">AI lead insights</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Rule-based prioritization from current CRM signals.</p></div><a href="{{ route('crm.pipeline.index', ['ai_category' => 'hot']) }}" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Open pipeline</a></div>

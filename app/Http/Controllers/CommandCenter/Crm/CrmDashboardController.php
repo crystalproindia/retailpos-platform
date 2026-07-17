@@ -5,6 +5,7 @@ namespace App\Http\Controllers\CommandCenter\Crm;
 use App\Http\Controllers\Controller;
 use App\Repositories\Crm\DemoScheduleRepository;
 use App\Repositories\Crm\CrmCustomerRepository;
+use App\Repositories\Crm\CrmOnboardingRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
 use App\Repositories\Crm\ProformaRepository;
@@ -14,7 +15,7 @@ use Illuminate\View\View;
 
 class CrmDashboardController extends Controller
 {
-    public function __invoke(Request $request, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, QuotationRepository $quotationRepository, CrmCustomerRepository $customerRepository, ProformaRepository $proformas, CrmLeadScoringService $leadScoring): View
+    public function __invoke(Request $request, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, QuotationRepository $quotationRepository, CrmCustomerRepository $customerRepository, ProformaRepository $proformas, CrmOnboardingRepository $onboardings, CrmLeadScoringService $leadScoring): View
     {
         return view('command-center.crm.dashboard', [
             'metrics' => $leadRepository->dashboardMetrics($request->user()),
@@ -23,6 +24,7 @@ class CrmDashboardController extends Controller
             'quotationMetrics' => $quotationRepository->dashboardMetrics($request->user()),
             'customerMetrics' => $customerRepository->dashboardMetrics($request->user()),
             'proformaMetrics' => $proformas->metrics($request->user()),
+            'onboardingMetrics' => $request->user()->can('crm.onboarding.view') ? $onboardings->dashboard($request->user()) : null,
             'aiInsights' => $leadScoring->dashboardInsights($request->user()),
         ]);
     }

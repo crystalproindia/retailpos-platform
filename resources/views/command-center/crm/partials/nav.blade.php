@@ -6,6 +6,7 @@
         ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
         ['label' => 'Proforma Invoices', 'route' => 'crm.proformas.index'],
         ['label' => 'Customers', 'route' => 'crm.customers.index'],
+        ['label' => 'Onboarding', 'route' => 'crm.onboarding.index'],
         ['label' => 'Companies', 'route' => 'crm.companies.index'],
         ['label' => 'Contacts', 'route' => 'crm.contacts.index'],
         ['label' => 'Pipeline', 'route' => 'crm.pipeline.index'],

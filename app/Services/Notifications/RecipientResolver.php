@@ -48,6 +48,8 @@ class RecipientResolver
                 : collect(),
             'crm.lead_score.hot', 'crm.lead_score.at_risk', 'crm.lead_followup_overdue', 'crm.payment_followup_required' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
+            'crm.onboarding.started', 'crm.onboarding.task_assigned', 'crm.onboarding.task_overdue', 'crm.onboarding.target_go_live_missed', 'crm.onboarding.document_pending', 'crm.onboarding.blocked', 'crm.onboarding.go_live_ready', 'crm.onboarding.live', 'crm.onboarding.on_hold', 'crm.onboarding.cancelled' => $this->usersByIds($query, [$payload['implementation_owner_id'] ?? null, $payload['assigned_user_id'] ?? null])
+                ->merge($this->managers($event->companyId())),
             'crm.follow_up.due', 'crm.follow_up.overdue' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
             'crm.lead.created' => $this->leadCreatedRecipients($event, $query),

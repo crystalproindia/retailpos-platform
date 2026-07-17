@@ -53,6 +53,18 @@ class CrmCustomer extends Model
         return $this->hasMany(CrmProformaInvoice::class, 'customer_id')->latest('created_at');
     }
 
+    public function onboardings(): HasMany
+    {
+        return $this->hasMany(CrmCustomerOnboarding::class, 'customer_id')->latest('created_at');
+    }
+
+    public function activeOnboarding(): HasOne
+    {
+        return $this->hasOne(CrmCustomerOnboarding::class, 'customer_id')
+            ->whereNotIn('status', ['live', 'cancelled'])
+            ->latestOfMany('created_at');
+    }
+
     public function primaryContact(): HasOne
     {
         return $this->hasOne(CrmCustomerContact::class, 'customer_id')->where('is_primary', true);

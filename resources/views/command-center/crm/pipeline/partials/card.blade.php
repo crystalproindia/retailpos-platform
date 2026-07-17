@@ -66,6 +66,9 @@
             @if ($card['payment_label'])
                 <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{{ $card['payment_label'] }}</span>
             @endif
+            @if ($card['active_onboarding'])
+                <a href="{{ route('crm.onboarding.show', $card['active_onboarding']) }}" class="rounded-full bg-violet-100 px-2 py-1 text-[11px] font-semibold text-violet-800 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-200">Onboarding {{ $card['active_onboarding']->progress_percent }}%</a>
+            @endif
         </div>
     @endif
 
@@ -79,6 +82,11 @@
         @endif
         @if ($lead->crmCustomer)
             <a href="{{ route('crm.customers.show', $lead->crmCustomer) }}" class="text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Customer</a>
+            @if (! $card['active_onboarding'])
+                @can('crm.onboarding.create')
+                    <form method="POST" action="{{ route('crm.customers.onboarding.start', $lead->crmCustomer) }}">@csrf<button class="text-violet-700 hover:text-violet-900 dark:text-violet-300">Start onboarding</button></form>
+                @endcan
+            @endif
         @elseif ($stage->value === 'won')
             @can('crm.customers.convert')
                 <a href="{{ route('crm.customers.create-for-lead', $lead) }}" class="text-emerald-700 hover:text-emerald-900 dark:text-emerald-300">Convert</a>

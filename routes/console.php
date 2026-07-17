@@ -13,6 +13,7 @@ Schedule::command('notifications:retry-failed-deliveries')->everyFifteenMinutes(
 Schedule::command('notifications:dispatch-followup-due')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-overdue')->hourly()->withoutOverlapping();
 Schedule::command('retailpos:lead-followup-reminders')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('retailpos:onboarding-reminders')->hourly()->withoutOverlapping();
 Schedule::command('retailpos:crm-refresh-lead-scores --stale')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('notifications:prune-domain-events')->dailyAt('02:30')->withoutOverlapping();
 Schedule::command('operations:health-check')->everyFiveMinutes()->withoutOverlapping();

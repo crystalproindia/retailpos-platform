@@ -37,7 +37,7 @@ class CrmCustomerRepository
     public function findForUser(User $user, int $customerId): CrmCustomer
     {
         return $this->queryForUser($user)
-            ->with(['primaryContact', 'contacts', 'lead.status', 'quotation.items', 'creator', 'updater', 'auditLogs.user'])
+            ->with(['primaryContact', 'contacts', 'lead.status', 'quotation.items', 'activeOnboarding', 'creator', 'updater', 'auditLogs.user'])
             ->findOrFail($customerId);
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Repositories\Crm\DemoScheduleRepository;
 use App\Repositories\Crm\LeadRepository;
+use App\Repositories\Crm\CrmOnboardingRepository;
 use App\Repositories\DashboardRepository;
 use App\Services\Cms\CmsWebsiteControlService;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CmsWebsiteControlService $websiteControl): View
+    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CmsWebsiteControlService $websiteControl): View
     {
         $user = $request->user();
 
@@ -22,6 +23,7 @@ class DashboardController extends Controller
             'leadMetrics' => $leadRepository->commandCenterMetrics($user),
             'demoMetrics' => $demoScheduleRepository->dashboardMetrics($user),
             'upcomingDemos' => $demoScheduleRepository->upcomingForUser($user),
+            'onboardingMetrics' => $user->can('crm.onboarding.view') ? $onboardings->dashboard($user) : null,
             'cmsDashboard' => $user->can('cms.view') ? $websiteControl->dashboard($user->company_id) : null,
             'recentAuditLogs' => AuditLog::query()
                 ->with('user')

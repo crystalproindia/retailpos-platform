@@ -43,6 +43,7 @@ use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
+use App\Http\Controllers\CommandCenter\Crm\CrmOnboardingController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
@@ -186,6 +187,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->middleware('can:crm.quotations.view')->name('quotations.show');
         Route::get('customers', [CrmCustomerController::class, 'index'])->middleware('can:crm.customers.view')->name('customers.index');
         Route::get('customers/{customer}', [CrmCustomerController::class, 'show'])->middleware('can:crm.customers.view')->name('customers.show');
+        Route::post('customers/{customer}/onboarding', [CrmOnboardingController::class, 'startFromCustomer'])->middleware('can:crm.onboarding.create')->name('customers.onboarding.start');
         Route::get('leads/{lead}/customer-conversion', [CrmCustomerController::class, 'createForLead'])->middleware('can:crm.customers.convert')->name('customers.create-for-lead');
         Route::post('leads/{lead}/customer-conversion', [CrmCustomerController::class, 'storeForLead'])->middleware('can:crm.customers.convert')->name('customers.store-for-lead');
         Route::get('quotations/{quotation}/customer-conversion', [CrmCustomerController::class, 'createForQuotation'])->middleware('can:crm.customers.convert')->name('customers.create-for-quotation');
@@ -219,6 +221,18 @@ Route::middleware('auth')->group(function (): void {
         Route::get('pipeline', [PipelineController::class, 'index'])->middleware('can:crm.pipeline.manage')->name('pipeline.index');
         Route::post('pipeline/cards/{lead}/move', [PipelineController::class, 'move'])->middleware('can:crm.pipeline.manage')->name('pipeline.cards.move');
         Route::patch('pipeline/{lead}', [PipelineController::class, 'transition'])->middleware('can:crm.pipeline.manage')->name('pipeline.transition');
+
+        Route::get('onboarding', [CrmOnboardingController::class, 'index'])->middleware('can:crm.onboarding.view')->name('onboarding.index');
+        Route::get('onboarding/{onboarding}', [CrmOnboardingController::class, 'show'])->middleware('can:crm.onboarding.view')->name('onboarding.show');
+        Route::get('onboarding/{onboarding}/edit', [CrmOnboardingController::class, 'edit'])->middleware('can:crm.onboarding.update')->name('onboarding.edit');
+        Route::put('onboarding/{onboarding}', [CrmOnboardingController::class, 'update'])->middleware('can:crm.onboarding.update')->name('onboarding.update');
+        Route::post('onboarding/{onboarding}/status', [CrmOnboardingController::class, 'status'])->middleware('can:crm.onboarding.update')->name('onboarding.status');
+        Route::post('onboarding/{onboarding}/tasks', [CrmOnboardingController::class, 'storeTask'])->middleware('can:crm.onboarding.update')->name('onboarding.tasks.store');
+        Route::post('onboarding/{onboarding}/tasks/{task}', [CrmOnboardingController::class, 'task'])->middleware('can:crm.onboarding.complete_task')->name('onboarding.tasks.update');
+        Route::post('onboarding/{onboarding}/notes', [CrmOnboardingController::class, 'note'])->middleware('can:crm.onboarding.update')->name('onboarding.notes.store');
+        Route::post('onboarding/{onboarding}/documents', [CrmOnboardingController::class, 'document'])->middleware('can:crm.onboarding.manage_documents')->name('onboarding.documents.store');
+        Route::put('onboarding/{onboarding}/documents/{document}', [CrmOnboardingController::class, 'updateDocument'])->middleware('can:crm.onboarding.manage_documents')->name('onboarding.documents.update');
+        Route::post('proforma-invoices/{proforma}/onboarding', [CrmOnboardingController::class, 'startFromProforma'])->middleware('can:crm.onboarding.create')->name('proformas.onboarding.start');
 
         Route::get('activities', [ActivityController::class, 'index'])->middleware('can:crm.activities.manage')->name('activities.index');
         Route::post('activities', [ActivityController::class, 'store'])->middleware('can:crm.activities.manage')->name('activities.store');

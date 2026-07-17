@@ -104,6 +104,10 @@
             ])
         @endcan
 
+        @if ($onboardingMetrics)
+            @include('command-center.crm.partials.onboarding-dashboard')
+        @endif
+
         @if ($cmsDashboard)
             <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">

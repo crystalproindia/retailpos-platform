@@ -155,6 +155,25 @@ class NotificationTemplateRenderer
             return 'Lead '.($event->payload()['lead_title'] ?? 'record').' was converted to customer '.($event->payload()['customer_code'] ?? $event->payload()['customer_name'] ?? 'account').'.';
         }
 
+        if (str($event->eventKey())->startsWith('crm.onboarding.')) {
+            $number = $event->payload()['onboarding_number'] ?? 'this onboarding';
+            $name = $event->payload()['customer_name'] ?? 'the customer';
+
+            return match ($event->eventKey()) {
+                'crm.onboarding.started' => "Onboarding {$number} started for {$name}.",
+                'crm.onboarding.task_assigned' => "An onboarding responsibility was assigned for {$name}.",
+                'crm.onboarding.task_overdue' => 'An onboarding task is overdue for '.$name.'.',
+                'crm.onboarding.target_go_live_missed' => 'The target go-live date has passed for '.$name.'.',
+                'crm.onboarding.document_pending' => 'A required onboarding document is still pending for '.$name.'.',
+                'crm.onboarding.blocked' => "Onboarding {$number} is blocked.",
+                'crm.onboarding.go_live_ready' => "Onboarding {$number} is ready for go-live.",
+                'crm.onboarding.live' => "{$name} is now live.",
+                'crm.onboarding.on_hold' => "Onboarding {$number} is on hold.",
+                'crm.onboarding.cancelled' => "Onboarding {$number} was cancelled.",
+                default => "Onboarding {$number} was updated.",
+            };
+        }
+
         return ($definition['description'] ?? 'A platform event occurred.').' Event: '.$event->eventKey().'.';
     }
 
@@ -218,6 +237,16 @@ class NotificationTemplateRenderer
             'crm.proforma.fully_paid' => 'proforma_fully_paid',
             'crm.proforma.share_failed' => 'proforma_share_failed',
             'crm.customer.created' => 'crm_customer_created',
+            'crm.onboarding.started' => 'onboarding_started',
+            'crm.onboarding.task_assigned' => 'onboarding_task_assigned',
+            'crm.onboarding.task_overdue' => 'onboarding_task_overdue',
+            'crm.onboarding.target_go_live_missed' => 'onboarding_target_go_live_missed',
+            'crm.onboarding.document_pending' => 'onboarding_document_pending',
+            'crm.onboarding.blocked' => 'onboarding_blocked',
+            'crm.onboarding.go_live_ready' => 'onboarding_go_live_ready',
+            'crm.onboarding.live' => 'onboarding_live',
+            'crm.onboarding.on_hold' => 'onboarding_on_hold',
+            'crm.onboarding.cancelled' => 'onboarding_cancelled',
             'crm.lead.assigned' => 'lead_assigned',
             'crm.lead.status_changed' => 'lead_status_changed',
             'crm.pipeline.stage_changed' => 'pipeline_stage_changed',
@@ -240,6 +269,7 @@ class NotificationTemplateRenderer
             'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected' => $event->aggregateId() ? route('crm.quotations.show', $event->aggregateId()) : null,
             'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed' => $event->aggregateId() ? route('crm.proformas.show', $event->aggregateId()) : null,
             'crm.customer.created' => $event->aggregateId() ? route('crm.customers.show', $event->aggregateId()) : null,
+            'crm.onboarding.started', 'crm.onboarding.task_assigned', 'crm.onboarding.task_overdue', 'crm.onboarding.target_go_live_missed', 'crm.onboarding.document_pending', 'crm.onboarding.blocked', 'crm.onboarding.go_live_ready', 'crm.onboarding.live', 'crm.onboarding.on_hold', 'crm.onboarding.cancelled', 'crm.onboarding.updated' => $event->aggregateId() ? route('crm.onboarding.show', $event->aggregateId()) : null,
             'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
                 ? route('crm.leads.show', $event->payload()['lead_id'])
                 : route('crm.followups.index'),

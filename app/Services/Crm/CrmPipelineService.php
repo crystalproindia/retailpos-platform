@@ -24,7 +24,7 @@ class CrmPipelineService
     {
         $statuses = $this->stageService->statusesForCompany($user->company_id);
         $leads = $this->filteredQuery($user, $filters)
-            ->with(['latestQuotation', 'latestProforma', 'latestActivity', 'crmCustomer', 'leadScore'])
+            ->with(['latestQuotation', 'latestProforma', 'latestActivity', 'crmCustomer.activeOnboarding', 'leadScore'])
             ->latest('updated_at')
             ->get();
 
@@ -135,6 +135,7 @@ class CrmPipelineService
                 ? 'Partial payment'
                 : ($proforma?->status === ProformaStatus::Paid ? 'Paid' : null),
             'ai_score' => $lead->leadScore,
+            'active_onboarding' => $lead->crmCustomer?->activeOnboarding,
         ];
     }
 }

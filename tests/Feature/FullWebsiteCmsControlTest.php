@@ -32,6 +32,16 @@ class FullWebsiteCmsControlTest extends TestCase
         $this->getJson('/api/public/cms/case-studies/newrie-london')->assertNotFound();
     }
 
+    public function test_public_cms_lists_return_empty_json_when_no_public_company_is_configured(): void
+    {
+        config()->set('services.retailpos.public_lead_company_id', null);
+
+        $this->getJson('/api/public/cms/pages')->assertOk()->assertExactJson(['data' => []]);
+        $this->getJson('/api/public/cms/navigation')->assertOk()->assertExactJson(['data' => []]);
+        $this->getJson('/api/public/cms/settings')->assertOk()->assertExactJson(['data' => []]);
+        $this->getJson('/api/public/cms/case-studies')->assertOk()->assertExactJson(['data' => []]);
+    }
+
     public function test_website_routes_are_authorized_and_media_rejects_executables(): void
     {
         $manager = $this->manager();

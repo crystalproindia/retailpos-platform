@@ -14,7 +14,9 @@ use App\Models\Cms\CmsPage;
 use App\Models\Cms\CmsRedirect;
 use App\Models\Cms\CmsSetting;
 use App\Models\Cms\CmsSeoSetting;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PublicCmsService
@@ -51,7 +53,7 @@ class PublicCmsService
 
     public function settings(): array
     {
-        return $this->remember('settings', function (int $companyId): array {
+        return $this->publicArray('settings', fn (): array => $this->remember('settings', function (int $companyId): array {
             $settings = CmsSeoSetting::query()->with(['defaultOgImage', 'defaultTwitterImage'])->where('company_id', $companyId)->first();
             if (! $settings) return [];
             return [
@@ -62,13 +64,13 @@ class PublicCmsService
                 'contact_email' => $settings->contact_email, 'address' => $settings->address, 'same_as_social_links' => $settings->same_as_social_links,
                 'website_settings' => CmsSetting::query()->with('media')->where('company_id', $companyId)->where('is_public', true)->get()->mapWithKeys(fn (CmsSetting $setting) => [$setting->key => $setting->media ? $this->mediaUrl($setting->media) : $setting->value])->all(),
             ];
-        });
+        }) ?? []);
     }
 
     /** @return array<int, array<string, mixed>> */
     public function pages(): array
     {
-        return $this->remember('pages', fn (int $companyId) => CmsPage::query()->where('company_id', $companyId)->where('status', CmsPage::STATUS_PUBLISHED)->where('is_active', true)->orderBy('sort_order')->get()->map(fn (CmsPage $page) => ['slug' => $page->slug, 'route_path' => $page->route_path, 'title' => $page->title, 'page_type' => $page->page_type, 'published_at' => $page->published_at?->toIso8601String()])->all()) ?? [];
+        return $this->publicArray('pages', fn (): array => $this->remember('pages', fn (int $companyId) => CmsPage::query()->where('company_id', $companyId)->where('status', CmsPage::STATUS_PUBLISHED)->where('is_active', true)->orderBy('sort_order')->get()->map(fn (CmsPage $page) => ['slug' => $page->slug, 'route_path' => $page->route_path, 'title' => $page->title, 'page_type' => $page->page_type, 'published_at' => $page->published_at?->toIso8601String()])->all()) ?? []);
     }
 
     public function pageBySlug(string $slug): ?array
@@ -81,12 +83,15 @@ class PublicCmsService
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function navigation(): array { return $this->contentNavigation(); }
+    public function navigation(): array
+    {
+        return $this->publicArray('navigation', fn (): array => $this->contentNavigation());
+    }
 
     /** @return array<int, array<string, mixed>> */
     public function caseStudies(): array
     {
-        return $this->remember('case-studies', fn (int $companyId) => CmsCaseStudy::query()->with(['featuredImageMedia', 'ogImageMedia'])->where('company_id', $companyId)->where('status', 'published')->whereNotNull('published_at')->orderBy('sort_order')->get()->map(fn (CmsCaseStudy $study) => $this->caseStudyPayload($study))->all()) ?? [];
+        return $this->publicArray('case-studies', fn (): array => $this->remember('case-studies', fn (int $companyId) => CmsCaseStudy::query()->with(['featuredImageMedia', 'ogImageMedia'])->where('company_id', $companyId)->where('status', 'published')->whereNotNull('published_at')->orderBy('sort_order')->get()->map(fn (CmsCaseStudy $study) => $this->caseStudyPayload($study))->all()) ?? []);
     }
 
     public function caseStudy(string $slug): ?array
@@ -233,6 +238,21 @@ class PublicCmsService
             : '';
 
         return Cache::remember("public-cms:{$companyId}{$contentKey}:{$key}", now()->addMinutes(10), fn () => $callback($companyId));
+    }
+
+    /** @param callable(): array<mixed> $callback */
+    private function publicArray(string $resource, callable $callback): array
+    {
+        try {
+            return $callback();
+        } catch (QueryException $exception) {
+            Log::warning('Public CMS resource is unavailable.', [
+                'resource' => $resource,
+                'exception_class' => $exception::class,
+            ]);
+
+            return [];
+        }
     }
 
     /** @return array<string, mixed> */

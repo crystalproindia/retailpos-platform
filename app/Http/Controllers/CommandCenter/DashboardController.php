@@ -10,12 +10,13 @@ use App\Repositories\Crm\CrmOnboardingRepository;
 use App\Repositories\Crm\CrmSupportTicketRepository;
 use App\Repositories\DashboardRepository;
 use App\Services\Cms\CmsWebsiteControlService;
+use App\Services\Crm\CrmExecutiveReportService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CmsWebsiteControlService $websiteControl): View
+    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CmsWebsiteControlService $websiteControl, CrmExecutiveReportService $reports): View
     {
         $user = $request->user();
 
@@ -26,6 +27,7 @@ class DashboardController extends Controller
             'upcomingDemos' => $demoScheduleRepository->upcomingForUser($user),
             'onboardingMetrics' => $user->can('crm.onboarding.view') ? $onboardings->dashboard($user) : null,
             'supportMetrics' => $user->can('crm.support.view') ? $supportTickets->dashboard($user) : null,
+            'businessHealth' => $user->can('crm.reports.view') ? $reports->dashboard($user) : null,
             'cmsDashboard' => $user->can('cms.view') ? $websiteControl->dashboard($user->company_id) : null,
             'recentAuditLogs' => AuditLog::query()
                 ->with('user')

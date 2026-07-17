@@ -112,6 +112,13 @@
             @include('command-center.crm.partials.support-dashboard')
         @endif
 
+        @if ($businessHealth)
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p class="text-sm font-semibold text-teal-700 dark:text-teal-300">Executive reports</p><h2 class="mt-1 text-base font-semibold text-slate-950 dark:text-white">Business Health Snapshot</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $businessHealth['summary_message'] }}</p></div><a href="{{ route('crm.reports.visualization') }}" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300">Open visualization</a></div>
+                <div class="mt-5 flex items-center gap-4 rounded-lg bg-slate-50 p-4 dark:bg-slate-950"><span class="text-3xl" aria-hidden="true">{{ $businessHealth['overall']['icon'] }}</span><div><p class="text-2xl font-semibold text-slate-950 dark:text-white">{{ $businessHealth['overall_score'] }}<span class="text-sm text-slate-500">/100</span></p><p class="text-sm font-medium text-slate-600 dark:text-slate-300">{{ $businessHealth['overall']['label'] }}</p></div>@if($businessHealth['risks']->isNotEmpty())<p class="ml-auto max-w-sm text-right text-sm text-slate-600 dark:text-slate-300">Top risk: {{ $businessHealth['risks']->first()['area'] }}</p>@endif</div>
+            </section>
+        @endif
+
         @if ($cmsDashboard)
             <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">

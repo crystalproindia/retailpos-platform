@@ -49,6 +49,7 @@ use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\CrmOnboardingController;
 use App\Http\Controllers\CommandCenter\Crm\CrmSupportTicketController;
+use App\Http\Controllers\CommandCenter\Crm\CrmReportController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
@@ -176,6 +177,11 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware(['role:administrator,manager,sales', 'can:crm.view'])->prefix('crm')->name('crm.')->group(function (): void {
         Route::get('/', CrmDashboardController::class)->name('dashboard');
+        Route::get('reports', [CrmReportController::class, 'index'])->middleware('can:crm.reports.view')->name('reports.index');
+        Route::get('reports/executive', [CrmReportController::class, 'executive'])->middleware('can:crm.reports.executive')->name('reports.executive');
+        Route::get('reports/visualization', [CrmReportController::class, 'visualization'])->middleware('can:crm.reports.view')->name('reports.visualization');
+        Route::get('reports/{report}', [CrmReportController::class, 'show'])->whereIn('report', ['sales', 'payments', 'onboarding', 'support', 'customers'])->middleware('can:crm.reports.view')->name('reports.show');
+        Route::get('reports/{report}/export', [CrmReportController::class, 'export'])->whereIn('report', ['sales', 'payments', 'support'])->middleware('can:crm.reports.export')->name('reports.export');
 
         Route::get('leads', [LeadController::class, 'index'])->middleware('can:crm.leads.view')->name('leads.index');
         Route::get('demo-requests', [LeadController::class, 'demoRequests'])->middleware('can:crm.leads.view')->name('demo-requests.index');

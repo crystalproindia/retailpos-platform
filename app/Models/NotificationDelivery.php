@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['company_id', 'user_id', 'domain_event_log_id', 'notification_id', 'event_key', 'channel', 'recipient', 'status', 'attempt_count', 'provider', 'provider_message_id', 'payload', 'response', 'failure_reason', 'queued_at', 'sent_at', 'delivered_at', 'failed_at', 'next_retry_at'])]
+#[Fillable(['company_id', 'user_id', 'created_by', 'domain_event_log_id', 'notification_id', 'related_type', 'related_id', 'event_key', 'template_key', 'channel', 'recipient', 'recipient_name', 'subject', 'status', 'attempt_count', 'provider', 'provider_message_id', 'idempotency_key', 'payload', 'response', 'failure_reason', 'queued_at', 'sent_at', 'delivered_at', 'failed_at', 'next_retry_at'])]
 class NotificationDelivery extends Model
 {
     protected function casts(): array
@@ -30,6 +30,11 @@ class NotificationDelivery extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function eventLog(): BelongsTo

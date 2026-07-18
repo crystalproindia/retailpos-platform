@@ -395,6 +395,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('pages/{page}/unpublish', [CmsPageController::class, 'unpublish'])->name('pages.unpublish');
         Route::post('pages/{page}/sections', [CmsPageController::class, 'storeSection'])->name('pages.sections.store');
         Route::put('pages/{page}/sections/{section}', [CmsPageController::class, 'updateSection'])->name('pages.sections.update');
+        Route::post('pages/{page}/sections/{section}/move', [CmsPageController::class, 'moveSection'])->name('pages.sections.move');
         Route::delete('pages/{page}/sections/{section}', [CmsPageController::class, 'destroySection'])->name('pages.sections.destroy');
 
         Route::get('homepage', [CmsHomepageController::class, 'index'])->middleware('can:cms.homepage.manage')->name('homepage.index');
@@ -495,16 +496,20 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('website')->name('website.')->group(function (): void {
+        Route::get('/', CmsDashboardController::class)->name('dashboard');
         Route::get('pages', [CmsPageController::class, 'index'])->middleware('can:website.pages.view')->name('pages.index');
         Route::get('pages/create', [CmsPageController::class, 'create'])->middleware('can:website.pages.create')->name('pages.create');
         Route::post('pages', [CmsPageController::class, 'store'])->middleware('can:website.pages.create')->name('pages.store');
+        Route::post('pages/bulk', [CmsPageController::class, 'bulk'])->middleware('can:website.pages.update')->name('pages.bulk');
         Route::get('pages/{page}/edit', [CmsPageController::class, 'edit'])->middleware('can:website.pages.update')->name('pages.edit');
         Route::put('pages/{page}', [CmsPageController::class, 'update'])->middleware('can:website.pages.update')->name('pages.update');
         Route::delete('pages/{page}', [CmsPageController::class, 'destroy'])->middleware('can:website.pages.delete')->name('pages.destroy');
+        Route::post('pages/{page}/restore', [CmsPageController::class, 'restore'])->middleware('can:website.pages.delete')->name('pages.restore');
         Route::post('pages/{page}/publish', [CmsPageController::class, 'publish'])->middleware('can:website.pages.publish')->name('pages.publish');
         Route::post('pages/{page}/unpublish', [CmsPageController::class, 'unpublish'])->middleware('can:website.pages.publish')->name('pages.unpublish');
         Route::post('pages/{page}/sections', [CmsPageController::class, 'storeSection'])->middleware('can:website.sections.manage')->name('pages.sections.store');
         Route::put('pages/{page}/sections/{section}', [CmsPageController::class, 'updateSection'])->middleware('can:website.sections.manage')->name('pages.sections.update');
+        Route::post('pages/{page}/sections/{section}/move', [CmsPageController::class, 'moveSection'])->middleware('can:website.sections.manage')->name('pages.sections.move');
         Route::delete('pages/{page}/sections/{section}', [CmsPageController::class, 'destroySection'])->middleware('can:website.sections.manage')->name('pages.sections.destroy');
         Route::get('case-studies', [CmsCaseStudyController::class, 'index'])->middleware('can:website.case_studies.view')->name('case-studies.index');
         Route::get('case-studies/create', [CmsCaseStudyController::class, 'create'])->middleware('can:website.case_studies.create')->name('case-studies.create');

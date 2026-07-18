@@ -23,13 +23,15 @@ class CmsPageController extends Controller
             'pages' => $pageRepository->paginateForCompany($request->user()->company_id, $request->only(['search', 'status', 'page_type', 'trashed'])),
             'statuses' => [CmsPage::STATUS_DRAFT, CmsPage::STATUS_PUBLISHED, CmsPage::STATUS_SCHEDULED, CmsPage::STATUS_ARCHIVED],
             'pageTypes' => ['standard', 'landing', 'product', 'module', 'industry', 'solution', 'legal'],
+            'routePrefix' => $this->routePrefix($request),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         return view('command-center.cms.pages.create', [
             'page' => new CmsPage(['status' => CmsPage::STATUS_DRAFT]),
+            'routePrefix' => $this->routePrefix($request),
         ]);
     }
 
@@ -37,13 +39,14 @@ class CmsPageController extends Controller
     {
         $page = $pageService->create($request->user(), $request->validated());
 
-        return redirect()->route('cms.pages.edit', $page)->with('status', 'CMS page created.');
+        return redirect()->route($this->routePrefix($request).'.pages.edit', $page)->with('status', 'CMS page created.');
     }
 
     public function edit(Request $request, CmsPageRepository $pageRepository, int $page): View
     {
         return view('command-center.cms.pages.edit', [
             'page' => $pageRepository->findForCompany($request->user()->company_id, $page, true),
+            'routePrefix' => $this->routePrefix($request),
         ]);
     }
 
@@ -120,11 +123,25 @@ class CmsPageController extends Controller
         return back()->with('status', 'Page section updated.');
     }
 
+    public function moveSection(Request $request, CmsPageRepository $pageRepository, CmsPageSectionRepository $sectionRepository, CmsPageSectionService $sectionService, int $page, int $section): RedirectResponse
+    {
+        $direction = $request->validate(['direction' => ['required', 'in:up,down']])['direction'];
+        $pageRepository->findForCompany($request->user()->company_id, $page);
+        $sectionService->move($sectionRepository->findForPage($request->user()->company_id, $page, $section), $direction);
+
+        return back()->with('status', 'Page section reordered.');
+    }
+
     public function destroySection(Request $request, CmsPageRepository $pageRepository, CmsPageSectionRepository $sectionRepository, CmsPageSectionService $sectionService, int $page, int $section): RedirectResponse
     {
         $pageRepository->findForCompany($request->user()->company_id, $page);
         $sectionService->delete($sectionRepository->findForPage($request->user()->company_id, $page, $section));
 
         return back()->with('status', 'Page section removed.');
+    }
+
+    private function routePrefix(Request $request): string
+    {
+        return $request->routeIs('website.*') ? 'website' : 'cms';
     }
 }

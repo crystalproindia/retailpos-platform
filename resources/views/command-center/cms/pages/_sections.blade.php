@@ -8,12 +8,12 @@
         @forelse ($page->sections as $section)
             <details class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
                 <summary class="cursor-pointer font-medium text-slate-950 dark:text-white">{{ $section->section_key }} <span class="ml-2 text-sm font-normal text-slate-500">{{ str($section->section_type)->replace('_', ' ')->headline() }}</span></summary>
-                <form method="POST" action="{{ route('cms.pages.sections.update', [$page, $section]) }}" class="mt-4 grid gap-3 md:grid-cols-2">
+                <form method="POST" action="{{ route($routePrefix.'.pages.sections.update', [$page, $section]) }}" class="mt-4 grid gap-3 md:grid-cols-2">
                     @csrf
                     @method('PUT')
                     <input name="section_key" value="{{ $section->section_key }}" required class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     <select name="section_type" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
-                        @foreach (['hero', 'feature_grid', 'trust_metrics', 'client_logos', 'faq', 'cta', 'custom'] as $type)
+                        @foreach (['hero', 'feature_grid', 'trust_metrics', 'client_logos', 'case_study_grid', 'product_grid', 'module_grid', 'industry_grid', 'solution_grid', 'faq', 'testimonial', 'pricing', 'cta', 'rich_text', 'stats', 'image_text', 'custom_json'] as $type)
                             <option value="{{ $type }}" @selected($section->section_type === $type)>{{ str($type)->replace('_', ' ')->headline() }}</option>
                         @endforeach
                     </select>
@@ -25,7 +25,9 @@
                     <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="hidden" name="is_active" value="0"><input type="checkbox" name="is_active" value="1" @checked($section->is_active) class="rounded border-slate-300"> Active</label>
                     <div class="flex gap-3 md:col-span-2">
                         <button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Save section</button>
-                        <button formmethod="POST" formaction="{{ route('cms.pages.sections.destroy', [$page, $section]) }}" name="_method" value="DELETE" class="rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 dark:border-rose-800 dark:text-rose-300">Remove</button>
+                        <button formmethod="POST" formaction="{{ route($routePrefix.'.pages.sections.move', [$page, $section]) }}" name="direction" value="up" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Move up</button>
+                        <button formmethod="POST" formaction="{{ route($routePrefix.'.pages.sections.move', [$page, $section]) }}" name="direction" value="down" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Move down</button>
+                        <button formmethod="POST" formaction="{{ route($routePrefix.'.pages.sections.destroy', [$page, $section]) }}" name="_method" value="DELETE" class="rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 dark:border-rose-800 dark:text-rose-300" onclick="return confirm('Remove this section?')">Remove</button>
                     </div>
                 </form>
             </details>
@@ -34,12 +36,12 @@
         @endforelse
     </div>
 
-    <form method="POST" action="{{ route('cms.pages.sections.store', $page) }}" class="mt-5 grid gap-3 rounded-lg border border-dashed border-slate-300 p-4 md:grid-cols-2 dark:border-slate-700">
+    <form method="POST" action="{{ route($routePrefix.'.pages.sections.store', $page) }}" class="mt-5 grid gap-3 rounded-lg border border-dashed border-slate-300 p-4 md:grid-cols-2 dark:border-slate-700">
         @csrf
         <p class="md:col-span-2 font-semibold text-slate-950 dark:text-white">Add section</p>
         <input name="section_key" placeholder="Section key, e.g. conversion-cta" required class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
         <select name="section_type" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
-            @foreach (['hero', 'feature_grid', 'trust_metrics', 'client_logos', 'faq', 'cta', 'custom'] as $type)
+            @foreach (['hero', 'feature_grid', 'trust_metrics', 'client_logos', 'case_study_grid', 'product_grid', 'module_grid', 'industry_grid', 'solution_grid', 'faq', 'testimonial', 'pricing', 'cta', 'rich_text', 'stats', 'image_text', 'custom_json'] as $type)
                 <option value="{{ $type }}">{{ str($type)->replace('_', ' ')->headline() }}</option>
             @endforeach
         </select>

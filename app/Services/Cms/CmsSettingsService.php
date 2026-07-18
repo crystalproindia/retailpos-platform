@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 class CmsSettingsService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(private readonly AuditLogger $auditLogger, private readonly WebsiteRevalidationService $revalidation) {}
 
     public function ensureDefaultSettings(int $companyId): void
     {
@@ -26,6 +26,7 @@ class CmsSettingsService
                     'label' => $definition['label'],
                     'value_type' => $definition['type'],
                     'is_public' => $definition['is_public'] ?? true,
+                    'value' => $definition['default'] ?? null,
                 ],
             );
         });
@@ -37,8 +38,15 @@ class CmsSettingsService
      */
     public function updateSettings(User $user, array $values): Collection
     {
-        $settings = collect(config('cms.settings'))->map(function (array $definition, string $key) use ($user, $values): CmsSetting {
+        $clearKeys = array_flip($values['clear_settings'] ?? []);
+
+        $this->ensureDefaultSettings($user->company_id);
+
+        $settings = collect(config('cms.settings'))->filter(function (array $definition, string $key) use ($values, $clearKeys): bool {
+            return array_key_exists($key, $values) && (filled($values[$key]) || array_key_exists($key, $clearKeys));
+        })->map(function (array $definition, string $key) use ($user, $values, $clearKeys): CmsSetting {
             $isMedia = $definition['type'] === 'media';
+            $value = array_key_exists($key, $clearKeys) ? null : $this->normalizedValue($key, $values[$key]);
 
             return CmsSetting::updateOrCreate(
                 [
@@ -48,8 +56,8 @@ class CmsSettingsService
                 [
                     'group' => $definition['group'] ?? 'general',
                     'label' => $definition['label'],
-                    'media_id' => $isMedia ? ($values[$key] ?? null) : null,
-                    'value' => $isMedia ? null : ($values[$key] ?? null),
+                    'media_id' => $isMedia ? $value : null,
+                    'value' => $isMedia ? null : $value,
                     'value_type' => $definition['type'],
                     'is_public' => $definition['is_public'] ?? true,
                 ],
@@ -59,6 +67,7 @@ class CmsSettingsService
         $this->auditLogger->record('cms.settings.updated', null, 'CMS settings updated', [
             'company_id' => $user->company_id,
         ]);
+        $this->revalidation->revalidate($user->company_id, '/', ['type' => 'settings']);
 
         return $settings;
     }
@@ -96,5 +105,12 @@ class CmsSettingsService
         $this->auditLogger->record('cms.social_links.updated', null, 'CMS social links updated', [
             'company_id' => $user->company_id,
         ]);
+    }
+
+    private function normalizedValue(string $key, mixed $value): mixed
+    {
+        return str_contains($key, 'whatsapp') && is_string($value)
+            ? preg_replace('/\D+/', '', $value)
+            : $value;
     }
 }

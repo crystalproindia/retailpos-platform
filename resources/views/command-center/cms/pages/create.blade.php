@@ -13,7 +13,7 @@
 @section('content')
     <div class="space-y-6">
         @include('command-center.cms.partials.nav')
-        <form method="POST" action="{{ route('cms.pages.store') }}">
+        <form method="POST" action="{{ route($routePrefix.'.pages.store') }}">
             @include('command-center.cms.pages._form', ['method' => 'POST'])
         </form>
     </div>

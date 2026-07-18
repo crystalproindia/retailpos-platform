@@ -7,6 +7,9 @@
 @section('content')
     <div class="space-y-6">
         @include('command-center.cms.partials.nav')
+        @php
+            $routePrefix = request()->routeIs('website.*') ? 'website' : 'cms';
+        @endphp
 
         <section class="cms-panel overflow-hidden p-0">
             <div class="bg-gradient-to-br from-teal-700 via-teal-600 to-cyan-700 px-6 py-7 text-white sm:px-8">
@@ -17,19 +20,32 @@
                         <p class="mt-3 text-sm leading-6 text-teal-50">A calm workspace for the pages, brand system, content library, and website metadata your team manages every day.</p>
                     </div>
                     <div class="flex flex-wrap gap-3">
-                        <a href="{{ route('cms.pages.create') }}" class="inline-flex min-h-11 items-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50">New page</a>
-                        <a href="{{ route('cms.case-studies.create') }}" class="inline-flex min-h-11 items-center rounded-lg border border-white/30 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">New case study</a>
+                        <a href="{{ route($routePrefix.'.pages.create') }}" class="inline-flex min-h-11 items-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50">New page</a>
+                        <a href="{{ route($routePrefix.'.case-studies.create') }}" class="inline-flex min-h-11 items-center rounded-lg border border-white/30 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">New case study</a>
                     </div>
                 </div>
             </div>
             <div class="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
-                @foreach (['Total pages' => $dashboard['counts']['pages'], 'Published' => $dashboard['counts']['published_pages'], 'Drafts' => $dashboard['counts']['draft_pages'], 'Scheduled' => $dashboard['counts']['scheduled_pages'], 'Articles' => $dashboard['counts']['articles'], 'Client logos' => $dashboard['counts']['client_logos'], 'Case studies' => $dashboard['counts']['case_studies'], 'Testimonials' => $dashboard['counts']['testimonials'], 'Media files' => $dashboard['counts']['media']] as $label => $value)
+                @foreach (['Published pages' => $dashboard['counts']['published_pages'], 'Draft pages' => $dashboard['counts']['draft_pages'], 'Published case studies' => $dashboard['counts']['published_case_studies'], 'Draft case studies' => $dashboard['counts']['draft_case_studies'], 'Media files' => $dashboard['counts']['media']] as $label => $value)
                     <article class="bg-white px-5 py-4">
                         <p class="text-sm font-medium text-slate-500">{{ $label }}</p>
                         <p class="mt-1 text-3xl font-semibold text-slate-900">{{ $value }}</p>
                     </article>
                 @endforeach
             </div>
+        </section>
+
+        <section class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <article class="cms-panel">
+                <div class="flex flex-wrap items-start justify-between gap-4"><div><p class="cms-kicker">Publishing</p><h2 class="mt-2 text-lg font-semibold text-slate-900">Website publishing health</h2><p class="mt-1 text-sm text-slate-600">Last content update: {{ $dashboard['lastContentUpdate']?->diffForHumans() ?? 'No content changes yet' }}</p></div><span class="rounded-full px-3 py-1 text-xs font-semibold {{ $dashboard['revalidation']['configured'] ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800' }}">Revalidation {{ $dashboard['revalidation']['configured'] ? 'configured' : 'not configured' }}</span></div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div class="cms-subtle-panel"><p class="text-xs font-medium text-slate-500">Public CMS API</p><p class="mt-1 text-sm font-semibold text-emerald-700">Available</p></div>
+                    <div class="cms-subtle-panel"><p class="text-xs font-medium text-slate-500">Last successful refresh</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $dashboard['revalidation']['last_success']?->created_at?->diffForHumans() ?? 'None recorded' }}</p></div>
+                    <div class="cms-subtle-panel"><p class="text-xs font-medium text-slate-500">Last failed refresh</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $dashboard['revalidation']['last_failure']?->created_at?->diffForHumans() ?? 'None recorded' }}</p></div>
+                </div>
+                @if ($dashboard['revalidation']['latest'])<p class="mt-4 text-sm text-slate-600">Latest result: <span class="font-semibold text-slate-900">{{ str($dashboard['revalidation']['latest']->status)->replace('_', ' ')->headline() }}</span> - {{ $dashboard['revalidation']['latest']->message }}</p>@endif
+            </article>
+            <article class="cms-panel"><p class="cms-kicker">Quick links</p><h2 class="mt-2 text-lg font-semibold text-slate-900">Website workspace</h2><div class="mt-5 grid grid-cols-2 gap-3">@foreach (['Pages' => 'website.pages.index', 'Case Studies' => 'website.case-studies.index', 'Navigation' => 'website.navigation.index', 'Settings' => 'website.settings.index', 'Media' => 'website.media.index'] as $label => $route)<a href="{{ route($route) }}" class="cms-subtle-panel text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800">{{ $label }}</a>@endforeach</div></article>
         </section>
 
         <div class="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">

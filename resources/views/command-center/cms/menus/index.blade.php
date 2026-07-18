@@ -14,6 +14,8 @@
     <div class="space-y-6">
         @include('command-center.cms.partials.nav')
 
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Review changes to key links such as Products, Modules, Industries, Solutions, Pricing, Book Demo, Talk to Sales, and Case Studies before saving.</div>
+
         <section class="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
             <form method="POST" action="{{ route('cms.menus.store') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 @csrf

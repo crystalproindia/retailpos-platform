@@ -9,6 +9,7 @@ use App\Models\Cms\CmsContentPage;
 use App\Models\Cms\CmsContentSection;
 use App\Models\Cms\CmsFooterBlock;
 use App\Models\Cms\CmsMedia;
+use App\Models\Cms\CmsMenu;
 use App\Models\Cms\CmsNavigationItem;
 use App\Models\Cms\CmsPage;
 use App\Models\Cms\CmsRedirect;
@@ -55,14 +56,15 @@ class PublicCmsService
     {
         return $this->publicArray('settings', fn (): array => $this->remember('settings', function (int $companyId): array {
             $settings = CmsSeoSetting::query()->with(['defaultOgImage', 'defaultTwitterImage'])->where('company_id', $companyId)->first();
-            if (! $settings) return [];
+            $websiteSettings = CmsSetting::query()->with('media')->where('company_id', $companyId)->where('is_public', true)->get()->mapWithKeys(fn (CmsSetting $setting) => [$setting->key => $setting->media ? $this->mediaUrl($setting->media) : $setting->value])->all();
+            if (! $settings && $websiteSettings === []) return [];
             return [
-                'default_site_title' => $settings->default_meta_title, 'default_meta_description' => $settings->default_meta_description,
-                'default_canonical_url' => $settings->default_canonical_url, 'default_og_image_url' => $this->mediaUrl($settings->defaultOgImage), 'default_twitter_image_url' => $this->mediaUrl($settings->defaultTwitterImage), 'company_name' => $settings->company_name,
-                'company_logo_url' => $settings->company_logo_url, 'contact_phone_india' => $settings->contact_phone_india,
-                'contact_phone_singapore' => $settings->contact_phone_singapore, 'contact_phone_malaysia' => $settings->contact_phone_malaysia,
-                'contact_email' => $settings->contact_email, 'address' => $settings->address, 'same_as_social_links' => $settings->same_as_social_links,
-                'website_settings' => CmsSetting::query()->with('media')->where('company_id', $companyId)->where('is_public', true)->get()->mapWithKeys(fn (CmsSetting $setting) => [$setting->key => $setting->media ? $this->mediaUrl($setting->media) : $setting->value])->all(),
+                'default_site_title' => $settings?->default_meta_title, 'default_meta_description' => $settings?->default_meta_description,
+                'default_canonical_url' => $settings?->default_canonical_url, 'default_og_image_url' => $this->mediaUrl($settings?->defaultOgImage), 'default_twitter_image_url' => $this->mediaUrl($settings?->defaultTwitterImage), 'company_name' => $settings?->company_name,
+                'company_logo_url' => $settings?->company_logo_url, 'contact_phone_india' => $settings?->contact_phone_india,
+                'contact_phone_singapore' => $settings?->contact_phone_singapore, 'contact_phone_malaysia' => $settings?->contact_phone_malaysia,
+                'contact_email' => $settings?->contact_email, 'address' => $settings?->address, 'same_as_social_links' => $settings?->same_as_social_links,
+                'website_settings' => $websiteSettings,
             ];
         }) ?? []);
     }
@@ -85,7 +87,27 @@ class PublicCmsService
     /** @return array<int, array<string, mixed>> */
     public function navigation(): array
     {
-        return $this->publicArray('navigation', fn (): array => $this->contentNavigation());
+        return $this->publicArray('navigation', fn (): array => $this->remember('navigation', function (int $companyId): array {
+            $menuItems = CmsMenu::query()
+                ->with(['items.parent'])
+                ->where('company_id', $companyId)
+                ->where('is_enabled', true)
+                ->orderBy('location')
+                ->get()
+                ->flatMap(fn (CmsMenu $menu) => $menu->items
+                    ->where('is_enabled', true)
+                    ->map(fn ($item) => [
+                        'label' => $item->label,
+                        'url' => $item->url,
+                        'location' => $menu->location,
+                        'parent_label' => $item->parent?->label,
+                        'opens_new_tab' => $item->opens_new_tab,
+                    ]))
+                ->values()
+                ->all();
+
+            return $menuItems !== [] ? $menuItems : $this->contentNavigation();
+        }) ?? []);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -215,6 +237,25 @@ class PublicCmsService
         Cache::forever($versionKey, ((int) Cache::get($versionKey, 1)) + 1);
     }
 
+    public function forgetWebsiteData(int $companyId, string $type, ?string $slug = null): void
+    {
+        if (app()->environment('testing')) {
+            return;
+        }
+
+        $keys = match ($type) {
+            'page' => ['pages', 'sitemap', $slug ? 'page:'.$slug : null],
+            'case_study' => ['case-studies', $slug ? 'case-study:'.$slug : null],
+            'navigation' => ['navigation', 'content-navigation'],
+            'settings' => ['settings'],
+            default => [],
+        };
+
+        foreach (array_filter($keys) as $key) {
+            Cache::forget("public-cms:{$companyId}:{$key}");
+        }
+    }
+
     /** @return array<string, mixed> */
     public function contentPreview(CmsContentPage $page): array
     {
@@ -299,7 +340,7 @@ class PublicCmsService
     /** @return array<string, mixed> */
     private function caseStudyPayload(CmsCaseStudy $study, bool $withDetail = false): array
     {
-        return array_filter(['slug' => $study->slug, 'title' => $study->title, 'client_name' => $study->client_name, 'industry' => $study->industry, 'location' => $study->location, 'business_type' => $study->project_type, 'summary' => $study->short_summary, 'cover_image_url' => $this->mediaUrl($study->featuredImageMedia), 'published_at' => $study->published_at?->toIso8601String(), 'seo' => ['title' => $study->seo_title, 'description' => $study->seo_description, 'image_url' => $this->mediaUrl($study->ogImageMedia)], 'challenge' => $withDetail ? $study->challenge : null, 'solution' => $withDetail ? $study->solution : null, 'results' => $withDetail ? $study->results : null, 'outcome_metrics' => $withDetail ? ($study->metrics ?? []) : null, 'sections' => $withDetail ? $study->sections->map(fn ($section) => ['section_type' => $section->section_type, 'title' => $section->title, 'subtitle' => $section->subtitle, 'content' => $section->content, 'settings' => $section->settings ?? []])->values()->all() : null], fn ($value) => $value !== null);
+        return array_filter(['slug' => $study->slug, 'title' => $study->title, 'client_name' => $study->client_name, 'industry' => $study->industry, 'location' => $study->location, 'business_type' => $study->project_type, 'summary' => $study->short_summary, 'cover_image_url' => $this->mediaUrl($study->featuredImageMedia), 'published_at' => $study->published_at?->toIso8601String(), 'seo' => ['title' => $study->seo_title, 'description' => $study->seo_description, 'image_url' => $this->mediaUrl($study->ogImageMedia)], 'challenge' => $withDetail ? $study->challenge : null, 'solution' => $withDetail ? $study->solution : null, 'results' => $withDetail ? $study->results : null, 'outcome_metrics' => $withDetail ? ($study->metrics ?? []) : null, 'schema_json' => $withDetail ? ($study->schema_json ?? []) : null, 'sections' => $withDetail ? $study->sections->map(fn ($section) => ['section_type' => $section->section_type, 'title' => $section->title, 'subtitle' => $section->subtitle, 'content' => $section->content, 'settings' => $section->settings ?? []])->values()->all() : null], fn ($value) => $value !== null);
     }
 
     private function mediaUrl(?CmsMedia $media): ?string

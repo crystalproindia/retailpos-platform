@@ -25,6 +25,13 @@ class CmsPageSectionRequest extends FormRequest
         }
     }
 
+    public function messages(): array
+    {
+        return [
+            'settings.array' => 'Section settings must be a valid JSON object.',
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */

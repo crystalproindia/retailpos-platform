@@ -20,15 +20,15 @@
                 <p class="mt-1 font-semibold text-slate-950 dark:text-white">{{ str($page->status)->headline() }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <form method="POST" action="{{ route('cms.pages.publish', $page) }}">
+                <form method="POST" action="{{ route($routePrefix.'.pages.publish', $page) }}">
                     @csrf
                     <button class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700">Publish</button>
                 </form>
-                <form method="POST" action="{{ route('cms.pages.unpublish', $page) }}">
+                <form method="POST" action="{{ route($routePrefix.'.pages.unpublish', $page) }}">
                     @csrf
                     <button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Unpublish</button>
                 </form>
-                <form method="POST" action="{{ route('cms.pages.destroy', $page) }}">
+                <form method="POST" action="{{ route($routePrefix.'.pages.destroy', $page) }}">
                     @csrf
                     @method('DELETE')
                     <button class="rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950">Move to trash</button>
@@ -36,7 +36,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('cms.pages.update', $page) }}">
+        <form method="POST" action="{{ route($routePrefix.'.pages.update', $page) }}">
             @include('command-center.cms.pages._form', ['method' => 'PUT'])
         </form>
 

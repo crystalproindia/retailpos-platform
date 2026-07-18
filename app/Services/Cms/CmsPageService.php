@@ -33,7 +33,7 @@ class CmsPageService
         $page->seo()->create($this->seoPayload($data));
         $this->createRevision($page, $user);
 
-        if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidation->trigger($this->path($page));
+        if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidate($page);
 
         return $page->load('seo');
     }
@@ -50,7 +50,7 @@ class CmsPageService
         $page->seo()->updateOrCreate(['page_id' => $page->id], $this->seoPayload($data));
         $this->createRevision($page->refresh(), $user);
 
-        if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidation->trigger($this->path($page));
+        if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidate($page);
 
         return $page->load('seo');
     }
@@ -72,7 +72,7 @@ class CmsPageService
             aggregateId: $page->id,
             payload: $this->eventPayload($page),
         ));
-        $this->revalidation->trigger($this->path($page));
+        $this->revalidate($page);
 
         return $page;
     }
@@ -94,7 +94,7 @@ class CmsPageService
             aggregateId: $page->id,
             payload: $this->eventPayload($page),
         ));
-        $this->revalidation->trigger($this->path($page));
+        $this->revalidate($page);
 
         return $page;
     }
@@ -201,6 +201,14 @@ class CmsPageService
     private function path(CmsPage $page): string
     {
         return $page->route_path ?: '/'.$page->slug;
+    }
+
+    private function revalidate(CmsPage $page): void
+    {
+        $this->revalidation->revalidate($page->company_id, $this->path($page), [
+            'type' => 'page',
+            'slug' => $page->slug,
+        ]);
     }
 
     /**

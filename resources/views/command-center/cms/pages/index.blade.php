@@ -20,10 +20,10 @@
                     <h1 class="text-xl font-semibold text-slate-950 dark:text-white">Dynamic Pages</h1>
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Create, publish, schedule, revise, and optimize public website pages.</p>
                 </div>
-                <a href="{{ route('cms.pages.create') }}" class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">New page</a>
+                <a href="{{ route($routePrefix.'.pages.create') }}" class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">New page</a>
             </div>
 
-            <form method="GET" action="{{ route('cms.pages.index') }}" class="mt-5 grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
+            <form method="GET" action="{{ route($routePrefix.'.pages.index') }}" class="mt-5 grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
                 <input name="search" value="{{ request('search') }}" placeholder="Search pages" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                 <select name="status" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     <option value="">All statuses</option>
@@ -45,7 +45,7 @@
             </form>
         </section>
 
-        <form method="POST" action="{{ route('cms.pages.bulk') }}" class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <form method="POST" action="{{ route($routePrefix.'.pages.bulk') }}" class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             @csrf
             <div class="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center dark:border-slate-800">
                 <select name="action" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
@@ -82,9 +82,9 @@
                                 <td class="px-5 py-4 text-slate-500 dark:text-slate-400">{{ $page->updated_at->format('d M Y') }}</td>
                                 <td class="px-5 py-4 text-right">
                                     @if ($page->trashed())
-                                        <button formaction="{{ route('cms.pages.restore', $page->id) }}" formmethod="POST" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Restore</button>
+                                        <button formaction="{{ route($routePrefix.'.pages.restore', $page->id) }}" formmethod="POST" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Restore</button>
                                     @else
-                                        <a href="{{ route('cms.pages.edit', $page) }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Edit</a>
+                                        <a href="{{ route($routePrefix.'.pages.edit', $page) }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">Edit</a>
                                     @endif
                                 </td>
                             </tr>

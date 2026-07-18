@@ -9,7 +9,7 @@ use App\Services\AuditLogger;
 
 class CmsMenuService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(private readonly AuditLogger $auditLogger, private readonly WebsiteRevalidationService $revalidation) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -18,6 +18,7 @@ class CmsMenuService
     {
         $menu = CmsMenu::create($data + ['company_id' => $user->company_id]);
         $this->auditLogger->record('cms.menu.created', $menu, 'CMS menu created');
+        $this->revalidate($menu);
 
         return $menu;
     }
@@ -29,6 +30,7 @@ class CmsMenuService
     {
         $menu->update($data);
         $this->auditLogger->record('cms.menu.updated', $menu, 'CMS menu updated');
+        $this->revalidate($menu);
 
         return $menu;
     }
@@ -41,6 +43,7 @@ class CmsMenuService
         $this->ensureParentBelongsToMenu($menu, $data['parent_id'] ?? null);
         $item = $menu->items()->create($data);
         $this->auditLogger->record('cms.menu_item.created', $item, 'CMS menu item created');
+        $this->revalidate($menu);
 
         return $item;
     }
@@ -53,6 +56,7 @@ class CmsMenuService
         $this->ensureParentBelongsToMenu($menu, $data['parent_id'] ?? null, $item->id);
         $item->update($data);
         $this->auditLogger->record('cms.menu_item.updated', $item, 'CMS menu item updated');
+        $this->revalidate($menu);
 
         return $item;
     }
@@ -73,4 +77,10 @@ class CmsMenuService
 
         abort_unless((int) $parentId !== $itemId && $menu->items()->whereKey($parentId)->exists(), 422, 'The selected parent must belong to this menu.');
     }
+
+    private function revalidate(CmsMenu $menu): void
+    {
+        $this->revalidation->revalidate($menu->company_id, '/', ['type' => 'navigation']);
+    }
+
 }

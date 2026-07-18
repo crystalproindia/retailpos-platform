@@ -57,7 +57,31 @@ class CmsContentImportService
     private function validateManifest(array $manifest): void
     {
         if (! isset($manifest['pages']) && ! isset($manifest['case_studies']) && ! isset($manifest['settings'])) throw ValidationException::withMessages(['manifest' => 'The manifest must include pages, case studies, or settings.']);
-        foreach ($manifest['pages'] ?? [] as $index => $page) if (! is_array($page) || blank($page['title'] ?? null)) throw ValidationException::withMessages(["pages.$index.title" => 'Each imported page needs a title.']);
-        foreach ($manifest['case_studies'] ?? [] as $index => $study) if (! is_array($study) || blank($study['title'] ?? null)) throw ValidationException::withMessages(["case_studies.$index.title" => 'Each imported case study needs a title.']);
+        $errors = [];
+        foreach ($manifest['pages'] ?? [] as $index => $page) {
+            if (! is_array($page) || blank($page['title'] ?? null)) { $errors["pages.$index.title"] = 'Each imported page needs a title.'; continue; }
+            $slug = Str::slug((string) ($page['slug'] ?? $page['title']));
+            $this->validateFiniteFields($errors, "pages.$index", 'page', $slug, $page, ['slug' => 255, 'title' => 255, 'h1' => 255, 'page_type' => 255, 'route_path' => 255]);
+            foreach ($page['sections'] ?? [] as $sectionIndex => $section) {
+                if (! is_array($section)) { $errors["pages.$index.sections.$sectionIndex"] = "Page \"{$slug}\" has an invalid section."; continue; }
+                $this->validateFiniteFields($errors, "pages.$index.sections.$sectionIndex", 'page section', $slug, $section, ['section_key' => 255, 'section_type' => 255, 'title' => 255]);
+            }
+        }
+        foreach ($manifest['case_studies'] ?? [] as $index => $study) {
+            if (! is_array($study) || blank($study['title'] ?? null)) { $errors["case_studies.$index.title"] = 'Each imported case study needs a title.'; continue; }
+            $slug = Str::slug((string) ($study['slug'] ?? $study['title']));
+            $this->validateFiniteFields($errors, "case_studies.$index", 'case study', $slug, $study, ['slug' => 255, 'title' => 255, 'client_name' => 255, 'industry' => 255, 'location' => 255, 'project_type' => 255]);
+        }
+        if ($errors !== []) throw ValidationException::withMessages($errors);
+    }
+
+    /** @param array<string, string> $errors @param array<string, mixed> $data @param array<string, int> $limits */
+    private function validateFiniteFields(array &$errors, string $path, string $entity, string $slug, array $data, array $limits): void
+    {
+        foreach ($limits as $field => $limit) {
+            if (! isset($data[$field]) || ! is_string($data[$field])) continue;
+            $length = mb_strlen($data[$field]);
+            if ($length > $limit) $errors["{$path}.{$field}"] = ucfirst($entity)." \"{$slug}\": {$field} has {$length} characters; maximum allowed is {$limit}.";
+        }
     }
 }

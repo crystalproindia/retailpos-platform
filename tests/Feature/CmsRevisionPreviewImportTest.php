@@ -7,7 +7,9 @@ use App\Models\Cms\CmsPage;
 use App\Models\Cms\CmsPreviewToken;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\Cms\CmsContentImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class CmsRevisionPreviewImportTest extends TestCase
@@ -64,6 +66,32 @@ class CmsRevisionPreviewImportTest extends TestCase
         $this->artisan('cms:import-website-content', ['file' => $file, '--company' => $company->id])->assertSuccessful();
         $this->assertDatabaseHas('cms_pages', ['company_id' => $company->id, 'slug' => 'imported-page', 'status' => 'draft']);
         @unlink($file);
+    }
+
+    public function test_import_accepts_long_descriptive_subtitles_and_rejects_finite_field_overflow_before_writing(): void
+    {
+        $company = Company::factory()->create();
+        $subtitle = str_repeat('Approved website subtitle. ', 30);
+        app(CmsContentImportService::class)->import($company, null, ['pages' => [[
+            'title' => 'Long subtitle page', 'slug' => 'long-subtitle-page', 'page_type' => 'standard', 'subtitle' => $subtitle,
+            'sections' => [['section_key' => 'hero', 'section_type' => 'hero', 'subtitle' => $subtitle]],
+        ]]]);
+        $this->assertDatabaseHas('cms_pages', ['company_id' => $company->id, 'slug' => 'long-subtitle-page', 'subtitle' => $subtitle]);
+        $this->assertDatabaseHas('cms_page_sections', ['page_id' => CmsPage::query()->where('slug', 'long-subtitle-page')->value('id'), 'subtitle' => $subtitle]);
+
+        try {
+            app(CmsContentImportService::class)->import($company, null, ['pages' => [
+                ['title' => 'Valid page', 'slug' => 'valid-page', 'page_type' => 'standard'],
+                ['title' => str_repeat('X', 256), 'slug' => 'too-long-title', 'page_type' => 'standard'],
+            ]]);
+            $this->fail('Expected manifest validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('page', strtolower($exception->errors()['pages.1.title'][0]));
+            $this->assertStringContainsString('256', $exception->errors()['pages.1.title'][0]);
+            $this->assertStringContainsString('255', $exception->errors()['pages.1.title'][0]);
+        }
+
+        $this->assertDatabaseMissing('cms_pages', ['company_id' => $company->id, 'slug' => 'valid-page']);
     }
 
     private function user(): User { return User::factory()->for(Company::factory())->create(['role' => UserRole::Administrator]); }

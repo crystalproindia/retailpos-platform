@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\Cms\CmsPage;
 use App\Models\Cms\CmsPreviewToken;
+use App\Models\Cms\CmsCaseStudy;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Cms\CmsContentImportService;
@@ -43,6 +44,22 @@ class CmsRevisionPreviewImportTest extends TestCase
         $this->getJson('/api/public/cms/preview/page/private-draft?token='.$query['token'])->assertNotFound();
         $token->update(['expires_at' => now()->subMinute()]);
         $this->getJson($url['path'].'?token='.$query['token'])->assertNotFound();
+    }
+
+    public function test_legacy_cms_edit_screens_and_preview_actions_use_the_existing_secure_workflow(): void
+    {
+        $administrator = $this->user();
+        $page = CmsPage::create($this->page($administrator));
+        $study = CmsCaseStudy::create(['company_id' => $administrator->company_id, 'title' => 'Draft story', 'slug' => 'draft-story', 'client_name' => 'Client', 'status' => 'draft']);
+
+        $this->actingAs($administrator)->get("/cms/pages/{$page->id}/edit")->assertOk();
+        $this->actingAs($administrator)->post("/cms/pages/{$page->id}/preview")->assertRedirect()->assertSessionHas('preview_url');
+        $this->actingAs($administrator)->get("/cms/case-studies/{$study->id}/edit")->assertOk();
+        $this->actingAs($administrator)->post("/cms/case-studies/{$study->id}/preview")->assertRedirect()->assertSessionHas('preview_url');
+
+        $staff = User::factory()->for($administrator->company)->create(['role' => UserRole::Staff]);
+        $this->actingAs($staff)->post("/cms/pages/{$page->id}/preview")->assertForbidden();
+        $this->actingAs($staff)->post("/cms/case-studies/{$study->id}/preview")->assertForbidden();
     }
 
     public function test_restore_revision_returns_page_to_draft_and_records_a_new_revision(): void

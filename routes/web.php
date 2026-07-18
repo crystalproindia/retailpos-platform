@@ -394,6 +394,10 @@ Route::middleware('auth')->group(function (): void {
         Route::post('pages/{page}/restore', [CmsPageController::class, 'restore'])->name('pages.restore');
         Route::post('pages/{page}/publish', [CmsPageController::class, 'publish'])->name('pages.publish');
         Route::post('pages/{page}/unpublish', [CmsPageController::class, 'unpublish'])->name('pages.unpublish');
+        Route::get('pages/{page}/revisions', [CmsPageController::class, 'revisions'])->middleware('can:cms.pages.manage')->name('pages.revisions.index');
+        Route::post('pages/{page}/revisions/{revision}/restore', [CmsPageController::class, 'restoreRevision'])->middleware('can:cms.pages.manage')->name('pages.revisions.restore');
+        Route::post('pages/{page}/preview', [CmsPageController::class, 'preview'])->middleware('can:cms.pages.manage')->name('pages.preview');
+        Route::post('pages/{page}/preview/revoke', [CmsPageController::class, 'revokePreview'])->middleware('can:cms.pages.manage')->name('pages.preview.revoke');
         Route::post('pages/{page}/sections', [CmsPageController::class, 'storeSection'])->name('pages.sections.store');
         Route::put('pages/{page}/sections/{section}', [CmsPageController::class, 'updateSection'])->name('pages.sections.update');
         Route::post('pages/{page}/sections/{section}/move', [CmsPageController::class, 'moveSection'])->name('pages.sections.move');

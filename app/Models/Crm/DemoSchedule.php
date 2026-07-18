@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['company_id', 'lead_id', 'assigned_to', 'scheduled_by', 'title', 'scheduled_date', 'starts_at', 'ends_at', 'timezone', 'meeting_mode', 'meeting_link', 'customer_email', 'customer_phone', 'notes', 'status', 'completed_at', 'cancelled_at', 'external_calendar_provider', 'external_calendar_event_id', 'external_calendar_event_url', 'external_meeting_link', 'calendar_sync_status', 'calendar_synced_at'])]
+#[Fillable(['company_id', 'lead_id', 'assigned_to', 'scheduled_by', 'title', 'scheduled_date', 'starts_at', 'ends_at', 'timezone', 'meeting_mode', 'meeting_link', 'customer_email', 'customer_phone', 'notes', 'status', 'completed_at', 'cancelled_at', 'external_calendar_provider', 'external_calendar_event_id', 'external_calendar_event_url', 'external_meeting_link', 'calendar_sync_status', 'calendar_sync_error', 'calendar_sync_attempts', 'calendar_synced_at'])]
 class DemoSchedule extends Model
 {
     use Auditable;
@@ -27,6 +27,7 @@ class DemoSchedule extends Model
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'calendar_synced_at' => 'datetime',
+            'calendar_sync_attempts' => 'integer',
         ];
     }
 

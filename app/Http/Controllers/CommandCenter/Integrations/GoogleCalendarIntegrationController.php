@@ -93,6 +93,7 @@ class GoogleCalendarIntegrationController extends Controller
 
         $validated = $request->validate([
             'calendar_id' => ['required', 'string', 'max:255'],
+            'timezone' => ['required', 'timezone'],
         ]);
 
         try {

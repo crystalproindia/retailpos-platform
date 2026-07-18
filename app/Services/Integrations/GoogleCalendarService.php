@@ -149,7 +149,12 @@ class GoogleCalendarService
 
     public function markSynced(int $companyId): void
     {
-        $this->connectionForCompany($companyId)?->update(['last_synced_at' => now()]);
+        $this->connectionForCompany($companyId)?->update(['last_synced_at' => now(), 'last_sync_status' => 'synced', 'last_sync_error' => null]);
+    }
+
+    public function markSyncFailed(int $companyId, string $message): void
+    {
+        $this->connectionForCompany($companyId)?->update(['last_sync_status' => 'failed', 'last_sync_error' => str($message)->limit(500, '')->toString()]);
     }
 
     /**
@@ -279,7 +284,7 @@ class GoogleCalendarService
         if ($createMeet) {
             $payload['conferenceData'] = [
                 'createRequest' => [
-                    'requestId' => 'retailpos-demo-'.$demo->id.'-'.Str::uuid(),
+                    'requestId' => 'retailpos-demo-'.$demo->id,
                     'conferenceSolutionKey' => ['type' => 'hangoutsMeet'],
                 ],
             ];
@@ -300,7 +305,6 @@ class GoogleCalendarService
             'Business type: '.($lead?->business_type ?: 'Not provided'),
             filled($lead?->description) ? 'Requirement: '.$lead->description : null,
             'CRM lead: '.route('crm.leads.show', $demo->lead_id),
-            filled($demo->notes) ? 'Notes: '.$demo->notes : null,
         ]));
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Cms\PublicCmsService;
+use App\Services\Cms\CmsPreviewService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,4 +28,6 @@ class PublicCmsController extends Controller
     public function contentPage(string $pageKey, PublicCmsService $cms): JsonResponse { $data = $cms->contentPage($pageKey); abort_unless($data, 404); return response()->json(['data' => $data]); }
     public function contentNavigation(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->contentNavigation()]); }
     public function contentFooter(PublicCmsService $cms): JsonResponse { return response()->json(['data' => $cms->contentFooter()]); }
+    public function previewPage(Request $request, string $slug, CmsPreviewService $previews, PublicCmsService $cms): JsonResponse { $page = $previews->resolve('page', $slug, (string) $request->query('token')); abort_unless($page, 404); return response()->json(['data' => $cms->previewPage($page)]); }
+    public function previewCaseStudy(Request $request, string $slug, CmsPreviewService $previews, PublicCmsService $cms): JsonResponse { $study = $previews->resolve('case-study', $slug, (string) $request->query('token')); abort_unless($study, 404); return response()->json(['data' => $cms->previewCaseStudy($study)]); }
 }

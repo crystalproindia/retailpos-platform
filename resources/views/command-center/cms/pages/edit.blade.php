@@ -20,6 +20,8 @@
                 <p class="mt-1 font-semibold text-slate-950 dark:text-white">{{ str($page->status)->headline() }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
+                <form method="POST" action="{{ route($routePrefix.'.pages.preview', $page) }}">@csrf<button class="rounded-lg border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700">Preview Draft</button></form>
+                <a href="{{ route($routePrefix.'.pages.revisions.index', $page) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Revision History</a>
                 <form method="POST" action="{{ route($routePrefix.'.pages.publish', $page) }}">
                     @csrf
                     <button class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700">Publish</button>
@@ -35,6 +37,8 @@
                 </form>
             </div>
         </div>
+
+        @if(session('preview_url'))<section class="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">Private preview link (expires in 30 minutes): <a class="font-semibold underline" href="{{ session('preview_url') }}" target="_blank">Open preview</a><form class="mt-3 inline" method="POST" action="{{ route($routePrefix.'.pages.preview.revoke', $page) }}">@csrf<button class="font-semibold underline">Revoke preview links</button></form></section>@endif
 
         <form method="POST" action="{{ route($routePrefix.'.pages.update', $page) }}">
             @include('command-center.cms.pages._form', ['method' => 'PUT'])

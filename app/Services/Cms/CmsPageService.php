@@ -17,6 +17,7 @@ class CmsPageService
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly WebsiteRevalidationService $revalidation,
+        private readonly CmsRevisionService $revisions,
     ) {}
 
     /**
@@ -32,6 +33,7 @@ class CmsPageService
 
         $page->seo()->create($this->seoPayload($data));
         $this->createRevision($page, $user);
+        $this->revisions->record($page, $user, 'created', $this->snapshot($page), null, 'Page created');
 
         if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidate($page);
 
@@ -43,12 +45,14 @@ class CmsPageService
      */
     public function update(CmsPage $page, User $user, array $data): CmsPage
     {
+        $before = $this->snapshot($page->load('seo'));
         $page->update($this->pagePayload($data) + [
             'slug' => $this->slug($data['slug'] ?? $page->slug),
         ]);
 
         $page->seo()->updateOrCreate(['page_id' => $page->id], $this->seoPayload($data));
         $this->createRevision($page->refresh(), $user);
+        $this->revisions->record($page, $user, 'updated', $this->snapshot($page->load('seo')), $before, 'Page draft saved');
 
         if ($page->status === CmsPage::STATUS_PUBLISHED) $this->revalidate($page);
 
@@ -64,6 +68,7 @@ class CmsPageService
         ]);
 
         $this->createRevision($page->refresh(), $user);
+        $this->revisions->record($page, $user, 'published', $this->snapshot($page->load('seo')), null, 'Page published');
         $this->auditLogger->record('cms.page.published', $page, 'CMS page published');
         $this->domainEvents->dispatch(new CmsPagePublished(
             companyId: $page->company_id,
@@ -86,6 +91,7 @@ class CmsPageService
         ]);
 
         $this->createRevision($page->refresh(), $user);
+        $this->revisions->record($page, $user, 'unpublished', $this->snapshot($page->load('seo')), null, 'Page unpublished');
         $this->auditLogger->record('cms.page.unpublished', $page, 'CMS page unpublished');
         $this->domainEvents->dispatch(new CmsPageUnpublished(
             companyId: $page->company_id,
@@ -110,6 +116,15 @@ class CmsPageService
 
         $this->auditLogger->record('cms.page.restored', $page, 'CMS page restored');
 
+        return $page;
+    }
+
+    public function restoreRevision(CmsPage $page, \App\Models\Cms\CmsRevision $revision, User $user): CmsPage
+    {
+        $snapshot = $revision->snapshot['page'] ?? [];
+        $page->update(Arr::only($snapshot, ['slug', 'route_path', 'title', 'h1', 'page_type', 'subtitle', 'hero_content', 'intro_content', 'body_content', 'footer_seo_content', 'schema_json']) + ['status' => CmsPage::STATUS_DRAFT, 'published_at' => null, 'scheduled_for' => null]);
+        $this->revisions->record($page->refresh(), $user, 'restored', $this->snapshot($page->load('seo')), null, 'Revision restored as draft');
+        $this->auditLogger->record('cms.page.revision_restored', $page, 'CMS page revision restored as draft', ['revision_id' => $revision->id]);
         return $page;
     }
 
@@ -223,5 +238,11 @@ class CmsPageService
             'status' => $page->status,
             'published_at' => $page->published_at?->toISOString(),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function snapshot(CmsPage $page): array
+    {
+        return ['page' => $page->only(['slug', 'route_path', 'title', 'h1', 'page_type', 'subtitle', 'hero_content', 'intro_content', 'body_content', 'footer_seo_content', 'status', 'is_active', 'schema_json', 'published_at']), 'seo' => $page->seo?->toArray(), 'sections' => $page->sections()->orderBy('sort_order')->get()->map->only(['section_key', 'section_type', 'title', 'subtitle', 'content', 'settings', 'sort_order', 'is_active'])->all()];
     }
 }

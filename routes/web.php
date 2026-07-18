@@ -21,6 +21,7 @@ use App\Http\Controllers\CommandCenter\Cms\CmsFaqController;
 use App\Http\Controllers\CommandCenter\Cms\CmsCtaController;
 use App\Http\Controllers\CommandCenter\Cms\CmsLandingPageController;
 use App\Http\Controllers\CommandCenter\Cms\CmsHomepageController;
+use App\Http\Controllers\CommandCenter\Cms\CmsImportController;
 use App\Http\Controllers\CommandCenter\Cms\CmsMediaController;
 use App\Http\Controllers\CommandCenter\Cms\CmsMenuController;
 use App\Http\Controllers\CommandCenter\Cms\CmsPageController;
@@ -467,6 +468,8 @@ Route::middleware('auth')->group(function (): void {
         Route::put('case-studies/{caseStudy}', [CmsCaseStudyController::class, 'update'])->middleware('can:cms.case_studies.manage')->name('case-studies.update');
         Route::post('case-studies/{caseStudy}/publish', [CmsCaseStudyController::class, 'publish'])->middleware('can:cms.case_studies.manage')->name('case-studies.publish');
         Route::post('case-studies/{caseStudy}/unpublish', [CmsCaseStudyController::class, 'unpublish'])->middleware('can:cms.case_studies.manage')->name('case-studies.unpublish');
+        Route::post('case-studies/{caseStudy}/preview', [CmsCaseStudyController::class, 'preview'])->middleware('can:cms.case_studies.manage')->name('case-studies.preview');
+        Route::post('case-studies/{caseStudy}/preview/revoke', [CmsCaseStudyController::class, 'revokePreview'])->middleware('can:cms.case_studies.manage')->name('case-studies.preview.revoke');
         Route::delete('case-studies/{caseStudy}', [CmsCaseStudyController::class, 'destroy'])->middleware('can:cms.case_studies.manage')->name('case-studies.destroy');
         Route::post('case-studies/{caseStudy}/restore', [CmsCaseStudyController::class, 'restore'])->middleware('can:cms.case_studies.manage')->name('case-studies.restore');
 
@@ -507,6 +510,10 @@ Route::middleware('auth')->group(function (): void {
         Route::post('pages/{page}/restore', [CmsPageController::class, 'restore'])->middleware('can:website.pages.delete')->name('pages.restore');
         Route::post('pages/{page}/publish', [CmsPageController::class, 'publish'])->middleware('can:website.pages.publish')->name('pages.publish');
         Route::post('pages/{page}/unpublish', [CmsPageController::class, 'unpublish'])->middleware('can:website.pages.publish')->name('pages.unpublish');
+        Route::get('pages/{page}/revisions', [CmsPageController::class, 'revisions'])->middleware('can:website.revisions.view')->name('pages.revisions.index');
+        Route::post('pages/{page}/revisions/{revision}/restore', [CmsPageController::class, 'restoreRevision'])->middleware('can:website.revisions.restore')->name('pages.revisions.restore');
+        Route::post('pages/{page}/preview', [CmsPageController::class, 'preview'])->middleware('can:website.preview.create')->name('pages.preview');
+        Route::post('pages/{page}/preview/revoke', [CmsPageController::class, 'revokePreview'])->middleware('can:website.preview.revoke')->name('pages.preview.revoke');
         Route::post('pages/{page}/sections', [CmsPageController::class, 'storeSection'])->middleware('can:website.sections.manage')->name('pages.sections.store');
         Route::put('pages/{page}/sections/{section}', [CmsPageController::class, 'updateSection'])->middleware('can:website.sections.manage')->name('pages.sections.update');
         Route::post('pages/{page}/sections/{section}/move', [CmsPageController::class, 'moveSection'])->middleware('can:website.sections.manage')->name('pages.sections.move');
@@ -518,6 +525,8 @@ Route::middleware('auth')->group(function (): void {
         Route::put('case-studies/{caseStudy}', [CmsCaseStudyController::class, 'update'])->middleware('can:website.case_studies.update')->name('case-studies.update');
         Route::post('case-studies/{caseStudy}/publish', [CmsCaseStudyController::class, 'publish'])->middleware('can:website.case_studies.publish')->name('case-studies.publish');
         Route::post('case-studies/{caseStudy}/unpublish', [CmsCaseStudyController::class, 'unpublish'])->middleware('can:website.case_studies.publish')->name('case-studies.unpublish');
+        Route::post('case-studies/{caseStudy}/preview', [CmsCaseStudyController::class, 'preview'])->middleware('can:website.preview.create')->name('case-studies.preview');
+        Route::post('case-studies/{caseStudy}/preview/revoke', [CmsCaseStudyController::class, 'revokePreview'])->middleware('can:website.preview.revoke')->name('case-studies.preview.revoke');
         Route::delete('case-studies/{caseStudy}', [CmsCaseStudyController::class, 'destroy'])->middleware('can:website.case_studies.delete')->name('case-studies.destroy');
         Route::get('media', [CmsMediaController::class, 'index'])->middleware('can:website.media.view')->name('media.index');
         Route::post('media', [CmsMediaController::class, 'store'])->middleware('can:website.media.upload')->name('media.store');
@@ -529,6 +538,8 @@ Route::middleware('auth')->group(function (): void {
         Route::put('navigation/{menu}/items/{item}', [CmsMenuController::class, 'updateItem'])->middleware('can:website.navigation.update')->name('navigation.items.update');
         Route::get('settings', [CmsAdminSettingsController::class, 'index'])->middleware('can:website.settings.view')->name('settings.index');
         Route::put('settings', [CmsAdminSettingsController::class, 'update'])->middleware('can:website.settings.update')->name('settings.update');
+        Route::get('import', [CmsImportController::class, 'index'])->middleware(['role:administrator', 'can:website.import.view'])->name('import.index');
+        Route::post('import', [CmsImportController::class, 'store'])->middleware(['role:administrator', 'can:website.import.execute'])->name('import.store');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:notifications.view'])->prefix('notifications')->name('notifications.')->group(function (): void {

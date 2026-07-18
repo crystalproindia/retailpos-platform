@@ -7,10 +7,12 @@ use App\Http\Requests\Cms\CmsPageSectionRequest;
 use App\Http\Requests\Cms\StoreCmsPageRequest;
 use App\Http\Requests\Cms\UpdateCmsPageRequest;
 use App\Models\Cms\CmsPage;
+use App\Models\Cms\CmsRevision;
 use App\Repositories\Cms\CmsPageRepository;
 use App\Repositories\Cms\CmsPageSectionRepository;
 use App\Services\Cms\CmsPageSectionService;
 use App\Services\Cms\CmsPageService;
+use App\Services\Cms\CmsPreviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -84,6 +86,32 @@ class CmsPageController extends Controller
         $pageService->unpublish($pageRepository->findForCompany($request->user()->company_id, $page), $request->user());
 
         return back()->with('status', 'CMS page unpublished.');
+    }
+
+    public function revisions(Request $request, CmsPageRepository $pageRepository, int $page): View
+    {
+        $cmsPage = $pageRepository->findForCompany($request->user()->company_id, $page);
+        return view('command-center.cms.revisions.index', ['entity' => $cmsPage, 'revisions' => CmsRevision::query()->with('creator')->where('company_id', $request->user()->company_id)->where('revisionable_type', CmsPage::class)->where('revisionable_id', $cmsPage->id)->latest('revision_number')->get(), 'routePrefix' => $this->routePrefix($request), 'entityType' => 'pages']);
+    }
+
+    public function restoreRevision(Request $request, CmsPageRepository $pageRepository, CmsPageService $pageService, int $page, int $revision): RedirectResponse
+    {
+        $cmsPage = $pageRepository->findForCompany($request->user()->company_id, $page);
+        $item = CmsRevision::query()->where('company_id', $request->user()->company_id)->where('revisionable_type', CmsPage::class)->where('revisionable_id', $cmsPage->id)->findOrFail($revision);
+        $pageService->restoreRevision($cmsPage, $item, $request->user());
+        return back()->with('status', 'Revision restored as a draft. Review and publish when ready.');
+    }
+
+    public function preview(Request $request, CmsPageRepository $pageRepository, CmsPreviewService $previews, int $page): RedirectResponse
+    {
+        $link = $previews->create($pageRepository->findForCompany($request->user()->company_id, $page), $request->user());
+        return back()->with('preview_url', $link['url'])->with('status', 'Draft preview link created. It expires in 30 minutes.');
+    }
+
+    public function revokePreview(Request $request, CmsPageRepository $pageRepository, CmsPreviewService $previews, int $page): RedirectResponse
+    {
+        $previews->revoke($pageRepository->findForCompany($request->user()->company_id, $page), $request->user());
+        return back()->with('status', 'Draft preview links revoked.');
     }
 
     public function bulk(Request $request, CmsPageRepository $pageRepository, CmsPageService $pageService): RedirectResponse

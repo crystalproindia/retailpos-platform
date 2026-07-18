@@ -84,6 +84,13 @@ class PublicCmsService
         });
     }
 
+    /** @return array<string, mixed> */
+    public function previewPage(CmsPage $page): array
+    {
+        $page->load(['seo.ogImage', 'seo.twitterImage', 'sections' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')]);
+        return $this->page($page) + ['slug' => $page->slug, 'page_type' => $page->page_type, 'sections' => $page->sections->map(fn ($section) => ['section_key' => $section->section_key, 'section_type' => $section->section_type, 'title' => $section->title, 'subtitle' => $section->subtitle, 'content' => $section->content, 'settings' => $section->settings ?? [], 'sort_order' => $section->sort_order])->values()->all()];
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function navigation(): array
     {
@@ -122,6 +129,12 @@ class PublicCmsService
             $study = CmsCaseStudy::query()->with(['featuredImageMedia', 'ogImageMedia', 'sections' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])->where('company_id', $companyId)->where('slug', $slug)->where('status', 'published')->whereNotNull('published_at')->first();
             return $study ? $this->caseStudyPayload($study, true) : null;
         });
+    }
+
+    /** @return array<string, mixed> */
+    public function previewCaseStudy(CmsCaseStudy $study): array
+    {
+        return $this->caseStudyPayload($study->load(['featuredImageMedia', 'ogImageMedia', 'sections' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')]), true);
     }
 
     /** @return array<int, array<string, mixed>> */

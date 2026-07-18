@@ -18,6 +18,8 @@ Route::prefix('public/cms')->middleware('throttle:public-cms')->group(function (
     Route::get('navigation', [PublicCmsController::class, 'navigation']);
     Route::get('case-studies', [PublicCmsController::class, 'caseStudies']);
     Route::get('case-studies/{slug}', [PublicCmsController::class, 'caseStudy']);
+    Route::get('preview/page/{slug}', [PublicCmsController::class, 'previewPage'])->middleware('throttle:20,1');
+    Route::get('preview/case-study/{slug}', [PublicCmsController::class, 'previewCaseStudy'])->middleware('throttle:20,1');
     Route::get('sitemap', [PublicCmsController::class, 'sitemap']);
     Route::get('redirects', [PublicCmsController::class, 'redirects']);
     Route::get('robots', [PublicCmsController::class, 'robots']);

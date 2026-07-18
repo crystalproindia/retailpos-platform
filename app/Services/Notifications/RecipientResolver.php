@@ -5,6 +5,7 @@ namespace App\Services\Notifications;
 use App\Contracts\Events\DomainEvent;
 use App\Enums\UserRole;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class RecipientResolver
@@ -39,7 +40,7 @@ class RecipientResolver
         $users = match ($event->eventKey()) {
             'pos.sale.held', 'pos.sale.completed', 'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => $this->managers($event->companyId()),
             'crm.lead.assigned' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
-            'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+            'crm.demo.scheduled', 'crm.demo.rescheduled', 'crm.demo.cancelled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
             'crm.lead.status_changed' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
@@ -125,7 +126,7 @@ class RecipientResolver
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
+     * @param  Builder<User>  $query
      * @return Collection<int, User>
      */
     private function leadCreatedRecipients(DomainEvent $event, $query): Collection

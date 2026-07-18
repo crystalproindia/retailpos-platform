@@ -3,10 +3,9 @@
 namespace App\Jobs\Notifications;
 
 use App\Models\NotificationDelivery;
-use App\Notifications\PlatformNotification;
+use App\Services\Notifications\EmailDeliveryService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 class SendNotificationDeliveryJob implements ShouldQueue
@@ -27,11 +26,11 @@ class SendNotificationDeliveryJob implements ShouldQueue
 
     public function __construct(public readonly int $deliveryId) {}
 
-    public function handle(): void
+    public function handle(EmailDeliveryService $emailDelivery): void
     {
-        $delivery = NotificationDelivery::query()->with('user')->findOrFail($this->deliveryId);
+        $delivery = NotificationDelivery::query()->findOrFail($this->deliveryId);
 
-        if ($delivery->channel !== 'email' || ! $delivery->recipient) {
+        if ($delivery->channel !== 'email' || ! $delivery->recipient || ! filter_var($delivery->recipient, FILTER_VALIDATE_EMAIL)) {
             $delivery->update([
                 'status' => 'failed',
                 'failure_reason' => 'Email delivery requires a valid recipient address.',
@@ -41,27 +40,7 @@ class SendNotificationDeliveryJob implements ShouldQueue
             return;
         }
 
-        $delivery->update([
-            'status' => 'sending',
-            'attempt_count' => $delivery->attempt_count + 1,
-            'sent_at' => now(),
-        ]);
-
-        $payload = $delivery->payload ?? [];
-        Notification::route('mail', $delivery->recipient)->notify(new PlatformNotification(
-            channel: 'email',
-            eventKey: $delivery->event_key,
-            title: $payload['title'] ?? str($delivery->event_key)->replace('.', ' ')->headline()->toString(),
-            message: $payload['message'] ?? '',
-            actionUrl: $payload['action_url'] ?? null,
-            severity: $payload['severity'] ?? 'info',
-        ));
-
-        $delivery->update([
-            'status' => 'delivered',
-            'delivered_at' => now(),
-            'failure_reason' => null,
-        ]);
+        $emailDelivery->send($delivery);
     }
 
     public function failed(Throwable $exception): void
@@ -70,7 +49,7 @@ class SendNotificationDeliveryJob implements ShouldQueue
             ->whereKey($this->deliveryId)
             ->update([
                 'status' => 'failed',
-                'failure_reason' => str($exception->getMessage())->limit(500)->toString(),
+                'failure_reason' => 'Email transport could not complete delivery.',
                 'failed_at' => now(),
                 'next_retry_at' => now()->addMinutes(15),
             ]);

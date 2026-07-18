@@ -102,6 +102,14 @@ class NotificationTemplateRenderer
             return 'Demo scheduled for '.$name.' on '.($event->payload()['scheduled_at'] ?? 'the selected time').'.';
         }
 
+        if (in_array($event->eventKey(), ['crm.demo.rescheduled', 'crm.demo.cancelled'], true)) {
+            $name = $event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead';
+
+            return $event->eventKey() === 'crm.demo.cancelled'
+                ? 'Demo cancelled for '.$name.'.'
+                : 'Demo rescheduled for '.$name.' on '.($event->payload()['scheduled_at'] ?? 'the selected time').'.';
+        }
+
         if ($event->eventKey() === 'crm.pipeline.stage_changed') {
             $name = $event->payload()['business_name'] ?? $event->payload()['lead_title'] ?? 'this lead';
 

@@ -2980,3 +2980,15 @@ The Support Tickets list uses responsive ticket rows, mobile-friendly filters, S
 - There is no public customer portal, inbound email parser, live chat, WhatsApp automation, external helpdesk sync, file storage upload, customer satisfaction survey, or full-text search engine in this foundation.
 - Attachment records intentionally provide safe external-link metadata only. A future Media Library adapter can add managed file storage without changing the ticket lifecycle.
 - SLA bands are configurable application defaults, not contractual service guarantees; per-company policy administration is deferred.
+
+## Email Notifications and SMTP Delivery Foundation
+
+The email foundation extends the existing Notification Center rather than introducing a second delivery system. `CompanyEmailSetting` stores an optional company SMTP connection in `company_email_settings`; SMTP passwords use Laravel's encrypted cast and are never returned to controllers or views. Environment SMTP remains supported through `MAIL_MAILER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_ENCRYPTION`, `MAIL_FROM_ADDRESS`, and `MAIL_FROM_NAME`. A company can explicitly disable delivery even when environment SMTP exists.
+
+`EmailDeliveryService` is the reusable mail boundary. It resolves company or environment SMTP, normalizes safe delivery status, queues the established `SendNotificationDeliveryJob`, creates idempotent tenant-scoped `notification_deliveries` records, and records safe audit events. The delivery table now includes template, subject, recipient-name, related-record, creator, and idempotency metadata; it intentionally stores compact structured content data rather than credentials or rendered email bodies. `CommandCenterEmail` renders the branded responsive email wrapper with the confirmed RetailPOS contact details.
+
+Administrators manage `/settings/integrations/email`, including test delivery, password retention/removal, and company disablement. Administrators and managers can view the tenant-scoped `/settings/email-deliveries` log, with safe status/error display and failed-delivery retry. Capabilities are `integrations.email.view`, `integrations.email.manage`, `email.deliveries.view`, `email.deliveries.retry`, and `email.test.send`. Test email requests are rate limited, recipients are validated, and no SMTP value is emitted to audit data.
+
+Lead-received internal notifications and demo confirmation, reschedule, and cancellation templates are connected through the domain-event listener. Lead/demo records remain durable when SMTP is missing or delivery fails; the delivery is marked `skipped_not_configured` or `failed` without changing CRM state. Google Calendar/Meet sync code, credentials, and configuration remain untouched and paused.
+
+Current limitation: delivery confirms the local mail transport accepted the message (`sent`); provider webhooks for final inbox delivery, bounce classification, and suppression lists remain future integrations.

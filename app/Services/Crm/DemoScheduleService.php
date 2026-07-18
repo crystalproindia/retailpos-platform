@@ -6,6 +6,8 @@ use App\Enums\Crm\ActivityType;
 use App\Enums\Crm\DemoScheduleStatus;
 use App\Enums\Crm\LeadPriority;
 use App\Enums\Crm\LeadStageType;
+use App\Events\Domain\Crm\DemoCancelled;
+use App\Events\Domain\Crm\DemoRescheduled;
 use App\Events\Domain\Crm\DemoScheduled;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmLead;
@@ -94,6 +96,7 @@ class DemoScheduleService
                 'company_id' => $lead->company_id,
                 'lead_id' => $lead->id,
             ]);
+            $this->domainEvents->dispatch(new DemoRescheduled(companyId: $lead->company_id, actorId: $user->id, aggregateType: DemoSchedule::class, aggregateId: $schedule->id, payload: $this->eventPayload($schedule, $lead)));
             $this->leadScoring->refresh($lead, $user);
 
             return $schedule->refresh()->load(['assignedTo', 'scheduledBy']);
@@ -133,6 +136,7 @@ class DemoScheduleService
             'company_id' => $lead->company_id,
             'lead_id' => $lead->id,
         ]);
+        $this->domainEvents->dispatch(new DemoCancelled(companyId: $lead->company_id, actorId: $user->id, aggregateType: DemoSchedule::class, aggregateId: $schedule->id, payload: $this->eventPayload($schedule, $lead)));
         $this->leadScoring->refresh($lead, $user);
 
         return $schedule->refresh()->load(['assignedTo', 'scheduledBy']);
@@ -256,6 +260,8 @@ class DemoScheduleService
             ->where('starts_at', '<', $endsAt)
             ->where('ends_at', '>', $startsAt)
             ->exists();
-        if ($conflict) throw ValidationException::withMessages(['start_time' => 'Selected time conflicts with an existing booking.']);
+        if ($conflict) {
+            throw ValidationException::withMessages(['start_time' => 'Selected time conflicts with an existing booking.']);
+        }
     }
 }

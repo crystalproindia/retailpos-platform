@@ -32,11 +32,11 @@ class QuotationShareController extends Controller
 
     public function createEmail(Request $request, QuotationRepository $quotations, QuotationShareService $sharing, QuotationService $quotationService, int $quotation): View
     {
-        $crmQuotation = $quotationService->generatePublicLink($quotations->findForUser($request->user(), $quotation), $request->user());
+        $link = $quotationService->issuePublicLink($quotations->findForUser($request->user(), $quotation), $request->user());
 
         return view('command-center.crm.quotations.email', [
-            'quotation' => $crmQuotation,
-            'defaults' => $sharing->emailDefaults($crmQuotation),
+            'quotation' => $link->quotation,
+            'defaults' => $sharing->emailDefaults($link->quotation, $link->url),
         ]);
     }
 
@@ -45,11 +45,11 @@ class QuotationShareController extends Controller
         $crmQuotation = $quotations->findForUser($request->user(), $quotation);
         $result = $sharing->sendEmail($crmQuotation, $request->user(), $request->validated(), $request->ccRecipients());
 
-        if (! $result['sent']) {
-            return redirect()->route('crm.quotations.show', $crmQuotation)->with('error', 'We could not send this proposal email. Check mail configuration and try again.');
+        if (! $result['configured']) {
+            return redirect()->route('crm.quotations.show', $crmQuotation)->with('error', 'Quotation saved. Email delivery was skipped because SMTP is not configured.');
         }
 
-        $message = 'Proposal email sent successfully.';
+        $message = $result['queued'] ? 'Proposal email queued for delivery.' : 'Proposal email delivery is being processed.';
         if ($result['attachment_unavailable']) {
             $message .= ' The secure proposal link was sent without the PDF attachment.';
         }

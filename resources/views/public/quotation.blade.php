@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive">
     <title>{{ $quotation->quotation_number }} | RetailPOS</title>
     @vite(['resources/css/app.css'])
 </head>
@@ -28,10 +29,22 @@
                     </tbody></table>
                 </section>
                 <section class="ml-auto mt-6 max-w-sm space-y-2 text-sm"><div class="flex justify-between text-slate-500"><span>Subtotal</span><span>{{ $quotation->currency }} {{ number_format((float) $quotation->subtotal, 2) }}</span></div><div class="flex justify-between text-slate-500"><span>Discount</span><span>{{ $quotation->currency }} {{ number_format((float) $quotation->discount_total, 2) }}</span></div><div class="flex justify-between text-slate-500"><span>Tax</span><span>{{ $quotation->currency }} {{ number_format((float) $quotation->tax_total, 2) }}</span></div><div class="flex justify-between border-t border-slate-200 pt-3 text-lg font-semibold"><span>Grand total</span><span>{{ $quotation->currency }} {{ number_format((float) $quotation->grand_total, 2) }}</span></div></section>
+                @if (session('status'))<div class="mt-6 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-medium text-teal-900">{{ session('status') }}</div>@endif
+                @if ($quotation->valid_until?->isPast())<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This quotation expired on {{ $quotation->valid_until->format('d M Y') }}. Please contact RetailPOS for an updated quotation.</div>@endif
                 @if ($quotation->notes)<section class="mt-8 border-t border-slate-200 pt-6"><h2 class="font-semibold">Notes</h2><p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{{ $quotation->notes }}</p></section>@endif
                 @if ($quotation->terms_conditions)<section class="mt-8 border-t border-slate-200 pt-6"><h2 class="font-semibold">Terms and conditions</h2><p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{{ $quotation->terms_conditions }}</p></section>@endif
             </div>
-            <footer class="border-t border-slate-200 bg-slate-50 p-6 text-center"><p class="text-sm font-semibold">Questions about this quotation?</p><p class="mt-2 text-sm text-slate-600">Contact RetailPOS through your usual sales contact.</p><p class="mt-4 text-xs text-slate-500">Online acceptance and PDF download will be available in a future release.</p></footer>
+            <footer class="border-t border-slate-200 bg-slate-50 p-6">
+                <div class="flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><p class="text-sm font-semibold">Questions about this quotation?</p><p class="mt-2 text-sm text-slate-600">India: +91 8072682244 · Malaysia: +60 104305163 · Singapore: +65 92475024<br>info@retailpos.biz · global@retailpos.biz</p></div><a href="{{ route('quotations.public.pdf', $publicToken) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-800">Download PDF</a></div>
+                @if (! $quotation->public_responded_at && ! $quotation->valid_until?->isPast())
+                    <form method="POST" action="{{ route('quotations.public.decision', $publicToken) }}" class="mt-6 grid gap-3 border-t border-slate-200 pt-6">@csrf
+                        <div class="grid gap-3 sm:grid-cols-2"><input name="name" required maxlength="120" placeholder="Your name" class="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><select name="decision" required class="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="accepted">Accept quotation</option><option value="rejected">Reject quotation</option></select></div>
+                        <textarea name="message" rows="3" maxlength="2000" placeholder="Optional message" class="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"></textarea><input name="rejection_reason" maxlength="1000" placeholder="Reason if rejecting" class="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="confirm" value="1" required> I confirm this decision is authorized.</label><button class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white">Submit decision</button>
+                    </form>
+                @elseif ($quotation->public_responded_at)
+                    <p class="mt-6 border-t border-slate-200 pt-6 text-sm font-medium text-slate-700">A {{ $quotation->status?->label() }} decision was recorded on {{ $quotation->public_responded_at->format('d M Y, h:i A') }}.</p>
+                @endif
+            </footer>
         </article>
     </main>
 </body>

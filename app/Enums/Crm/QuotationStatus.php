@@ -6,10 +6,13 @@ enum QuotationStatus: string
 {
     case Draft = 'draft';
     case Sent = 'sent';
+    case Viewed = 'viewed';
     case Accepted = 'accepted';
     case Rejected = 'rejected';
     case Expired = 'expired';
     case Converted = 'converted';
+    case Cancelled = 'cancelled';
+    case Superseded = 'superseded';
 
     public function label(): string
     {
@@ -20,9 +23,9 @@ enum QuotationStatus: string
     {
         return match ($this) {
             self::Draft => 'neutral',
-            self::Sent => 'info',
+            self::Sent, self::Viewed => 'info',
             self::Accepted, self::Converted => 'success',
-            self::Rejected, self::Expired => 'danger',
+            self::Rejected, self::Expired, self::Cancelled, self::Superseded => 'danger',
         };
     }
 

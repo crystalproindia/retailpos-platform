@@ -21,8 +21,9 @@ class ActivityRepository
             ->when($filters['status'] ?? null, function (Builder $query, string $status): void {
                 match ($status) {
                     'completed' => $query->whereNotNull('completed_at'),
-                    'overdue' => $query->whereNull('completed_at')->where('scheduled_at', '<', now()),
-                    default => $query->whereNull('completed_at'),
+                    'cancelled' => $query->whereNotNull('cancelled_at'),
+                    'overdue' => $query->whereNull('completed_at')->whereNull('cancelled_at')->where('scheduled_at', '<', now()),
+                    default => $query->whereNull('completed_at')->whereNull('cancelled_at'),
                 };
             })
             ->latest('scheduled_at')
@@ -56,6 +57,7 @@ class ActivityRepository
         return $this->queryForUser($user)
             ->whereIn('type', ['follow_up', 'call', 'meeting', 'task'])
             ->whereNull('completed_at')
+            ->whereNull('cancelled_at')
             ->when($overdueOnly, fn (Builder $query) => $query->where('scheduled_at', '<', now()))
             ->oldest('scheduled_at')
             ->limit(50)

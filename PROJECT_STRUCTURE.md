@@ -1,4 +1,12 @@
-# RetailPOS Platform - Phase 1 / 1.5 / 1.6 / 2 / 3 Project Structure
+# RetailPOS Platform - Command Center Project Structure
+
+## Sales Pipeline and Quotations
+
+The sales foundation reuses the CRM lead, status, audit, activity, PDF, notification, and email-delivery systems rather than duplicating them. `crm_opportunities` and `crm_opportunity_stage_histories` provide tenant-scoped commercial deal tracking. `crm_activities` is extended for follow-up lifecycle fields, reminders, timezone, opportunity links, completion, and cancellation.
+
+Quotation records now support optional opportunity links, secure hashed public-link state, view/decision tracking, immutable customer decisions, and item snapshots for unit and fixed/percentage discounts. Public quotation routes live under `/q/{token}` and are rate-limited, noindex, and customer-safe. `/sales/pipeline`, `/sales/follow-ups`, `/sales/quotations`, and `/sales/opportunities` provide sales entry points while preserving the existing CRM views and role policy.
+
+See `docs/sales-pipeline-and-quotations.md` for workflow, security, delivery, deployment, and troubleshooting details.
 
 This document describes the Command Center foundation built in Phase 1, the dynamic Module Registry foundation added in Phase 1.5, the Enterprise CMS foundation added in Phase 1.6, and the Enterprise CRM foundation added in Phase 2.
 

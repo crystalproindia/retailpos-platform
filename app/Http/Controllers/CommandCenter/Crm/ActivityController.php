@@ -6,6 +6,7 @@ use App\Enums\Crm\ActivityType;
 use App\Enums\Crm\LeadPriority;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\CompleteActivityRequest;
+use App\Http\Requests\Crm\CancelActivityRequest;
 use App\Http\Requests\Crm\RescheduleActivityRequest;
 use App\Http\Requests\Crm\StoreActivityRequest;
 use App\Repositories\Crm\ActivityRepository;
@@ -57,5 +58,12 @@ class ActivityController extends Controller
         );
 
         return back()->with('status', 'CRM activity rescheduled.');
+    }
+
+    public function cancel(CancelActivityRequest $request, ActivityRepository $activityRepository, ActivityService $activityService, int $activity): RedirectResponse
+    {
+        $activityService->cancel($activityRepository->findForUser($request->user(), $activity), $request->user(), $request->validated('outcome'));
+
+        return back()->with('status', 'CRM follow-up cancelled.');
     }
 }

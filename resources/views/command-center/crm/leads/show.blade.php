@@ -22,6 +22,9 @@
                     @can('crm.quotations.create')
                         <a href="{{ route('crm.quotations.create', $lead) }}" class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create quotation</a>
                     @endcan
+                    @can('sales.opportunities.create')
+                        <a href="{{ route('sales.opportunities.create', $lead) }}" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200">Create opportunity</a>
+                    @endcan
                     @can('crm.demos.create')
                         <a href="{{ route('crm.demos.create', $lead) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Schedule Demo</a>
                     @endcan

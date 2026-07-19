@@ -114,13 +114,23 @@ class QuotationController extends Controller
     public function publicLink(Request $request, QuotationRepository $quotationRepository, QuotationService $quotationService, int $quotation): RedirectResponse
     {
         abort_unless($request->user()->can('crm.quotations.update'), 403);
-        $updated = $quotationService->generatePublicLink(
+        $link = $quotationService->issuePublicLink(
             $quotationRepository->findForUser($request->user(), $quotation),
             $request->user(),
             $request->boolean('regenerate'),
         );
 
-        return redirect()->route('crm.quotations.show', $updated)->with('status', $request->boolean('regenerate') ? 'Secure public quotation link regenerated.' : 'Secure public quotation link is ready.');
+        return redirect()->route('crm.quotations.show', $link->quotation)
+            ->with('status', $request->boolean('regenerate') ? 'Secure public quotation link regenerated.' : 'Secure public quotation link is ready.')
+            ->with('publicQuotationUrl', $link->url);
+    }
+
+    public function revision(Request $request, QuotationRepository $quotationRepository, QuotationService $quotationService, int $quotation): RedirectResponse
+    {
+        abort_unless($request->user()->can('crm.quotations.update'), 403);
+        $revision = $quotationService->createRevision($quotationRepository->findForUser($request->user(), $quotation), $request->user());
+
+        return redirect()->route('crm.quotations.edit', $revision)->with('status', 'Draft quotation revision created.');
     }
 
     /** @return array<string, int|float|string|null> */

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['lead_id', 'company_id', 'quotation_number', 'title', 'customer_name', 'customer_company', 'customer_email', 'customer_phone', 'billing_address', 'currency', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'valid_until', 'status', 'notes', 'terms_conditions', 'internal_remarks', 'public_token', 'public_url', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at', 'created_by', 'updated_by'])]
+#[Fillable(['lead_id', 'opportunity_id', 'company_id', 'quotation_number', 'title', 'customer_name', 'customer_company', 'customer_email', 'customer_phone', 'billing_address', 'currency', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'valid_until', 'status', 'notes', 'terms_conditions', 'internal_remarks', 'public_token_hash', 'public_token_expires_at', 'public_token_revoked_at', 'first_viewed_at', 'last_viewed_at', 'public_view_count', 'public_responded_at', 'public_response_name', 'public_response_message', 'rejection_reason', 'version_number', 'parent_quotation_id', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at', 'created_by', 'updated_by'])]
 class CrmQuotation extends Model
 {
     use Auditable;
@@ -32,6 +32,11 @@ class CrmQuotation extends Model
             'accepted_at' => 'datetime',
             'rejected_at' => 'datetime',
             'converted_at' => 'datetime',
+            'public_token_expires_at' => 'datetime',
+            'public_token_revoked_at' => 'datetime',
+            'first_viewed_at' => 'datetime',
+            'last_viewed_at' => 'datetime',
+            'public_responded_at' => 'datetime',
         ];
     }
 
@@ -44,6 +49,10 @@ class CrmQuotation extends Model
     {
         return $this->belongsTo(CrmLead::class, 'lead_id');
     }
+
+    public function opportunity(): BelongsTo { return $this->belongsTo(CrmOpportunity::class, 'opportunity_id'); }
+    public function parentQuotation(): BelongsTo { return $this->belongsTo(self::class, 'parent_quotation_id'); }
+    public function revisions(): HasMany { return $this->hasMany(self::class, 'parent_quotation_id')->latest('version_number'); }
 
     public function items(): HasMany
     {
@@ -83,5 +92,12 @@ class CrmQuotation extends Model
     public function isExpired(): bool
     {
         return $this->valid_until?->isPast() && $this->status === QuotationStatus::Sent;
+    }
+
+    public function publicLinkIsActive(): bool
+    {
+        return $this->public_token_hash !== null
+            && $this->public_token_revoked_at === null
+            && ($this->public_token_expires_at === null || $this->public_token_expires_at->isFuture());
     }
 }

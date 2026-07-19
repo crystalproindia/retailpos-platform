@@ -19,6 +19,8 @@ class ActivityService
             'company_id' => $user->company_id,
             'assigned_user_id' => $data['assigned_user_id'] ?? $user->id,
             'created_by' => $user->id,
+            'timezone' => $data['timezone'] ?? config('app.timezone', 'UTC'),
+            'follow_up_status' => 'pending',
         ]);
 
         $this->auditLogger->record('crm.activity.created', $activity, 'CRM activity created');
@@ -30,7 +32,9 @@ class ActivityService
     {
         $activity->update([
             'completed_at' => now(),
+            'completed_by' => $user->id,
             'outcome' => $outcome,
+            'follow_up_status' => 'completed',
         ]);
 
         $this->auditLogger->record('crm.activity.completed', $activity, 'CRM activity completed', [
@@ -45,9 +49,26 @@ class ActivityService
         $activity->update([
             'scheduled_at' => $scheduledAt,
             'completed_at' => null,
+            'completed_by' => null,
+            'cancelled_at' => null,
+            'cancelled_by' => null,
+            'follow_up_status' => 'pending',
         ]);
 
         $this->auditLogger->record('crm.activity.rescheduled', $activity, 'CRM activity rescheduled');
+
+        return $activity;
+    }
+
+    public function cancel(CrmActivity $activity, User $user, ?string $outcome = null): CrmActivity
+    {
+        $activity->update([
+            'cancelled_at' => now(),
+            'cancelled_by' => $user->id,
+            'outcome' => $outcome,
+            'follow_up_status' => 'cancelled',
+        ]);
+        $this->auditLogger->record('crm.follow_up.cancelled', $activity, 'CRM follow-up cancelled', ['company_id' => $activity->company_id]);
 
         return $activity;
     }

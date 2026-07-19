@@ -43,6 +43,7 @@ use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
+use App\Http\Controllers\CommandCenter\Crm\OpportunityController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaShareController;
@@ -120,7 +121,11 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
-Route::get('q/{publicToken}', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
+Route::prefix('q/{publicToken}')->middleware('throttle:public-quotation')->group(function (): void {
+    Route::get('/', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
+    Route::get('pdf', [PublicQuotationController::class, 'pdf'])->name('quotations.public.pdf');
+    Route::post('decision', [PublicQuotationController::class, 'respond'])->name('quotations.public.decision');
+});
 Route::get('pi/{publicToken}', [PublicProformaController::class, 'show'])->name('proformas.public.show');
 
 Route::prefix('portal')->name('portal.')->group(function (): void {
@@ -221,6 +226,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject'])->middleware('can:crm.quotations.reject')->name('quotations.reject');
         Route::post('quotations/{quotation}/convert', [QuotationController::class, 'convert'])->middleware('can:crm.quotations.update')->name('quotations.convert');
         Route::post('quotations/{quotation}/public-link', [QuotationController::class, 'publicLink'])->middleware('can:crm.quotations.update')->name('quotations.public-link');
+        Route::post('quotations/{quotation}/revision', [QuotationController::class, 'revision'])->middleware('can:crm.quotations.update')->name('quotations.revision');
         Route::get('quotations/{quotation}/pdf', [QuotationShareController::class, 'downloadPdf'])->middleware('can:crm.quotations.view')->name('quotations.pdf.download');
         Route::get('quotations/{quotation}/pdf/preview', [QuotationShareController::class, 'previewPdf'])->middleware('can:crm.quotations.view')->name('quotations.pdf.preview');
         Route::get('quotations/{quotation}/email/create', [QuotationShareController::class, 'createEmail'])->middleware('can:crm.quotations.send')->name('quotations.email.create');
@@ -306,8 +312,19 @@ Route::middleware('auth')->group(function (): void {
         Route::post('activities', [ActivityController::class, 'store'])->middleware('can:crm.activities.manage')->name('activities.store');
         Route::post('activities/{activity}/complete', [ActivityController::class, 'complete'])->middleware('can:crm.activities.manage')->name('activities.complete');
         Route::patch('activities/{activity}/reschedule', [ActivityController::class, 'reschedule'])->middleware('can:crm.activities.manage')->name('activities.reschedule');
+        Route::post('activities/{activity}/cancel', [ActivityController::class, 'cancel'])->middleware('can:sales.followups.manage')->name('activities.cancel');
 
         Route::get('follow-ups', FollowUpController::class)->middleware('can:crm.activities.manage')->name('followups.index');
+    });
+
+    Route::middleware(['role:administrator,manager,sales'])->prefix('sales')->name('sales.')->group(function (): void {
+        Route::get('pipeline', fn () => redirect()->route('crm.pipeline.index'))->middleware('can:sales.pipeline.view')->name('pipeline.index');
+        Route::get('follow-ups', fn () => redirect()->route('crm.followups.index'))->middleware('can:sales.followups.view')->name('followups.index');
+        Route::get('quotations', fn () => redirect()->route('crm.quotations.index'))->middleware('can:sales.quotations.view')->name('quotations.index');
+        Route::get('leads/{lead}/opportunities/create', [OpportunityController::class, 'create'])->middleware('can:sales.opportunities.create')->name('opportunities.create');
+        Route::post('leads/{lead}/opportunities', [OpportunityController::class, 'store'])->middleware('can:sales.opportunities.create')->name('opportunities.store');
+        Route::get('opportunities', [OpportunityController::class, 'index'])->middleware('can:sales.opportunities.view')->name('opportunities.index');
+        Route::post('opportunities/{opportunity}/move', [OpportunityController::class, 'move'])->middleware('can:sales.opportunities.update')->name('opportunities.move');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:customers.view'])->prefix('customers')->name('customers.')->group(function (): void {

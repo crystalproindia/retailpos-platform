@@ -645,6 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.innerHTML = `<input type="hidden" name="_token" value="${csrf}">`;
         const append = (name, value) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value ?? ''; form.append(input); };
         append('customer_id', state.customer?.id || '');
+        append('register_id', [...document.querySelectorAll('[data-pos-register]')].map((input) => input.value).find(Boolean) || '');
         append('device_type', posApp.dataset.posMode === 'mobile' || window.matchMedia('(max-width: 1023px)').matches ? 'mobile' : 'desktop');
         append('manual_discount_amount', manualDiscount());
         append('coupon_code', document.querySelector('[data-pos-coupon]')?.value || '');

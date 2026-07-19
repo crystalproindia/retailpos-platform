@@ -6,16 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\PosCheckoutRequest;
 use App\Http\Requests\Pos\PosQuickCustomerRequest;
 use App\Models\Customers\Customer;
+use App\Models\Pos\PosRegister;
+use App\Models\Pos\PosSale;
 use App\Repositories\Pos\PosCatalogRepository;
 use App\Repositories\Pos\PosSaleRepository;
 use App\Services\Pos\CustomerProductSuggestionService;
 use App\Services\Pos\PosCheckoutService;
 use App\Services\Pos\PosCustomerLookupService;
 use App\Services\Pos\PosDashboardService;
+use App\Services\Pos\PosReceiptPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Http\Response;
 
 class PosController extends Controller
 {
@@ -42,6 +46,39 @@ class PosController extends Controller
     public function heldBills(Request $request, PosSaleRepository $sales): View
     {
         return view('command-center.pos.held', ['heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id, $request->string('q')->toString())]);
+    }
+
+    public function salesHistory(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:completed,voided'],
+            'payment_method' => ['nullable', 'in:cash,card,upi,bank_transfer,wallet,credit,other'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $sales = PosSale::query()
+            ->with(['branch', 'register', 'customer', 'completer', 'payments'])
+            ->where('company_id', $request->user()->company_id)
+            ->whereIn('status', ['completed', 'voided'])
+            ->when($filters['q'] ?? null, function ($query, string $search): void {
+                $query->where(function ($sales) use ($search): void {
+                    $sales->where('receipt_number', 'like', "%{$search}%")
+                        ->orWhere('sale_number', 'like', "%{$search}%")
+                        ->orWhere('customer_name_snapshot', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn ($customer) => $customer->where('display_name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
+                });
+            })
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['payment_method'] ?? null, fn ($query, string $method) => $query->whereHas('payments', fn ($payments) => $payments->where('payment_method', $method)))
+            ->when($filters['from'] ?? null, fn ($query, string $from) => $query->whereDate('completed_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, string $to) => $query->whereDate('completed_at', '<=', $to))
+            ->latest('completed_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('command-center.pos.sales.index', compact('sales', 'filters'));
     }
 
     public function catalog(Request $request, PosCatalogRepository $catalog): JsonResponse
@@ -90,9 +127,25 @@ class PosController extends Controller
     public function receipt(Request $request, PosSaleRepository $sales, int $sale): View
     {
         $sale = $sales->findForCompany($request->user()->company_id, $sale);
-        abort_unless($sale->status === 'completed', 404);
+        abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
 
         return view('command-center.pos.receipt', compact('sale'));
+    }
+
+    public function receiptPdf(Request $request, PosSaleRepository $sales, PosReceiptPdfService $pdf, int $sale): Response
+    {
+        $sale = $sales->findForCompany($request->user()->company_id, $sale);
+        abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
+
+        return $pdf->document($sale)->download($pdf->filename($sale));
+    }
+
+    public function void(Request $request, PosSaleRepository $sales, PosCheckoutService $checkout, int $sale): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+        $sale = $checkout->void($sales->findForCompany($request->user()->company_id, $sale), $request->user(), $data['reason']);
+
+        return redirect()->route('pos.receipts.show', $sale)->with('status', 'Sale voided and stock restored.');
     }
 
     /** @return array<string, mixed> */
@@ -113,6 +166,7 @@ class PosController extends Controller
             'resumedSale' => $resumedSale,
             'posMode' => $mode,
             'popularProductIds' => $dashboard->popularProductIds($request->user()->company_id, $request->user()->branch_id),
+            'openRegisters' => PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $request->user()->branch_id)->where('is_active', true)->whereNotNull('current_session_id')->orderBy('name')->get(),
         ]);
     }
 

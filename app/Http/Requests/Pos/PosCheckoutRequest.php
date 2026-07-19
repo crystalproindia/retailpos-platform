@@ -15,6 +15,9 @@ class PosCheckoutRequest extends FormRequest
 
         return [
             'branch_id' => ['nullable', Rule::exists('branches', 'id')->where('company_id', $companyId)],
+            'register_id' => ['nullable', Rule::exists('pos_registers', 'id')->where('company_id', $companyId)],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'sale_type' => ['nullable', Rule::in(['retail', 'wholesale'])],
             'customer_id' => ['nullable', Rule::exists('customers', 'id')->where('company_id', $companyId)],
             'coupon_code' => ['nullable', 'string', 'max:80'],
             'manual_discount_amount' => ['nullable', 'numeric', 'min:0'],

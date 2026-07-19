@@ -24,6 +24,7 @@ class PosCheckoutService
     public function __construct(
         private readonly PosCatalogRepository $catalog,
         private readonly PosNumberService $numbers,
+        private readonly PosRegisterService $registers,
         private readonly PromotionRuleEngine $promotions,
         private readonly CustomerInsightService $insights,
         private readonly AuditLogger $audit,
@@ -47,6 +48,19 @@ class PosCheckoutService
     public function complete(User $user, array $data): PosSale
     {
         return DB::transaction(function () use ($user, $data): PosSale {
+            $branchId = (int) ($data['branch_id'] ?? $user->branch_id);
+            $branch = \App\Models\Branch::query()->where('company_id', $user->company_id)->findOrFail($branchId);
+            if (! $branch->is_active) throw ValidationException::withMessages(['branch_id' => 'Inactive branches cannot create POS sales.']);
+            $data['branch_id'] = $branchId;
+            $branchHasRegisters = \App\Models\Pos\PosRegister::query()->where('company_id', $user->company_id)->where('branch_id', $branchId)->where('is_active', true)->exists();
+            if ($branchHasRegisters && empty($data['register_id'])) {
+                throw ValidationException::withMessages(['register_id' => 'Select an open POS register before completing this sale.']);
+            }
+            if (! empty($data['register_id'])) {
+                $session = $this->registers->activeSession($user, (int) $data['register_id'], $branchId);
+                $data['register_session_id'] = $session->id;
+                $data['receipt_prefix'] = $session->register->receipt_prefix;
+            }
             [$lines, $totals] = $this->linesAndTotals($user, $data);
             $paid = round(collect($data['payments'] ?? [])->sum(fn (array $payment) => (float) $payment['amount']), 2);
             if ($paid < $totals['total']) throw ValidationException::withMessages(['payments' => 'Payment total must cover the bill total.']);
@@ -59,6 +73,30 @@ class PosCheckoutService
             $this->dispatch('pos.sale.completed', $user, $sale, ['customer_id' => $sale->customer_id, 'total' => $sale->total_amount]);
 
             return $sale->load(['items.product', 'payments', 'customer.groups.group', 'customer.loyaltyAccount', 'customer.insight']);
+        });
+    }
+
+    public function void(PosSale $sale, User $user, string $reason): PosSale
+    {
+        return DB::transaction(function () use ($sale, $user, $reason): PosSale {
+            $sale = PosSale::query()->where('company_id', $user->company_id)->with('items.product')->lockForUpdate()->findOrFail($sale->id);
+            if ($sale->status !== 'completed') {
+                throw ValidationException::withMessages(['sale' => 'Only completed POS sales can be voided.']);
+            }
+            foreach ($sale->items as $item) {
+                $product = $item->product;
+                if (! $product || ! $product->track_inventory) continue;
+                $level = StockLevel::query()->where('company_id', $user->company_id)->where('product_id', $product->id)->when($sale->branch_id, fn ($query) => $query->where('branch_id', $sale->branch_id))->lockForUpdate()->firstOrFail();
+                $before = (float) $level->quantity_on_hand;
+                $after = $before + (float) $item->quantity;
+                $level->update(['quantity_on_hand' => $after, 'quantity_available' => (float) $level->quantity_available + (float) $item->quantity, 'last_stock_movement_at' => now()]);
+                StockMovement::create(['company_id' => $user->company_id, 'branch_id' => $sale->branch_id, 'warehouse_id' => $level->warehouse_id, 'stock_location_id' => $level->stock_location_id, 'product_id' => $product->id, 'movement_type' => 'sale_void', 'direction' => 'in', 'quantity' => $item->quantity, 'quantity_before' => $before, 'quantity_after' => $after, 'unit_cost' => $product->cost_price, 'reference_type' => PosSale::class, 'reference_id' => $sale->id, 'reason' => 'POS sale void: '.$reason, 'created_by' => $user->id, 'occurred_at' => now()]);
+            }
+            $sale->payments()->whereIn('status', ['recorded', 'confirmed'])->update(['status' => 'reversed', 'reversed_by' => $user->id, 'reversed_at' => now()]);
+            $sale->update(['status' => 'voided', 'voided_by' => $user->id, 'voided_at' => now(), 'void_reason' => $reason]);
+            $this->audit->record('pos.sale.voided', $sale, 'POS sale voided', ['company_id' => $user->company_id]);
+
+            return $sale->refresh()->load(['items.product', 'payments', 'customer']);
         });
     }
 
@@ -85,8 +123,9 @@ class PosCheckoutService
     private function persistSale(User $user, array $data, array $lines, array $totals, string $status, float $paid = 0): PosSale
     {
         $customer = isset($data['customer_id']) ? Customer::query()->where('company_id', $user->company_id)->findOrFail($data['customer_id']) : null;
-        $sale = PosSale::create(['company_id' => $user->company_id, 'branch_id' => $data['branch_id'] ?? $user->branch_id, 'customer_id' => $customer?->id, 'sale_number' => $this->numbers->next($user->company_id), 'offline_uuid' => $data['offline_uuid'] ?? null, 'offline_reference' => $data['offline_reference'] ?? null, 'synced_from_offline' => (bool) ($data['synced_from_offline'] ?? false), 'offline_created_at' => $data['offline_created_at'] ?? null, 'device_id' => $data['device_id'] ?? null, 'status' => $status, 'subtotal' => $totals['subtotal'], 'discount_amount' => $totals['discount'], 'tax_amount' => $totals['tax'], 'total_amount' => $totals['total'], 'paid_amount' => $paid, 'change_amount' => max(0, round($paid - $totals['total'], 2)), 'notes' => $data['notes'] ?? null, 'device_type' => $data['device_type'] ?? 'desktop', 'held_by' => $status === 'held' ? $user->id : null, 'completed_by' => $status === 'completed' ? $user->id : null, 'held_at' => $status === 'held' ? now() : null, 'completed_at' => $status === 'completed' ? now() : null]);
-        foreach ($lines as $line) $sale->items()->create(['company_id' => $user->company_id, 'product_id' => $line['product']->id, 'category_id' => $line['product']->category_id, 'product_name' => $line['product']->name, 'sku' => $line['product']->sku, 'barcode' => $line['product']->barcode, 'quantity' => $line['quantity'], 'unit_price' => $line['unit_price'], 'line_total' => $line['line_total']]);
+        $number = $this->numbers->next($user->company_id, $data['receipt_prefix'] ?? null);
+        $sale = PosSale::create(['company_id' => $user->company_id, 'branch_id' => $data['branch_id'] ?? $user->branch_id, 'register_id' => $data['register_id'] ?? null, 'register_session_id' => $data['register_session_id'] ?? null, 'customer_id' => $customer?->id, 'customer_name_snapshot' => $customer?->display_name, 'customer_mobile_snapshot' => $customer?->phone ?: $customer?->whatsapp, 'sale_number' => $number, 'receipt_number' => $status === 'completed' ? $number : null, 'offline_uuid' => $data['offline_uuid'] ?? null, 'offline_reference' => $data['offline_reference'] ?? null, 'completion_key' => $data['completion_key'] ?? null, 'synced_from_offline' => (bool) ($data['synced_from_offline'] ?? false), 'offline_created_at' => $data['offline_created_at'] ?? null, 'device_id' => $data['device_id'] ?? null, 'status' => $status, 'currency' => $data['currency'] ?? $user->company?->currency ?? 'INR', 'sale_type' => $data['sale_type'] ?? 'retail', 'subtotal' => $totals['subtotal'], 'discount_amount' => $totals['discount'], 'item_discount_total' => $totals['discount'], 'bill_discount_total' => 0, 'tax_amount' => $totals['tax'], 'total_amount' => $totals['total'], 'paid_amount' => $paid, 'change_amount' => max(0, round($paid - $totals['total'], 2)), 'balance_due' => max(0, round($totals['total'] - $paid, 2)), 'notes' => $data['notes'] ?? null, 'device_type' => $data['device_type'] ?? 'desktop', 'held_by' => $status === 'held' ? $user->id : null, 'completed_by' => $status === 'completed' ? $user->id : null, 'held_at' => $status === 'held' ? now() : null, 'completed_at' => $status === 'completed' ? now() : null, 'sold_at' => $status === 'completed' ? now() : null]);
+        foreach ($lines as $index => $line) $sale->items()->create(['company_id' => $user->company_id, 'product_id' => $line['product']->id, 'product_variant_id' => $line['product']->is_variant ? $line['product']->id : null, 'category_id' => $line['product']->category_id, 'product_name' => $line['product']->name, 'sku' => $line['product']->sku, 'barcode' => $line['product']->barcode, 'variant_label' => $line['product']->variant_name, 'hsn_sac' => $line['product']->hsn_code, 'unit' => $line['product']->unit?->short_code, 'quantity' => $line['quantity'], 'unit_price' => $line['unit_price'], 'price_source' => isset($data['items'][$index]['unit_price']) ? 'manual' : 'product', 'discount_amount' => 0, 'taxable_amount' => $line['line_total'], 'tax_profile_name' => $line['product']->taxRate?->name, 'tax_rate' => $line['product']->taxRate?->rate ?? 0, 'tax_amount' => 0, 'line_total' => $line['line_total'], 'sort_order' => $index + 1]);
 
         return $sale->load('customer');
     }

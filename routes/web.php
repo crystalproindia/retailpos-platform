@@ -93,6 +93,7 @@ use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
 use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
 use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
 use App\Http\Controllers\CommandCenter\Pos\PosController;
+use App\Http\Controllers\CommandCenter\Pos\PosRegisterController;
 use App\Http\Controllers\CommandCenter\Pos\PosOfflineController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionCampaignController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionCouponController;
@@ -387,6 +388,10 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:pos.view'])->prefix('pos')->name('pos.')->group(function (): void {
+        Route::get('registers', [PosRegisterController::class, 'index'])->middleware('can:pos.registers.view')->name('registers.index');
+        Route::post('registers', [PosRegisterController::class, 'store'])->middleware('can:pos.registers.manage')->name('registers.store');
+        Route::post('registers/{register}/open', [PosRegisterController::class, 'open'])->whereNumber('register')->middleware('can:pos.sessions.open')->name('registers.open');
+        Route::post('register-sessions/{session}/close', [PosRegisterController::class, 'close'])->whereNumber('session')->middleware('can:pos.sessions.close')->name('registers.sessions.close');
         Route::get('/', [PosController::class, 'index'])->name('index');
         Route::get('dashboard', [PosController::class, 'dashboard'])->name('dashboard');
         Route::get('terminal', [PosController::class, 'terminal'])->name('terminal');
@@ -400,6 +405,7 @@ Route::middleware('auth')->group(function (): void {
             Route::post('records/{record}/retry', [PosOfflineController::class, 'retry'])->whereNumber('record')->middleware(['role:administrator,manager', 'can:pos.offline.retry'])->name('records.retry');
         });
         Route::get('held', [PosController::class, 'heldBills'])->middleware('can:pos.hold')->name('held.index');
+        Route::get('sales', [PosController::class, 'salesHistory'])->middleware('can:pos.sales.view')->name('sales.index');
         Route::get('catalog', [PosController::class, 'catalog'])->name('catalog');
         Route::get('customers/lookup', [PosController::class, 'customer'])->name('customers.lookup');
         Route::post('customers/quick-create', [PosController::class, 'quickCustomer'])->middleware('can:pos.customers.create')->name('customers.quick-create');
@@ -407,6 +413,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('checkout', [PosController::class, 'complete'])->middleware('can:pos.checkout')->name('checkout');
         Route::get('held/{sale}', [PosController::class, 'resume'])->whereNumber('sale')->middleware('can:pos.hold')->name('held.resume');
         Route::get('receipts/{sale}', [PosController::class, 'receipt'])->whereNumber('sale')->name('receipts.show');
+        Route::get('receipts/{sale}/pdf', [PosController::class, 'receiptPdf'])->whereNumber('sale')->middleware('can:pos.receipts.view')->name('receipts.pdf');
+        Route::post('sales/{sale}/void', [PosController::class, 'void'])->whereNumber('sale')->middleware('can:pos.sales.void')->name('sales.void');
     });
 
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {

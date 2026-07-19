@@ -1,5 +1,9 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## POS Core Operations
+
+The counter-POS foundation uses `pos_sales`, `pos_sale_items`, and `pos_payments` independently of CRM invoices. The operational extension adds `pos_registers` and `pos_register_sessions`, branch/store metadata, register/session/receipt snapshots on new POS sales, transactional stock restoration for voids, and PDF receipts. `PosRegisterService`, `PosCheckoutService`, and `PosReceiptPdfService` own the register, completion, void, and receipt concerns; routes live under `/pos`, including `/pos/registers`, receipt PDF, and void actions. Details and compatibility limits are documented in `docs/pos-core-foundation.md`.
+
 ## Invoices, Payments and Receipts
 
 The sales invoice foundation adds tenant-scoped invoice, item-snapshot, and payment records without replacing quotations, CRM customers, contacts, opportunities, email delivery, audit history, or the existing proforma flow. It supports approved-quotation conversion, manual draft invoices, issue/send/view/overdue/paid lifecycle calculation, partial payment recording, reversals, customer-safe invoice and receipt PDFs, secure hashed public links, manual reminders, and WhatsApp share links.

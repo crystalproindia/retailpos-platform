@@ -59,6 +59,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public-quotation', fn ($request) => Limit::perMinute(30)
             ->by('public-quotation:'.$request->ip()));
 
+        RateLimiter::for('public-invoice', fn ($request) => Limit::perMinute(30)
+            ->by('public-invoice:'.$request->ip()));
+
         Gate::policy(CrmLead::class, CrmLeadPolicy::class);
         Gate::policy(CrmCompany::class, CrmCompanyPolicy::class);
         Gate::policy(CrmContact::class, CrmContactPolicy::class);

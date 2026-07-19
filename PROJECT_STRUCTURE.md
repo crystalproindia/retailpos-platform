@@ -1,5 +1,11 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## Invoices, Payments and Receipts
+
+The sales invoice foundation adds tenant-scoped invoice, item-snapshot, and payment records without replacing quotations, CRM customers, contacts, opportunities, email delivery, audit history, or the existing proforma flow. It supports approved-quotation conversion, manual draft invoices, issue/send/view/overdue/paid lifecycle calculation, partial payment recording, reversals, customer-safe invoice and receipt PDFs, secure hashed public links, manual reminders, and WhatsApp share links.
+
+Core additions are `CrmInvoice`, `CrmInvoiceItem`, `CrmInvoicePayment`, `InvoiceRepository`, `InvoiceService`, `InvoicePdfService`, `InvoiceShareService`, and `PublicInvoiceService`; admin routes live under `/sales/invoices` and public customer views under `/i/{token}`. `crm_invoices`, `crm_invoice_items`, and `crm_invoice_payments` are indexed by company and collection workflow fields. See `docs/invoices-payments-and-receipts.md` for lifecycle, security, queue operations, tax/GST limits, and deployment guidance.
+
 ## Sales Pipeline and Quotations
 
 The sales foundation reuses the CRM lead, status, audit, activity, PDF, notification, and email-delivery systems rather than duplicating them. `crm_opportunities` and `crm_opportunity_stage_histories` provide tenant-scoped commercial deal tracking. `crm_activities` is extended for follow-up lifecycle fields, reminders, timezone, opportunity links, completion, and cancellation.

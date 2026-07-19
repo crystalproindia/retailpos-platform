@@ -54,6 +54,8 @@ class CrmQuotation extends Model
     public function parentQuotation(): BelongsTo { return $this->belongsTo(self::class, 'parent_quotation_id'); }
     public function revisions(): HasMany { return $this->hasMany(self::class, 'parent_quotation_id')->latest('version_number'); }
 
+    public function invoices(): HasMany { return $this->hasMany(CrmInvoice::class, 'quotation_id')->latest('created_at'); }
+
     public function items(): HasMany
     {
         return $this->hasMany(CrmQuotationItem::class, 'quotation_id')->orderBy('sort_order');

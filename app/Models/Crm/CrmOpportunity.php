@@ -30,6 +30,7 @@ class CrmOpportunity extends Model
     public function assignedUser(): BelongsTo { return $this->belongsTo(User::class, 'assigned_user_id'); }
     public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function quotations(): HasMany { return $this->hasMany(CrmQuotation::class, 'opportunity_id'); }
+    public function invoices(): HasMany { return $this->hasMany(CrmInvoice::class, 'opportunity_id'); }
     public function activities(): HasMany { return $this->hasMany(CrmActivity::class, 'opportunity_id'); }
     public function stageHistory(): HasMany { return $this->hasMany(CrmOpportunityStageHistory::class, 'opportunity_id')->latest('changed_at'); }
 

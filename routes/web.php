@@ -43,6 +43,7 @@ use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
+use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
 use App\Http\Controllers\CommandCenter\Crm\OpportunityController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
@@ -113,6 +114,7 @@ use App\Http\Controllers\Portal\CustomerPortalAccessController;
 use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\PublicProformaController;
 use App\Http\Controllers\PublicQuotationController;
+use App\Http\Controllers\PublicInvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -125,6 +127,11 @@ Route::prefix('q/{publicToken}')->middleware('throttle:public-quotation')->group
     Route::get('/', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
     Route::get('pdf', [PublicQuotationController::class, 'pdf'])->name('quotations.public.pdf');
     Route::post('decision', [PublicQuotationController::class, 'respond'])->name('quotations.public.decision');
+});
+Route::prefix('i/{token}')->middleware('throttle:public-invoice')->group(function (): void {
+    Route::get('/', [PublicInvoiceController::class, 'show'])->name('invoices.public.show');
+    Route::get('pdf', [PublicInvoiceController::class, 'pdf'])->name('invoices.public.pdf');
+    Route::get('receipts/{payment}', [PublicInvoiceController::class, 'receipt'])->whereNumber('payment')->name('invoices.public.receipts.pdf');
 });
 Route::get('pi/{publicToken}', [PublicProformaController::class, 'show'])->name('proformas.public.show');
 
@@ -325,6 +332,28 @@ Route::middleware('auth')->group(function (): void {
         Route::post('leads/{lead}/opportunities', [OpportunityController::class, 'store'])->middleware('can:sales.opportunities.create')->name('opportunities.store');
         Route::get('opportunities', [OpportunityController::class, 'index'])->middleware('can:sales.opportunities.view')->name('opportunities.index');
         Route::post('opportunities/{opportunity}/move', [OpportunityController::class, 'move'])->middleware('can:sales.opportunities.update')->name('opportunities.move');
+        Route::get('invoices', [InvoiceController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.index');
+        Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
+        Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');
+        Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('can:sales.finance.export')->name('invoices.export');
+        Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->middleware('can:sales.invoices.update')->name('invoices.edit');
+        Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.update');
+        Route::get('quotations/{quotation}/invoices/create', [InvoiceController::class, 'createFromQuotation'])->middleware('can:sales.invoices.create')->name('invoices.create-from-quotation');
+        Route::post('quotations/{quotation}/invoices', [InvoiceController::class, 'storeFromQuotation'])->middleware('can:sales.invoices.create')->name('invoices.store-from-quotation');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('can:sales.invoices.view')->name('invoices.show');
+        Route::post('invoices/{invoice}/issue', [InvoiceController::class, 'issue'])->middleware('can:sales.invoices.issue')->name('invoices.issue');
+        Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'payment'])->middleware('can:sales.payments.record')->name('invoices.payments.store');
+        Route::post('invoices/{invoice}/payments/{payment}/clear', [InvoiceController::class, 'clear'])->middleware('can:sales.payments.clear')->name('invoices.payments.clear');
+        Route::post('invoices/{invoice}/payments/{payment}/reverse', [InvoiceController::class, 'reverse'])->middleware('can:sales.payments.reverse')->name('invoices.payments.reverse');
+        Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('can:sales.invoices.cancel')->name('invoices.cancel');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('can:sales.invoices.pdf')->name('invoices.pdf');
+        Route::get('invoices/{invoice}/receipts/{payment}', [InvoiceController::class, 'receipt'])->middleware('can:sales.receipts.pdf')->name('invoices.receipts.pdf');
+        Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->middleware('can:sales.invoices.send')->name('invoices.send');
+        Route::get('invoices/{invoice}/whatsapp', [InvoiceController::class, 'whatsapp'])->middleware('can:sales.invoices.send')->name('invoices.whatsapp');
+        Route::post('invoices/{invoice}/reminder', [InvoiceController::class, 'reminder'])->middleware('can:sales.reminders.send')->name('invoices.reminder');
+        Route::post('invoices/{invoice}/public-link/revoke', [InvoiceController::class, 'revokeLink'])->middleware('can:sales.invoices.public_link')->name('invoices.public-link.revoke');
+        Route::post('invoices/{invoice}/payments/{payment}/receipt/send', [InvoiceController::class, 'sendReceipt'])->middleware('can:sales.receipts.send')->name('invoices.receipts.send');
+        Route::get('invoices/{invoice}/payments/{payment}/receipt/whatsapp', [InvoiceController::class, 'receiptWhatsapp'])->middleware('can:sales.receipts.send')->name('invoices.receipts.whatsapp');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:customers.view'])->prefix('customers')->name('customers.')->group(function (): void {

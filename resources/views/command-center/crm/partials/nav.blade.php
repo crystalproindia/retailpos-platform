@@ -12,6 +12,7 @@
         ['label' => 'Contacts', 'route' => 'crm.contacts.index'],
         ['label' => 'Pipeline', 'route' => 'crm.pipeline.index'],
         ['label' => 'Opportunities', 'route' => 'sales.opportunities.index'],
+        ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
         ['label' => 'Activities', 'route' => 'crm.activities.index'],
         ['label' => 'Reports', 'route' => 'crm.reports.index'],
         ['label' => 'Visualization Dashboard', 'route' => 'crm.reports.visualization'],

@@ -19,6 +19,22 @@ $posManagementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
+        'compliance.gst.view' => $posManagementRoles,
+        'compliance.gst.settings.manage' => $administratorRoles,
+        'compliance.gst.reports.view' => $posManagementRoles,
+        'compliance.gst.exports.create' => $posManagementRoles,
+        'compliance.gst.periods.review' => $posManagementRoles,
+        'compliance.gst.periods.lock' => $administratorRoles,
+        'compliance.credit_notes.view' => $posManagementRoles,
+        'compliance.credit_notes.create' => $posManagementRoles,
+        'compliance.credit_notes.issue' => $administratorRoles,
+        'compliance.debit_notes.view' => $posManagementRoles,
+        'compliance.debit_notes.create' => $posManagementRoles,
+        'compliance.debit_notes.issue' => $administratorRoles,
+        'compliance.einvoice.validate' => $posManagementRoles,
+        'compliance.einvoice.submit' => $administratorRoles,
+        'compliance.ewaybill.validate' => $posManagementRoles,
+        'compliance.ewaybill.submit' => $administratorRoles,
         'pos.view' => $posUserRoles,
         'pos.access' => $posUserRoles,
         'pos.sales.create' => $posUserRoles,

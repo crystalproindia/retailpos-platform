@@ -29,6 +29,9 @@ use App\Http\Controllers\CommandCenter\Cms\CmsSettingsController as CmsAdminSett
 use App\Http\Controllers\CommandCenter\Cms\CmsTestimonialController;
 use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
 use App\Http\Controllers\CommandCenter\Cms\CmsTrustMetricController;
+use App\Http\Controllers\CommandCenter\Compliance\GstSettingsController;
+use App\Http\Controllers\CommandCenter\Compliance\GstNoteController;
+use App\Http\Controllers\CommandCenter\Compliance\GstComplianceController;
 use App\Http\Controllers\CommandCenter\Crm\ActivityController;
 use App\Http\Controllers\CommandCenter\Crm\AiLeadAssistantController;
 use App\Http\Controllers\CommandCenter\Crm\ContactController;
@@ -415,6 +418,22 @@ Route::middleware('auth')->group(function (): void {
         Route::get('receipts/{sale}', [PosController::class, 'receipt'])->whereNumber('sale')->name('receipts.show');
         Route::get('receipts/{sale}/pdf', [PosController::class, 'receiptPdf'])->whereNumber('sale')->middleware('can:pos.receipts.view')->name('receipts.pdf');
         Route::post('sales/{sale}/void', [PosController::class, 'void'])->whereNumber('sale')->middleware('can:pos.sales.void')->name('sales.void');
+    });
+
+    Route::middleware(['role:administrator,manager', 'can:compliance.gst.view'])->prefix('compliance/gst')->name('compliance.gst.')->group(function (): void {
+        Route::get('/', [GstComplianceController::class, 'dashboard'])->name('dashboard');
+        Route::get('settings', [GstSettingsController::class, 'index'])->name('settings.index');
+        Route::put('settings', [GstSettingsController::class, 'update'])->middleware('can:compliance.gst.settings.manage')->name('settings.update');
+        Route::get('notes', [GstNoteController::class, 'index'])->middleware('can:compliance.credit_notes.view')->name('notes.index');
+        Route::post('notes', [GstNoteController::class, 'store'])->middleware('can:compliance.credit_notes.create')->name('notes.store');
+        Route::get('reports/{report?}', [GstComplianceController::class, 'reports'])->middleware('can:compliance.gst.reports.view')->name('reports.index');
+        Route::get('exports', [GstComplianceController::class, 'exports'])->middleware('can:compliance.gst.exports.create')->name('exports.index');
+        Route::post('exports/download', [GstComplianceController::class, 'downloadExport'])->middleware('can:compliance.gst.exports.create')->name('exports.download');
+        Route::get('filing-guide', [GstComplianceController::class, 'guide'])->name('guide');
+        Route::get('periods', [GstComplianceController::class, 'periods'])->middleware('can:compliance.gst.periods.review')->name('periods.index');
+        Route::put('periods/{period}', [GstComplianceController::class, 'transitionPeriod'])->middleware('can:compliance.gst.periods.lock')->name('periods.transition');
+        Route::get('document-series', [GstComplianceController::class, 'series'])->name('series.index');
+        Route::get('e-way-bills', [GstComplianceController::class, 'eway'])->middleware('can:compliance.ewaybill.validate')->name('eway.index');
     });
 
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {

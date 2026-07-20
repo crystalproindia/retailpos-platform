@@ -3010,3 +3010,6 @@ Administrators manage `/settings/integrations/email`, including test delivery, p
 Lead-received internal notifications and demo confirmation, reschedule, and cancellation templates are connected through the domain-event listener. Lead/demo records remain durable when SMTP is missing or delivery fails; the delivery is marked `skipped_not_configured` or `failed` without changing CRM state.
 
 Current limitation: delivery confirms the local mail transport accepted the message (`sent`); provider webhooks for final inbox delivery, bounce classification, and suppression lists remain future integrations.
+# GST Compliance Foundation
+
+`app/Models/Compliance` contains tenant GST settings and GST note models. `app/Services/Compliance` contains structural GSTIN validation and the explicit state-based GST calculator. `database/migrations/2026_07_20_020000_create_gst_compliance_foundation.php` adds GST settings, masters, notes, periods, export history, and additive CRM invoice readiness fields. See `docs/gst-indian-compliance-foundation.md` for the provider and accountant-review boundary.

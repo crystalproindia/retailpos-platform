@@ -6,6 +6,9 @@
         ['label' => 'Requests', 'route' => 'purchases.requests.index', 'can' => 'purchases.requests.view'],
         ['label' => 'Orders', 'route' => 'purchases.orders.index', 'can' => 'purchases.orders.view'],
         ['label' => 'GRN', 'route' => 'purchases.grn.index', 'can' => 'purchases.grn.view'],
+        ['label' => 'Invoices', 'route' => 'purchases.invoices.index', 'can' => 'purchase-invoices.view'],
+        ['label' => 'Payments', 'route' => 'purchases.payments.index', 'can' => 'supplier-payments.view'],
+        ['label' => 'Reports', 'route' => 'purchases.reports.index', 'can' => 'purchase-reports.view'],
         ['label' => 'Returns', 'route' => 'purchases.returns.index', 'can' => 'purchases.returns.view'],
         ['label' => 'Settings', 'route' => 'purchases.settings.index', 'can' => 'purchases.settings.manage'],
     ];

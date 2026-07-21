@@ -3017,3 +3017,9 @@ Current limitation: delivery confirms the local mail transport accepted the mess
 # Command Center Navigation
 
 The sidebar and mobile drawer are generated from `config/modules.php` through `app/Support/Modules/ModuleRegistry.php`. The registry includes completed POS, Sales Invoice, GST & Compliance, CMS, email, notifications, and operations routes, while paused Google Calendar/Meet navigation remains excluded. See `docs/command-center-navigation.md`.
+
+# Purchase Invoice and Supplier Payables Foundation
+
+Phase 1A extends, rather than replaces, the existing supplier, purchase order, GRN, receiving, stock-posting, return, approval, dashboard, and registry modules. The additive tables are `purchase_invoices`, `purchase_invoice_items`, `supplier_payments`, and `supplier_payment_allocations`, with a follow-up migration adding workflow, idempotency, and numbering fields.
+
+The purchase domain now contains invoice and payment services plus payable/ageing calculations. Purchase invoices are created from accepted GRN quantities, retain tax and product snapshots, and become payable only when approved. Supplier payments can be allocated across approved invoices or kept as advances; reversal is auditable and restores outstanding amounts transactionally. See `docs/purchases/` for the architecture, workflows, GST boundary, permissions, testing, and production runbook.

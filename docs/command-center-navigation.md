@@ -22,3 +22,7 @@ Run `php artisan retailpos:sync-permissions --dry-run` to audit the active code-
 Add only a completed index or dashboard route to `config/modules.php`; never add an entity-specific edit/show route. Set the parent, category, sort order, role visibility, and a real named route. Then verify the route with the registry test and ensure the destination retains its authorization middleware.
 
 Google Calendar and Google Meet remain paused and are deliberately not included in this navigation registry.
+
+## Purchase Finance
+
+The Purchases group reuses the existing dashboard, suppliers, requests, orders, GRNs, and returns. It now also exposes working Purchase Invoices, Supplier Payments, and Purchase Reports routes. The shared registry powers both desktop and mobile navigation, and every item is protected by its matching capability gate.

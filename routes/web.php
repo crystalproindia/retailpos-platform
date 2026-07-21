@@ -107,7 +107,10 @@ use App\Http\Controllers\CommandCenter\Promotions\PromotionSimulatorController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionUsageController;
 use App\Http\Controllers\CommandCenter\Purchases\GoodsReceiptController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseDashboardController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseInvoiceController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseOrderController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseReportController;
+use App\Http\Controllers\CommandCenter\Purchases\SupplierPaymentController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseRequestController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseReturnController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
@@ -782,6 +785,23 @@ Route::middleware('auth')->group(function (): void {
         Route::post('grn', [GoodsReceiptController::class, 'store'])->middleware('can:purchases.grn.create')->name('grn.store');
         Route::get('grn/{goodsReceipt}', [GoodsReceiptController::class, 'show'])->middleware('can:purchases.grn.view')->name('grn.show');
         Route::post('grn/{goodsReceipt}/receive', [GoodsReceiptController::class, 'receive'])->middleware('can:purchases.grn.receive')->name('grn.receive');
+
+        Route::get('invoices', [PurchaseInvoiceController::class, 'index'])->middleware('can:purchase-invoices.view')->name('invoices.index');
+        Route::get('invoices/create', [PurchaseInvoiceController::class, 'create'])->middleware('can:purchase-invoices.create')->name('invoices.create');
+        Route::post('invoices', [PurchaseInvoiceController::class, 'store'])->middleware('can:purchase-invoices.create')->name('invoices.store');
+        Route::get('invoices/{purchaseInvoice}', [PurchaseInvoiceController::class, 'show'])->middleware('can:purchase-invoices.view')->name('invoices.show');
+        Route::post('invoices/{purchaseInvoice}/verify', [PurchaseInvoiceController::class, 'verify'])->middleware('can:purchase-invoices.verify')->name('invoices.verify');
+        Route::post('invoices/{purchaseInvoice}/approve', [PurchaseInvoiceController::class, 'approve'])->middleware('can:purchase-invoices.approve')->name('invoices.approve');
+        Route::post('invoices/{purchaseInvoice}/cancel', [PurchaseInvoiceController::class, 'cancel'])->middleware('can:purchase-invoices.cancel')->name('invoices.cancel');
+
+        Route::get('payments', [SupplierPaymentController::class, 'index'])->middleware('can:supplier-payments.view')->name('payments.index');
+        Route::get('payments/create', [SupplierPaymentController::class, 'create'])->middleware('can:supplier-payments.create')->name('payments.create');
+        Route::post('payments', [SupplierPaymentController::class, 'store'])->middleware('can:supplier-payments.create')->name('payments.store');
+        Route::get('payments/{supplierPayment}', [SupplierPaymentController::class, 'show'])->middleware('can:supplier-payments.view')->name('payments.show');
+        Route::post('payments/{supplierPayment}/reverse', [SupplierPaymentController::class, 'reverse'])->middleware('can:supplier-payments.reverse')->name('payments.reverse');
+
+        Route::get('reports', [PurchaseReportController::class, 'index'])->middleware('can:purchase-reports.view')->name('reports.index');
+        Route::get('reports/input-gst', [PurchaseReportController::class, 'inputGst'])->middleware('can:input-gst-reports.view')->name('reports.input-gst');
 
         Route::get('returns', [PurchaseReturnController::class, 'index'])->middleware('can:purchases.returns.view')->name('returns.index');
         Route::get('returns/create', [PurchaseReturnController::class, 'create'])->middleware('can:purchases.returns.create')->name('returns.create');

@@ -1,0 +1,4 @@
+<?php
+namespace App\Models\Purchases; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo; use Illuminate\Database\Eloquent\Relations\HasMany;
+#[Fillable(['company_id','supplier_id','branch_id','payment_number','payment_date','payment_type','payment_method','amount','unallocated_amount','reference','status','notes','recorded_by','reversed_by','reversed_at','reversal_reason'])]
+class SupplierPayment extends Model {protected function casts():array{return ['payment_date'=>'date','reversed_at'=>'datetime','amount'=>'decimal:2','unallocated_amount'=>'decimal:2'];}public function allocations():HasMany{return $this->hasMany(SupplierPaymentAllocation::class);}public function supplier():BelongsTo{return $this->belongsTo(Supplier::class);}}

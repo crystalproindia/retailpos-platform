@@ -1,0 +1,3 @@
+<?php
+namespace App\Models\Purchases; use Illuminate\Database\Eloquent\Attributes\Fillable; use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+#[Fillable(['supplier_payment_id','purchase_invoice_id','amount'])] class SupplierPaymentAllocation extends Model {protected function casts():array{return ['amount'=>'decimal:2'];}public function invoice():BelongsTo{return $this->belongsTo(PurchaseInvoice::class,'purchase_invoice_id');}}

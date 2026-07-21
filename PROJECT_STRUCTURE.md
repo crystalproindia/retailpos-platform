@@ -3013,3 +3013,7 @@ Current limitation: delivery confirms the local mail transport accepted the mess
 # GST Compliance Foundation
 
 `app/Models/Compliance` contains tenant GST settings and GST note models. `app/Services/Compliance` contains structural GSTIN validation and the explicit state-based GST calculator. `database/migrations/2026_07_20_020000_create_gst_compliance_foundation.php` adds GST settings, masters, notes, periods, export history, and additive CRM invoice readiness fields. See `docs/gst-indian-compliance-foundation.md` for the provider and accountant-review boundary.
+
+# Command Center Navigation
+
+The sidebar and mobile drawer are generated from `config/modules.php` through `app/Support/Modules/ModuleRegistry.php`. The registry includes completed POS, Sales Invoice, GST & Compliance, CMS, email, notifications, and operations routes, while paused Google Calendar/Meet navigation remains excluded. See `docs/command-center-navigation.md`.

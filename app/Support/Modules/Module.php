@@ -97,6 +97,10 @@ class Module
             return request()->routeIs('operations.*');
         }
 
+        if (str_starts_with($this->route, 'compliance.')) {
+            return request()->routeIs('compliance.*');
+        }
+
         if (str_starts_with($this->route, 'inventory.')) {
             return request()->routeIs('inventory.*');
         }

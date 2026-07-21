@@ -66,4 +66,21 @@ class ModuleRegistryTest extends TestCase
         $this->assertFalse($registry->enabled()->contains('id', 'crm'));
         $this->assertFalse($registry->sidebar(UserRole::Administrator)->contains('id', 'crm'));
     }
+
+    public function test_completed_pos_and_gst_modules_are_visible_to_administrators_and_resolve_to_named_routes(): void
+    {
+        $registry = new ModuleRegistry;
+        $modules = $registry->sidebar(UserRole::Administrator);
+
+        $this->assertTrue($modules->contains('id', 'pos'));
+        $this->assertTrue($modules->contains('id', 'gst-compliance'));
+        $this->assertContains('pos-registers', collect($modules->firstWhere('id', 'pos')->children)->pluck('id'));
+        $this->assertContains('gst-exports', collect($modules->firstWhere('id', 'gst-compliance')->children)->pluck('id'));
+        $this->assertFalse($registry->all()->contains(fn ($module) => str_contains($module->route, 'google')));
+
+        $registry->all()->each(function ($module): void {
+            $this->assertTrue(\Illuminate\Support\Facades\Route::has($module->route), "{$module->id} uses a missing route");
+            $this->assertNotEmpty($module->url());
+        });
+    }
 }

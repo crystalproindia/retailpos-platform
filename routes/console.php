@@ -8,6 +8,19 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Artisan::command('retailpos:sync-permissions {--dry-run : Report the configured permission matrix without writing data}', function (): int {
+    $capabilities = collect(config('permissions.capabilities', []));
+    $roles = $capabilities->flatMap(fn (array $allowed) => $allowed)->unique()->sort()->values();
+
+    $this->info(($this->option('dry-run') ? 'Dry run: ' : '').$capabilities->count().' code-defined capabilities are active.');
+    foreach ($roles as $role) {
+        $this->line(sprintf('%s: %d capabilities', $role, $capabilities->filter(fn (array $allowed) => in_array($role, $allowed, true))->count()));
+    }
+    $this->comment('Permissions are configuration-defined gates in this application; no role or user records were changed.');
+
+    return 0;
+})->purpose('Audit the configured RetailPOS role and permission matrix');
+
 Schedule::useCache('file');
 Schedule::command('notifications:retry-failed-deliveries')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-due')->everyFifteenMinutes()->withoutOverlapping();

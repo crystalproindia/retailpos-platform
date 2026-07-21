@@ -1,5 +1,42 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
+
+Phase 8A adds a provider-neutral SaaS domain without duplicating the existing `companies`, `branches`, `users`, invoice, payment, settings, permission, audit, notification, or navigation systems. `Company` remains the tenant boundary; a company has historical `saasSubscriptions`, and its existing branches and users remain tenant scoped.
+
+### SaaS Models and Tables
+
+- `SaasPlan`, `SaasPlanFeature`, `SaasPlanLimit`, and `SaasPlanVersion` map to `saas_plans`, `saas_plan_features`, `saas_plan_limits`, and `saas_plan_versions`.
+  - Plans are soft-deleted, versioned on each save, and use stable feature keys. Empty limit values mean unlimited; zero is never treated as unlimited.
+- `SaasSubscription` and `SaasSubscriptionEvent` map to `saas_subscriptions` and `saas_subscription_events`.
+  - Subscriptions retain immutable price, tax, feature, and limit snapshots; lifecycle changes are handled only by `SubscriptionService` and recorded as events/audit records.
+- `SaasTenantOverride` supports time-bounded, auditable per-tenant feature and limit overrides.
+- `SaasTenantOnboarding` records idempotent platform-assisted tenant creation and allows a failed/incomplete workflow to be reviewed safely.
+- The Phase 8A migrations add optional country, tax, industry, and billing-contact attributes to `companies`, an explicit `users.is_platform_admin` flag, SaaS tables, and a forward-only grandfathering backfill. Existing tenants receive an active complimentary `legacy-unlimited` subscription with all registered features and unlimited limits.
+
+### Services and Middleware
+
+- `PlanService`: saves plan features/limits atomically, produces immutable plan versions, and duplicates plans as drafts.
+- `SubscriptionService`: creates subscriptions, produces unguessable subscription numbers, records lifecycle events, preserves snapshots, and clears entitlement cache on changes.
+- `TenantOnboardingService`: creates the company, primary branch, primary administrator, and first subscription in one transaction keyed by an idempotency UUID. It never stores the submitted password in onboarding payload.
+- `EntitlementService`: resolves tenant access by active subscription, feature snapshot, and time-bounded override. It is the single source for future feature checks.
+- `UsageService`: recalculates user, branch, warehouse, product, monthly invoice, and monthly POS transaction usage from source records; it does not rely on drift-prone counters.
+- `platform-admin`: requires `is_platform_admin`, deliberately separate from tenant `administrator` role.
+- `subscription.active` and `subscription.feature`: opt-in route middleware. `SAAS_ENTITLEMENT_ENFORCEMENT=false` by default, so existing modules stay available until a reviewed rollout deliberately attaches their feature middleware.
+
+### SaaS Routes and Screens
+
+- Platform-only routes under `/saas`: dashboard, plans, subscriptions, tenant detail/status controls, and assisted onboarding.
+- Tenant-administrator routes under `/account/subscription`: current plan, trial/renewal state, snapshot usage, subscription history, and provider-neutral upgrade/downgrade/cancellation requests.
+- Platform screens are intentionally not registered in the tenant Module Registry/sidebar. A tenant admin therefore cannot discover or access platform operations merely by holding a tenant administrator role.
+
+### Provider-Neutral and Rollout Limits
+
+- No Razorpay, Stripe, Cashfree, PhonePe, Google Calendar, or Google Meet integration is added or enabled.
+- No gateway credentials, charging, proration, provider webhooks, reseller commission, custom domain, or white-label provisioning is implemented in this phase.
+- Usage services and entitlement middleware are ready for a controlled, module-by-module enforcement rollout, but no existing operational route is globally locked by this release.
+- Renewal reminders and posted subscription invoices are intentionally deferred until a provider-neutral billing document and queued notification specification is approved; dashboard revenue values therefore remain labelled as readiness/estimate data rather than realised revenue.
+
 ## POS Core Operations
 
 The counter-POS foundation uses `pos_sales`, `pos_sale_items`, and `pos_payments` independently of CRM invoices. The operational extension adds `pos_registers` and `pos_register_sessions`, branch/store metadata, register/session/receipt snapshots on new POS sales, transactional stock restoration for voids, and PDF receipts. `PosRegisterService`, `PosCheckoutService`, and `PosReceiptPdfService` own the register, completion, void, and receipt concerns; routes live under `/pos`, including `/pos/registers`, receipt PDF, and void actions. Details and compatibility limits are documented in `docs/pos-core-foundation.md`.

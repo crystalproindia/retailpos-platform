@@ -117,6 +117,11 @@ use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
+use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
+use App\Http\Controllers\CommandCenter\Saas\SaasPlanController;
+use App\Http\Controllers\CommandCenter\Saas\SaasSubscriptionController;
+use App\Http\Controllers\CommandCenter\Saas\SaasTenantOnboardingController;
+use App\Http\Controllers\CommandCenter\Saas\TenantSubscriptionController;
 use App\Http\Controllers\Portal\CustomerPortalAccessController;
 use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\PublicProformaController;
@@ -187,6 +192,29 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
+
+    Route::middleware('role:administrator')->prefix('account/subscription')->name('account.subscription.')->group(function (): void {
+        Route::get('/', [TenantSubscriptionController::class, 'index'])->name('index');
+        Route::post('requests', [TenantSubscriptionController::class, 'requestChange'])->name('requests.store');
+    });
+
+    Route::middleware('platform-admin')->prefix('saas')->name('saas.')->group(function (): void {
+        Route::get('/', SaasDashboardController::class)->name('dashboard');
+        Route::get('plans', [SaasPlanController::class, 'index'])->name('plans.index');
+        Route::get('plans/create', [SaasPlanController::class, 'create'])->name('plans.create');
+        Route::post('plans', [SaasPlanController::class, 'store'])->name('plans.store');
+        Route::get('plans/{plan}', [SaasPlanController::class, 'show'])->name('plans.show');
+        Route::get('plans/{plan}/edit', [SaasPlanController::class, 'edit'])->name('plans.edit');
+        Route::put('plans/{plan}', [SaasPlanController::class, 'update'])->name('plans.update');
+        Route::post('plans/{plan}/duplicate', [SaasPlanController::class, 'duplicate'])->name('plans.duplicate');
+        Route::post('plans/{plan}/archive', [SaasPlanController::class, 'archive'])->name('plans.archive');
+        Route::get('subscriptions', [SaasSubscriptionController::class, 'index'])->name('subscriptions.index');
+        Route::post('subscriptions/{subscription}/transition', [SaasSubscriptionController::class, 'transition'])->name('subscriptions.transition');
+        Route::get('tenants/{company}', [SaasSubscriptionController::class, 'show'])->name('tenants.show');
+        Route::get('onboarding', [SaasTenantOnboardingController::class, 'index'])->name('onboarding.index');
+        Route::get('onboarding/create', [SaasTenantOnboardingController::class, 'create'])->name('onboarding.create');
+        Route::post('onboarding', [SaasTenantOnboardingController::class, 'store'])->name('onboarding.store');
+    });
 
     Route::prefix('integrations/google')->name('integrations.google.')->group(function (): void {
         Route::get('/', [GoogleCalendarIntegrationController::class, 'index'])->middleware('can:integrations.google.view')->name('index');

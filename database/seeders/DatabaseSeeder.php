@@ -100,6 +100,8 @@ use App\Models\Pos\PosSale;
 use App\Models\Pos\PosSaleItem;
 use App\Models\QueueJobSnapshot;
 use App\Models\Setting;
+use App\Models\SaasPlan;
+use App\Models\SaasSubscription;
 use App\Models\SystemHealthCheck;
 use App\Models\User;
 use App\Models\WebhookDelivery;
@@ -159,6 +161,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'RetailPOS Administrator',
                 'role' => UserRole::Administrator,
                 'is_active' => true,
+                'is_platform_admin' => true,
                 'email_verified_at' => now(),
                 'password' => 'password',
             ],
@@ -187,6 +190,61 @@ class DatabaseSeeder extends Seeder
                 'is_active' => true,
                 'email_verified_at' => now(),
                 'password' => 'password',
+            ],
+        );
+
+        $growthPlan = SaasPlan::updateOrCreate(
+            ['code' => 'retail-growth'],
+            [
+                'name' => 'Retail Growth',
+                'description' => 'Demo plan for the RetailPOS subscription foundation.',
+                'status' => 'active',
+                'billing_interval' => 'monthly',
+                'currency' => 'INR',
+                'base_price' => 0,
+                'setup_fee' => 0,
+                'tax_percentage' => 0,
+                'trial_days' => 14,
+                'grace_period_days' => 3,
+                'sort_order' => 10,
+                'is_public' => true,
+                'is_recommended' => true,
+                'is_custom' => false,
+            ],
+        );
+
+        foreach (config('saas.features') as $feature) {
+            $growthPlan->features()->updateOrCreate(['feature_key' => $feature], ['is_enabled' => true]);
+        }
+
+        foreach (config('saas.usage_limits') as $limit) {
+            $growthPlan->limits()->updateOrCreate(['limit_key' => $limit], ['limit_value' => null]);
+        }
+
+        $growthPlan->load(['features', 'limits']);
+        $snapshot = $growthPlan->snapshot();
+        $growthPlan->versions()->firstOrCreate(['version' => 1], ['snapshot' => $snapshot, 'created_by' => $admin->id]);
+        SaasSubscription::firstOrCreate(
+            ['company_id' => $company->id, 'subscription_number' => 'SUB-DEMO-RETAIL-GROWTH'],
+            [
+                'saas_plan_id' => $growthPlan->id,
+                'status' => 'trialing',
+                'billing_interval' => $growthPlan->billing_interval,
+                'currency' => $growthPlan->currency,
+                'price_snapshot' => $growthPlan->base_price,
+                'tax_snapshot' => $growthPlan->tax_percentage,
+                'setup_fee_snapshot' => $growthPlan->setup_fee,
+                'feature_snapshot' => $snapshot['features'],
+                'limit_snapshot' => $snapshot['limits'],
+                'trial_starts_at' => today(),
+                'trial_ends_at' => today()->addDays($growthPlan->trial_days),
+                'starts_at' => today(),
+                'current_period_starts_at' => today(),
+                'current_period_ends_at' => today()->addMonth(),
+                'renewal_date' => today()->addMonth(),
+                'grace_period_ends_at' => today()->addDays($growthPlan->trial_days + $growthPlan->grace_period_days),
+                'billing_method' => 'complimentary',
+                'internal_notes' => 'Demo-only SaaS foundation subscription.',
             ],
         );
 

@@ -31,7 +31,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'legal_name', 'tax_id', 'email', 'phone', 'address', 'timezone', 'currency', 'is_active'])]
+#[Fillable(['name', 'legal_name', 'trade_name', 'tax_id', 'email', 'phone', 'address', 'city', 'state', 'country', 'postal_code', 'timezone', 'currency', 'tax_registration_type', 'industry', 'billing_contact_name', 'billing_contact_email', 'is_active'])]
 class Company extends Model
 {
     /** @use HasFactory<CompanyFactory> */
@@ -172,5 +172,10 @@ class Company extends Model
     public function posSales(): HasMany
     {
         return $this->hasMany(PosSale::class);
+    }
+
+    public function saasSubscriptions(): HasMany
+    {
+        return $this->hasMany(SaasSubscription::class);
     }
 }

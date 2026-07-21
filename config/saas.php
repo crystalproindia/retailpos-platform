@@ -7,7 +7,8 @@ return [
      */
     'enforcement_enabled' => filter_var(env('SAAS_ENTITLEMENT_ENFORCEMENT', false), FILTER_VALIDATE_BOOL),
 
-    'grandfathered_plan_code' => env('SAAS_GRANDFATHERED_PLAN_CODE', 'legacy-unlimited'),
+    // Stable internal code. This must not vary by deployment environment.
+    'grandfathered_plan_code' => 'existing-tenant-access',
 
     'features' => [
         'crm', 'quotations', 'sales_invoices', 'pos', 'gst_compliance',

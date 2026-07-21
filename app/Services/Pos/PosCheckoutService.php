@@ -16,6 +16,7 @@ use App\Services\AuditLogger;
 use App\Services\Customers\CustomerInsightService;
 use App\Services\Events\DomainEventDispatcher;
 use App\Services\Promotions\PromotionRuleEngine;
+use App\Services\Saas\UsageService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,6 +30,7 @@ class PosCheckoutService
         private readonly CustomerInsightService $insights,
         private readonly AuditLogger $audit,
         private readonly DomainEventDispatcher $events,
+        private readonly UsageService $usage,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -48,6 +50,7 @@ class PosCheckoutService
     public function complete(User $user, array $data): PosSale
     {
         return DB::transaction(function () use ($user, $data): PosSale {
+            $this->usage->assertWithinLimit($user->company, 'monthly_pos_transactions');
             $branchId = (int) ($data['branch_id'] ?? $user->branch_id);
             $branch = \App\Models\Branch::query()->where('company_id', $user->company_id)->findOrFail($branchId);
             if (! $branch->is_active) throw ValidationException::withMessages(['branch_id' => 'Inactive branches cannot create POS sales.']);

@@ -119,9 +119,11 @@ use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
 use App\Http\Controllers\CommandCenter\Saas\SaasPlanController;
+use App\Http\Controllers\CommandCenter\Saas\SaasResellerController;
 use App\Http\Controllers\CommandCenter\Saas\SaasSubscriptionController;
 use App\Http\Controllers\CommandCenter\Saas\SaasTenantOnboardingController;
 use App\Http\Controllers\CommandCenter\Saas\TenantSubscriptionController;
+use App\Http\Controllers\CommandCenter\Saas\WhiteLabelController;
 use App\Http\Controllers\Portal\CustomerPortalAccessController;
 use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\PublicProformaController;
@@ -194,26 +196,40 @@ Route::middleware('auth')->group(function (): void {
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
 
     Route::middleware('role:administrator')->prefix('account/subscription')->name('account.subscription.')->group(function (): void {
-        Route::get('/', [TenantSubscriptionController::class, 'index'])->name('index');
-        Route::post('requests', [TenantSubscriptionController::class, 'requestChange'])->name('requests.store');
+        Route::get('/', [TenantSubscriptionController::class, 'index'])->middleware('can:subscription.view')->name('index');
+        Route::post('requests', [TenantSubscriptionController::class, 'requestChange'])->middleware('can:subscription.request-plan-change')->name('requests.store');
+        Route::get('white-label', [WhiteLabelController::class, 'edit'])->name('white-label.edit');
+        Route::put('white-label', [WhiteLabelController::class, 'update'])->name('white-label.update');
     });
 
     Route::middleware('platform-admin')->prefix('saas')->name('saas.')->group(function (): void {
-        Route::get('/', SaasDashboardController::class)->name('dashboard');
-        Route::get('plans', [SaasPlanController::class, 'index'])->name('plans.index');
-        Route::get('plans/create', [SaasPlanController::class, 'create'])->name('plans.create');
-        Route::post('plans', [SaasPlanController::class, 'store'])->name('plans.store');
-        Route::get('plans/{plan}', [SaasPlanController::class, 'show'])->name('plans.show');
-        Route::get('plans/{plan}/edit', [SaasPlanController::class, 'edit'])->name('plans.edit');
-        Route::put('plans/{plan}', [SaasPlanController::class, 'update'])->name('plans.update');
-        Route::post('plans/{plan}/duplicate', [SaasPlanController::class, 'duplicate'])->name('plans.duplicate');
-        Route::post('plans/{plan}/archive', [SaasPlanController::class, 'archive'])->name('plans.archive');
-        Route::get('subscriptions', [SaasSubscriptionController::class, 'index'])->name('subscriptions.index');
-        Route::post('subscriptions/{subscription}/transition', [SaasSubscriptionController::class, 'transition'])->name('subscriptions.transition');
-        Route::get('tenants/{company}', [SaasSubscriptionController::class, 'show'])->name('tenants.show');
-        Route::get('onboarding', [SaasTenantOnboardingController::class, 'index'])->name('onboarding.index');
-        Route::get('onboarding/create', [SaasTenantOnboardingController::class, 'create'])->name('onboarding.create');
-        Route::post('onboarding', [SaasTenantOnboardingController::class, 'store'])->name('onboarding.store');
+        Route::get('/', SaasDashboardController::class)->middleware('can:saas.dashboard.view')->name('dashboard');
+        Route::get('plans', [SaasPlanController::class, 'index'])->middleware('can:saas.plans.view')->name('plans.index');
+        Route::get('plans/create', [SaasPlanController::class, 'create'])->middleware('can:saas.plans.create')->name('plans.create');
+        Route::post('plans', [SaasPlanController::class, 'store'])->middleware('can:saas.plans.create')->name('plans.store');
+        Route::get('plans/{plan}', [SaasPlanController::class, 'show'])->middleware('can:saas.plans.view')->name('plans.show');
+        Route::get('plans/{plan}/edit', [SaasPlanController::class, 'edit'])->middleware('can:saas.plans.update')->name('plans.edit');
+        Route::put('plans/{plan}', [SaasPlanController::class, 'update'])->middleware('can:saas.plans.update')->name('plans.update');
+        Route::post('plans/{plan}/duplicate', [SaasPlanController::class, 'duplicate'])->middleware('can:saas.plans.create')->name('plans.duplicate');
+        Route::post('plans/{plan}/archive', [SaasPlanController::class, 'archive'])->middleware('can:saas.plans.archive')->name('plans.archive');
+        Route::get('subscriptions', [SaasSubscriptionController::class, 'index'])->middleware('can:saas.subscriptions.view')->name('subscriptions.index');
+        Route::post('subscriptions/{subscription}/transition', [SaasSubscriptionController::class, 'transition'])->middleware('can:saas.subscriptions.update')->name('subscriptions.transition');
+        Route::post('subscriptions/{subscription}/renew', [SaasSubscriptionController::class, 'renew'])->middleware('can:saas.subscriptions.renew')->name('subscriptions.renew');
+        Route::post('subscriptions/{subscription}/trials/extend', [SaasSubscriptionController::class, 'extendTrial'])->middleware('can:saas.trials.extend')->name('subscriptions.trials.extend');
+        Route::post('subscriptions/{subscription}/plan-change', [SaasSubscriptionController::class, 'changePlan'])->middleware('can:saas.subscriptions.update')->name('subscriptions.plan-change');
+        Route::delete('subscriptions/{subscription}/plan-change', [SaasSubscriptionController::class, 'cancelPlanChange'])->middleware('can:saas.subscriptions.update')->name('subscriptions.plan-change.cancel');
+        Route::get('tenants/{company}', [SaasSubscriptionController::class, 'show'])->middleware('can:saas.tenants.view')->name('tenants.show');
+        Route::get('onboarding', [SaasTenantOnboardingController::class, 'index'])->middleware('can:saas.onboarding.manage')->name('onboarding.index');
+        Route::get('onboarding/create', [SaasTenantOnboardingController::class, 'create'])->middleware('can:saas.tenants.create')->name('onboarding.create');
+        Route::post('onboarding', [SaasTenantOnboardingController::class, 'store'])->middleware('can:saas.onboarding.manage')->name('onboarding.store');
+        Route::get('resellers', [SaasResellerController::class, 'index'])->middleware('can:saas.resellers.view')->name('resellers.index');
+        Route::get('resellers/create', [SaasResellerController::class, 'create'])->middleware('can:saas.resellers.manage')->name('resellers.create');
+        Route::post('resellers', [SaasResellerController::class, 'store'])->middleware('can:saas.resellers.manage')->name('resellers.store');
+        Route::get('resellers/{reseller}', [SaasResellerController::class, 'show'])->middleware('can:saas.resellers.view')->name('resellers.show');
+        Route::get('resellers/{reseller}/edit', [SaasResellerController::class, 'edit'])->middleware('can:saas.resellers.manage')->name('resellers.edit');
+        Route::put('resellers/{reseller}', [SaasResellerController::class, 'update'])->middleware('can:saas.resellers.manage')->name('resellers.update');
+        Route::post('resellers/{reseller}/tenants', [SaasResellerController::class, 'assign'])->middleware('can:saas.resellers.manage')->name('resellers.tenants.assign');
+        Route::delete('resellers/{reseller}/tenants/{assignment}', [SaasResellerController::class, 'unassign'])->middleware('can:saas.resellers.manage')->name('resellers.tenants.unassign');
     });
 
     Route::prefix('integrations/google')->name('integrations.google.')->group(function (): void {

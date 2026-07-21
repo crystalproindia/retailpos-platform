@@ -33,3 +33,7 @@ Schedule::command('notifications:prune-domain-events')->dailyAt('02:30')->withou
 Schedule::command('operations:health-check')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('operations:capture-queue-snapshot')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('operations:prune-health-checks')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('saas:process-trials')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('saas:process-renewals')->dailyAt('08:10')->withoutOverlapping();
+Schedule::command('saas:process-expirations')->dailyAt('08:20')->withoutOverlapping();
+Schedule::command('saas:recalculate-usage')->dailyAt('08:30')->withoutOverlapping();

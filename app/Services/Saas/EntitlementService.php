@@ -11,8 +11,9 @@ class EntitlementService
 {
     public function subscription(Company $company): ?SaasSubscription
     {
-        return Cache::remember(
-            "saas:subscription:{$company->id}",
+        $cacheKey = "saas:subscription:{$company->id}";
+        $subscription = Cache::remember(
+            $cacheKey,
             now()->addMinutes(5),
             fn (): ?SaasSubscription => SaasSubscription::query()
                 ->where('company_id', $company->id)
@@ -20,6 +21,20 @@ class EntitlementService
                 ->latest('id')
                 ->first(),
         );
+
+        if ($subscription === null || $subscription instanceof SaasSubscription) {
+            return $subscription;
+        }
+
+        // File or serialized caches may retain an old class payload across a
+        // deployment. Discard it and recover from the authoritative database.
+        Cache::forget($cacheKey);
+
+        return Cache::remember($cacheKey, now()->addMinutes(5), fn (): ?SaasSubscription => SaasSubscription::query()
+            ->where('company_id', $company->id)
+            ->whereIn('status', ['trialing', 'active', 'grace_period', 'past_due', 'suspended'])
+            ->latest('id')
+            ->first());
     }
 
     public function active(Company $company): bool
@@ -54,6 +69,11 @@ class EntitlementService
     public function clear(Company $company): void
     {
         Cache::forget("saas:subscription:{$company->id}");
+    }
+
+    public function clearForCompanyId(int $companyId): void
+    {
+        Cache::forget("saas:subscription:{$companyId}");
     }
 
     private function override(Company $company, string $type, string $key): mixed

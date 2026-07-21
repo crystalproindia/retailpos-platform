@@ -6,10 +6,15 @@ use App\Enums\UserRole;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\SaasPlan;
+use App\Models\SaasReseller;
+use App\Models\SaasUsageSnapshot;
 use App\Models\User;
 use App\Services\Saas\EntitlementService;
+use App\Services\Saas\PlanChangeService;
+use App\Services\Saas\SaasLifecycleService;
 use App\Services\Saas\SubscriptionService;
 use App\Services\Saas\TenantOnboardingService;
+use App\Services\Saas\UsageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -133,6 +138,100 @@ class SaasSubscriptionFoundationTest extends TestCase
         $this->assertDatabaseCount('saas_subscriptions', 1);
         $this->assertDatabaseHas('branches', ['company_id' => $first->company_id, 'name' => 'Flagship Store']);
         $this->assertDatabaseHas('users', ['company_id' => $first->company_id, 'email' => 'admin@northstar.test']);
+    }
+
+    public function test_trial_reminders_and_expiration_are_idempotent(): void
+    {
+        [$company, $administrator] = $this->tenant();
+        $subscription = app(SubscriptionService::class)->create($company, $this->plan(['trial_days' => 1, 'grace_period_days' => 1]), $administrator);
+        $subscription->update(['trial_ends_at' => today()->addDay(), 'grace_period_ends_at' => today()->addDays(2)]);
+
+        app(SaasLifecycleService::class)->processTrials();
+        app(SaasLifecycleService::class)->processTrials();
+        $this->assertSame(1, $subscription->fresh()->events()->where('event_key', 'TrialEndingIn1Days')->count());
+
+        $subscription->update(['trial_ends_at' => today()->subDay(), 'grace_period_ends_at' => today()->subDay()]);
+        app(SaasLifecycleService::class)->processTrials();
+        app(SaasLifecycleService::class)->processTrials();
+        $this->assertSame('expired', $subscription->fresh()->status);
+        $this->assertSame(1, $subscription->fresh()->events()->where('event_key', 'SubscriptionExpired')->count());
+    }
+
+    public function test_renewal_is_idempotent_and_reactivates_a_suspended_subscription(): void
+    {
+        [$company, $administrator] = $this->tenant();
+        $subscription = app(SubscriptionService::class)->create($company, $this->plan(), $administrator);
+        app(SubscriptionService::class)->transition($subscription, 'suspended', $administrator, 'Test');
+
+        $first = app(SubscriptionService::class)->renew($subscription, $administrator, 'offline', 'REF-1', 'renewal-test');
+        $second = app(SubscriptionService::class)->renew($subscription, $administrator, 'offline', 'REF-1', 'renewal-test');
+
+        $this->assertSame('active', $first->status);
+        $this->assertSame($first->renewal_date?->toDateString(), $second->renewal_date?->toDateString());
+        $this->assertSame(1, $subscription->fresh()->events()->where('idempotency_key', 'renewal-test')->count());
+        $this->assertTrue(app(EntitlementService::class)->active($company));
+    }
+
+    public function test_usage_recalculation_persists_one_snapshot_per_metric_and_limit_override_expires(): void
+    {
+        [$company] = $this->tenant();
+        $plan = $this->plan();
+        $plan->limits()->create(['limit_key' => 'users', 'limit_value' => 1]);
+        app(SubscriptionService::class)->create($company, $plan, null);
+        app(UsageService::class)->recalculate($company);
+        app(UsageService::class)->recalculate($company);
+        $this->assertSame(count(config('saas.usage_limits')), SaasUsageSnapshot::where('company_id', $company->id)->count());
+
+        $company->saasSubscriptions()->first()->company->saasSubscriptions();
+        \App\Models\SaasTenantOverride::create(['company_id' => $company->id, 'override_type' => 'limit', 'key' => 'users', 'value' => ['value' => 5], 'reason' => 'Temporary support approval', 'ends_at' => today()->subDay()]);
+        $this->assertSame(1, app(EntitlementService::class)->limit($company, 'users'));
+    }
+
+    public function test_plan_change_detects_downgrade_conflicts_and_can_be_cancelled_without_deleting_records(): void
+    {
+        [$company, $administrator] = $this->tenant();
+        User::factory()->for($company)->create(['role' => UserRole::Staff]);
+        $current = $this->plan();
+        $current->limits()->create(['limit_key' => 'users', 'limit_value' => null]);
+        $subscription = app(SubscriptionService::class)->create($company, $current, $administrator);
+        $downgrade = $this->plan();
+        $downgrade->limits()->create(['limit_key' => 'users', 'limit_value' => 1]);
+
+        $service = app(PlanChangeService::class);
+        $this->assertArrayHasKey('users', $service->conflicts($subscription, $downgrade));
+        $service->schedule($subscription, $downgrade, $administrator, false, 'At renewal');
+        $this->assertSame($downgrade->id, $subscription->fresh()->pending_saas_plan_id);
+        $service->cancelScheduledChange($subscription->fresh(), $administrator);
+        $this->assertNull($subscription->fresh()->pending_saas_plan_id);
+        $this->assertSame(2, User::where('company_id', $company->id)->count());
+    }
+
+    public function test_white_label_requires_entitlement_and_stays_tenant_scoped(): void
+    {
+        [$company, $administrator] = $this->tenant();
+        $plan = $this->plan();
+        app(SubscriptionService::class)->create($company, $plan, $administrator);
+        $this->actingAs($administrator)->get(route('account.subscription.white-label.edit'))->assertForbidden();
+
+        $planWithWhiteLabel = $this->plan();
+        $planWithWhiteLabel->features()->create(['feature_key' => 'white_label', 'is_enabled' => true]);
+        app(SubscriptionService::class)->transition($company->saasSubscriptions()->first(), 'cancelled', $administrator);
+        app(SubscriptionService::class)->create($company, $planWithWhiteLabel, $administrator);
+        $this->actingAs($administrator)->put(route('account.subscription.white-label.update'), [
+            'display_name' => 'Northstar Retail', 'primary_color' => '#112233', 'secondary_color' => '#445566', 'custom_domain_status' => 'pending', 'show_powered_by' => 1,
+        ])->assertRedirect();
+        $this->assertDatabaseHas('settings', ['company_id' => $company->id, 'group' => 'saas_white_label', 'key' => 'display_name']);
+    }
+
+    public function test_resellers_are_platform_only_and_tenant_assignment_is_audited(): void
+    {
+        [$company, $tenantAdministrator] = $this->tenant();
+        $this->actingAs($tenantAdministrator)->get(route('saas.resellers.index'))->assertForbidden();
+        $tenantAdministrator->update(['is_platform_admin' => true]);
+
+        $reseller = SaasReseller::create(['partner_code' => 'NORTHSTAR-PARTNER', 'company_name' => 'Northstar Partner', 'status' => 'active', 'owner_id' => $tenantAdministrator->id]);
+        $this->actingAs($tenantAdministrator)->post(route('saas.resellers.tenants.assign', $reseller), ['company_id' => $company->id])->assertRedirect();
+        $this->assertDatabaseHas('saas_reseller_tenant_assignments', ['saas_reseller_id' => $reseller->id, 'company_id' => $company->id]);
     }
 
     /** @return array{Company, User} */

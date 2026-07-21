@@ -178,4 +178,9 @@ class Company extends Model
     {
         return $this->hasMany(SaasSubscription::class);
     }
+
+    public function saasResellerAssignments(): HasMany
+    {
+        return $this->hasMany(SaasResellerTenantAssignment::class);
+    }
 }

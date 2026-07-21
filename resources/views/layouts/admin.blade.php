@@ -76,6 +76,31 @@
                             @endforeach
                         </div>
                     @endforeach
+
+                    @if ($user?->is_platform_admin)
+                        <div class="space-y-1">
+                            <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>SaaS Management</p>
+                            @foreach ([
+                                ['route' => 'saas.dashboard', 'label' => 'SaaS Dashboard', 'icon' => 'layout-dashboard'],
+                                ['route' => 'saas.subscriptions.index', 'label' => 'Tenants & Subscriptions', 'icon' => 'building-2'],
+                                ['route' => 'saas.plans.index', 'label' => 'Plans', 'icon' => 'layers-3'],
+                                ['route' => 'saas.onboarding.index', 'label' => 'Onboarding', 'icon' => 'user-plus'],
+                                ['route' => 'saas.resellers.index', 'label' => 'Resellers', 'icon' => 'handshake'],
+                            ] as $item)
+                                <a href="{{ route($item['route']) }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ request()->routeIs(str_replace('.index', '.*', $item['route'])) ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}">
+                                    <x-icon :name="$item['icon']" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $item['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @elseif ($user?->isAdministrator())
+                        <div class="space-y-1">
+                            <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>Subscription</p>
+                            <a href="{{ route('account.subscription.index') }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ request()->routeIs('account.subscription.index') ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"><x-icon name="credit-card" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>Current Plan & Usage</span></a>
+                            @if (app(\App\Services\Saas\EntitlementService::class)->allows($user->company, 'white_label'))
+                                <a href="{{ route('account.subscription.white-label.edit') }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ request()->routeIs('account.subscription.white-label.*') ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"><x-icon name="palette" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>White-label Settings</span></a>
+                            @endif
+                        </div>
+                    @endif
                 </nav>
 
                 <div class="border-t border-slate-200 p-4 dark:border-slate-800" data-sidebar-label>

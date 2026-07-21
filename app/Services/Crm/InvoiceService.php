@@ -12,18 +12,20 @@ use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Saas\UsageService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class InvoiceService
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly UsageService $usage) {}
 
     /** @param array<string,mixed> $data */
     public function create(User $user, array $data): CrmInvoice
     {
         return DB::transaction(function () use ($user, $data): CrmInvoice {
+            $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
             $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
             $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + [
                 'company_id' => $user->company_id,

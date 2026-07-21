@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Inventory\Warehouse;
 use App\Services\AuditLogger;
+use App\Services\Saas\UsageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class WarehouseController extends Controller
@@ -27,9 +29,13 @@ class WarehouseController extends Controller
         ]);
     }
 
-    public function store(Request $request, AuditLogger $auditLogger): RedirectResponse
+    public function store(Request $request, AuditLogger $auditLogger, UsageService $usage): RedirectResponse
     {
-        $warehouse = Warehouse::create($this->validated($request) + ['company_id' => $request->user()->company_id]);
+        $warehouse = DB::transaction(function () use ($request, $usage): Warehouse {
+            $usage->assertWithinLimit($request->user()->company, 'warehouses');
+
+            return Warehouse::create($this->validated($request) + ['company_id' => $request->user()->company_id]);
+        });
         $auditLogger->record('inventory.warehouse.created', $warehouse, 'Inventory warehouse created');
 
         return redirect()->route('inventory.warehouses.index')->with('status', 'Warehouse created.');

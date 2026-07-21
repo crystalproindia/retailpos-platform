@@ -3060,3 +3060,8 @@ The sidebar and mobile drawer are generated from `config/modules.php` through `a
 Phase 1A extends, rather than replaces, the existing supplier, purchase order, GRN, receiving, stock-posting, return, approval, dashboard, and registry modules. The additive tables are `purchase_invoices`, `purchase_invoice_items`, `supplier_payments`, and `supplier_payment_allocations`, with a follow-up migration adding workflow, idempotency, and numbering fields.
 
 The purchase domain now contains invoice and payment services plus payable/ageing calculations. Purchase invoices are created from accepted GRN quantities, retain tax and product snapshots, and become payable only when approved. Supplier payments can be allocated across approved invoices or kept as advances; reversal is auditable and restores outstanding amounts transactionally. See `docs/purchases/` for the architecture, workflows, GST boundary, permissions, testing, and production runbook.
+# Phase 8A — SaaS Core
+
+The SaaS foundation lives in `app/Models/Saas*`, `app/Services/Saas`, `app/Console/Commands/Saas`, `app/Http/Controllers/CommandCenter/Saas`, and `resources/views/command-center/saas`. It provides versioned plans, tenant-bound subscription snapshots, lifecycle events, onboarding, grandfathering, entitlement and usage services, platform-only administration, tenant subscription UI, white-label readiness, and reseller/tenant assignment history.
+
+See `docs/saas/` for architecture, plan/entitlement behavior, lifecycle and scheduler operations, usage enforcement, white-label and reseller boundaries, security, testing, and production recovery.

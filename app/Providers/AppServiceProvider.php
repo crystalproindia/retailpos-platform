@@ -68,8 +68,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(CrmActivity::class, CrmActivityPolicy::class);
 
         collect(config('permissions.capabilities', []))->each(function (array $roles, string $capability): void {
-            Gate::define($capability, function (User $user) use ($roles): bool {
+            Gate::define($capability, function (User $user) use ($roles, $capability): bool {
                 $role = $user->role instanceof UserRole ? $user->role->value : $user->role;
+
+                if (str_starts_with($capability, 'saas.')) {
+                    return $user->is_platform_admin && in_array($role, $roles, true);
+                }
 
                 return in_array($role, $roles, true);
             });

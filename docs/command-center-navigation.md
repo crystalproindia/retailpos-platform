@@ -30,3 +30,7 @@ The Purchases group reuses the existing dashboard, suppliers, requests, orders, 
 ## Navigation Boundary
 
 Only completed routes are visible. Registry entries that still use the generic `modules.show` foundation screen remain disabled until their dedicated module route and authorization boundary exist. The current role model contains Administrator, Manager, Sales, and Staff only; Finance, Warehouse, Cashier, and Content/Marketing role matrices are future role-model work and are not inferred by the navigation layer.
+
+## SaaS Navigation
+
+The shared admin layout renders the same responsive sidebar on desktop and mobile. Platform administrators receive a SaaS Management section with working named routes for dashboard, subscriptions, plans, onboarding, and resellers. Tenant administrators receive Subscription navigation and receive White-label Settings only when their entitlement allows it. No platform SaaS link is rendered for tenant-only administrators. The mobile drawer uses the shared navigation links and closes after navigation through the existing client-side drawer behavior.

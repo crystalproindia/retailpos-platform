@@ -9,6 +9,8 @@ use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosSale;
 use App\Models\User;
+use App\Models\SaasUsageSnapshot;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class UsageService
@@ -33,6 +35,12 @@ class UsageService
 
     public function assertWithinLimit(Company $company, string $key): void
     {
+        // Callers create tenant-owned resources inside a transaction. Locking the
+        // tenant row serializes concurrent create attempts for the same company.
+        if (DB::transactionLevel() > 0) {
+            $company = Company::query()->lockForUpdate()->findOrFail($company->id);
+        }
+
         $limit = $this->entitlements->limit($company, $key);
 
         if ($limit !== null && $this->current($company, $key) >= $limit) {
@@ -55,5 +63,19 @@ class UsageService
                 'state' => $percentage === null ? 'unlimited' : ($percentage >= 100 ? 'exceeded' : ($percentage >= 80 ? 'near_limit' : 'within_limit')),
             ]];
         })->all();
+    }
+
+    /** @return array<string, array{current: int, limit: ?int, percentage: ?int, state: string}> */
+    public function recalculate(Company $company, bool $persist = true): array
+    {
+        $summary = $this->summary($company);
+        if ($persist) {
+            foreach ($summary as $key => $metric) {
+                SaasUsageSnapshot::updateOrCreate(['company_id' => $company->id, 'usage_key' => $key], [
+                    'current_value' => $metric['current'], 'limit_value' => $metric['limit'], 'state' => $metric['state'], 'calculated_at' => now(),
+                ]);
+            }
+        }
+        return $summary;
     }
 }

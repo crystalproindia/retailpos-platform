@@ -38,7 +38,7 @@ class NotificationTemplateRenderer
             'severity' => $definition['severity'] ?? 'info',
             'event_key' => $event->eventKey(),
             'action_url' => $this->actionUrl($event),
-            'icon' => $definition['category'] === 'CRM' ? 'crm' : 'bell',
+            'icon' => ($definition['category'] ?? null) === 'CRM' ? 'crm' : 'bell',
             'metadata' => [
                 'category' => $definition['category'] ?? 'System',
                 'correlation_id' => $event->correlationId(),

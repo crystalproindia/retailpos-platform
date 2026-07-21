@@ -38,6 +38,15 @@ class ResponsiveNavigationTest extends TestCase
         $this->assertStringContainsString('translate: 0;', $styles);
     }
 
+    public function test_mobile_navigation_closes_after_navigation_or_escape(): void
+    {
+        $scripts = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertStringContainsString("sidebar?.querySelectorAll('a')", $scripts);
+        $this->assertStringContainsString("event.key === 'Escape'", $scripts);
+        $this->assertStringContainsString('closeSidebar({ restoreFocus: false })', $scripts);
+    }
+
     private function user(): User
     {
         $company = Company::factory()->create();

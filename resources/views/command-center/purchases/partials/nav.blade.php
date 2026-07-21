@@ -9,6 +9,7 @@
         ['label' => 'Invoices', 'route' => 'purchases.invoices.index', 'can' => 'purchase-invoices.view'],
         ['label' => 'Payments', 'route' => 'purchases.payments.index', 'can' => 'supplier-payments.view'],
         ['label' => 'Reports', 'route' => 'purchases.reports.index', 'can' => 'purchase-reports.view'],
+        ['label' => 'Input GST', 'route' => 'purchases.reports.input-gst', 'can' => 'input-gst-reports.view'],
         ['label' => 'Returns', 'route' => 'purchases.returns.index', 'can' => 'purchases.returns.view'],
         ['label' => 'Settings', 'route' => 'purchases.settings.index', 'can' => 'purchases.settings.manage'],
     ];

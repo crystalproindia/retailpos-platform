@@ -25,4 +25,8 @@ Google Calendar and Google Meet remain paused and are deliberately not included 
 
 ## Purchase Finance
 
-The Purchases group reuses the existing dashboard, suppliers, requests, orders, GRNs, and returns. It now also exposes working Purchase Invoices, Supplier Payments, and Purchase Reports routes. The shared registry powers both desktop and mobile navigation, and every item is protected by its matching capability gate.
+The Purchases group reuses the existing dashboard, suppliers, requests, orders, GRNs, and returns. It exposes working Purchase Invoices, Supplier Payments, Purchase Reports, and the Input GST Register. The shared registry powers both desktop and mobile navigation, and every item is protected by its matching capability gate.
+
+## Navigation Boundary
+
+Only completed routes are visible. Registry entries that still use the generic `modules.show` foundation screen remain disabled until their dedicated module route and authorization boundary exist. The current role model contains Administrator, Manager, Sales, and Staff only; Finance, Warehouse, Cashier, and Content/Marketing role matrices are future role-model work and are not inferred by the navigation layer.

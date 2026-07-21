@@ -89,6 +89,18 @@ class Module
             return request()->routeIs('crm.*');
         }
 
+        if (str_starts_with($this->route, 'sales.')) {
+            return request()->routeIs('sales.*');
+        }
+
+        if (str_starts_with($this->route, 'pos.')) {
+            return request()->routeIs('pos.*');
+        }
+
+        if (str_starts_with($this->route, 'customers.')) {
+            return request()->routeIs('customers.*');
+        }
+
         if (str_starts_with($this->route, 'notifications.')) {
             return request()->routeIs('notifications.*');
         }

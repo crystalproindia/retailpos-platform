@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sidebarOpenButtons = [...document.querySelectorAll('[data-sidebar-open]')];
     const sidebarCloseButtons = [...document.querySelectorAll('[data-sidebar-close], [data-sidebar-overlay]')];
+    const sidebar = document.querySelector('[data-sidebar]');
     const mobileNavigation = window.matchMedia('(max-width: 1023px)');
     let sidebarTrigger = null;
 
@@ -63,6 +64,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     sidebarCloseButtons.forEach((button) => {
         button.addEventListener('click', () => closeSidebar());
+    });
+
+    sidebar?.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', () => {
+            if (mobileNavigation.matches) {
+                closeSidebar({ restoreFocus: false });
+            }
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && mobileNavigation.matches) {
+            closeSidebar();
+        }
     });
 
     mobileNavigation.addEventListener('change', (event) => {

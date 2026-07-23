@@ -53,4 +53,14 @@ class SaasSubscription extends Model
     {
         return $this->hasMany(SaasSubscriptionEvent::class);
     }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(SaasSubscriptionInvoice::class);
+    }
+
+    public function billingPayments(): HasMany
+    {
+        return $this->hasMany(SaasBillingPayment::class);
+    }
 }

@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\PublicLeadIntakeController;
 use App\Http\Controllers\Api\PublicCmsController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\SaasBillingWebhookController;
+
+Route::post('saas-billing/razorpay/webhook', SaasBillingWebhookController::class)->middleware('throttle:60,1');
 
 Route::post('public/leads', PublicLeadIntakeController::class)
     ->middleware(['public.lead.token', 'public.lead.payload', 'throttle:public-leads']);

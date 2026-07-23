@@ -2,6 +2,7 @@
 
 namespace App\Services\Saas;
 
+use App\Data\SaasBilling\PaymentVerification;
 use App\Models\Company;
 use App\Models\SaasBillingPayment;
 use App\Models\SaasSubscription;
@@ -19,6 +20,7 @@ class SaasSubscriptionInvoiceService
         private readonly SaasBillingNumberService $numbers,
         private readonly SaasInvoiceTaxService $taxes,
         private readonly SubscriptionService $subscriptions,
+        private readonly SaasBillingNotificationService $notifications,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -101,9 +103,9 @@ class SaasSubscriptionInvoiceService
         });
     }
 
-    public function issue(SaasSubscriptionInvoice $invoice, User $actor, ?CarbonImmutable $dueDate = null): SaasSubscriptionInvoice
+    public function issue(SaasSubscriptionInvoice $invoice, ?User $actor, ?CarbonImmutable $dueDate = null): SaasSubscriptionInvoice
     {
-        return DB::transaction(function () use ($invoice, $actor, $dueDate): SaasSubscriptionInvoice {
+        $issued = DB::transaction(function () use ($invoice, $actor, $dueDate): SaasSubscriptionInvoice {
             $invoice = SaasSubscriptionInvoice::query()->lockForUpdate()->findOrFail($invoice->id);
             if ($invoice->status !== 'draft') {
                 return $invoice;
@@ -112,19 +114,25 @@ class SaasSubscriptionInvoiceService
                 'status' => 'issued',
                 'issue_date' => $invoice->issue_date ?? today(),
                 'due_date' => $dueDate ?? $invoice->due_date ?? today(),
-                'issued_by' => $actor->id,
+                'issued_by' => $actor?->id,
                 'issued_at' => now(),
             ]);
             $this->audit->record('saas.billing.invoice_issued', $invoice, 'Subscription invoice issued.', ['company_id' => $invoice->company_id]);
 
             return $invoice->refresh();
         });
+
+        if ($issued->status === 'issued') {
+            $this->notifications->invoiceIssued($issued);
+        }
+
+        return $issued;
     }
 
     /** @param array<string,mixed> $data */
     public function recordManualPayment(SaasSubscriptionInvoice $invoice, User $actor, array $data): SaasBillingPayment
     {
-        return DB::transaction(function () use ($invoice, $actor, $data): SaasBillingPayment {
+        $payment = DB::transaction(function () use ($invoice, $actor, $data): SaasBillingPayment {
             $invoice = SaasSubscriptionInvoice::query()->with('subscription')->lockForUpdate()->findOrFail($invoice->id);
             if (! $invoice->isPayable()) {
                 throw ValidationException::withMessages(['invoice' => 'Only issued subscription invoices with an outstanding balance can receive payments.']);
@@ -168,6 +176,12 @@ class SaasSubscriptionInvoiceService
 
             return $payment->refresh();
         });
+
+        if ($payment->status === 'confirmed') {
+            $this->notifications->paymentConfirmed($payment->loadMissing('invoice'));
+        }
+
+        return $payment;
     }
 
     public function void(SaasSubscriptionInvoice $invoice, User $actor, string $reason): SaasSubscriptionInvoice
@@ -190,7 +204,58 @@ class SaasSubscriptionInvoiceService
         });
     }
 
-    private function refreshInvoice(SaasSubscriptionInvoice $invoice, User $actor): void
+    public function recordGatewayPayment(SaasSubscriptionInvoice $invoice, ?User $actor, PaymentVerification $verification, string $provider, string $idempotencyKey): SaasBillingPayment
+    {
+        $payment = DB::transaction(function () use ($invoice, $actor, $verification, $provider, $idempotencyKey): SaasBillingPayment {
+            $invoice = SaasSubscriptionInvoice::query()->with('subscription')->lockForUpdate()->findOrFail($invoice->id);
+            if ($existing = SaasBillingPayment::query()->where('provider', $provider)->where('provider_payment_id', $verification->paymentId)->first()) {
+                return $existing;
+            }
+            if (! $invoice->isPayable()) {
+                throw ValidationException::withMessages(['invoice' => 'This invoice is no longer available for payment confirmation.']);
+            }
+            $amount = $this->money($verification->amount);
+            if ($amount <= 0 || $amount > $this->money($invoice->balance_due) || $invoice->currency !== $verification->currency) {
+                throw ValidationException::withMessages(['payment' => 'The verified gateway payment does not match the outstanding invoice balance.']);
+            }
+
+            $payment = SaasBillingPayment::create([
+                'company_id' => $invoice->company_id,
+                'saas_subscription_invoice_id' => $invoice->id,
+                'saas_subscription_id' => $invoice->saas_subscription_id,
+                'payment_number' => $this->numbers->paymentNumber($invoice->company_id, now()),
+                'receipt_number' => $this->numbers->receiptNumber($invoice->company_id, now()),
+                'provider' => $provider,
+                'provider_payment_id' => $verification->paymentId,
+                'provider_order_id' => $verification->orderId,
+                'status' => 'confirmed',
+                'payment_method' => $verification->method,
+                'amount' => $this->decimal($amount),
+                'currency' => $verification->currency,
+                'transaction_reference' => $verification->paymentId,
+                'metadata' => $verification->metadata,
+                'idempotency_key' => $idempotencyKey,
+                'recorded_by' => $actor?->id,
+                'paid_at' => now(),
+                'reconciliation_status' => 'matched',
+            ]);
+            $this->refreshInvoice($invoice, $actor);
+            if ($invoice->refresh()->status === 'paid') {
+                $this->subscriptions->renew($invoice->subscription, $actor, $provider, $verification->paymentId, 'saas-payment:'.$payment->id);
+            }
+            $this->audit->record('saas.billing.gateway_payment_confirmed', $payment, 'Gateway subscription payment confirmed.', ['company_id' => $invoice->company_id, 'invoice_id' => $invoice->id]);
+
+            return $payment->refresh();
+        });
+
+        if ($payment->status === 'confirmed') {
+            $this->notifications->paymentConfirmed($payment->loadMissing('invoice'));
+        }
+
+        return $payment;
+    }
+
+    private function refreshInvoice(SaasSubscriptionInvoice $invoice, ?User $actor): void
     {
         $paid = $invoice->payments()->where('status', 'confirmed')->sum('amount');
         $balance = max(0, $this->money($invoice->grand_total) - $this->money((string) $paid));

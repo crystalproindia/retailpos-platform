@@ -14,6 +14,7 @@
                 <p class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ number_format($value) }}</p>
             </section>
         @endforeach
+        <a href="{{ route('saas.billing.index') }}" class="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950"><p class="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">Billing outstanding</p><p class="mt-2 text-2xl font-semibold text-amber-950 dark:text-white">INR {{ number_format((float)$metrics['billing_outstanding'], 2) }}</p><p class="mt-1 text-sm text-amber-800 dark:text-amber-200">{{ number_format($metrics['billing_overdue']) }} overdue invoices</p></a>
         <section class="rounded-lg border border-sky-200 bg-sky-50 p-4 shadow-sm dark:border-sky-900 dark:bg-sky-950">
             <p class="text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">Revenue readiness</p>
             <p class="mt-2 text-sm text-sky-900 dark:text-sky-100">Provider-neutral estimates are intentionally unavailable until subscription invoices and payments are posted.</p>

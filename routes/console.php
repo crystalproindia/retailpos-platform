@@ -37,3 +37,7 @@ Schedule::command('saas:process-trials')->dailyAt('08:00')->withoutOverlapping()
 Schedule::command('saas:process-renewals')->dailyAt('08:10')->withoutOverlapping();
 Schedule::command('saas:process-expirations')->dailyAt('08:20')->withoutOverlapping();
 Schedule::command('saas:recalculate-usage')->dailyAt('08:30')->withoutOverlapping();
+Schedule::command('saas:generate-invoices')->dailyAt('07:40')->withoutOverlapping();
+Schedule::command('saas:process-overdue-invoices')->dailyAt('08:05')->withoutOverlapping();
+Schedule::command('saas:send-billing-reminders')->dailyAt('08:15')->withoutOverlapping();
+Schedule::command('saas:reconcile-payments')->dailyAt('08:40')->withoutOverlapping();

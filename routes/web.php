@@ -118,11 +118,14 @@ use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
+use App\Http\Controllers\CommandCenter\Saas\SaasBillingController;
+use App\Http\Controllers\CommandCenter\Saas\SaasBillingGatewayController;
 use App\Http\Controllers\CommandCenter\Saas\SaasPlanController;
 use App\Http\Controllers\CommandCenter\Saas\SaasResellerController;
 use App\Http\Controllers\CommandCenter\Saas\SaasSubscriptionController;
 use App\Http\Controllers\CommandCenter\Saas\SaasTenantOnboardingController;
 use App\Http\Controllers\CommandCenter\Saas\TenantSubscriptionController;
+use App\Http\Controllers\CommandCenter\Saas\TenantBillingController;
 use App\Http\Controllers\CommandCenter\Saas\WhiteLabelController;
 use App\Http\Controllers\Portal\CustomerPortalAccessController;
 use App\Http\Controllers\Portal\CustomerPortalController;
@@ -198,12 +201,32 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('role:administrator')->prefix('account/subscription')->name('account.subscription.')->group(function (): void {
         Route::get('/', [TenantSubscriptionController::class, 'index'])->middleware('can:subscription.view')->name('index');
         Route::post('requests', [TenantSubscriptionController::class, 'requestChange'])->middleware('can:subscription.request-plan-change')->name('requests.store');
+        Route::get('billing', [TenantBillingController::class, 'index'])->middleware('can:subscription.billing.view')->name('billing.index');
+        Route::get('billing/invoices/{invoice}', [TenantBillingController::class, 'show'])->middleware('can:subscription.billing.view')->name('billing.show');
+        Route::get('billing/invoices/{invoice}/pdf', [TenantBillingController::class, 'pdf'])->middleware('can:subscription.billing.view')->name('billing.pdf');
+        Route::post('billing/invoices/{invoice}/checkout', [TenantBillingController::class, 'checkout'])->middleware(['can:subscription.billing.pay', 'throttle:10,1'])->name('billing.checkout');
+        Route::get('billing/invoices/{invoice}/checkout/{session}', [TenantBillingController::class, 'checkoutShow'])->middleware('can:subscription.billing.pay')->name('billing.checkout.show');
+        Route::post('billing/invoices/{invoice}/checkout/{session}/callback', [TenantBillingController::class, 'callback'])->middleware(['can:subscription.billing.pay', 'throttle:10,1'])->name('billing.checkout.callback');
+        Route::get('billing/invoices/{invoice}/receipts/{payment}', [TenantBillingController::class, 'receipt'])->middleware('can:subscription.billing.receipts.view')->name('billing.receipt');
         Route::get('white-label', [WhiteLabelController::class, 'edit'])->name('white-label.edit');
         Route::put('white-label', [WhiteLabelController::class, 'update'])->name('white-label.update');
     });
 
     Route::middleware('platform-admin')->prefix('saas')->name('saas.')->group(function (): void {
         Route::get('/', SaasDashboardController::class)->middleware('can:saas.dashboard.view')->name('dashboard');
+        Route::get('billing', [SaasBillingController::class, 'index'])->middleware('can:saas.billing.view')->name('billing.index');
+        Route::get('billing/reports', [SaasBillingController::class, 'reports'])->middleware('can:saas.billing.view')->name('billing.reports');
+        Route::get('billing/invoices/{invoice}', [SaasBillingController::class, 'show'])->middleware('can:saas.billing.view')->name('billing.show');
+        Route::post('billing/invoices/{invoice}/issue', [SaasBillingController::class, 'issue'])->middleware('can:saas.billing.issue')->name('billing.issue');
+        Route::post('billing/invoices/{invoice}/void', [SaasBillingController::class, 'void'])->middleware('can:saas.billing.void')->name('billing.void');
+        Route::post('billing/invoices/{invoice}/payments', [SaasBillingController::class, 'payment'])->middleware('can:saas.billing.record-payment')->name('billing.payments.store');
+        Route::get('billing/invoices/{invoice}/pdf', [SaasBillingController::class, 'pdf'])->middleware('can:saas.billing.view')->name('billing.pdf');
+        Route::get('billing/invoices/{invoice}/receipts/{payment}', [SaasBillingController::class, 'receipt'])->middleware('can:saas.billing.view')->name('billing.receipt');
+        Route::post('billing/payments/{payment}/refunds', [SaasBillingController::class, 'requestRefund'])->middleware('can:saas.billing.refund')->name('billing.refunds.store');
+        Route::post('billing/refunds/{refund}/approve', [SaasBillingController::class, 'approveRefund'])->middleware('can:saas.billing.refund')->name('billing.refunds.approve');
+        Route::get('billing/gateway', [SaasBillingGatewayController::class, 'index'])->middleware('can:saas.billing.gateway.manage')->name('billing.gateway.index');
+        Route::put('billing/gateway', [SaasBillingGatewayController::class, 'update'])->middleware('can:saas.billing.gateway.manage')->name('billing.gateway.update');
+        Route::post('billing/gateway/test', [SaasBillingGatewayController::class, 'test'])->middleware('can:saas.billing.gateway.manage')->name('billing.gateway.test');
         Route::get('plans', [SaasPlanController::class, 'index'])->middleware('can:saas.plans.view')->name('plans.index');
         Route::get('plans/create', [SaasPlanController::class, 'create'])->middleware('can:saas.plans.create')->name('plans.create');
         Route::post('plans', [SaasPlanController::class, 'store'])->middleware('can:saas.plans.create')->name('plans.store');

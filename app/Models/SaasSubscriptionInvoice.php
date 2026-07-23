@@ -47,6 +47,7 @@ class SaasSubscriptionInvoice extends Model
     public function items(): HasMany { return $this->hasMany(SaasSubscriptionInvoiceItem::class)->orderBy('sort_order'); }
     public function payments(): HasMany { return $this->hasMany(SaasBillingPayment::class)->latest('paid_at'); }
     public function refunds(): HasMany { return $this->hasMany(SaasBillingRefund::class); }
+    public function checkoutSessions(): HasMany { return $this->hasMany(SaasBillingCheckoutSession::class); }
 
     public function isPayable(): bool
     {

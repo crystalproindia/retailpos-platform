@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\SaasSubscription;
 use App\Models\SaasTenantOnboarding;
+use App\Models\SaasSubscriptionInvoice;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -24,6 +25,8 @@ class SaasDashboardController extends Controller
                 'past_due' => (clone $subscriptions)->where('status', 'past_due')->count(),
                 'suspended' => (clone $subscriptions)->where('status', 'suspended')->count(),
                 'renewals_due' => (clone $subscriptions)->whereDate('renewal_date', '<=', today()->addDays(30))->whereIn('status', ['active', 'grace_period', 'past_due'])->count(),
+                'billing_outstanding' => SaasSubscriptionInvoice::query()->whereIn('status', ['issued', 'partially_paid', 'overdue'])->sum('balance_due'),
+                'billing_overdue' => SaasSubscriptionInvoice::query()->where('status', 'overdue')->count(),
             ],
             'recentOnboarding' => SaasTenantOnboarding::query()->with(['company', 'plan'])->latest()->limit(6)->get(),
             'recentSubscriptions' => SaasSubscription::query()->with(['company', 'plan'])->latest()->limit(8)->get(),

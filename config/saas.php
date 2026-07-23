@@ -31,4 +31,8 @@ return [
     ],
 
     'renewal_reminder_days' => [30, 15, 7, 3, 1, 0],
+
+    'billing' => [
+        'invoice_lead_days' => 7,
+    ],
 ];

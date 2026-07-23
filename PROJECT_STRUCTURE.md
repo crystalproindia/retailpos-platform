@@ -3065,3 +3065,11 @@ The purchase domain now contains invoice and payment services plus payable/agein
 The SaaS foundation lives in `app/Models/Saas*`, `app/Services/Saas`, `app/Console/Commands/Saas`, `app/Http/Controllers/CommandCenter/Saas`, and `resources/views/command-center/saas`. It provides versioned plans, tenant-bound subscription snapshots, lifecycle events, onboarding, grandfathering, entitlement and usage services, platform-only administration, tenant subscription UI, white-label readiness, and reseller/tenant assignment history.
 
 See `docs/saas/` for architecture, plan/entitlement behavior, lifecycle and scheduler operations, usage enforcement, white-label and reseller boundaries, security, testing, and production recovery.
+
+# Phase 8B — SaaS Billing
+
+SaaS billing extends the Phase 8A subscription layer without reusing CRM, POS, or purchase payments. `saas_subscription_invoices`, `saas_subscription_invoice_items`, `saas_billing_payments`, and `saas_billing_refunds` hold the immutable billing ledger. `saas_billing_checkout_sessions` holds short-lived server-authored checkout state and `saas_billing_webhook_events` holds encrypted, verified inbound provider events.
+
+`SaasSubscriptionInvoiceService` owns invoice issue, manual collection, gateway payment allocation, and lifecycle renewal. `SaasBillingNumberService` uses the existing GST document-series table. `SaasInvoiceTaxService` delegates GST to the existing calculator. The provider-neutral `PaymentGateway` contract is implemented by a test-mode-only `RazorpayPaymentGateway`; encrypted credentials use the existing `IntegrationConnection` store. The platform Billing screens are under `/saas/billing`; tenant billing is under `/account/subscription/billing` and remains company-scoped. Billing scheduler commands generate invoices, process overdue invoices, queue reminders through the existing email delivery system, and reconcile payment records.
+
+See `docs/saas-billing/` for architecture, GST, test-mode gateway setup, webhooks, refunds, reconciliation, security, testing, and production operations. No live gateway credentials or Google Calendar/Meet changes are included.

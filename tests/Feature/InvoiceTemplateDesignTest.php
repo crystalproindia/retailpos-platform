@@ -21,6 +21,8 @@ class InvoiceTemplateDesignTest extends TestCase
     {
         [$user, $invoice] = $this->invoice();
         $service = app(InvoiceTemplateService::class);
+        $pdf = app(InvoicePdfService::class);
+        $renderedViews = [];
         foreach (InvoiceTemplateService::KEYS as $key) {
             $service->update($user->company, $user, ['template_key' => $key, 'brand_color' => '#0f766e', 'copy_label' => 'original', 'orientation' => 'portrait', 'options' => $service->defaultOptions()]);
             $render = $service->renderData($invoice->fresh()->load(['company', 'items']));
@@ -28,8 +30,14 @@ class InvoiceTemplateDesignTest extends TestCase
             $this->assertSame(9.0, $render['tax_rows'][0]['cgst_rate']);
             $this->assertSame(9.0, $render['tax_rows'][0]['sgst_rate']);
             $this->assertEquals(0.0, $render['tax_rows'][0]['igst_rate']);
-            $this->assertNotEmpty(app(InvoicePdfService::class)->document($invoice->fresh())->output());
+            $view = $pdf->templateView($key);
+            $this->assertTrue(view()->exists($view));
+            $markup = view($view, ['invoice' => $invoice->fresh()->load(['company', 'items']), 'render' => $render])->render();
+            $this->assertStringContainsString('GST rate-wise summary', $markup);
+            $renderedViews[] = hash('sha256', $markup);
+            $this->assertNotEmpty($pdf->document($invoice->fresh())->output());
         }
+        $this->assertCount(5, array_unique($renderedViews));
     }
 
     public function test_interstate_tax_uses_igst_and_required_gst_options_cannot_be_disabled(): void

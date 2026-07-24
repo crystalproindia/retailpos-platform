@@ -215,6 +215,10 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('platform-admin')->prefix('saas')->name('saas.')->group(function (): void {
         Route::get('/', SaasDashboardController::class)->middleware('can:saas.dashboard.view')->name('dashboard');
         Route::get('billing', [SaasBillingController::class, 'index'])->middleware('can:saas.billing.view')->name('billing.index');
+        Route::get('billing/invoices', [SaasBillingController::class, 'index'])->middleware('can:saas.billing.view')->name('billing.invoices.index');
+        Route::get('billing/payments', [SaasBillingController::class, 'payments'])->middleware('can:saas.billing.view')->name('billing.payments.index');
+        Route::get('billing/refunds', [SaasBillingController::class, 'refunds'])->middleware('can:saas.billing.refund')->name('billing.refunds.index');
+        Route::get('billing/reconciliation', [SaasBillingController::class, 'reconciliation'])->middleware('can:saas.billing.reconcile')->name('billing.reconciliation.index');
         Route::get('billing/reports', [SaasBillingController::class, 'reports'])->middleware('can:saas.billing.view')->name('billing.reports');
         Route::get('billing/invoices/{invoice}', [SaasBillingController::class, 'show'])->middleware('can:saas.billing.view')->name('billing.show');
         Route::post('billing/invoices/{invoice}/issue', [SaasBillingController::class, 'issue'])->middleware('can:saas.billing.issue')->name('billing.issue');

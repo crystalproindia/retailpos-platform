@@ -1,13 +1,9 @@
+@php
+    $saasNavigation = app(\App\Support\Navigation\SaasNavigationRegistry::class);
+@endphp
+
 <nav class="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-4 text-sm dark:border-slate-800">
-    <a href="{{ route('saas.dashboard') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.dashboard') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Overview</a>
-    <a href="{{ route('saas.plans.index') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.plans.*') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Plans</a>
-    <a href="{{ route('saas.subscriptions.index') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.subscriptions.*', 'saas.tenants.*') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Subscriptions</a>
-    <a href="{{ route('saas.subscriptions.index', ['status' => 'trialing']) }}" class="rounded-md px-3 py-2 {{ request('status') === 'trialing' ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Trials</a>
-    <a href="{{ route('saas.subscriptions.index', ['status' => 'grace_period']) }}" class="rounded-md px-3 py-2 {{ in_array(request('status'), ['grace_period', 'past_due'], true) ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Renewals</a>
-    <a href="{{ route('saas.subscriptions.index', ['status' => 'suspended']) }}" class="rounded-md px-3 py-2 {{ request('status') === 'suspended' ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Suspended</a>
-    <a href="{{ route('saas.billing.index') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.billing.index', 'saas.billing.show') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Billing</a>
-    <a href="{{ route('saas.billing.gateway.index') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.billing.gateway.*') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Gateway</a>
-    <a href="{{ route('saas.billing.reports') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.billing.reports') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Reports</a>
-    <a href="{{ route('saas.onboarding.index') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.onboarding.*') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Onboarding</a>
-    <a href="{{ route('saas.resellers.index') }}" class="rounded-md px-3 py-2 {{ request()->routeIs('saas.resellers.*') ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">Resellers</a>
+    @foreach ($saasNavigation->platformItems(auth()->user()) as $item)
+        <a href="{{ $saasNavigation->url($item) }}" class="rounded-md px-3 py-2 {{ $saasNavigation->isActive($item) ? 'bg-slate-950 text-white dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">{{ $item['label'] }}</a>
+    @endforeach
 </nav>

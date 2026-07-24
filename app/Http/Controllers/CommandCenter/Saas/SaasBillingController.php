@@ -22,6 +22,27 @@ class SaasBillingController extends Controller
         return view('command-center.saas.billing.index', ['invoices' => $invoices, 'metrics' => ['outstanding' => SaasSubscriptionInvoice::query()->whereIn('status', ['issued', 'partially_paid', 'overdue'])->sum('balance_due'), 'overdue' => SaasSubscriptionInvoice::query()->where('status', 'overdue')->count(), 'paid_this_month' => SaasSubscriptionInvoice::query()->where('status', 'paid')->whereMonth('paid_at', now()->month)->sum('amount_paid'), 'refunds_pending' => SaasBillingRefund::query()->where('status', 'requested')->count()]]);
     }
 
+    public function payments(): View
+    {
+        return view('command-center.saas.billing.payments', [
+            'payments' => SaasBillingPayment::query()->with(['company', 'invoice'])->latest('paid_at')->latest('id')->paginate(30),
+        ]);
+    }
+
+    public function refunds(): View
+    {
+        return view('command-center.saas.billing.refunds', [
+            'refunds' => SaasBillingRefund::query()->with(['company', 'payment', 'invoice'])->latest('id')->paginate(30),
+        ]);
+    }
+
+    public function reconciliation(): View
+    {
+        return view('command-center.saas.billing.reconciliation', [
+            'payments' => SaasBillingPayment::query()->with(['company', 'invoice'])->where('reconciliation_status', 'unreconciled')->latest('paid_at')->latest('id')->paginate(30),
+        ]);
+    }
+
     public function show(SaasSubscriptionInvoice $invoice): View
     {
         return view('command-center.saas.billing.show', ['invoice' => $invoice->load(['company', 'subscription.plan', 'items', 'payments.refunds', 'refunds'])]);

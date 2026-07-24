@@ -194,6 +194,11 @@ class Company extends Model
         return $this->hasMany(SaasBillingCheckoutSession::class);
     }
 
+    public function invoiceTemplateSettings(): HasMany
+    {
+        return $this->hasMany(InvoiceTemplateSetting::class);
+    }
+
     public function saasResellerAssignments(): HasMany
     {
         return $this->hasMany(SaasResellerTenantAssignment::class);

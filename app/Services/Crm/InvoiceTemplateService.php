@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Crm\CrmInvoice;
 use App\Models\InvoiceTemplateSetting;
 use App\Models\User;
+use App\Services\AuditLogger;
 
 class InvoiceTemplateService
 {
@@ -23,6 +24,8 @@ class InvoiceTemplateService
         ];
     }
 
+    public function __construct(private readonly InvoiceBalancePresentationService $balances, private readonly AuditLogger $audit) {}
+
     public function setting(Company $company): InvoiceTemplateSetting
     {
         return InvoiceTemplateSetting::firstOrCreate(['company_id' => $company->id], ['options' => $this->defaultOptions()])->refresh();
@@ -37,6 +40,7 @@ class InvoiceTemplateService
             'orientation' => $data['orientation'], 'payment_qr_uri' => $data['payment_qr_uri'] ?? null,
             'options' => array_replace($this->defaultOptions(), $data['options'] ?? []), 'updated_by' => $user->id,
         ]);
+        $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', ['company_id' => $company->id, 'template_key' => $setting->template_key]);
         return $setting->refresh();
     }
 
@@ -58,12 +62,19 @@ class InvoiceTemplateService
             $row['total_tax'] = $row['cgst'] + $row['sgst'] + $row['igst'] + $row['cess'];
         }
         unset($row);
-        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'tax_rows' => array_values($rows), 'previous_balance' => null, 'current_balance' => $invoice->balance_due];
+        $balance = $this->balances->forInvoice($invoice);
+        $qr = $this->validPaymentUri($setting->payment_qr_uri) && (float) $invoice->balance_due > 0 ? $setting->payment_qr_uri : null;
+        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'tax_rows' => array_values($rows), 'balance' => $balance, 'payment_qr_uri' => $qr];
     }
 
     /** @return array<string,bool> */
     public function defaultOptions(): array
     {
         return ['show_logo' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
+    }
+
+    private function validPaymentUri(?string $uri): bool
+    {
+        return is_string($uri) && (bool) preg_match('/^(upi:\/\/pay\?|https:\/\/)/i', $uri);
     }
 }

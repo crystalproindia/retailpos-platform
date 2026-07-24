@@ -57,7 +57,7 @@ class InvoiceTemplateService
         $rows = [];
         foreach ($items as $item) {
             $key = ($item->hsn_sac ?: 'Unclassified').'|'.$item->tax_rate.'|'.$item->tax_treatment_snapshot;
-            $rows[$key] ??= ['hsn_sac' => $item->hsn_sac ?: '—', 'taxable' => 0, 'tax_rate' => (float) $item->tax_rate, 'cgst' => 0, 'sgst' => 0, 'igst' => 0, 'cess' => 0];
+            $rows[$key] ??= ['hsn_sac' => $item->hsn_sac ?: '—', 'tax_treatment' => $item->tax_treatment_snapshot ?: 'standard', 'taxable' => 0, 'tax_rate' => (float) $item->tax_rate, 'cgst' => 0, 'sgst' => 0, 'igst' => 0, 'cess' => 0];
             foreach (['taxable' => 'line_subtotal', 'cgst' => 'cgst_amount', 'sgst' => 'sgst_amount', 'igst' => 'igst_amount', 'cess' => 'cess_amount'] as $target => $field) {
                 $rows[$key][$target] += (float) $item->{$field};
             }

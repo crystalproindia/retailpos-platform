@@ -24,7 +24,11 @@ class InvoiceTemplateService
         ];
     }
 
-    public function __construct(private readonly InvoiceBalancePresentationService $balances, private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly InvoiceBalancePresentationService $balances,
+        private readonly InvoicePaymentQrService $paymentQr,
+        private readonly AuditLogger $audit,
+    ) {}
 
     public function setting(Company $company): InvoiceTemplateSetting
     {
@@ -41,6 +45,7 @@ class InvoiceTemplateService
             'options' => array_replace($this->defaultOptions(), $data['options'] ?? []), 'updated_by' => $user->id,
         ]);
         $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', ['company_id' => $company->id, 'template_key' => $setting->template_key]);
+
         return $setting->refresh();
     }
 
@@ -53,7 +58,9 @@ class InvoiceTemplateService
         foreach ($items as $item) {
             $key = ($item->hsn_sac ?: 'Unclassified').'|'.$item->tax_rate.'|'.$item->tax_treatment_snapshot;
             $rows[$key] ??= ['hsn_sac' => $item->hsn_sac ?: '—', 'taxable' => 0, 'tax_rate' => (float) $item->tax_rate, 'cgst' => 0, 'sgst' => 0, 'igst' => 0, 'cess' => 0];
-            foreach (['taxable' => 'line_subtotal', 'cgst' => 'cgst_amount', 'sgst' => 'sgst_amount', 'igst' => 'igst_amount', 'cess' => 'cess_amount'] as $target => $field) $rows[$key][$target] += (float) $item->{$field};
+            foreach (['taxable' => 'line_subtotal', 'cgst' => 'cgst_amount', 'sgst' => 'sgst_amount', 'igst' => 'igst_amount', 'cess' => 'cess_amount'] as $target => $field) {
+                $rows[$key][$target] += (float) $item->{$field};
+            }
         }
         foreach ($rows as &$row) {
             $row['cgst_rate'] = $row['cgst'] > 0 ? $row['tax_rate'] / 2 : 0;
@@ -63,18 +70,14 @@ class InvoiceTemplateService
         }
         unset($row);
         $balance = $this->balances->forInvoice($invoice);
-        $qr = $this->validPaymentUri($setting->payment_qr_uri) && (float) $invoice->balance_due > 0 ? $setting->payment_qr_uri : null;
-        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'tax_rows' => array_values($rows), 'balance' => $balance, 'payment_qr_uri' => $qr];
+        $paymentQr = $this->paymentQr->forInvoice($invoice, $setting);
+
+        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'tax_rows' => array_values($rows), 'balance' => $balance, 'payment_qr_uri' => $paymentQr['payload'] ?? null, 'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null];
     }
 
     /** @return array<string,bool> */
     public function defaultOptions(): array
     {
         return ['show_logo' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
-    }
-
-    private function validPaymentUri(?string $uri): bool
-    {
-        return is_string($uri) && (bool) preg_match('/^(upi:\/\/pay\?|https:\/\/)/i', $uri);
     }
 }

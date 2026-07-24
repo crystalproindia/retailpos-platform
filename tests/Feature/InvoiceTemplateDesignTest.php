@@ -42,6 +42,65 @@ class InvoiceTemplateDesignTest extends TestCase
         $this->assertTrue($options['show_gst_breakup']); $this->assertTrue($options['show_gst_summary']); $this->assertTrue($options['show_hsn_sac']);
     }
 
+    public function test_payment_qr_embeds_a_trusted_upi_amount_for_unpaid_and_partially_paid_invoices(): void
+    {
+        [$user, $invoice] = $this->invoice();
+        $this->configurePaymentSource($user, 'merchant@upi');
+
+        $render = app(InvoiceTemplateService::class)->renderData($invoice->fresh()->load(['company', 'items']));
+        $this->assertStringContainsString('pa=merchant%40upi', $render['payment_qr_uri']);
+        $this->assertStringContainsString('am=1180.00', $render['payment_qr_uri']);
+        $this->assertStringStartsWith('data:image/png;base64,', $render['payment_qr_data_uri']);
+        $this->assertStringContainsString('/Subtype /Image', app(InvoicePdfService::class)->document($invoice->fresh())->output());
+
+        $invoice->update(['status' => InvoiceStatus::PartiallyPaid, 'amount_paid' => 180, 'balance_due' => 1000]);
+        $partialRender = app(InvoiceTemplateService::class)->renderData($invoice->fresh()->load(['company', 'items']));
+        $this->assertStringContainsString('am=1000.00', $partialRender['payment_qr_uri']);
+        $this->assertNotNull($partialRender['payment_qr_data_uri']);
+    }
+
+    public function test_payment_qr_rejects_missing_invalid_and_paid_invoice_sources(): void
+    {
+        [$user, $invoice] = $this->invoice();
+        $templates = app(InvoiceTemplateService::class);
+
+        $this->assertNull($templates->renderData($invoice->load(['company', 'items']))['payment_qr_data_uri']);
+        $this->configurePaymentSource($user, 'javascript:alert(1)');
+        $this->assertNull($templates->renderData($invoice->fresh()->load(['company', 'items']))['payment_qr_data_uri']);
+
+        $this->configurePaymentSource($user, 'upi://pay?pa=merchant@upi');
+        $invoice->update(['status' => InvoiceStatus::Paid, 'amount_paid' => 1180, 'balance_due' => 0]);
+        $this->assertNull($templates->renderData($invoice->fresh()->load(['company', 'items']))['payment_qr_data_uri']);
+    }
+
+    public function test_payment_qr_accepts_sanitized_https_checkouts_and_is_tenant_scoped(): void
+    {
+        [$user, $invoice] = $this->invoice();
+        $this->configurePaymentSource($user, 'https://checkout.example.test/sessions/session-1');
+        $first = app(InvoiceTemplateService::class)->renderData($invoice->fresh()->load(['company', 'items']));
+        $this->assertStringContainsString('https://checkout.example.test/sessions/session-1?', $first['payment_qr_uri']);
+        $this->assertStringContainsString('amount=1180.00', $first['payment_qr_uri']);
+
+        [$otherUser, $otherInvoice] = $this->invoice();
+        $this->configurePaymentSource($otherUser, 'othermerchant@upi');
+        $second = app(InvoiceTemplateService::class)->renderData($otherInvoice->fresh()->load(['company', 'items']));
+        $this->assertStringContainsString('pa=othermerchant%40upi', $second['payment_qr_uri']);
+        $this->assertStringNotContainsString('othermerchant%40upi', $first['payment_qr_uri']);
+    }
+
+    private function configurePaymentSource(User $user, ?string $paymentSource): void
+    {
+        $templates = app(InvoiceTemplateService::class);
+        $templates->update($user->company, $user, [
+            'template_key' => 'structured_gst_grid',
+            'brand_color' => '#0f766e',
+            'copy_label' => 'original',
+            'orientation' => 'portrait',
+            'payment_qr_uri' => $paymentSource,
+            'options' => $templates->defaultOptions(),
+        ]);
+    }
+
     /** @return array{User,CrmInvoice} */
     private function invoice(array $overrides = []): array
     {

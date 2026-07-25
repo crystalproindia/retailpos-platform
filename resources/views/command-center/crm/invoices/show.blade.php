@@ -24,6 +24,7 @@
                         @endcan
                         <form method="POST" action="{{ route('sales.invoices.issue', $invoice) }}">@csrf<button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Issue invoice</button></form>
                     @endif
+                    <a href="{{ route('sales.invoices.print', $invoice) }}" target="_blank" rel="noopener" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Print</a>
                     <a href="{{ route('sales.invoices.pdf', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Download PDF</a>
                     @if (! $invoice->status?->isEditable() && $invoice->billing_email)
                         <form method="POST" action="{{ route('sales.invoices.send', $invoice) }}">@csrf<input type="hidden" name="email" value="{{ $invoice->billing_email }}"><button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Send email</button></form>

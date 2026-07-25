@@ -427,6 +427,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('invoices/{invoice}/payments/{payment}/clear', [InvoiceController::class, 'clear'])->middleware('can:sales.payments.clear')->name('invoices.payments.clear');
         Route::post('invoices/{invoice}/payments/{payment}/reverse', [InvoiceController::class, 'reverse'])->middleware('can:sales.payments.reverse')->name('invoices.payments.reverse');
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('can:sales.invoices.cancel')->name('invoices.cancel');
+        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->middleware('can:sales.invoices.pdf')->name('invoices.print');
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('can:sales.invoices.pdf')->name('invoices.pdf');
         Route::get('invoices/{invoice}/receipts/{payment}', [InvoiceController::class, 'receipt'])->middleware('can:sales.receipts.pdf')->name('invoices.receipts.pdf');
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->middleware('can:sales.invoices.send')->name('invoices.send');

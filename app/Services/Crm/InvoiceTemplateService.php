@@ -72,7 +72,7 @@ class InvoiceTemplateService
         $balance = $this->balances->forInvoice($invoice);
         $paymentQr = $this->paymentQr->forInvoice($invoice, $setting);
 
-        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'tax_rows' => array_values($rows), 'balance' => $balance, 'payment_qr_uri' => $paymentQr['payload'] ?? null, 'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null];
+        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'item_chunks' => $items->chunk(50), 'tax_rows' => array_values($rows), 'balance' => $balance, 'payment_qr_uri' => $paymentQr['payload'] ?? null, 'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null];
     }
 
     /** @return array<string,bool> */

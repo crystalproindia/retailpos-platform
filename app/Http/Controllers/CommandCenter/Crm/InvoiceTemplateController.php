@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\CommandCenter\Crm;
 
 use App\Http\Controllers\Controller;
+use App\Repositories\Crm\InvoiceRepository;
+use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoicePaymentQrService;
 use App\Services\Crm\InvoiceTemplateService;
 use Illuminate\Http\RedirectResponse;
@@ -11,9 +13,16 @@ use Illuminate\View\View;
 
 class InvoiceTemplateController extends Controller
 {
-    public function index(Request $request, InvoiceTemplateService $templates): View
+    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices): View
     {
-        return view('command-center.crm.invoices.templates', ['setting' => $templates->setting($request->user()->company), 'templates' => $templates->definitions(), 'defaults' => $templates->defaultOptions()]);
+        return view('command-center.crm.invoices.templates', ['setting' => $templates->setting($request->user()->company), 'templates' => $templates->definitions(), 'defaults' => $templates->defaultOptions(), 'previewInvoice' => $invoices->paginate($request->user())->first()]);
+    }
+
+    public function preview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, int $invoice): \Illuminate\Http\Response
+    {
+        $record = $invoices->find($request->user(), $invoice);
+
+        return $pdf->document($record)->stream($pdf->filename($record));
     }
 
     public function update(Request $request, InvoiceTemplateService $templates, InvoicePaymentQrService $paymentQr): RedirectResponse

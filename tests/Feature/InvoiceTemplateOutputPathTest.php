@@ -33,6 +33,8 @@ class InvoiceTemplateOutputPathTest extends TestCase
             'options' => $templates->defaultOptions(),
         ]);
 
+        $this->actingAs($user)->get(route('sales.invoices.templates.index'))->assertOk()->assertSee('Invoice designs')->assertSee(route('sales.invoices.templates.preview', $invoice), false);
+        $this->actingAs($user)->get(route('sales.invoices.templates.preview', $invoice))->assertOk()->assertHeader('content-type', 'application/pdf');
         $this->actingAs($user)->get(route('sales.invoices.show', $invoice))->assertOk()->assertSee(route('sales.invoices.print', $invoice), false);
         $this->actingAs($user)->get(route('sales.invoices.print', $invoice))->assertOk()->assertHeader('content-type', 'application/pdf');
         $this->actingAs($user)->get(route('sales.invoices.pdf', $invoice))->assertOk()->assertHeader('content-type', 'application/pdf');
@@ -40,6 +42,9 @@ class InvoiceTemplateOutputPathTest extends TestCase
         $link = app(PublicInvoiceService::class)->issue($invoice, $user);
         $token = basename((string) parse_url($link->url, PHP_URL_PATH));
         $this->get(route('invoices.public.pdf', $token))->assertOk()->assertHeader('content-type', 'application/pdf');
+
+        [$otherUser] = $this->invoiceWithItems(1);
+        $this->actingAs($otherUser)->get(route('sales.invoices.templates.preview', $invoice))->assertNotFound();
     }
 
     #[DataProvider('longDocumentCases')]

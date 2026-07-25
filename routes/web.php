@@ -414,6 +414,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.index');
         Route::get('invoices/designs', [InvoiceTemplateController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.templates.index');
         Route::put('invoices/designs', [InvoiceTemplateController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.templates.update');
+        Route::get('invoices/designs/preview/{invoice}', [InvoiceTemplateController::class, 'preview'])->middleware('can:sales.invoices.view')->name('invoices.templates.preview');
         Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');
         Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('can:sales.finance.export')->name('invoices.export');

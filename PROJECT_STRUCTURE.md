@@ -3073,3 +3073,9 @@ SaaS billing extends the Phase 8A subscription layer without reusing CRM, POS, o
 `SaasSubscriptionInvoiceService` owns invoice issue, manual collection, gateway payment allocation, and lifecycle renewal. `SaasBillingNumberService` uses the existing GST document-series table. `SaasInvoiceTaxService` delegates GST to the existing calculator. The provider-neutral `PaymentGateway` contract is implemented by a test-mode-only `RazorpayPaymentGateway`; encrypted credentials use the existing `IntegrationConnection` store. The platform Billing screens are under `/saas/billing`; tenant billing is under `/account/subscription/billing` and remains company-scoped. Billing scheduler commands generate invoices, process overdue invoices, queue reminders through the existing email delivery system, and reconcile payment records.
 
 See `docs/saas-billing/` for architecture, GST, test-mode gateway setup, webhooks, refunds, reconciliation, security, testing, and production operations. No live gateway credentials or Google Calendar/Meet changes are included.
+
+# CRM Invoice Template Designs
+
+CRM invoice presentation is configured per company in invoice_template_settings. The CRM invoice template, balance presentation, payment QR, and PDF services form the display boundary for the five selected PDF layouts in resources/views/invoice-templates.
+
+The Sales invoice workspace exposes settings, a tenant-authorized inline preview route, CRM browser print, PDF download, and the existing secure public PDF path. Invoice calculations, stored GST snapshots, invoice numbering, payment allocation, accounting records, SaaS billing PDFs, and Google Calendar/Meet remain unchanged. See docs/invoice-templates for architecture, templates, settings, GST presentation, PDF rendering, and tests.

@@ -23,6 +23,10 @@ Add only a completed index or dashboard route to `config/modules.php`; never add
 
 Google Calendar and Google Meet remain paused and are deliberately not included in this navigation registry.
 
+## Invoice Designs
+
+Sales -> Invoices contains the tenant-scoped Invoice designs entry. It uses sales.invoices.view for access and sales.invoices.update for saving choices. The separate preview and print routes retain the existing invoice-view/PDF gates and repository ownership checks. The link is deliberately scoped to the Invoice workspace rather than added as a duplicate sidebar module.
+
 ## Purchase Finance
 
 The Purchases group reuses the existing dashboard, suppliers, requests, orders, GRNs, and returns. It exposes working Purchase Invoices, Supplier Payments, Purchase Reports, and the Input GST Register. The shared registry powers both desktop and mobile navigation, and every item is protected by its matching capability gate.

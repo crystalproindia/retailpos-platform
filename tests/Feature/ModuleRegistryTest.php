@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Support\Modules\ModuleRegistry;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -90,23 +89,56 @@ class ModuleRegistryTest extends TestCase
         });
     }
 
-    public function test_sales_and_pos_parent_modules_are_active_for_their_child_routes(): void
+    public function test_pos_parent_module_is_active_for_its_child_route(): void
     {
-        $this->app->instance('request', $this->requestFor('pos.sales.index'));
+        $this->setCurrentRoute('pos.sales.index');
         $registry = new ModuleRegistry;
         $this->assertTrue($registry->find('pos')->isActive());
+    }
 
-        $this->app->instance('request', $this->requestFor('sales.opportunities.index'));
+    public function test_sales_parent_module_is_active_for_its_child_route(): void
+    {
+        $this->setCurrentRoute('sales.opportunities.index');
         $registry = new ModuleRegistry;
         $this->assertTrue($registry->find('sales')->isActive());
     }
 
-    private function requestFor(string $routeName): Request
+    public function test_invoice_designs_is_a_single_settings_child_for_management_roles(): void
+    {
+        $registry = new ModuleRegistry;
+
+        foreach ([UserRole::Administrator, UserRole::Manager] as $role) {
+            $settings = $registry->sidebar($role)->firstWhere('id', 'settings');
+            $invoiceDesigns = collect($settings?->children)->where('id', 'invoice-designs');
+
+            $this->assertNotNull($settings);
+            $this->assertCount(1, $invoiceDesigns);
+            $this->assertSame('Invoice Designs', $invoiceDesigns->first()->name);
+            $this->assertSame('sales.invoices.templates.index', $invoiceDesigns->first()->route);
+            $this->assertSame([], $invoiceDesigns->first()->routeParameters);
+            $this->assertSame(route('sales.invoices.templates.index'), $invoiceDesigns->first()->url());
+            $this->assertSame([], Route::getRoutes()->getByName('sales.invoices.templates.index')->parameterNames());
+        }
+
+        foreach ([UserRole::Sales, UserRole::Staff] as $role) {
+            $this->assertFalse($registry->forRole($role)->contains('id', 'invoice-designs'));
+        }
+    }
+
+    public function test_invoice_designs_and_settings_are_active_for_design_and_preview_routes(): void
+    {
+        foreach (['sales.invoices.templates.index', 'sales.invoices.templates.preview'] as $routeName) {
+            $this->setCurrentRoute($routeName);
+            $registry = new ModuleRegistry;
+
+            $this->assertTrue($registry->find('settings')->isActive());
+            $this->assertTrue($registry->find('invoice-designs')->isActive());
+        }
+    }
+
+    private function setCurrentRoute(string $routeName): void
     {
         $route = Route::getRoutes()->getByName($routeName);
-        $request = Request::create($route->uri(), 'GET');
-        $request->setRouteResolver(fn () => $route);
-
-        return $request;
+        request()->setRouteResolver(fn () => $route);
     }
 }

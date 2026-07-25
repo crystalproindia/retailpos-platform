@@ -74,7 +74,12 @@ class Module
     public function isActive(): bool
     {
         if ($this->route === 'settings.show') {
-            return request()->routeIs('settings.*');
+            return request()->routeIs('settings.*')
+                || request()->routeIs('sales.invoices.templates.*');
+        }
+
+        if ($this->route === 'sales.invoices.templates.index') {
+            return request()->routeIs('sales.invoices.templates.*');
         }
 
         if (str_starts_with($this->route, 'cms.')) {

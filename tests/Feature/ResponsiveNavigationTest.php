@@ -50,6 +50,39 @@ class ResponsiveNavigationTest extends TestCase
         $this->assertStringContainsString('closeSidebar({ restoreFocus: false })', $scripts);
     }
 
+    public function test_invoice_designs_uses_the_shared_settings_navigation_for_management_roles_only(): void
+    {
+        $administrator = $this->user();
+        $manager = $this->userForRole(UserRole::Manager);
+        $salesUser = $this->userForRole(UserRole::Sales);
+        $staffUser = $this->userForRole(UserRole::Staff);
+
+        $this->actingAs($administrator)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Invoice Designs')
+            ->assertSee(route('sales.invoices.templates.index'), false);
+
+        $this->actingAs($manager)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Invoice Designs')
+            ->assertSee(route('sales.invoices.templates.index'), false);
+
+        $this->actingAs($salesUser)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee('Invoice Designs');
+
+        $this->actingAs($staffUser)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee('Invoice Designs');
+
+        $layout = file_get_contents(resource_path('views/layouts/admin.blade.php'));
+        $this->assertStringContainsString('ModuleRegistry::class', $layout);
+    }
+
     public function test_platform_billing_navigation_uses_parameter_free_named_routes(): void
     {
         $platform = $this->user(['is_platform_admin' => true]);
@@ -183,6 +216,17 @@ class ResponsiveNavigationTest extends TestCase
             'branch_id' => $branch->id,
             'role' => UserRole::Administrator,
         ] + $attributes);
+    }
+
+    private function userForRole(UserRole $role): User
+    {
+        $company = Company::factory()->create();
+        $branch = Branch::factory()->for($company)->create();
+
+        return User::factory()->for($company)->create([
+            'branch_id' => $branch->id,
+            'role' => $role,
+        ]);
     }
 
     private function requestFor(string $routeName): Request

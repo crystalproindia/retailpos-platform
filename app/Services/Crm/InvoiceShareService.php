@@ -25,19 +25,22 @@ class InvoiceShareService
     }
 
     /** @return array{configured:bool,queued:bool} */
-    public function send(CrmInvoice $invoice, User $user, string $recipient, string $template = 'invoice_issued', ?string $message = null): array
+    public function send(CrmInvoice $invoice, User $user, string $recipient, string $template = 'invoice_issued', ?string $message = null, bool $attachInvoicePdf = false): array
     {
         if ($invoice->status === InvoiceStatus::Draft) {
             throw ValidationException::withMessages(['invoice' => 'Issue the invoice before sending it to a customer.']);
         }
 
+        $invoice->loadMissing('company');
         $link = $this->links->issue($invoice, $user);
+        $businessName = $invoice->company->trade_name ?: $invoice->company->legal_name ?: $invoice->company->name;
         $delivery = $this->email->queue($invoice->company_id, $recipient, 'RetailPOS Invoice - '.$invoice->invoice_number, $template, [
-            'heading' => 'Your RetailPOS invoice is ready', 'greeting' => 'Hello '.($invoice->billing_name ?: $invoice->billing_company ?: 'there').',',
-            'message' => $message ?: 'Please review your invoice and payment balance.',
-            'details' => ['Invoice' => $invoice->invoice_number, 'Total' => $invoice->currency.' '.number_format((float) $invoice->grand_total, 2), 'Balance due' => $invoice->currency.' '.number_format((float) $invoice->balance_due, 2), 'Due date' => $invoice->due_date?->format('d M Y') ?: 'Not specified'],
+            'heading' => 'Your invoice from '.$businessName, 'greeting' => 'Hello '.($invoice->billing_name ?: $invoice->billing_company ?: 'there').',',
+            'message' => $message ?: 'Your PDF invoice is attached. You can also securely view it online using the link below.',
+            'details' => ['Business' => $businessName, 'Invoice' => $invoice->invoice_number, 'Invoice date' => $invoice->issue_date?->format('d M Y') ?: 'Not specified', 'Total' => $invoice->currency.' '.number_format((float) $invoice->grand_total, 2), 'Balance due' => $invoice->currency.' '.number_format((float) $invoice->balance_due, 2), 'Due date' => $invoice->due_date?->format('d M Y') ?: 'Not specified'],
             'action_url' => $link->url, 'action_label' => 'View invoice',
-        ], $invoice, $user, 'invoice-email:'.$invoice->id.':'.$template.':'.hash('sha256', strtolower($recipient).'|'.($message ?? '')));
+            'attachment_type' => $attachInvoicePdf ? InvoiceEmailAttachmentService::TYPE : null,
+        ], $invoice, $user, 'invoice-email:'.hash('sha256', implode('|', [$invoice->id, $template, $attachInvoicePdf ? 'pdf-v1' : 'plain', strtolower($recipient), $message ?? ''])));
         if ($delivery->status !== 'skipped_not_configured' && in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Issued], true)) { $invoice->update(['status' => InvoiceStatus::Sent, 'sent_at' => now(), 'updated_by' => $user->id]); }
         $this->audit->record('crm.invoice.email_queued', $invoice, 'Invoice email queued', ['company_id' => $invoice->company_id, 'delivery_id' => $delivery->id, 'template' => $template]);
         return ['configured' => $delivery->status !== 'skipped_not_configured', 'queued' => $delivery->status === 'queued'];

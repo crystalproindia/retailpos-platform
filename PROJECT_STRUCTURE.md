@@ -3079,3 +3079,11 @@ See `docs/saas-billing/` for architecture, GST, test-mode gateway setup, webhook
 CRM invoice presentation is configured per company in invoice_template_settings. The CRM invoice template, balance presentation, payment QR, and PDF services form the display boundary for the five selected PDF layouts in resources/views/invoice-templates.
 
 The Sales invoice workspace exposes settings, a tenant-authorized inline preview route, CRM browser print, PDF download, and the existing secure public PDF path. Invoice calculations, stored GST snapshots, invoice numbering, payment allocation, accounting records, SaaS billing PDFs, and Google Calendar/Meet remain unchanged. See docs/invoice-templates for architecture, templates, settings, GST presentation, PDF rendering, and tests.
+
+# Phase 8C — Invoice Delivery and Communication Hardening
+
+The customer Sales Invoice send action now queues the selected tenant invoice design as an in-memory PDF attachment through the established `EmailDeliveryService` and `SendNotificationDeliveryJob`. `InvoiceEmailAttachmentService` validates the delivery's CRM invoice reference and company boundary before invoking the existing `InvoicePdfService`, so email attachments, print, preview, download, and protected public PDF links share the same design, GST, totals, and payment-QR rendering path. The secure public link remains in the email body.
+
+`notification_deliveries` continues to be the only delivery ledger. It records the existing tenant, related invoice, recipient, queued/sent/failed/retry status, and a non-sensitive attachment type. PDF bytes, SMTP credentials, and raw QR payment payloads are not persisted. PDFs are generated only in the queue worker and never stored as duplicate files. The invoice detail page exposes the latest normal invoice email as queued, sent, or safely failed, while existing Email Delivery Logs provide retry controls.
+
+No database migration, SaaS billing PDF change, Google Calendar/Meet work, or external PDF service is introduced. See [Invoice Delivery Hardening](docs/invoice-delivery.md) for architecture, security controls, limitations, deployment, and rollback guidance.

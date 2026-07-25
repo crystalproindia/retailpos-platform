@@ -45,6 +45,24 @@
                     <p class="mt-2 whitespace-pre-line">{{ session('whatsappMessage') }}</p>
                 </div>
             @endif
+            @if ($invoice->latestInvoiceEmailDelivery)
+                @php($delivery = $invoice->latestInvoiceEmailDelivery)
+                <div @class([
+                    'mt-4 rounded-lg border p-4 text-sm',
+                    'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100' => $delivery->status === 'failed',
+                    'border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-100' => $delivery->status === 'sent',
+                    'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100' => ! in_array($delivery->status, ['failed', 'sent'], true),
+                ])>
+                    @if ($delivery->status === 'failed')
+                        <p class="font-semibold">The latest invoice email could not be delivered.</p>
+                        <p class="mt-1">It is safe to retry from Email Delivery Logs after the email connection or attachment issue is resolved.</p>
+                    @elseif ($delivery->status === 'sent')
+                        <p class="font-semibold">The latest invoice email was sent with its PDF attachment.</p>
+                    @else
+                        <p class="font-semibold">The latest invoice email is queued for delivery with its PDF attachment.</p>
+                    @endif
+                </div>
+            @endif
         </section>
 
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">

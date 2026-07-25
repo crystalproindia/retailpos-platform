@@ -45,13 +45,8 @@ class SendNotificationDeliveryJob implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        NotificationDelivery::query()
-            ->whereKey($this->deliveryId)
-            ->update([
-                'status' => 'failed',
-                'failure_reason' => 'Email transport could not complete delivery.',
-                'failed_at' => now(),
-                'next_retry_at' => now()->addMinutes(15),
-            ]);
+        $delivery = NotificationDelivery::query()->find($this->deliveryId);
+        if (! $delivery) return;
+        $delivery->update(['status' => 'failed', 'failure_reason' => $delivery->failure_reason ?: 'Email transport could not complete delivery.', 'failed_at' => now(), 'next_retry_at' => now()->addMinutes(15)]);
     }
 }

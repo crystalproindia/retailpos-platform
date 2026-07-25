@@ -9,15 +9,18 @@ use App\Models\NotificationDelivery;
 use App\Models\User;
 use App\Repositories\Integrations\CompanyEmailSettingsRepository;
 use App\Services\AuditLogger;
+use App\Services\Crm\InvoiceEmailAttachmentService;
+use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Database\QueryException;
-use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class EmailDeliveryService
 {
     public function __construct(
         private readonly CompanyEmailSettingsRepository $settings,
         private readonly AuditLogger $auditLogger,
+        private readonly InvoiceEmailAttachmentService $invoiceAttachments,
     ) {}
 
     /** @return array{configured: bool, source: string, setting: ?CompanyEmailSetting, reason: ?string} */
@@ -116,6 +119,23 @@ class EmailDeliveryService
         ]);
 
         $payload = $delivery->payload ?? [];
+        try {
+            $invoiceAttachment = $this->invoiceAttachments->forDelivery($delivery);
+            $attachments = $invoiceAttachment ? [$invoiceAttachment] : [];
+        } catch (Throwable $exception) {
+            $delivery->update([
+                'status' => 'failed',
+                'failure_reason' => 'Invoice PDF attachment could not be generated.',
+                'failed_at' => now(),
+                'next_retry_at' => now()->addMinutes(15),
+            ]);
+            $this->auditLogger->record('email.invoice_attachment_failed', $delivery, 'Invoice PDF attachment generation failed', [
+                'company_id' => $delivery->company_id,
+                'template_key' => $delivery->template_key,
+            ]);
+
+            throw $exception;
+        }
         $sender = $this->sender($configuration);
         $this->mailer($configuration)->to($delivery->recipient, $delivery->recipient_name)->send(new CommandCenterEmail(
             emailSubject: $delivery->subject ?: ($payload['heading'] ?? 'RetailPOS notification'),
@@ -128,6 +148,7 @@ class EmailDeliveryService
             fromAddress: $sender['address'],
             fromName: $sender['name'],
             replyToAddress: $sender['reply_to'],
+            attachmentData: $attachments,
         ));
 
         $delivery->update(['status' => 'sent', 'delivered_at' => now(), 'failure_reason' => null]);
@@ -192,6 +213,7 @@ class EmailDeliveryService
             'details' => collect($payload['details'] ?? [])->map(fn ($value) => str((string) $value)->limit(500)->toString())->all(),
             'action_url' => isset($payload['action_url']) && filter_var($payload['action_url'], FILTER_VALIDATE_URL) ? $payload['action_url'] : null,
             'action_label' => isset($payload['action_label']) ? str((string) $payload['action_label'])->limit(80)->toString() : null,
+            'attachment_type' => ($payload['attachment_type'] ?? null) === InvoiceEmailAttachmentService::TYPE ? InvoiceEmailAttachmentService::TYPE : null,
         ];
     }
 

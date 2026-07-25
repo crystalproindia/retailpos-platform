@@ -5,6 +5,7 @@ namespace App\Mail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
@@ -12,7 +13,10 @@ class CommandCenterEmail extends Mailable
 {
     use Queueable;
 
-    /** @param array<string, string> $details */
+    /**
+     * @param  array<string, string>  $details
+     * @param  array<int, array{contents: string, filename: string, mime: string}>  $attachmentData
+     */
     public function __construct(
         public readonly string $emailSubject,
         public readonly string $heading,
@@ -24,6 +28,7 @@ class CommandCenterEmail extends Mailable
         public readonly ?string $fromAddress = null,
         public readonly ?string $fromName = null,
         public readonly ?string $replyToAddress = null,
+        public readonly array $attachmentData = [],
     ) {}
 
     public function envelope(): Envelope
@@ -38,5 +43,17 @@ class CommandCenterEmail extends Mailable
     public function content(): Content
     {
         return new Content(view: 'emails.command-center');
+    }
+
+    /** @return array<int, Attachment> */
+    public function attachments(): array
+    {
+        return array_map(
+            fn (array $attachment): Attachment => Attachment::fromData(
+                fn (): string => $attachment['contents'],
+                $attachment['filename'],
+            )->withMime($attachment['mime']),
+            $this->attachmentData,
+        );
     }
 }

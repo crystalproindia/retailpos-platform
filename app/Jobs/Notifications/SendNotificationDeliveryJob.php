@@ -3,7 +3,9 @@
 namespace App\Jobs\Notifications;
 
 use App\Models\NotificationDelivery;
+use App\Enums\Notifications\EmailDeliveryStatus;
 use App\Services\Notifications\EmailDeliveryService;
+use App\Services\Notifications\EmailDeliveryLifecycleService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -26,16 +28,15 @@ class SendNotificationDeliveryJob implements ShouldQueue
 
     public function __construct(public readonly int $deliveryId) {}
 
-    public function handle(EmailDeliveryService $emailDelivery): void
+    public function handle(EmailDeliveryService $emailDelivery, EmailDeliveryLifecycleService $lifecycle): void
     {
         $delivery = NotificationDelivery::query()->findOrFail($this->deliveryId);
 
+        if (! in_array($delivery->status, ['queued', 'temporarily_failed'], true)) return;
+
         if ($delivery->channel !== 'email' || ! $delivery->recipient || ! filter_var($delivery->recipient, FILTER_VALIDATE_EMAIL)) {
-            $delivery->update([
-                'status' => 'failed',
-                'failure_reason' => 'Email delivery requires a valid recipient address.',
-                'failed_at' => now(),
-            ]);
+            $rejected = $lifecycle->transition($delivery, EmailDeliveryStatus::Rejected, 'delivery.rejected');
+            $rejected->update(['failure_reason' => 'Email delivery requires a valid recipient address.', 'next_retry_at' => null]);
 
             return;
         }
@@ -46,7 +47,7 @@ class SendNotificationDeliveryJob implements ShouldQueue
     public function failed(Throwable $exception): void
     {
         $delivery = NotificationDelivery::query()->find($this->deliveryId);
-        if (! $delivery) return;
-        $delivery->update(['status' => 'failed', 'failure_reason' => $delivery->failure_reason ?: 'Email transport could not complete delivery.', 'failed_at' => now(), 'next_retry_at' => now()->addMinutes(15)]);
+        if (! $delivery || ! in_array($delivery->status, ['processing', 'temporarily_failed'], true)) return;
+        app(EmailDeliveryLifecycleService::class)->markPermanentFailure($delivery, $delivery->failure_reason ?: 'Email transport could not complete delivery.');
     }
 }

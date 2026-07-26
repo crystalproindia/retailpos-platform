@@ -432,6 +432,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('can:sales.invoices.pdf')->name('invoices.pdf');
         Route::get('invoices/{invoice}/receipts/{payment}', [InvoiceController::class, 'receipt'])->middleware('can:sales.receipts.pdf')->name('invoices.receipts.pdf');
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->middleware('can:sales.invoices.send')->name('invoices.send');
+        Route::post('invoices/{invoice}/email-deliveries/{delivery}/resend', [InvoiceController::class, 'resend'])->middleware('can:sales.invoices.send')->name('invoices.email-deliveries.resend');
         Route::get('invoices/{invoice}/whatsapp', [InvoiceController::class, 'whatsapp'])->middleware('can:sales.invoices.send')->name('invoices.whatsapp');
         Route::post('invoices/{invoice}/reminder', [InvoiceController::class, 'reminder'])->middleware('can:sales.reminders.send')->name('invoices.reminder');
         Route::post('invoices/{invoice}/public-link/revoke', [InvoiceController::class, 'revokeLink'])->middleware('can:sales.invoices.public_link')->name('invoices.public-link.revoke');

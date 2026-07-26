@@ -20,16 +20,22 @@ class RetryNotificationDeliveriesCommand extends Command
         $webhookCount = 0;
 
         NotificationDelivery::query()
-            ->where('status', 'failed')
+            ->where('status', 'temporarily_failed')
             ->where('channel', 'email')
             ->where(function ($query): void {
                 $query->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
             })
             ->chunkById(100, function ($deliveries) use (&$notificationCount): void {
                 foreach ($deliveries as $delivery) {
-                    $delivery->update(['status' => 'queued', 'queued_at' => now()]);
-                    SendNotificationDeliveryJob::dispatch($delivery->id);
-                    $notificationCount++;
+                    $claimed = NotificationDelivery::query()
+                        ->whereKey($delivery->id)
+                        ->where('status', 'temporarily_failed')
+                        ->where('next_retry_at', '<=', now())
+                        ->update(['next_retry_at' => now()->addMinutes(15)]);
+                    if ($claimed) {
+                        SendNotificationDeliveryJob::dispatch($delivery->id);
+                        $notificationCount++;
+                    }
                 }
             });
 

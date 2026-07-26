@@ -10,12 +10,15 @@ use App\Models\Company;
 use App\Models\CompanyEmailSetting;
 use App\Models\Crm\CrmInvoice;
 use App\Models\NotificationDelivery;
+use App\Models\NotificationDeliveryEvent;
 use App\Models\User;
 use App\Services\Crm\InvoiceEmailAttachmentService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceService;
 use App\Services\Crm\InvoiceTemplateService;
 use App\Services\Notifications\EmailDeliveryService;
+use App\Services\Notifications\EmailDeliveryLifecycleService;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -82,12 +85,12 @@ class InvoiceEmailDeliveryTest extends TestCase
 
         $delivery->refresh();
         $this->assertSame('sent', $delivery->status);
-        $this->assertNotNull($delivery->delivered_at);
+        $this->assertNull($delivery->delivered_at);
         $this->assertSame([], Storage::disk('local')->allFiles());
         $this->actingAs($manager)
             ->get(route('sales.invoices.show', $invoice))
             ->assertOk()
-            ->assertSee('was sent with its PDF attachment');
+            ->assertSee('SMTP accepted the invoice email with its PDF attachment');
 
         Mail::assertSent(CommandCenterEmail::class, function (CommandCenterEmail $mail) use ($delivery, $invoice): bool {
             $businessName = $invoice->company->trade_name ?: $invoice->company->legal_name ?: $invoice->company->name;
@@ -139,7 +142,7 @@ class InvoiceEmailDeliveryTest extends TestCase
         }
 
         $delivery->refresh();
-        $this->assertSame('failed', $delivery->status);
+        $this->assertSame('temporarily_failed', $delivery->status);
         $this->assertSame('Invoice PDF attachment could not be generated.', $delivery->failure_reason);
         $this->assertNotNull($delivery->failed_at);
         $this->assertNotNull($delivery->next_retry_at);
@@ -147,7 +150,118 @@ class InvoiceEmailDeliveryTest extends TestCase
         $this->actingAs($manager)
             ->get(route('sales.invoices.show', $delivery->related_id))
             ->assertOk()
-            ->assertSee('could not be delivered');
+            ->assertSee('The latest invoice email could not be delivered');
+    }
+
+    public function test_sent_invoice_email_requires_a_signed_provider_event_before_it_is_marked_delivered(): void
+    {
+        Mail::fake();
+        $manager = $this->user(UserRole::Manager);
+        $this->configureEmail($manager);
+        $delivery = $this->invoiceDelivery($this->issuedInvoice($manager), $manager);
+
+        app(EmailDeliveryService::class)->send($delivery);
+        $delivery->refresh()->update(['provider' => 'generic', 'provider_message_id' => 'invoice-message-100']);
+        $this->assertSame('sent', $delivery->fresh()->status);
+        $this->assertNull($delivery->fresh()->delivered_at);
+
+        config(['email-delivery.webhook.enabled' => true, 'email-delivery.webhook.secret' => 'webhook-secret']);
+        $payload = ['company_id' => $manager->company_id, 'event_id' => 'delivery-event-100', 'event_type' => 'delivered', 'provider_message_id' => 'invoice-message-100', 'timestamp' => now()->toIso8601String()];
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'webhook-secret');
+
+        $this->call('POST', '/api/email-delivery/generic/webhook', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_RETAILPOS_EMAIL_SIGNATURE' => $signature], $body)
+            ->assertOk()->assertJson(['accepted' => true, 'duplicate' => false]);
+        $this->assertSame('delivered', $delivery->fresh()->status);
+        $this->assertNotNull($delivery->fresh()->delivered_at);
+        $this->assertSame(1, NotificationDeliveryEvent::query()->where('provider_event_id', 'delivery-event-100')->count());
+
+        $this->call('POST', '/api/email-delivery/generic/webhook', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_RETAILPOS_EMAIL_SIGNATURE' => $signature], $body)
+            ->assertOk()->assertJson(['duplicate' => true]);
+        $this->assertSame(1, NotificationDeliveryEvent::query()->where('provider_event_id', 'delivery-event-100')->count());
+    }
+
+    public function test_unsigned_expired_and_cross_company_provider_events_are_rejected(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $other = $this->user(UserRole::Manager);
+        $delivery = $this->invoiceDelivery($this->issuedInvoice($manager), $manager);
+        $delivery->update(['status' => 'sent', 'provider' => 'generic', 'provider_message_id' => 'invoice-message-200']);
+        config(['email-delivery.webhook.enabled' => true, 'email-delivery.webhook.secret' => 'webhook-secret']);
+
+        $this->postJson('/api/email-delivery/generic/webhook', ['company_id' => $manager->company_id, 'event_id' => 'unsigned-event', 'event_type' => 'delivered', 'provider_message_id' => 'invoice-message-200', 'timestamp' => now()->toIso8601String()])->assertUnauthorized();
+
+        $expired = ['company_id' => $other->company_id, 'event_id' => 'cross-company-event', 'event_type' => 'delivered', 'provider_message_id' => 'invoice-message-200', 'timestamp' => now()->subMinutes(10)->toIso8601String()];
+        $body = json_encode($expired, JSON_THROW_ON_ERROR);
+        $this->call('POST', '/api/email-delivery/generic/webhook', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_RETAILPOS_EMAIL_SIGNATURE' => 'sha256='.hash_hmac('sha256', $body, 'webhook-secret')], $body)
+            ->assertUnprocessable();
+        $this->assertSame('sent', $delivery->fresh()->status);
+    }
+
+    public function test_manual_resend_is_tenant_scoped_and_does_not_change_invoice_financial_status(): void
+    {
+        Queue::fake();
+        $manager = $this->user(UserRole::Manager);
+        $invoice = $this->issuedInvoice($manager);
+        $delivery = $this->invoiceDelivery($invoice, $manager);
+        $delivery->update(['status' => 'permanently_failed', 'failure_reason' => 'Email transport could not complete delivery.', 'failed_at' => now()]);
+
+        $this->actingAs($manager)
+            ->post(route('sales.invoices.email-deliveries.resend', [$invoice, $delivery]))
+            ->assertRedirect()->assertSessionHas('status', 'Invoice email queued for resend with its PDF attachment.');
+        $resent = NotificationDelivery::query()->where('id', '!=', $delivery->id)->sole();
+        $this->assertSame('queued', $resent->status);
+        $this->assertSame($invoice->id, $resent->related_id);
+        $this->assertSame($invoice->status, $invoice->fresh()->status);
+        Queue::assertPushed(SendNotificationDeliveryJob::class, fn (SendNotificationDeliveryJob $job): bool => $job->deliveryId === $resent->id);
+
+        $other = $this->user(UserRole::Manager);
+        $this->actingAs($other)->post(route('sales.invoices.email-deliveries.resend', [$invoice, $delivery]))->assertNotFound();
+    }
+
+    public function test_email_lifecycle_blocks_backward_delivery_transitions(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $delivery = $this->invoiceDelivery($this->issuedInvoice($manager), $manager);
+        $lifecycle = app(EmailDeliveryLifecycleService::class);
+        $processing = $lifecycle->transition($delivery, \App\Enums\Notifications\EmailDeliveryStatus::Processing, 'test.processing');
+        $sent = $lifecycle->transition($processing, \App\Enums\Notifications\EmailDeliveryStatus::Sent, 'test.sent');
+
+        $this->expectException(ValidationException::class);
+        $lifecycle->transition($sent, \App\Enums\Notifications\EmailDeliveryStatus::Queued, 'test.invalid');
+    }
+
+    public function test_invalid_recipient_is_rejected_without_a_retry(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $delivery = $this->invoiceDelivery($this->issuedInvoice($manager), $manager);
+        $delivery->update(['recipient' => 'not-an-email']);
+
+        (new SendNotificationDeliveryJob($delivery->id))->handle(app(EmailDeliveryService::class), app(EmailDeliveryLifecycleService::class));
+
+        $this->assertSame('rejected', $delivery->fresh()->status);
+        $this->assertNull($delivery->fresh()->next_retry_at);
+    }
+
+    public function test_due_temporary_failure_is_claimed_only_once_by_the_retry_scheduler(): void
+    {
+        Queue::fake();
+        $manager = $this->user(UserRole::Manager);
+        $delivery = $this->invoiceDelivery($this->issuedInvoice($manager), $manager);
+        $delivery->update(['status' => 'temporarily_failed', 'attempt_count' => 1, 'next_retry_at' => now()->subMinute()]);
+
+        $this->artisan('notifications:retry-failed-deliveries')->assertSuccessful();
+        $this->artisan('notifications:retry-failed-deliveries')->assertSuccessful();
+
+        Queue::assertPushed(SendNotificationDeliveryJob::class, 1);
+        $this->assertTrue($delivery->fresh()->next_retry_at->isFuture());
+    }
+
+    public function test_provider_event_endpoint_is_disabled_by_default(): void
+    {
+        config(['email-delivery.webhook.enabled' => false]);
+
+        $this->postJson('/api/email-delivery/generic/webhook', [])->assertNotFound();
     }
 
     private function issuedInvoice(User $user): CrmInvoice

@@ -22,8 +22,8 @@ class EmailIntegrationController extends Controller
         return view('command-center.integrations.email.index', [
             'setting' => app(CompanyEmailSettingsRepository::class)->forCompany($companyId),
             'configuration' => $delivery->configuration($companyId),
-            'lastSuccess' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->where('status', 'sent')->latest('delivered_at')->first(),
-            'lastFailure' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->where('status', 'failed')->latest('failed_at')->first(),
+            'lastSuccess' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->whereIn('status', ['sent', 'delivered'])->latest('sent_at')->first(),
+            'lastFailure' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->whereIn('status', ['temporarily_failed', 'permanently_failed', 'bounced', 'rejected', 'failed'])->latest('failed_at')->first(),
         ]);
     }
 

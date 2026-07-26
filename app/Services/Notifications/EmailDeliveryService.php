@@ -12,7 +12,10 @@ use App\Services\AuditLogger;
 use App\Services\Crm\InvoiceEmailAttachmentService;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class EmailDeliveryService
@@ -21,6 +24,7 @@ class EmailDeliveryService
         private readonly CompanyEmailSettingsRepository $settings,
         private readonly AuditLogger $auditLogger,
         private readonly InvoiceEmailAttachmentService $invoiceAttachments,
+        private readonly EmailDeliveryLifecycleService $lifecycle,
     ) {}
 
     /** @return array{configured: bool, source: string, setting: ?CompanyEmailSetting, reason: ?string} */
@@ -93,6 +97,7 @@ class EmailDeliveryService
         }
 
         if ($delivery->wasRecentlyCreated) {
+            if ($configuration['configured']) $this->lifecycle->recordQueued($delivery);
             $this->auditLogger->record('email.queued', $delivery, 'Email delivery queued', ['company_id' => $companyId, 'template_key' => $templateKey]);
             if ($configuration['configured']) {
                 SendNotificationDeliveryJob::dispatch($delivery->id);
@@ -111,24 +116,14 @@ class EmailDeliveryService
             return;
         }
 
-        $delivery->update([
-            'status' => 'sending',
-            'attempt_count' => $delivery->attempt_count + 1,
-            'sent_at' => now(),
-            'failure_reason' => null,
-        ]);
+        $delivery = $this->lifecycle->transition($delivery, \App\Enums\Notifications\EmailDeliveryStatus::Processing, 'delivery.processing');
 
         $payload = $delivery->payload ?? [];
         try {
             $invoiceAttachment = $this->invoiceAttachments->forDelivery($delivery);
             $attachments = $invoiceAttachment ? [$invoiceAttachment] : [];
         } catch (Throwable $exception) {
-            $delivery->update([
-                'status' => 'failed',
-                'failure_reason' => 'Invoice PDF attachment could not be generated.',
-                'failed_at' => now(),
-                'next_retry_at' => now()->addMinutes(15),
-            ]);
+            $delivery = $this->lifecycle->markTemporaryFailure($delivery, 'Invoice PDF attachment could not be generated.');
             $this->auditLogger->record('email.invoice_attachment_failed', $delivery, 'Invoice PDF attachment generation failed', [
                 'company_id' => $delivery->company_id,
                 'template_key' => $delivery->template_key,
@@ -136,32 +131,90 @@ class EmailDeliveryService
 
             throw $exception;
         }
-        $sender = $this->sender($configuration);
-        $this->mailer($configuration)->to($delivery->recipient, $delivery->recipient_name)->send(new CommandCenterEmail(
-            emailSubject: $delivery->subject ?: ($payload['heading'] ?? 'RetailPOS notification'),
-            heading: (string) ($payload['heading'] ?? 'RetailPOS notification'),
-            greeting: (string) ($payload['greeting'] ?? 'Hello,'),
-            messageText: (string) ($payload['message'] ?? ''),
-            details: (array) ($payload['details'] ?? []),
-            actionUrl: $payload['action_url'] ?? null,
-            actionLabel: $payload['action_label'] ?? null,
-            fromAddress: $sender['address'],
-            fromName: $sender['name'],
-            replyToAddress: $sender['reply_to'],
-            attachmentData: $attachments,
-        ));
+        try {
+            $sender = $this->sender($configuration);
+            $this->mailer($configuration)->to($delivery->recipient, $delivery->recipient_name)->send(new CommandCenterEmail(
+                emailSubject: $delivery->subject ?: ($payload['heading'] ?? 'RetailPOS notification'),
+                heading: (string) ($payload['heading'] ?? 'RetailPOS notification'),
+                greeting: (string) ($payload['greeting'] ?? 'Hello,'),
+                messageText: (string) ($payload['message'] ?? ''),
+                details: (array) ($payload['details'] ?? []),
+                actionUrl: $payload['action_url'] ?? null,
+                actionLabel: $payload['action_label'] ?? null,
+                fromAddress: $sender['address'],
+                fromName: $sender['name'],
+                replyToAddress: $sender['reply_to'],
+                attachmentData: $attachments,
+            ));
+        } catch (Throwable $exception) {
+            $this->lifecycle->markTemporaryFailure($delivery, 'Email transport could not complete delivery.');
 
-        $delivery->update(['status' => 'sent', 'delivered_at' => now(), 'failure_reason' => null]);
+            throw $exception;
+        }
+
+        $delivery = $this->lifecycle->transition($delivery, \App\Enums\Notifications\EmailDeliveryStatus::Sent, 'delivery.sent');
         $this->auditLogger->record('email.sent', $delivery, 'Email delivery sent', ['company_id' => $delivery->company_id, 'template_key' => $delivery->template_key]);
     }
 
     public function retry(NotificationDelivery $delivery, User $user): NotificationDelivery
     {
-        $delivery->update(['status' => 'queued', 'queued_at' => now(), 'failed_at' => null, 'next_retry_at' => null, 'failure_reason' => null, 'created_by' => $user->id]);
+        if ($delivery->status === 'failed') {
+            $delivery->update(['status' => 'queued', 'queued_at' => now(), 'next_retry_at' => null, 'created_by' => $user->id]);
+            SendNotificationDeliveryJob::dispatch($delivery->id);
+            $this->auditLogger->record('email.retried', $delivery, 'Legacy email delivery retried', ['company_id' => $delivery->company_id]);
+
+            return $delivery;
+        }
+        abort_unless($delivery->status === 'temporarily_failed', 422, 'Only temporary email delivery failures can be retried.');
+        $delivery->update(['queued_at' => now(), 'next_retry_at' => null, 'created_by' => $user->id]);
         SendNotificationDeliveryJob::dispatch($delivery->id);
         $this->auditLogger->record('email.retried', $delivery, 'Email delivery retried', ['company_id' => $delivery->company_id]);
 
         return $delivery;
+    }
+
+    public function manualResend(NotificationDelivery $delivery, User $user): NotificationDelivery
+    {
+        abort_unless(in_array($delivery->status, ['temporarily_failed', 'permanently_failed'], true), 422, 'This email delivery cannot be resent.');
+
+        $resent = DB::transaction(function () use ($delivery, $user): NotificationDelivery {
+            $recent = NotificationDelivery::query()
+                ->where('company_id', $delivery->company_id)
+                ->where('related_type', $delivery->related_type)
+                ->where('related_id', $delivery->related_id)
+                ->where('template_key', $delivery->template_key)
+                ->whereIn('status', ['queued', 'processing', 'sent'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->exists();
+            if ($recent) {
+                throw ValidationException::withMessages(['email' => 'A recent invoice email is already being delivered.']);
+            }
+
+            $resent = NotificationDelivery::query()->create([
+                'company_id' => $delivery->company_id,
+                'created_by' => $user->id,
+                'related_type' => $delivery->related_type,
+                'related_id' => $delivery->related_id,
+                'event_key' => $delivery->event_key,
+                'template_key' => $delivery->template_key,
+                'channel' => 'email',
+                'recipient' => $delivery->recipient,
+                'recipient_name' => $delivery->recipient_name,
+                'subject' => $delivery->subject,
+                'status' => 'queued',
+                'idempotency_key' => 'email-resend:'.hash('sha256', $delivery->id.'|'.Str::uuid()),
+                'payload' => $delivery->payload,
+                'queued_at' => now(),
+            ]);
+            $this->lifecycle->recordQueued($resent, 'delivery.manual_resend_queued', ['manual_resend_from' => $delivery->id]);
+            $this->auditLogger->record('email.manual_resent', $resent, 'Invoice email manually resent', ['company_id' => $resent->company_id, 'original_delivery_id' => $delivery->id]);
+
+            return $resent->refresh();
+        });
+
+        SendNotificationDeliveryJob::dispatch($resent->id);
+
+        return $resent;
     }
 
     /** @param array{configured: bool, source: string, setting: ?CompanyEmailSetting, reason: ?string} $configuration */

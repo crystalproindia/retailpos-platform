@@ -4,8 +4,10 @@ use App\Http\Controllers\Api\PublicLeadIntakeController;
 use App\Http\Controllers\Api\PublicCmsController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SaasBillingWebhookController;
+use App\Http\Controllers\Api\EmailDeliveryWebhookController;
 
 Route::post('saas-billing/razorpay/webhook', SaasBillingWebhookController::class)->middleware('throttle:60,1');
+Route::post('email-delivery/{provider}/webhook', EmailDeliveryWebhookController::class)->middleware('throttle:email-delivery-webhook')->where('provider', '[A-Za-z0-9_-]+');
 
 Route::post('public/leads', PublicLeadIntakeController::class)
     ->middleware(['public.lead.token', 'public.lead.payload', 'throttle:public-leads']);

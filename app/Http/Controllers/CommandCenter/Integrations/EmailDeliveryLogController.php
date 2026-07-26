@@ -4,7 +4,9 @@ namespace App\Http\Controllers\CommandCenter\Integrations;
 
 use App\Http\Controllers\Controller;
 use App\Models\NotificationDelivery;
+use App\Enums\Notifications\EmailDeliveryStatus;
 use App\Services\Notifications\EmailDeliveryService;
+use App\Services\Notifications\EmailDeliveryLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,17 +29,18 @@ class EmailDeliveryLogController extends Controller
     public function retry(Request $request, EmailDeliveryService $delivery, int $emailDelivery): RedirectResponse
     {
         $record = NotificationDelivery::query()->where('company_id', $request->user()->company_id)->where('channel', 'email')->findOrFail($emailDelivery);
-        abort_unless($record->status === 'failed', 422, 'Only failed email deliveries can be retried.');
+        abort_unless(in_array($record->status, ['temporarily_failed', 'failed'], true), 422, 'Only temporary email delivery failures can be retried.');
         $delivery->retry($record, $request->user());
 
         return back()->with('status', 'Email delivery queued for retry.');
     }
 
-    public function cancel(Request $request, int $emailDelivery): RedirectResponse
+    public function cancel(Request $request, EmailDeliveryLifecycleService $lifecycle, int $emailDelivery): RedirectResponse
     {
         $record = NotificationDelivery::query()->where('company_id', $request->user()->company_id)->where('channel', 'email')->findOrFail($emailDelivery);
         abort_unless(in_array($record->status, ['pending', 'queued'], true), 422, 'This email can no longer be cancelled.');
-        $record->update(['status' => 'cancelled']);
+        if ($record->status === 'pending') $record->update(['status' => 'queued']);
+        $lifecycle->transition($record->fresh(), EmailDeliveryStatus::Cancelled, 'delivery.cancelled');
 
         return back()->with('status', 'Pending email delivery cancelled.');
     }

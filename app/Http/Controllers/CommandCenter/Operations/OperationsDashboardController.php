@@ -34,7 +34,7 @@ class OperationsDashboardController extends Controller
             'queueSummary' => $queueMonitorService->summary(),
             'latestSnapshot' => $queueSnapshots->latest(),
             'failedJobsCount' => $failedJobs->count(),
-            'notificationFailures' => NotificationDelivery::query()->where('status', 'failed')->count(),
+            'notificationFailures' => NotificationDelivery::query()->whereIn('status', ['temporarily_failed', 'permanently_failed', 'bounced', 'rejected', 'failed'])->count(),
             'webhookFailures' => WebhookDelivery::query()->where('status', 'failed')->count(),
             'eventFailures' => DomainEventLog::query()->where('status', 'failed')->count(),
             'lastScheduledRun' => $scheduleMonitorService->tasks()->pluck('last_run')->filter()->sortByDesc('started_at')->first(),

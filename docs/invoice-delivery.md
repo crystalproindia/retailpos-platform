@@ -1,4 +1,4 @@
-# Phase 8C: Invoice Delivery and Communication Hardening
+# Phase 8C and 8D: Invoice Delivery, Tracking, and Reliability
 
 ## Objective
 
@@ -20,21 +20,35 @@ The PDF stays in memory and is passed to `CommandCenterEmail` through Laravel's 
 - Public invoice links still use the existing random-token, hash-at-rest, expiry, and revocation flow. The email retains that link without logging the raw token separately.
 - Delivery records store only the attachment type, related invoice reference, recipient, safe email content metadata, status, and safe failure reason. They never store the PDF binary, SMTP credentials, or payment QR payload.
 
-## Delivery Lifecycle
+## Delivery Lifecycle and Reliability
 
-The invoice send screen queues the normal delivery record and confirms that a PDF attachment is queued. The worker sets the normal `sending`, `sent`, or `failed` state. Attachment-render failures receive the safe reason `Invoice PDF attachment could not be generated.` and preserve the existing retry scheduling. The invoice detail page shows the latest standard invoice email as queued, sent, or safely failed; the existing Email Delivery Logs remain the retry surface.
+The invoice send screen queues the normal delivery record and confirms that a PDF attachment is queued. The lifecycle is `queued`, `processing`, `sent`, `delivered`, `temporarily_failed`, `permanently_failed`, `bounced`, `rejected`, or `cancelled`. Lifecycle changes are append-only `notification_delivery_events` records; terminal delivery states cannot move backwards.
+
+`sent` means the configured SMTP transport accepted the message. It does not claim inbox delivery. `delivered` is set only by a verified provider delivery event. Attachment-render failures receive the safe reason `Invoice PDF attachment could not be generated.`; transport failures receive a distinct safe transport reason. Both may retry with bounded exponential timing. Invalid recipients are `rejected`, while permanent failure, bounce, and rejection are never automatically retried.
+
+The fallback scheduler claims due temporary failures atomically before dispatching a retry, avoiding duplicate queued retries. Each send attempt regenerates the existing Phase 8C PDF in memory, preserving the current selected invoice design without storing a duplicate PDF file.
+
+The invoice detail page shows the latest standard invoice email, its last attempt, retry count, a masked provider reference where available, and a tenant-scoped history. It exposes one email action at a time: normal send, or an authorized manual resend after a temporary or permanent failure. A manual resend creates a fresh queued delivery record, preserves the invoice link and PDF descriptor, retains the original history, and is rate-protected against rapid duplicates. It never changes invoice financial state.
+
+## Provider Events and Webhook Security
+
+`POST /api/email-delivery/{provider}/webhook` is a provider-neutral event boundary and is disabled by default. No external provider integration is enabled by this release. A future adapter must set the provider and provider message ID on the delivery at send time, normalize the provider event to the documented payload, and use the same lifecycle service.
+
+When enabled, the generic endpoint requires a raw-body HMAC SHA-256 signature in `X-RetailPOS-Email-Signature`, formatted as `sha256=<digest>`, using `EMAIL_DELIVERY_WEBHOOK_SECRET`. The body must contain `company_id`, `event_id`, `event_type`, `provider_message_id`, and an ISO-8601 `timestamp`. Events are rate limited, expire after `EMAIL_DELIVERY_WEBHOOK_MAX_AGE_SECONDS` (300 seconds by default), verify the delivery's company, provider, and provider message ID, and are replay-safe through the unique provider event ID. Unsigned, stale, unknown, cross-company, and invalid events are rejected with no internal details. Raw bodies, secrets, and email content are never persisted or logged.
+
+Set `EMAIL_DELIVERY_WEBHOOK_ENABLED=true` only after a provider adapter and secret are configured. The supported normalized V1 event types are `delivered`, `bounced`, `rejected`, `permanently_failed`, and `temporarily_failed` (with `bounce`, `hard_failed`, `soft_failed`, and `deferred` accepted aliases).
 
 Invoice state is not changed by PDF rendering or mail transport failures. Existing reminders and receipt email behavior are intentionally unchanged.
 
 ## Known Limitations
 
-- A `sent` delivery means the configured SMTP transport accepted the message; inbox delivery, bounce, and suppression-state webhooks remain future work.
+- No external mail provider adapter is bundled. The generic event endpoint is a disabled-by-default contract, so this release does not claim provider delivery confirmation until a verified adapter is configured.
 - The PDF is regenerated at worker execution time, so an email that remains queued while an administrator changes the tenant template will use the active template at send time.
 - PDF binary generation occurs in the queue worker process; deploy workers need the existing DomPDF and GD runtime requirements.
 - There is no long-term PDF archive in this phase. Customers can use the existing protected link and authorized users can download again from the invoice workspace.
 
 ## Deployment and Rollback
 
-No migration is required. Deploy application code and built assets, then clear and rebuild Laravel caches before restarting queue workers. Keep the normal queue worker running so delivery records leave the queued state.
+Run the additive migration before deploying code: `php artisan migrate --force`. Deploy application code and built assets, then clear and rebuild Laravel caches before restarting queue workers. Keep the normal queue worker and scheduler running so delivery records leave the queued state and temporary failures can recover.
 
 To roll back, deploy the prior application revision, clear/rebuild caches, and restart queue workers. Existing delivery records remain safe: older application code ignores the attachment descriptor and no invoice or SaaS billing data requires reversal.

@@ -56,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('email-test', fn ($request) => Limit::perMinute(3)
             ->by('email-test:'.($request->user()?->id ?? $request->ip())));
 
+        RateLimiter::for('email-delivery-webhook', fn ($request) => Limit::perMinute(60)
+            ->by('email-delivery-webhook:'.$request->ip()));
+
         RateLimiter::for('public-quotation', fn ($request) => Limit::perMinute(30)
             ->by('public-quotation:'.$request->ip()));
 

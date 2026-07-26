@@ -6,6 +6,7 @@
 @section('content')
     <div class="space-y-6">
         @include('command-center.crm.partials.nav')
+        @php($latestInvoiceDelivery = $invoice->latestInvoiceEmailDelivery)
 
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
@@ -27,7 +28,11 @@
                     <a href="{{ route('sales.invoices.print', $invoice) }}" target="_blank" rel="noopener" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Print</a>
                     <a href="{{ route('sales.invoices.pdf', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Download PDF</a>
                     @if (! $invoice->status?->isEditable() && $invoice->billing_email)
-                        <form method="POST" action="{{ route('sales.invoices.send', $invoice) }}">@csrf<input type="hidden" name="email" value="{{ $invoice->billing_email }}"><button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Send email</button></form>
+                        @if ($latestInvoiceDelivery && in_array($latestInvoiceDelivery->status, ['temporarily_failed', 'permanently_failed'], true))
+                            <form method="POST" action="{{ route('sales.invoices.email-deliveries.resend', [$invoice, $latestInvoiceDelivery]) }}">@csrf<button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Resend invoice email</button></form>
+                        @else
+                            <form method="POST" action="{{ route('sales.invoices.send', $invoice) }}">@csrf<input type="hidden" name="email" value="{{ $invoice->billing_email }}"><button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Send email</button></form>
+                        @endif
                         <form method="POST" action="{{ route('sales.invoices.reminder', $invoice) }}">@csrf<input type="hidden" name="email" value="{{ $invoice->billing_email }}"><button class="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:text-amber-200">Send reminder</button></form>
                     @endif
                     <a href="{{ route('sales.invoices.whatsapp', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">WhatsApp</a>
@@ -45,24 +50,43 @@
                     <p class="mt-2 whitespace-pre-line">{{ session('whatsappMessage') }}</p>
                 </div>
             @endif
-            @if ($invoice->latestInvoiceEmailDelivery)
-                @php($delivery = $invoice->latestInvoiceEmailDelivery)
+            @if ($latestInvoiceDelivery)
+                @php($delivery = $latestInvoiceDelivery)
                 <div @class([
                     'mt-4 rounded-lg border p-4 text-sm',
-                    'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100' => $delivery->status === 'failed',
-                    'border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-100' => $delivery->status === 'sent',
-                    'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100' => ! in_array($delivery->status, ['failed', 'sent'], true),
+                    'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100' => in_array($delivery->status, ['temporarily_failed', 'permanently_failed', 'bounced', 'rejected'], true),
+                    'border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-100' => in_array($delivery->status, ['sent', 'delivered'], true),
+                    'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100' => ! in_array($delivery->status, ['temporarily_failed', 'permanently_failed', 'bounced', 'rejected', 'sent', 'delivered'], true),
                 ])>
-                    @if ($delivery->status === 'failed')
+                    <p class="font-semibold">Email status: {{ str($delivery->status)->replace('_', ' ')->headline() }}</p>
+                    @if (in_array($delivery->status, ['temporarily_failed', 'permanently_failed'], true))
                         <p class="font-semibold">The latest invoice email could not be delivered.</p>
-                        <p class="mt-1">It is safe to retry from Email Delivery Logs after the email connection or attachment issue is resolved.</p>
+                        <p class="mt-1">{{ $delivery->failure_reason ?: 'The delivery service could not complete the email.' }}</p>
+                    @elseif ($delivery->status === 'delivered')
+                        <p class="mt-1">The provider confirmed delivery of the invoice email and its PDF attachment.</p>
                     @elseif ($delivery->status === 'sent')
-                        <p class="font-semibold">The latest invoice email was sent with its PDF attachment.</p>
+                        <p class="mt-1">SMTP accepted the invoice email with its PDF attachment. Delivery confirmation will appear when a trusted provider event is available.</p>
                     @else
-                        <p class="font-semibold">The latest invoice email is queued for delivery with its PDF attachment.</p>
+                        <p class="mt-1">The latest invoice email is queued for delivery with its PDF attachment.</p>
                     @endif
+                    <p class="mt-2 text-xs opacity-80">Last attempt: {{ ($delivery->sent_at ?: $delivery->failed_at ?: $delivery->queued_at)?->format('d M Y H:i') ?? 'Not attempted yet' }} · Retries: {{ max(0, $delivery->attempt_count - 1) }}</p>
                 </div>
             @endif
+        </section>
+
+        <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-200 p-5 dark:border-slate-800"><h2 class="font-semibold text-slate-950 dark:text-white">Invoice email delivery history</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Safe delivery progress for this invoice. A sent email is not treated as delivered until a trusted provider event confirms it.</p></div>
+            <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                @forelse ($invoice->invoiceEmailDeliveries as $delivery)
+                    <div class="grid gap-3 p-5 text-sm md:grid-cols-[minmax(0,1.4fr)_auto_auto] md:items-center">
+                        <div><p class="font-medium text-slate-950 dark:text-white">{{ $delivery->recipient }}</p><p class="mt-1 text-xs text-slate-500">{{ $delivery->created_at->format('d M Y H:i') }} · {{ max(0, $delivery->attempt_count - 1) }} retries @if($delivery->maskedProviderMessageId()) · Provider reference {{ $delivery->maskedProviderMessageId() }} @endif</p>@if($delivery->failure_reason)<p class="mt-1 text-xs text-rose-700 dark:text-rose-300">{{ $delivery->failure_reason }}</p>@endif</div>
+                        <span class="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ str($delivery->status)->replace('_', ' ')->headline() }}</span>
+                        <span class="text-xs text-slate-500">{{ ($delivery->delivered_at ?: $delivery->sent_at ?: $delivery->failed_at ?: $delivery->queued_at)?->format('d M Y H:i') ?? 'Queued' }}</span>
+                    </div>
+                @empty
+                    <div class="p-8 text-sm text-slate-500">No invoice email has been sent yet.</div>
+                @endforelse
+            </div>
         </section>
 
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">

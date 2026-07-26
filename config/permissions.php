@@ -16,6 +16,7 @@ $customerManagementRoles = ['administrator', 'manager'];
 $customerUserRoles = ['administrator', 'manager', 'sales'];
 $posUserRoles = ['administrator', 'manager', 'sales'];
 $posManagementRoles = ['administrator', 'manager'];
+$managementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
@@ -392,6 +393,7 @@ return [
         'subscription.request-plan-change' => $administratorRoles,
         'subscription.cancel' => $administratorRoles,
         'subscription.billing-contact.update' => $administratorRoles,
+        'company.profile.update' => $managementRoles,
         'subscription.usage.view' => $administratorRoles,
         'white-label.view' => $administratorRoles,
         'white-label.update' => $administratorRoles,

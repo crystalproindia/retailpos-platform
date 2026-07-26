@@ -76,11 +76,15 @@ class InvoiceService
 
     public function issue(CrmInvoice $invoice, User $user): CrmInvoice
     {
-        $this->ensureDraft($invoice);
-        $invoice->update(['status' => InvoiceStatus::Issued, 'issue_date' => $invoice->issue_date ?? today(), 'updated_by' => $user->id]);
-        $this->audit->record('crm.invoice.issued', $invoice, 'Invoice issued', ['company_id' => $invoice->company_id]);
+        return DB::transaction(function () use ($invoice, $user): CrmInvoice {
+            $invoice = CrmInvoice::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($invoice->id);
+            $this->ensureDraft($invoice);
+            $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
+            $invoice->update(['status' => InvoiceStatus::Issued, 'issue_date' => $invoice->issue_date ?? today(), 'updated_by' => $user->id]);
+            $this->audit->record('crm.invoice.issued', $invoice, 'Invoice issued', ['company_id' => $invoice->company_id]);
 
-        return $invoice->refresh();
+            return $invoice->refresh();
+        });
     }
 
     /** @param array<string,mixed> $data */

@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['company_id', 'branch_id', 'name', 'email', 'role', 'is_active', 'is_platform_admin', 'password', 'last_login_at'])]
+#[Fillable(['company_id', 'branch_id', 'name', 'email', 'mobile', 'role', 'is_active', 'is_platform_admin', 'verification_status', 'verification_completed_at', 'requires_password_change', 'password', 'last_login_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -41,6 +41,8 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
             'is_platform_admin' => 'boolean',
+            'verification_completed_at' => 'datetime',
+            'requires_password_change' => 'boolean',
             'role' => UserRole::class,
             'password' => 'hashed',
         ];
@@ -111,5 +113,10 @@ class User extends Authenticatable
     public function notificationPreferences(): HasMany
     {
         return $this->hasMany(NotificationPreference::class);
+    }
+
+    public function accountVerifications(): HasMany
+    {
+        return $this->hasMany(AccountVerification::class);
     }
 }

@@ -3064,6 +3064,12 @@ The purchase domain now contains invoice and payment services plus payable/agein
 
 The SaaS foundation lives in `app/Models/Saas*`, `app/Services/Saas`, `app/Console/Commands/Saas`, `app/Http/Controllers/CommandCenter/Saas`, and `resources/views/command-center/saas`. It provides versioned plans, tenant-bound subscription snapshots, lifecycle events, onboarding, grandfathering, entitlement and usage services, platform-only administration, tenant subscription UI, white-label readiness, and reseller/tenant assignment history.
 
+# SaaS Phase A — Free 365 and Quick Provisioning
+
+`saas_industries` is the configurable stable-key industry registry. `account_verifications` stores hashed, expiring, one-time account verification codes. `TenantProvisioningService` is the atomic creation path shared by platform-admin account creation and future public signup; it creates the company, primary outlet, owner, selected subscription, pending verification record, and audit event in one transaction. `AccountVerificationService`, `IndustryRegistry`, `EntitlementService`, and `UsageService` enforce secure verification, enabled-industry selection, package access, and tenant-timezone monthly invoice usage.
+
+Free 365 is the editable `free-365` package: 365 days from activation, one active user/outlet, core POS/sales/products/customers/inventory/GST/dashboard access, no automatic renewal, and 25 shared finalised CRM/POS invoices per tenant calendar month. Expiry retains login and authorised read/export paths but blocks writes. See `docs/saas-free365.md` and `docs/tenant-provisioning.md`.
+
 See `docs/saas/` for architecture, plan/entitlement behavior, lifecycle and scheduler operations, usage enforcement, white-label and reseller boundaries, security, testing, and production recovery.
 
 # Phase 8B — SaaS Billing

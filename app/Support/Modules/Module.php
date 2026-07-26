@@ -4,6 +4,7 @@ namespace App\Support\Modules;
 
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Services\Saas\EntitlementService;
 
 class Module
 {
@@ -76,7 +77,15 @@ class Module
 
     public function allowedForUser(User $user): bool
     {
-        return $this->allowedFor($user->role) && (! $this->permission || $user->can($this->permission));
+        if (! $this->allowedFor($user->role) || ($this->permission && ! $user->can($this->permission))) {
+            return false;
+        }
+
+        if (! config('saas.enforcement_enabled', false) || ! $this->licenseKey || ! $user->company) {
+            return true;
+        }
+
+        return app(EntitlementService::class)->allows($user->company, $this->licenseKey);
     }
 
     public function url(): string

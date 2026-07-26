@@ -19,6 +19,7 @@ class SaasNavigationRegistry
             ['label' => 'SaaS Dashboard', 'route' => 'saas.dashboard', 'icon' => 'dashboard', 'permission' => 'saas.dashboard.view', 'active' => ['saas.dashboard']],
             ['label' => 'Tenants & Subscriptions', 'route' => 'saas.subscriptions.index', 'icon' => 'company', 'permission' => 'saas.subscriptions.view', 'active' => ['saas.subscriptions.*', 'saas.tenants.*']],
             ['label' => 'Plans', 'route' => 'saas.plans.index', 'icon' => 'layers', 'permission' => 'saas.plans.view', 'active' => ['saas.plans.*']],
+            ['label' => 'Create Account', 'route' => 'saas.tenants.create', 'icon' => 'users', 'permission' => 'saas.tenants.create', 'active' => ['saas.tenants.create']],
             ['label' => 'Onboarding', 'route' => 'saas.onboarding.index', 'icon' => 'users', 'permission' => 'saas.onboarding.manage', 'active' => ['saas.onboarding.*']],
             ['label' => 'Resellers', 'route' => 'saas.resellers.index', 'icon' => 'users', 'permission' => 'saas.resellers.view', 'active' => ['saas.resellers.*']],
             ...$this->platformBillingItems($user),

@@ -9,6 +9,7 @@ use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosSale;
 use App\Models\User;
+use App\Enums\Crm\InvoiceStatus;
 use App\Models\SaasUsageSnapshot;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +27,7 @@ class UsageService
             'branches' => Branch::where('company_id', $company->id)->where('is_active', true)->count(),
             'warehouses' => Warehouse::where('company_id', $company->id)->where('is_active', true)->count(),
             'products' => Product::where('company_id', $company->id)->count(),
-            'monthly_invoices' => CrmInvoice::where('company_id', $company->id)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
+            'monthly_invoices' => $this->finalisedInvoiceCount($company),
             'monthly_pos_transactions' => PosSale::where('company_id', $company->id)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
             // Storage, API and outbound email meters are deliberately not guessed.
             default => 0,
@@ -44,7 +45,7 @@ class UsageService
         $limit = $this->entitlements->limit($company, $key);
 
         if ($limit !== null && $this->current($company, $key) >= $limit) {
-            throw ValidationException::withMessages([$key => 'Your subscription limit has been reached.']);
+            throw ValidationException::withMessages([$key => 'Your subscription limit has been reached. Upgrade your package to continue.']);
         }
     }
 
@@ -77,5 +78,48 @@ class UsageService
             }
         }
         return $summary;
+    }
+
+    public function invoiceUsage(Company $company): array
+    {
+        $used = $this->finalisedInvoiceCount($company);
+        $limit = $this->entitlements->limit($company, 'monthly_invoices');
+        $now = now($company->timezone ?: config('app.timezone'));
+
+        return [
+            'used' => $used,
+            'remaining' => $limit === null ? null : max(0, $limit - $used),
+            'reset_at' => $now->copy()->addMonthNoOverflow()->startOfMonth()->toIso8601String(),
+            'package' => $this->entitlements->subscription($company)?->plan?->name,
+        ];
+    }
+
+    private function finalisedInvoiceCount(Company $company): int
+    {
+        $timezone = $company->timezone ?: config('app.timezone');
+        $now = now($timezone);
+        $start = $now->copy()->startOfMonth()->utc();
+        $end = $now->copy()->endOfMonth()->utc();
+
+        $salesInvoices = CrmInvoice::query()
+            ->where('company_id', $company->id)
+            ->whereIn('status', [
+                InvoiceStatus::Issued->value,
+                InvoiceStatus::Sent->value,
+                InvoiceStatus::Viewed->value,
+                InvoiceStatus::PartiallyPaid->value,
+                InvoiceStatus::Paid->value,
+                InvoiceStatus::Overdue->value,
+            ])
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+
+        $posInvoices = PosSale::query()
+            ->where('company_id', $company->id)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+
+        return $salesInvoices + $posInvoices;
     }
 }

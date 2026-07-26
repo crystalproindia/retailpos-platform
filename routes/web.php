@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\AccountVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CommandCenter\Cms\CmsArticleController;
@@ -119,6 +120,7 @@ use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
+use App\Http\Controllers\CommandCenter\CompanyProfileController;
 use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingGatewayController;
@@ -197,6 +199,10 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
+    Route::get('account/verification', [AccountVerificationController::class, 'show'])->name('account.verification.show');
+    Route::post('account/verification', [AccountVerificationController::class, 'verify'])->middleware('throttle:10,1')->name('account.verification.verify');
+    Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
+
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
 
@@ -247,6 +253,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('subscriptions/{subscription}/trials/extend', [SaasSubscriptionController::class, 'extendTrial'])->middleware('can:saas.trials.extend')->name('subscriptions.trials.extend');
         Route::post('subscriptions/{subscription}/plan-change', [SaasSubscriptionController::class, 'changePlan'])->middleware('can:saas.subscriptions.update')->name('subscriptions.plan-change');
         Route::delete('subscriptions/{subscription}/plan-change', [SaasSubscriptionController::class, 'cancelPlanChange'])->middleware('can:saas.subscriptions.update')->name('subscriptions.plan-change.cancel');
+        Route::get('tenants/create', [SaasTenantOnboardingController::class, 'create'])->middleware('can:saas.tenants.create')->name('tenants.create');
+        Route::post('tenants', [SaasTenantOnboardingController::class, 'store'])->middleware('can:saas.tenants.create')->name('tenants.store');
         Route::get('tenants/{company}', [SaasSubscriptionController::class, 'show'])->middleware('can:saas.tenants.view')->name('tenants.show');
         Route::get('onboarding', [SaasTenantOnboardingController::class, 'index'])->middleware('can:saas.onboarding.manage')->name('onboarding.index');
         Route::get('onboarding/create', [SaasTenantOnboardingController::class, 'create'])->middleware('can:saas.tenants.create')->name('onboarding.create');
@@ -935,6 +943,8 @@ Route::middleware('auth')->group(function (): void {
 
     Route::redirect('settings', 'settings/general')->name('settings.index');
     Route::middleware('role:administrator,manager')->group(function (): void {
+        Route::get('settings/company-profile', [CompanyProfileController::class, 'edit'])->middleware('can:company.profile.update')->name('settings.company-profile.edit');
+        Route::put('settings/company-profile', [CompanyProfileController::class, 'update'])->middleware('can:company.profile.update')->name('settings.company-profile.update');
         Route::get('settings/{section}', [SettingsController::class, 'show'])->name('settings.show');
         Route::put('settings/{section}', [SettingsController::class, 'update'])->name('settings.update');
     });

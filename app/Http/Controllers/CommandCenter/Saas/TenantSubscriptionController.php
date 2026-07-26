@@ -21,6 +21,7 @@ class TenantSubscriptionController extends Controller
         return view('command-center.saas.subscription.index', [
             'subscription' => $entitlements->subscription($company)?->load(['plan', 'pendingPlan', 'events' => fn ($query) => $query->latest()->limit(15)]),
             'usage' => $usage->summary($company),
+            'invoiceUsage' => $usage->invoiceUsage($company),
             'plans' => SaasPlan::query()->where('status', 'active')->where('is_public', true)->orderBy('sort_order')->get(),
         ]);
     }

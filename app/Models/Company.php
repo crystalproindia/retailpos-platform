@@ -209,4 +209,9 @@ class Company extends Model
     {
         return $this->hasMany(SaasResellerTenantAssignment::class);
     }
+
+    public function hasPlaceholderName(): bool
+    {
+        return $this->name === 'Your Store Name';
+    }
 }

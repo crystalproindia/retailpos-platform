@@ -17,7 +17,7 @@ class EntitlementService
             now()->addMinutes(5),
             fn (): ?SaasSubscription => SaasSubscription::query()
                 ->where('company_id', $company->id)
-                ->whereIn('status', ['trialing', 'active', 'grace_period', 'past_due', 'suspended'])
+                ->whereIn('status', ['trialing', 'active', 'grace_period', 'past_due', 'suspended', 'expired'])
                 ->latest('id')
                 ->first(),
         );
@@ -32,7 +32,7 @@ class EntitlementService
 
         return Cache::remember($cacheKey, now()->addMinutes(5), fn (): ?SaasSubscription => SaasSubscription::query()
             ->where('company_id', $company->id)
-            ->whereIn('status', ['trialing', 'active', 'grace_period', 'past_due', 'suspended'])
+            ->whereIn('status', ['trialing', 'active', 'grace_period', 'past_due', 'suspended', 'expired'])
             ->latest('id')
             ->first());
     }
@@ -44,6 +44,7 @@ class EntitlementService
 
     public function allows(Company $company, string $feature): bool
     {
+        $feature = $this->canonicalFeature($feature);
         $override = $this->override($company, 'feature', $feature);
 
         if ($override !== null) {
@@ -52,7 +53,20 @@ class EntitlementService
 
         $subscription = $this->subscription($company);
 
-        return $this->active($company) && (bool) ($subscription?->feature_snapshot[$feature] ?? false);
+        if (! $this->active($company) || ! $subscription) {
+            return false;
+        }
+
+        if ((bool) ($subscription->feature_snapshot[$feature] ?? false)) {
+            return true;
+        }
+
+        $legacy = collect(config('saas.entitlement_aliases', []))
+            ->filter(fn (string $canonical): bool => $canonical === $feature)
+            ->keys()
+            ->first();
+
+        return $legacy ? (bool) ($subscription->feature_snapshot[$legacy] ?? false) : false;
     }
 
     public function limit(Company $company, string $key): ?int
@@ -88,5 +102,10 @@ class EntitlementService
             ->first();
 
         return $override?->value['value'] ?? null;
+    }
+
+    private function canonicalFeature(string $feature): string
+    {
+        return config('saas.entitlement_aliases.'.$feature, $feature);
     }
 }

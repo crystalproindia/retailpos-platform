@@ -10,6 +10,7 @@ use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
 use App\Events\Domain\Saas\SaasSubscriptionDomainEvent;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -22,9 +23,9 @@ class SubscriptionService
     ) {
     }
 
-    public function create(Company $company, SaasPlan $plan, ?User $actor, string $method = 'manual'): SaasSubscription
+    public function create(Company $company, SaasPlan $plan, ?User $actor, string $method = 'manual', ?Carbon $activationDate = null): SaasSubscription
     {
-        $subscription = DB::transaction(function () use ($company, $plan, $actor, $method): SaasSubscription {
+        $subscription = DB::transaction(function () use ($company, $plan, $actor, $method, $activationDate): SaasSubscription {
             $active = SaasSubscription::query()
                 ->where('company_id', $company->id)
                 ->whereIn('status', ['trialing', 'active', 'grace_period', 'past_due', 'suspended'])
@@ -38,7 +39,9 @@ class SubscriptionService
             $plan->loadMissing(['features', 'limits']);
             $snapshot = $plan->snapshot();
             $trial = $plan->trial_days > 0;
-            $today = today();
+            $today = ($activationDate ?? today())->copy()->startOfDay();
+            $isFree365 = $plan->code === config('saas.free365_plan_code');
+            $periodEnd = $isFree365 ? $today->copy()->addDays(365) : $this->periodEnd($today, $plan->billing_interval);
 
             $subscription = SaasSubscription::create([
                 'company_id' => $company->id,
@@ -56,10 +59,11 @@ class SubscriptionService
                 'trial_ends_at' => $trial ? $today->copy()->addDays($plan->trial_days) : null,
                 'starts_at' => $today,
                 'current_period_starts_at' => $today,
-                'current_period_ends_at' => $this->periodEnd($today, $plan->billing_interval),
-                'renewal_date' => $this->periodEnd($today, $plan->billing_interval),
+                'current_period_ends_at' => $periodEnd,
+                'renewal_date' => $periodEnd,
                 'grace_period_ends_at' => $trial ? $today->copy()->addDays($plan->trial_days + $plan->grace_period_days) : null,
                 'billing_method' => $method,
+                'auto_renew' => $isFree365 ? false : false,
             ]);
 
             $this->event($subscription, $trial ? 'TrialStarted' : 'SubscriptionActivated', null, $subscription->status, $actor);
@@ -76,13 +80,14 @@ class SubscriptionService
     public function transition(SaasSubscription $subscription, string $status, ?User $actor, ?string $reason = null, ?string $idempotencyKey = null): SaasSubscription
     {
         $updated = DB::transaction(function () use ($subscription, $status, $actor, $reason, $idempotencyKey): SaasSubscription {
-            $subscription = SaasSubscription::lockForUpdate()->findOrFail($subscription->id);
+            $subscription = SaasSubscription::with('plan')->lockForUpdate()->findOrFail($subscription->id);
             $from = $subscription->status;
             if ($from === $status) {
                 return $subscription;
             }
 
-            if (! $this->canTransition($from, $status)) {
+            $free365Expiry = $from === 'active' && $status === 'expired' && $subscription->plan?->code === config('saas.free365_plan_code');
+            if (! $free365Expiry && ! $this->canTransition($from, $status)) {
                 throw ValidationException::withMessages(['status' => 'This subscription lifecycle change is not allowed.']);
             }
 

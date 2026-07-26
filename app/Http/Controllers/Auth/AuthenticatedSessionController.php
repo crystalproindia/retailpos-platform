@@ -20,6 +20,10 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
+        if ($request->user()?->verification_status === 'pending') {
+            return redirect()->route('account.verification.show');
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

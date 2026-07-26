@@ -22,10 +22,17 @@ class EnsureActiveSubscription
         }
 
         $company = $user->company;
-        abort_unless($company && app(EntitlementService::class)->active($company), Response::HTTP_FORBIDDEN, 'Your account is not currently active.');
+        $entitlements = app(EntitlementService::class);
+        if (! $company) abort(Response::HTTP_FORBIDDEN, 'Your account is not currently active.');
+        if (! $entitlements->active($company)) {
+            $expired = $entitlements->subscription($company)?->status === 'expired';
+            $readOnly = in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true);
+            abort_unless($expired && $readOnly, Response::HTTP_FORBIDDEN, 'Your package has expired. Upgrade or renew to create new records.');
+            return $next($request);
+        }
 
         if ($feature = $this->featureFor($request)) {
-            abort_unless(app(EntitlementService::class)->allows($company, $feature), Response::HTTP_FORBIDDEN, 'Your subscription does not include this feature.');
+            abort_unless($entitlements->allows($company, $feature), Response::HTTP_FORBIDDEN, 'Your subscription does not include this feature.');
         }
 
         return $next($request);

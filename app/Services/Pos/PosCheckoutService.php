@@ -51,6 +51,7 @@ class PosCheckoutService
     {
         return DB::transaction(function () use ($user, $data): PosSale {
             $this->usage->assertWithinLimit($user->company, 'monthly_pos_transactions');
+            $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
             $branchId = (int) ($data['branch_id'] ?? $user->branch_id);
             $branch = \App\Models\Branch::query()->where('company_id', $user->company_id)->findOrFail($branchId);
             if (! $branch->is_active) throw ValidationException::withMessages(['branch_id' => 'Inactive branches cannot create POS sales.']);

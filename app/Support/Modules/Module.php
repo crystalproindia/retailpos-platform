@@ -3,6 +3,7 @@
 namespace App\Support\Modules;
 
 use App\Enums\UserRole;
+use App\Models\User;
 
 class Module
 {
@@ -28,6 +29,8 @@ class Module
         public readonly ?string $licenseKey = null,
         public readonly ?string $parentId = null,
         public readonly array $children = [],
+        public readonly ?string $permission = null,
+        public readonly array $searchAliases = [],
     ) {
         //
     }
@@ -52,6 +55,8 @@ class Module
             badge: $attributes['badge'] ?? null,
             licenseKey: $attributes['license_key'] ?? null,
             parentId: $attributes['parent_id'] ?? null,
+            permission: $attributes['permission'] ?? null,
+            searchAliases: array_values($attributes['search_aliases'] ?? []),
         );
     }
 
@@ -64,6 +69,11 @@ class Module
         $roleValue = $role instanceof UserRole ? $role->value : $role;
 
         return in_array($roleValue, $this->roles, true);
+    }
+
+    public function allowedForUser(User $user): bool
+    {
+        return $this->allowedFor($user->role) && (! $this->permission || $user->can($this->permission));
     }
 
     public function url(): string
@@ -156,6 +166,8 @@ class Module
             licenseKey: $this->licenseKey,
             parentId: $this->parentId,
             children: $children,
+            permission: $this->permission,
+            searchAliases: $this->searchAliases,
         );
     }
 }

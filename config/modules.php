@@ -13,6 +13,27 @@ $customerRoles = ['administrator', 'manager', 'sales'];
 $posRoles = ['administrator', 'manager', 'sales'];
 
 return [
+    'navigation_search' => [
+        'aliases' => [
+            'bill' => ['invoice', 'billing'],
+            'invoice design' => ['invoice designs', 'invoice template'],
+            'bill design' => ['invoice designs', 'invoice template'],
+            'stock' => ['inventory'],
+            'item' => ['product', 'products'],
+            'party' => ['customer', 'supplier'],
+            'vendor' => ['supplier'],
+            'gst' => ['tax', 'compliance'],
+            'barcode' => ['barcode templates'],
+            'staff' => ['users', 'employees'],
+            'branch' => ['outlet', 'branches'],
+            'shop' => ['outlet', 'branches'],
+            'purchase bill' => ['purchase invoice'],
+            'sales bill' => ['sales invoice'],
+            'email' => ['email integration', 'email deliveries'],
+            'payment' => ['invoice payment', 'payments'],
+            'return' => ['returns', 'purchase returns'],
+        ],
+    ],
     'modules' => [
         'dashboard' => [
             'name' => 'Dashboard',
@@ -1265,6 +1286,8 @@ return [
             'badge' => null,
             'license_key' => null,
             'parent_id' => 'settings',
+            'permission' => 'sales.invoices.update',
+            'search_aliases' => ['invoice design', 'invoice template', 'bill design'],
         ],
         'integrations' => [
             'name' => 'Email Integration',

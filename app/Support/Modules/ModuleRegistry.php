@@ -3,6 +3,7 @@
 namespace App\Support\Modules;
 
 use App\Enums\UserRole;
+use App\Models\User;
 use Illuminate\Support\Collection;
 
 class ModuleRegistry
@@ -68,6 +69,16 @@ class ModuleRegistry
         return $this->enabled()
             ->filter(fn (Module $module): bool => $module->allowedFor($role))
             ->values();
+    }
+
+    /** @return Collection<int, Module> */
+    public function sidebarForUser(User $user): Collection
+    {
+        $modules = $this->enabled()
+            ->filter(fn (Module $module): bool => $module->visibleInSidebar && $module->allowedForUser($user))
+            ->values();
+
+        return $this->withChildren($modules);
     }
 
     /**

@@ -50,7 +50,7 @@ class ModuleRegistryTest extends TestCase
         $this->assertFalse($staffModules->contains('id', 'settings'));
         $this->assertFalse($staffModules->contains('id', 'audit-logs'));
         $this->assertTrue($adminModules->contains('id', 'settings'));
-        $this->assertFalse($adminModules->contains('id', 'audit-logs'));
+        $this->assertTrue($adminModules->contains('id', 'audit-logs'));
     }
 
     public function test_disabled_modules_are_excluded_from_enabled_and_sidebar_results(): void
@@ -80,7 +80,7 @@ class ModuleRegistryTest extends TestCase
         $this->assertContains('purchase-input-gst', collect($modules->firstWhere('id', 'purchases')->children)->pluck('id'));
         $this->assertContains('sales-opportunities', collect($modules->firstWhere('id', 'sales')->children)->pluck('id'));
         $this->assertContains('website-media', collect($modules->firstWhere('id', 'website-cms')->children)->pluck('id'));
-        $this->assertFalse($registry->enabled()->contains(fn ($module) => $module->route === 'modules.show'));
+        $this->assertTrue($registry->enabled()->contains(fn ($module) => $module->route === 'modules.show'));
         $this->assertFalse($registry->all()->contains(fn ($module) => str_contains($module->route, 'google')));
 
         $registry->enabled()->each(function ($module): void {

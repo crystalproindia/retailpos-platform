@@ -31,6 +31,8 @@ class Module
         public readonly array $children = [],
         public readonly ?string $permission = null,
         public readonly array $searchAliases = [],
+        public readonly bool $searchable = true,
+        public readonly bool $navigable = true,
     ) {
         //
     }
@@ -57,6 +59,7 @@ class Module
             parentId: $attributes['parent_id'] ?? null,
             permission: $attributes['permission'] ?? null,
             searchAliases: array_values($attributes['search_aliases'] ?? []),
+            searchable: (bool) ($attributes['searchable'] ?? true),
         );
     }
 
@@ -79,6 +82,11 @@ class Module
     public function url(): string
     {
         return route($this->route, $this->routeParameters);
+    }
+
+    public function navigationIdentity(): string
+    {
+        return 'module:'.$this->id;
     }
 
     public function isActive(): bool
@@ -148,7 +156,7 @@ class Module
     /**
      * @param  array<int, Module>  $children
      */
-    public function withChildren(array $children): self
+    public function withChildren(array $children, ?bool $navigable = null): self
     {
         return new self(
             id: $this->id,
@@ -168,6 +176,8 @@ class Module
             children: $children,
             permission: $this->permission,
             searchAliases: $this->searchAliases,
+            searchable: $this->searchable,
+            navigable: $navigable ?? $this->navigable,
         );
     }
 }

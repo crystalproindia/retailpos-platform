@@ -101,17 +101,19 @@ class InvoicePaymentsFoundationTest extends TestCase
     {
         $manager = $this->user(UserRole::Manager);
         $invoice = $this->invoice($manager, 2500);
+        $invoice->update(['due_date' => today()->addDays(3)]);
         app(InvoiceService::class)->issue($invoice, $manager);
 
         $otherManager = $this->user(UserRole::Manager);
         $this->actingAs($otherManager)->get('/sales/invoices/'.$invoice->id)->assertNotFound();
 
         $this->actingAs($manager)
-            ->post('/sales/invoices/'.$invoice->id.'/reminder', ['email' => 'asha@example.test'])
+            ->post('/sales/invoices/'.$invoice->id.'/reminder', ['stage' => 'due_soon'])
             ->assertRedirect();
 
         $delivery = NotificationDelivery::query()->where('company_id', $manager->company_id)->firstOrFail();
-        $this->assertSame('email.invoice_reminder', $delivery->event_key);
+        $this->assertSame('email.invoice_reminder_due_soon', $delivery->event_key);
+        $this->assertSame('manual', $delivery->reminder_source);
         $this->assertSame('skipped_not_configured', $delivery->status);
     }
 

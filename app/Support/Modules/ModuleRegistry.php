@@ -51,14 +51,12 @@ class ModuleRegistry
      */
     public function sidebar(?UserRole $role = null): Collection
     {
-        $modules = $this->enabled()
-            ->filter(fn (Module $module): bool => $module->visibleInSidebar)
-            ->when($role, fn (Collection $modules): Collection => $modules->filter(
-                fn (Module $module): bool => $module->allowedFor($role),
-            ))
-            ->values();
+        $visible = $this->visibleEnabled();
+        $authorized = $role
+            ? $visible->filter(fn (Module $module): bool => $module->allowedFor($role))
+            : $visible;
 
-        return $this->withChildren($modules);
+        return $this->navigationTree($visible, $authorized);
     }
 
     /**
@@ -74,11 +72,10 @@ class ModuleRegistry
     /** @return Collection<int, Module> */
     public function sidebarForUser(User $user): Collection
     {
-        $modules = $this->enabled()
-            ->filter(fn (Module $module): bool => $module->visibleInSidebar && $module->allowedForUser($user))
-            ->values();
+        $visible = $this->visibleEnabled();
+        $authorized = $visible->filter(fn (Module $module): bool => $module->allowedForUser($user));
 
-        return $this->withChildren($modules);
+        return $this->navigationTree($visible, $authorized);
     }
 
     /**
@@ -91,11 +88,48 @@ class ModuleRegistry
             ->sortBy('sortOrder');
     }
 
+    /** @return Collection<string, Module> */
+    private function visibleEnabled(): Collection
+    {
+        return $this->enabled()
+            ->filter(fn (Module $module): bool => $module->visibleInSidebar);
+    }
+
     /**
-     * @param  Collection<int, Module>  $modules
+     * @param  Collection<string, Module>  $visible
+     * @param  Collection<string, Module>  $authorized
      * @return Collection<int, Module>
      */
-    private function withChildren(Collection $modules): Collection
+    private function navigationTree(Collection $visible, Collection $authorized): Collection
+    {
+        $selected = clone $authorized;
+
+        foreach ($authorized as $module) {
+            $parentId = $module->parentId;
+            $seen = [];
+
+            while ($parentId !== null && ! isset($seen[$parentId])) {
+                $seen[$parentId] = true;
+                $parent = $visible->get($parentId);
+                if (! $parent) break;
+
+                $selected->put($parent->id, $parent);
+                $parentId = $parent->parentId;
+            }
+        }
+
+        return $this->withChildren(
+            $selected->sortBy('sortOrder'),
+            $authorized->mapWithKeys(fn (Module $module): array => [$module->id => true]),
+        );
+    }
+
+    /**
+     * @param  Collection<string, Module>  $modules
+     * @param  Collection<string, string>|null  $navigableIds
+     * @return Collection<int, Module>
+     */
+    private function withChildren(Collection $modules, ?Collection $navigableIds = null): Collection
     {
         $children = $modules
             ->filter(fn (Module $module): bool => $module->parentId !== null)
@@ -103,9 +137,22 @@ class ModuleRegistry
 
         return $modules
             ->filter(fn (Module $module): bool => $module->parentId === null)
-            ->map(fn (Module $module): Module => $module->withChildren(
-                ($children->get($module->id) ?? collect())->values()->all(),
-            ))
+            ->map(fn (Module $module): Module => $this->buildModule($module, $children, $navigableIds))
             ->values();
+    }
+
+    /**
+     * @param  Collection<string, Collection<int, Module>>  $children
+     * @param  Collection<string, string>|null  $navigableIds
+     */
+    private function buildModule(Module $module, Collection $children, ?Collection $navigableIds): Module
+    {
+        return $module->withChildren(
+            ($children->get($module->id) ?? collect())
+                ->map(fn (Module $child): Module => $this->buildModule($child, $children, $navigableIds))
+                ->values()
+                ->all(),
+            $navigableIds?->has($module->id) ?? true,
+        );
     }
 }

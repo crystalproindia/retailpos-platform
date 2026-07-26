@@ -63,7 +63,7 @@ class InvoiceReminderTest extends TestCase
         $settings->update(['automatic_enabled' => true]);
 
         foreach ([[InvoiceReminderStage::DueSoon, 3], [InvoiceReminderStage::DueToday, 0], [InvoiceReminderStage::Overdue, -3]] as [$stage, $daysFromToday]) {
-            $invoice = $this->issuedInvoice($manager, now()->addDays($daysFromToday)->toDateString());
+            $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays($daysFromToday)->toDateString());
             $decision = $service->automaticEligibility($invoice->fresh()->load(['company', 'creator']));
             $this->assertTrue($decision['eligible']);
             $this->assertSame($stage, $decision['rule']->stage);
@@ -82,12 +82,12 @@ class InvoiceReminderTest extends TestCase
             ['status' => InvoiceStatus::Cancelled],
             ['billing_email' => 'not-an-email'],
         ] as $changes) {
-            $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+            $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
             $invoice->update($changes);
             $this->assertFalse($service->automaticEligibility($invoice->fresh()->load(['company', 'creator']))['eligible']);
         }
 
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         $manager->company->update(['is_active' => false]);
         $this->assertFalse($service->automaticEligibility($invoice->fresh()->load(['company', 'creator']))['eligible']);
     }
@@ -99,7 +99,7 @@ class InvoiceReminderTest extends TestCase
         $this->configureEmail($manager);
         $settings = app(InvoiceReminderSettingsService::class)->ensure($manager->company);
         $settings->update(['automatic_enabled' => true]);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         $invoice->update(['amount_paid' => 2500, 'balance_due' => 9300, 'status' => InvoiceStatus::PartiallyPaid]);
 
         $result = app(InvoiceReminderService::class)->queueAutomatic($invoice->fresh()->load(['company', 'creator']));
@@ -117,7 +117,7 @@ class InvoiceReminderTest extends TestCase
         $this->configureEmail($manager);
         $settings = app(InvoiceReminderSettingsService::class)->ensure($manager->company);
         $settings->update(['automatic_enabled' => true]);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
 
         $this->artisan('invoices:dispatch-reminders', ['--company' => $manager->company_id, '--dry-run' => true])->assertSuccessful();
         $this->assertDatabaseCount('notification_deliveries', 0);
@@ -133,7 +133,7 @@ class InvoiceReminderTest extends TestCase
         Queue::fake();
         $manager = $this->user(UserRole::Manager);
         $this->configureEmail($manager);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
 
         $this->actingAs($manager)->get(route('sales.invoices.show', $invoice))
             ->assertOk()
@@ -154,7 +154,7 @@ class InvoiceReminderTest extends TestCase
     public function test_cross_tenant_and_restricted_users_cannot_send_manual_reminders(): void
     {
         $manager = $this->user(UserRole::Manager);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         $other = $this->user(UserRole::Manager);
         $sales = $this->user(UserRole::Sales, $manager->company, $manager->branch);
         $staff = $this->user(UserRole::Staff, $manager->company, $manager->branch);
@@ -170,7 +170,7 @@ class InvoiceReminderTest extends TestCase
         Mail::fake();
         $manager = $this->user(UserRole::Manager);
         $this->configureEmail($manager);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         $status = $invoice->status;
         $result = app(InvoiceReminderService::class)->queueManual($invoice, $manager, InvoiceReminderStage::DueSoon, true);
 
@@ -192,7 +192,7 @@ class InvoiceReminderTest extends TestCase
         Mail::fake();
         $manager = $this->user(UserRole::Manager);
         $this->configureEmail($manager);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
 
         $delivery = app(InvoiceReminderService::class)->queueManual($invoice, $manager, InvoiceReminderStage::DueSoon, false)['delivery'];
         app(EmailDeliveryService::class)->send($delivery);
@@ -209,7 +209,7 @@ class InvoiceReminderTest extends TestCase
         $manager = $this->user(UserRole::Manager);
         $settings = app(InvoiceReminderSettingsService::class)->ensure($manager->company);
         $settings->update(['automatic_enabled' => true]);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         NotificationDelivery::query()->create([
             'company_id' => $manager->company_id,
             'related_type' => $invoice->getMorphClass(),
@@ -235,7 +235,7 @@ class InvoiceReminderTest extends TestCase
         $this->configureEmail($manager);
         $settings = app(InvoiceReminderSettingsService::class)->ensure($manager->company);
         $settings->update(['automatic_enabled' => true]);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         $delivery = app(InvoiceReminderService::class)->queueAutomatic($invoice->fresh()->load(['company', 'creator']))['delivery'];
         $invoice->update(['amount_paid' => $invoice->grand_total, 'balance_due' => 0, 'status' => InvoiceStatus::Paid]);
 
@@ -254,7 +254,7 @@ class InvoiceReminderTest extends TestCase
         $this->configureEmail($manager);
         $settings = app(InvoiceReminderSettingsService::class)->ensure($manager->company);
         $settings->update(['automatic_enabled' => true]);
-        $invoice = $this->issuedInvoice($manager, now()->addDays(3)->toDateString());
+        $invoice = $this->issuedInvoice($manager, $this->tenantNow($manager)->addDays(3)->toDateString());
         $delivery = app(InvoiceReminderService::class)->queueAutomatic($invoice->fresh()->load(['company', 'creator']))['delivery'];
         $invoice->update(['billing_email' => 'updated@example.test']);
 
@@ -288,7 +288,7 @@ class InvoiceReminderTest extends TestCase
             'billing_name' => 'Asha Retail',
             'billing_email' => 'asha@example.test',
             'currency' => 'INR',
-            'issue_date' => now()->toDateString(),
+            'issue_date' => $this->tenantNow($user)->toDateString(),
             'due_date' => $dueDate,
             'items' => [[
                 'name' => 'RetailPOS licence',
@@ -313,6 +313,11 @@ class InvoiceReminderTest extends TestCase
             'from_name' => $user->company->name,
             'from_address' => 'billing@example.test',
         ]);
+    }
+
+    private function tenantNow(User $user): \Carbon\CarbonImmutable
+    {
+        return \Carbon\CarbonImmutable::now($user->company->timezone ?: config('app.timezone'));
     }
 
     private function user(UserRole $role, ?Company $company = null, ?Branch $branch = null): User

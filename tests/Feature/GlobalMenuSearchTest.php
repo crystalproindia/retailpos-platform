@@ -53,14 +53,15 @@ class GlobalMenuSearchTest extends TestCase
         }
     }
 
-    public function test_index_uses_visible_enabled_modules_and_deduplicates_routes(): void
+    public function test_index_uses_visible_enabled_modules_and_preserves_distinct_navigation_items_that_share_a_route(): void
     {
         $administrator = $this->user(UserRole::Administrator);
         $entries = app(GlobalMenuSearchService::class)->entriesFor($administrator);
 
-        $this->assertSame(1, $entries->where('route', 'crm.dashboard')->count());
+        $this->assertSame(2, $entries->where('route', 'crm.dashboard')->count());
+        $this->assertSame(['CRM', 'CRM Dashboard'], $entries->where('route', 'crm.dashboard')->pluck('label')->all());
         $this->assertFalse($entries->contains('label', 'Asha Retail'));
-        $this->assertSame(['label', 'route', 'url', 'icon', 'breadcrumb', 'group', 'aliases'], array_keys($entries->first()));
+        $this->assertSame(['navigation_key', 'label', 'route', 'url', 'icon', 'breadcrumb', 'group', 'aliases'], array_keys($entries->first()));
 
         $modules = config('modules.modules');
         $modules['invoice-designs']['enabled'] = false;
@@ -103,7 +104,7 @@ class GlobalMenuSearchTest extends TestCase
         $this->assertStringContainsString("event.key === 'Escape'", $script);
         $this->assertStringContainsString('localStorage.getItem(recentKey)', $script);
         $this->assertStringContainsString('route: item.dataset.route', $script);
-        $this->assertStringContainsString('sources.get(entry.route)', $script);
+        $this->assertStringContainsString('sources.get(entry.navigationKey)', $script);
         $this->assertStringContainsString('storeRecentMenus(recent.map', $script);
         $this->assertStringContainsString('clearRecentMenus()', $script);
         $this->assertStringContainsString('editDistance', $script);

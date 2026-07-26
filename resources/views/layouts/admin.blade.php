@@ -67,7 +67,7 @@
                                     };
                                 @endphp
 
-                                <a href="{{ $module->url() }}"
+                                <a @if ($module->navigable) href="{{ $module->url() }}" @else aria-disabled="true" role="group" @endif
                                     class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
                                     title="{{ $module->name }}">
                                     <x-icon :name="$module->icon" class="size-5 shrink-0" />
@@ -239,7 +239,7 @@
                         <div class="space-y-1" data-global-menu-group data-global-menu-group-name="{{ $group }}">
                             <p class="px-2 pb-2 pt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{{ $group }}</p>
                             @foreach ($entries as $entry)
-                                <button type="button" data-global-menu-result data-route="{{ $entry['route'] }}" data-url="{{ $entry['url'] }}" data-label="{{ $entry['label'] }}" data-breadcrumb="{{ $entry['breadcrumb'] }}" data-aliases="{{ implode(' ', $entry['aliases']) }}" data-search="{{ strtolower($entry['label'].' '.$entry['route'].' '.$entry['breadcrumb'].' '.implode(' ', $entry['aliases'])) }}" class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800" aria-selected="false">
+                                <button type="button" data-global-menu-result data-navigation-key="{{ $entry['navigation_key'] }}" data-route="{{ $entry['route'] }}" data-url="{{ $entry['url'] }}" data-label="{{ $entry['label'] }}" data-breadcrumb="{{ $entry['breadcrumb'] }}" data-aliases="{{ implode(' ', $entry['aliases']) }}" data-search="{{ strtolower($entry['label'].' '.$entry['route'].' '.$entry['breadcrumb'].' '.implode(' ', $entry['aliases'])) }}" class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800" aria-selected="false">
                                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><x-icon :name="$entry['icon']" class="size-5" /></span>
                                     <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-slate-900 dark:text-white" data-global-menu-result-label>{{ $entry['label'] }}</span><span class="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400" data-global-menu-result-breadcrumb>{{ $entry['breadcrumb'] }}</span></span>
                                     <x-icon name="chevron-right" class="size-4 shrink-0 text-slate-400" />

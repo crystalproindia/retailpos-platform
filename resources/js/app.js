@@ -178,8 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try { localStorage.removeItem(recentKey); } catch { /* Browser storage is optional. */ }
         };
         const saveRecentMenu = (item) => {
-            const recent = loadRecentMenus().filter((entry) => entry.route !== item.dataset.route);
-            recent.unshift({ route: item.dataset.route, label: item.dataset.label, breadcrumb: item.dataset.breadcrumb, url: item.dataset.url });
+            const recent = loadRecentMenus().filter((entry) => entry.navigationKey !== item.dataset.navigationKey);
+            recent.unshift({ navigationKey: item.dataset.navigationKey, route: item.dataset.route, label: item.dataset.label, breadcrumb: item.dataset.breadcrumb, url: item.dataset.url });
             storeRecentMenus(recent.slice(0, 5));
         };
         const selectableMenuResults = () => menuResults.filter((item) => !item.hidden);
@@ -197,9 +197,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderRecentMenus = () => {
             if (!menuRecent || !menuRecentItems) return;
             menuRecentItems.replaceChildren();
-            const sources = new Map(menuResults.map((item) => [item.dataset.route, item]));
-            const recent = loadRecentMenus().map((entry) => sources.get(entry.route)).filter(Boolean).slice(0, 5);
+            const sources = new Map(menuResults.map((item) => [item.dataset.navigationKey, item]));
+            const recent = loadRecentMenus().map((entry) => sources.get(entry.navigationKey)).filter(Boolean).slice(0, 5);
             storeRecentMenus(recent.map((item) => ({
+                navigationKey: item.dataset.navigationKey,
                 route: item.dataset.route,
                 label: item.dataset.label,
                 breadcrumb: item.dataset.breadcrumb,

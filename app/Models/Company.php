@@ -8,6 +8,7 @@ use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
+use App\Models\Crm\CrmInvoiceReminderSetting;
 use App\Models\Crm\CrmQuotation;
 use App\Models\Customers\Customer;
 use App\Models\Customers\CustomerGroup;
@@ -197,6 +198,11 @@ class Company extends Model
     public function invoiceTemplateSettings(): HasMany
     {
         return $this->hasMany(InvoiceTemplateSetting::class);
+    }
+
+    public function invoiceReminderSettings(): HasMany
+    {
+        return $this->hasMany(CrmInvoiceReminderSetting::class);
     }
 
     public function saasResellerAssignments(): HasMany

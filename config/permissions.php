@@ -200,6 +200,7 @@ return [
         'sales.receipts.pdf' => $crmUserRoles,
         'sales.receipts.send' => $crmUserRoles,
         'sales.reminders.send' => $crmUserRoles,
+        'sales.reminders.manage' => $crmManagementRoles,
         'sales.finance.dashboard' => $crmUserRoles,
         'sales.finance.export' => $crmManagementRoles,
         'sales.invoice_settings.manage' => $administratorRoles,

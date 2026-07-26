@@ -33,7 +33,11 @@
                         @else
                             <form method="POST" action="{{ route('sales.invoices.send', $invoice) }}">@csrf<input type="hidden" name="email" value="{{ $invoice->billing_email }}"><button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Send email</button></form>
                         @endif
-                        <form method="POST" action="{{ route('sales.invoices.reminder', $invoice) }}">@csrf<input type="hidden" name="email" value="{{ $invoice->billing_email }}"><button class="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:text-amber-200">Send reminder</button></form>
+                        @can('sales.reminders.send')
+                            @if ($invoice->balance_due > 0 && ! $invoice->status?->isTerminal() && $reminderRules->isNotEmpty())
+                                <button type="button" data-invoice-reminder-open class="rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-200 dark:hover:bg-amber-950/30">Send payment reminder</button>
+                            @endif
+                        @endcan
                     @endif
                     <a href="{{ route('sales.invoices.whatsapp', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">WhatsApp</a>
                     @if ($invoice->public_token_hash && ! $invoice->public_token_revoked_at)
@@ -85,6 +89,17 @@
                     </div>
                 @empty
                     <div class="p-8 text-sm text-slate-500">No invoice email has been sent yet.</div>
+                @endforelse
+            </div>
+        </section>
+
+        <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-200 p-5 dark:border-slate-800"><h2 class="font-semibold text-slate-950 dark:text-white">Payment reminder activity</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Automatic and manual reminders are separate from the original invoice email. SMTP acceptance is not provider-confirmed delivery.</p></div>
+            <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                @forelse ($invoice->reminderEmailDeliveries as $delivery)
+                    <div class="grid gap-3 p-5 text-sm lg:grid-cols-[minmax(0,1.4fr)_auto_auto] lg:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="font-medium text-slate-950 dark:text-white">{{ str($delivery->reminder_stage)->replace('_', ' ')->headline() }}</p><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $delivery->reminder_source }}</span>@if(($delivery->payload['attachment_type'] ?? null) === \App\Services\Crm\InvoiceEmailAttachmentService::TYPE)<span class="text-xs text-slate-500">PDF attached</span>@endif</div><p class="mt-1 text-xs text-slate-500">{{ $delivery->recipient }} · {{ $delivery->queued_at?->format('d M Y H:i') ?? $delivery->created_at->format('d M Y H:i') }} · {{ max(0, $delivery->attempt_count - 1) }} retries @if($delivery->reminder_source === 'manual' && $delivery->createdBy) · Manual by {{ $delivery->createdBy->name }} @endif</p>@if($delivery->failure_reason)<p class="mt-1 text-xs text-rose-700 dark:text-rose-300">{{ $delivery->failure_reason }}</p>@endif</div><span class="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ str($delivery->status)->replace('_', ' ')->headline() }}</span><span class="text-xs text-slate-500">{{ ($delivery->delivered_at ?: $delivery->sent_at ?: $delivery->failed_at ?: $delivery->queued_at)?->format('d M Y H:i') ?? 'Queued' }}</span></div>
+                @empty
+                    <div class="p-8 text-sm text-slate-500 dark:text-slate-400">No payment reminders have been queued for this invoice.</div>
                 @endforelse
             </div>
         </section>
@@ -151,4 +166,22 @@
             </aside>
         </section>
     </div>
+
+    @can('sales.reminders.send')
+        @if ($invoice->balance_due > 0 && ! $invoice->status?->isTerminal() && $invoice->billing_email && $reminderRules->isNotEmpty())
+            <div data-invoice-reminder-modal class="fixed inset-0 z-50 hidden p-4" role="dialog" aria-modal="true" aria-labelledby="invoice-reminder-title">
+                <button type="button" data-invoice-reminder-close class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" aria-label="Close payment reminder"></button>
+                <section class="relative mx-auto mt-[8vh] w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-start justify-between border-b border-slate-200 p-5 dark:border-slate-800"><div><p class="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">Customer communication</p><h2 id="invoice-reminder-title" class="mt-1 text-xl font-semibold text-slate-950 dark:text-white">Send payment reminder</h2></div><button type="button" data-invoice-reminder-close class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close"><x-icon name="x" class="size-5" /></button></div>
+                    <form method="POST" action="{{ route('sales.invoices.reminder', $invoice) }}" class="space-y-4 p-5">@csrf
+                        <div class="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm dark:bg-slate-800/70 sm:grid-cols-2"><div><p class="text-xs text-slate-500">Recipient</p><p class="mt-1 break-all font-semibold text-slate-950 dark:text-white">{{ $invoice->billing_email }}</p></div><div><p class="text-xs text-slate-500">Outstanding balance</p><p class="mt-1 font-semibold text-slate-950 dark:text-white">{{ $invoice->currency }} {{ number_format((float) $invoice->balance_due, 2) }}</p></div><div><p class="text-xs text-slate-500">Invoice</p><p class="mt-1 font-semibold text-slate-950 dark:text-white">{{ $invoice->invoice_number }}</p></div><div><p class="text-xs text-slate-500">Secure link</p><p class="mt-1 font-semibold text-teal-700 dark:text-teal-300">Included</p></div></div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Reminder type<select name="stage" class="mt-2 block w-full">@foreach($reminderRules as $rule)<option value="{{ $rule->stage->value }}">{{ $rule->stage->label() }}</option>@endforeach</select></label>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Optional note<textarea name="note" maxlength="1000" rows="3" class="mt-2 block w-full" placeholder="Add a short, customer-safe note if needed."></textarea></label>
+                        <label class="inline-flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200"><input type="hidden" name="attach_pdf" value="0"><input type="checkbox" name="attach_pdf" value="1" checked>Attach the active invoice PDF</label>
+                        <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end"><button type="button" data-invoice-reminder-close class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Cancel</button><button class="rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400">Queue reminder</button></div>
+                    </form>
+                </section>
+            </div>
+        @endif
+    @endcan
 @endsection

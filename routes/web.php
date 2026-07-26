@@ -47,6 +47,7 @@ use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
+use App\Http\Controllers\CommandCenter\Crm\InvoiceReminderSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceTemplateController;
 use App\Http\Controllers\CommandCenter\Crm\OpportunityController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
@@ -415,6 +416,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('invoices/designs', [InvoiceTemplateController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.templates.index');
         Route::put('invoices/designs', [InvoiceTemplateController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.templates.update');
         Route::get('invoices/designs/preview/{invoice}', [InvoiceTemplateController::class, 'preview'])->middleware('can:sales.invoices.view')->name('invoices.templates.preview');
+        Route::get('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'index'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings');
+        Route::put('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'update'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.update');
+        Route::post('invoices/reminders/settings/restore-defaults', [InvoiceReminderSettingsController::class, 'restore'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.restore');
         Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');
         Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('can:sales.finance.export')->name('invoices.export');

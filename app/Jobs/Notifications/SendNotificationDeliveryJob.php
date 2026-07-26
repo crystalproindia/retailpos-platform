@@ -6,6 +6,7 @@ use App\Models\NotificationDelivery;
 use App\Enums\Notifications\EmailDeliveryStatus;
 use App\Services\Notifications\EmailDeliveryService;
 use App\Services\Notifications\EmailDeliveryLifecycleService;
+use App\Services\Crm\InvoiceReminderService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -28,11 +29,19 @@ class SendNotificationDeliveryJob implements ShouldQueue
 
     public function __construct(public readonly int $deliveryId) {}
 
-    public function handle(EmailDeliveryService $emailDelivery, EmailDeliveryLifecycleService $lifecycle): void
+    public function handle(EmailDeliveryService $emailDelivery, EmailDeliveryLifecycleService $lifecycle, ?InvoiceReminderService $reminders = null): void
     {
         $delivery = NotificationDelivery::query()->findOrFail($this->deliveryId);
 
         if (! in_array($delivery->status, ['queued', 'temporarily_failed'], true)) return;
+
+        $reminders ??= app(InvoiceReminderService::class);
+        if (! $reminders->canSendQueuedAutomatic($delivery)) {
+            $cancelled = $lifecycle->transition($delivery, EmailDeliveryStatus::Cancelled, 'delivery.reminder_cancelled');
+            $cancelled->update(['failure_reason' => 'Automatic reminder cancelled because the invoice is no longer eligible.', 'next_retry_at' => null]);
+
+            return;
+        }
 
         if ($delivery->channel !== 'email' || ! $delivery->recipient || ! filter_var($delivery->recipient, FILTER_VALIDATE_EMAIL)) {
             $rejected = $lifecycle->transition($delivery, EmailDeliveryStatus::Rejected, 'delivery.rejected');

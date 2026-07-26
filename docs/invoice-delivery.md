@@ -52,3 +52,6 @@ Invoice state is not changed by PDF rendering or mail transport failures. Existi
 Run the additive migration before deploying code: `php artisan migrate --force`. Deploy application code and built assets, then clear and rebuild Laravel caches before restarting queue workers. Keep the normal queue worker and scheduler running so delivery records leave the queued state and temporary failures can recover.
 
 To roll back, deploy the prior application revision, clear/rebuild caches, and restart queue workers. Existing delivery records remain safe: older application code ignores the attachment descriptor and no invoice or SaaS billing data requires reversal.
+## Invoice Payment Reminders
+
+Phase 8F extends this delivery foundation with tenant-configurable payment reminders. Reminder records stay in `notification_deliveries`, use the existing PDF attachment service and secure invoice links, and are distinguished by `reminder_stage` and `reminder_source`. See [Invoice Payment Reminders](invoice-reminders.md) for eligibility, cooldowns, scheduler behavior, queue requirements, and the generic SMTP limitation.

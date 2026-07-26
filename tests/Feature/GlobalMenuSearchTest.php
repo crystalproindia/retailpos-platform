@@ -35,6 +35,24 @@ class GlobalMenuSearchTest extends TestCase
         }
     }
 
+    public function test_invoice_reminder_settings_are_searchable_for_management_roles_only(): void
+    {
+        foreach ([UserRole::Administrator, UserRole::Manager] as $role) {
+            $entry = app(GlobalMenuSearchService::class)->entriesFor($this->user($role))
+                ->firstWhere('route', 'sales.invoices.reminders.settings');
+
+            $this->assertNotNull($entry);
+            $this->assertSame('Invoice Reminders', $entry['label']);
+            $this->assertContains('payment reminder', $entry['aliases']);
+            $this->assertContains('final notice', $entry['aliases']);
+        }
+
+        foreach ([UserRole::Sales, UserRole::Staff] as $role) {
+            $this->assertFalse(app(GlobalMenuSearchService::class)->entriesFor($this->user($role))
+                ->contains('route', 'sales.invoices.reminders.settings'));
+        }
+    }
+
     public function test_index_uses_visible_enabled_modules_and_deduplicates_routes(): void
     {
         $administrator = $this->user(UserRole::Administrator);

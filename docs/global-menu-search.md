@@ -14,7 +14,7 @@ The current module registry does not define outlet-specific menu items. If a fut
 
 ## Aliases
 
-Aliases live in `config/modules.php` under `navigation_search.aliases`. V1 includes bill/invoice, stock/inventory, item/product, party/customer-supplier, vendor/supplier, GST/compliance, barcode, staff/users-employees, branch-shop/outlet, purchase or sales bill, email, payment, and return language. Module-specific aliases are supported through `search_aliases`; Invoice Designs adds invoice template and bill design.
+Aliases live in `config/modules.php` under `navigation_search.aliases`. V1 includes bill/invoice, stock/inventory, item/product, party/customer-supplier, vendor/supplier, GST/compliance, barcode, staff/users-employees, branch-shop/outlet, purchase or sales bill, email, payment, and return language. Module-specific aliases are supported through `search_aliases`; Invoice Designs adds invoice template and bill design. Invoice Reminders adds payment reminder, invoice reminder, overdue, outstanding, due invoice, collection reminder, unpaid bill, final notice, and bill reminder. As with every module, aliases are available only after the registry has admitted the route for the current user.
 
 Search is case-insensitive, supports partial and multi-word matching, and applies a small edit-distance tolerance for individual words of four or more characters. Results match label, route, breadcrumb, and aliases.
 

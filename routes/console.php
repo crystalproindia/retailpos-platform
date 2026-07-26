@@ -23,6 +23,7 @@ Artisan::command('retailpos:sync-permissions {--dry-run : Report the configured 
 
 Schedule::useCache('file');
 Schedule::command('notifications:retry-failed-deliveries')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('invoices:dispatch-reminders')->hourly()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-due')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:dispatch-followup-overdue')->hourly()->withoutOverlapping();
 Schedule::command('retailpos:lead-followup-reminders')->everyFifteenMinutes()->withoutOverlapping();

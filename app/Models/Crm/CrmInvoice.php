@@ -40,5 +40,6 @@ class CrmInvoice extends Model
     public function payments(): HasMany { return $this->hasMany(CrmInvoicePayment::class, 'invoice_id')->latest('payment_date'); }
     public function latestInvoiceEmailDelivery(): MorphOne { return $this->morphOne(NotificationDelivery::class, 'related')->where('channel', 'email')->where('template_key', 'invoice_issued')->latestOfMany(); }
     public function invoiceEmailDeliveries(): MorphMany { return $this->morphMany(NotificationDelivery::class, 'related')->where('channel', 'email')->where('template_key', 'invoice_issued')->latest(); }
+    public function reminderEmailDeliveries(): MorphMany { return $this->morphMany(NotificationDelivery::class, 'related')->where('channel', 'email')->whereNotNull('reminder_stage')->latest(); }
     public function isOverdue(): bool { return $this->balance_due > 0 && $this->due_date?->isPast() && ! $this->status?->isTerminal(); }
 }

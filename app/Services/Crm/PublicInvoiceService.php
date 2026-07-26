@@ -7,16 +7,17 @@ use App\Models\Crm\CrmInvoice;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Support\Crm\PublicInvoiceLink;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class PublicInvoiceService
 {
     public function __construct(private readonly AuditLogger $audit) {}
-    public function issue(CrmInvoice $invoice, User $user, bool $regenerate = false): PublicInvoiceLink
+    public function issue(CrmInvoice $invoice, User $user, bool $regenerate = false, ?CarbonInterface $expiresAt = null): PublicInvoiceLink
     {
-        return DB::transaction(function () use ($invoice, $user, $regenerate): PublicInvoiceLink {
+        return DB::transaction(function () use ($invoice, $user, $regenerate, $expiresAt): PublicInvoiceLink {
             do { $token = bin2hex(random_bytes(32)); $hash = hash('sha256', $token); } while (CrmInvoice::query()->where('public_token_hash', $hash)->exists());
-            $invoice->update(['public_token_hash' => $hash, 'public_token_expires_at' => $invoice->due_date?->copy()->endOfDay(), 'public_token_revoked_at' => null, 'updated_by' => $user->id]);
+            $invoice->update(['public_token_hash' => $hash, 'public_token_expires_at' => $expiresAt ?? $invoice->due_date?->copy()->endOfDay(), 'public_token_revoked_at' => null, 'updated_by' => $user->id]);
             $this->audit->record('crm.invoice.public_link_'.($regenerate ? 'regenerated' : 'generated'), $invoice, 'Secure invoice link issued', ['company_id' => $invoice->company_id]);
             return new PublicInvoiceLink($invoice->refresh(), route('invoices.public.show', $token));
         });

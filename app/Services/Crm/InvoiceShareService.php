@@ -53,17 +53,6 @@ class InvoiceShareService
         return $this->send($invoice, $user, (string) $invoice->billing_email, 'payment_receipt', 'We received your payment of '.$invoice->currency.' '.number_format((float) $payment->amount, 2).' against invoice '.$invoice->invoice_number.'. Receipt '.$payment->receipt_number.' is available from your invoice page.');
     }
 
-    /** @return array{configured:bool,queued:bool} */
-    public function remind(CrmInvoice $invoice, User $user, string $recipient): array
-    {
-        $result = $this->send($invoice, $user, $recipient, $invoice->isOverdue() ? 'invoice_overdue' : 'invoice_reminder', 'This is a friendly reminder that your invoice balance is '.$invoice->currency.' '.number_format((float) $invoice->balance_due, 2).'.');
-        $this->audit->record('crm.invoice.reminder_queued', $invoice, 'Invoice reminder queued', [
-            'company_id' => $invoice->company_id,
-        ]);
-
-        return $result;
-    }
-
     /** @return array{message:string,whatsapp_url:?string} */
     public function receiptWhatsapp(CrmInvoicePayment $payment, User $user): array
     {

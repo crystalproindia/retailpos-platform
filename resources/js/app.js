@@ -291,6 +291,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const invoiceReminderModal = document.querySelector('[data-invoice-reminder-modal]');
+
+    if (invoiceReminderModal) {
+        const reminderOpen = document.querySelector('[data-invoice-reminder-open]');
+        let reminderTrigger = null;
+        const closeReminderModal = () => {
+            if (invoiceReminderModal.classList.contains('hidden')) return;
+            invoiceReminderModal.classList.add('hidden');
+            body.classList.remove('invoice-reminder-modal-open');
+            reminderTrigger?.focus();
+            reminderTrigger = null;
+        };
+        const openReminderModal = (trigger) => {
+            reminderTrigger = trigger;
+            closeDropdowns();
+            invoiceReminderModal.classList.remove('hidden');
+            body.classList.add('invoice-reminder-modal-open');
+            window.requestAnimationFrame(() => invoiceReminderModal.querySelector('select, textarea, button')?.focus());
+        };
+
+        reminderOpen?.addEventListener('click', () => openReminderModal(reminderOpen));
+        invoiceReminderModal.querySelectorAll('[data-invoice-reminder-close]').forEach((button) => button.addEventListener('click', closeReminderModal));
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !invoiceReminderModal.classList.contains('hidden')) closeReminderModal();
+        });
+    }
+
     const updateContentItemFields = (container) => {
         const type = container.querySelector('[data-content-section-type]')?.value;
         const group = type === 'faq' ? 'faq' : type === 'testimonials' ? 'testimonials' : type === 'stats' ? 'stats' : 'standard';

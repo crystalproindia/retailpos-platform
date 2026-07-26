@@ -65,8 +65,12 @@ class EmailDeliveryService
         ?User $createdBy = null,
         ?string $idempotencyKey = null,
         ?string $recipientName = null,
+        ?string $reminderStage = null,
+        ?string $reminderSource = null,
     ): NotificationDelivery {
         $recipient = $this->cleanAddress($recipient);
+        $reminderStage = $this->cleanReminderValue($reminderStage, 32);
+        $reminderSource = $this->cleanReminderValue($reminderSource, 16);
         $idempotencyKey ??= hash('sha256', implode('|', [$templateKey, $related?->getMorphClass() ?? '', $related?->getKey() ?? '', $recipient]));
         $configuration = $this->configuration($companyId);
 
@@ -79,6 +83,8 @@ class EmailDeliveryService
                     'related_id' => $related?->getKey(),
                     'event_key' => 'email.'.$templateKey,
                     'template_key' => $templateKey,
+                    'reminder_stage' => $reminderStage,
+                    'reminder_source' => $reminderSource,
                     'channel' => 'email',
                     'recipient' => $recipient,
                     'recipient_name' => $recipientName,
@@ -278,5 +284,12 @@ class EmailDeliveryService
     private function cleanSubject(string $subject): string
     {
         return str($subject)->replace(["\r", "\n"], ' ')->squish()->limit(180)->toString();
+    }
+
+    private function cleanReminderValue(?string $value, int $limit): ?string
+    {
+        $value = str((string) $value)->replace(["\r", "\n"], '')->squish()->lower()->limit($limit)->toString();
+
+        return $value !== '' && preg_match('/\A[a-z_]+\z/', $value) ? $value : null;
     }
 }

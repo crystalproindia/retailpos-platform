@@ -27,6 +27,10 @@
         overflow: hidden;
     }
 
+    body.invoice-reminder-modal-open {
+        overflow: hidden;
+    }
+
     input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
     select,
     textarea {

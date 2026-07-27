@@ -7,6 +7,7 @@
 - `StoreSetupRecommendationService` uses the existing SaaS industry registry and entitlement service. Its controlled subtype/category configuration is `config/store_setup.php`; it is not a second industry registry.
 - `StoreSetupWizardController` serves `/getting-started/store-setup`, a CSV product-template handoff, review/apply, and completion. The Free 365 checklist exposes a Resume Setup action for authorised tenant administrators.
 - Phase C verification hardens the Store Setup Wizard's rendered subtype lookup and requires the review stage before setup can be applied. `docs/store-setup-wizard.md` records the local SQLite repair procedure, isolated `4d5916f` invoice-test comparison, browser verification evidence, production prerequisites, and the intentionally deferred secure product-import lifecycle.
+- `docs/invoice-payments-foundation-fix.md` records the isolated invoice-payment foundation repair, its transaction-scoped tenant reloads, preserved financial invariants, and deployment considerations.
 
 ## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
 

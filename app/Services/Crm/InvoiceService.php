@@ -90,9 +90,9 @@ class InvoiceService
     /** @param array<string,mixed> $data */
     public function update(CrmInvoice $invoice, User $user, array $data): CrmInvoice
     {
-        $this->ensureDraft($invoice);
-
         return DB::transaction(function () use ($invoice, $user, $data): CrmInvoice {
+            $invoice = $this->findInvoiceForUpdate($invoice->id, $user);
+            $this->ensureDraft($invoice);
             $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
             $invoice->update(Arr::only($data, [
                 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
@@ -114,20 +114,19 @@ class InvoiceService
     /** @param array<string,mixed> $data */
     public function recordPayment(CrmInvoice $invoice, User $user, array $data): CrmInvoicePayment
     {
-        if ($invoice->status?->isTerminal() || $invoice->status === InvoiceStatus::Draft) {
-            throw ValidationException::withMessages(['invoice' => 'Payments can only be recorded against an issued invoice.']);
-        }
-        if (($data['currency'] ?? $invoice->currency) !== $invoice->currency) {
-            throw ValidationException::withMessages(['currency' => 'Payment currency must match the invoice currency.']);
-        }
-        $amountCents = $this->cents((string) $data['amount']);
-
-        return DB::transaction(function () use ($invoice, $user, $data, $amountCents): CrmInvoicePayment {
-            $invoice->refresh();
+        return DB::transaction(function () use ($invoice, $user, $data): CrmInvoicePayment {
+            $invoice = $this->findInvoiceForUpdate($invoice->id, $user);
+            if ($invoice->status?->isTerminal() || $invoice->status === InvoiceStatus::Draft) {
+                throw ValidationException::withMessages(['invoice' => 'Payments can only be recorded against an issued invoice.']);
+            }
+            if (($data['currency'] ?? $invoice->currency) !== $invoice->currency) {
+                throw ValidationException::withMessages(['currency' => 'Payment currency must match the invoice currency.']);
+            }
+            $amountCents = $this->cents((string) $data['amount']);
             if ($amountCents <= 0 || $amountCents > $this->cents((string) $invoice->balance_due)) {
                 throw ValidationException::withMessages(['amount' => 'Payment must be greater than zero and cannot exceed the outstanding balance.']);
             }
-            $key = hash('sha256', implode('|', [$invoice->id, $data['payment_date'], $data['amount'], $data['payment_method'], $data['transaction_reference'] ?? '']));
+            $key = hash('sha256', implode('|', [$invoice->id, $data['payment_date'], $this->decimal($amountCents), $data['payment_method'], $data['transaction_reference'] ?? '']));
             $existing = CrmInvoicePayment::query()->where('company_id', $invoice->company_id)->where('idempotency_key', $key)->first();
             if ($existing) {
                 return $existing;
@@ -148,12 +147,13 @@ class InvoiceService
 
     public function reversePayment(CrmInvoicePayment $payment, User $user, string $reason): CrmInvoicePayment
     {
-        if ($payment->status === InvoicePaymentStatus::Reversed) {
-            throw ValidationException::withMessages(['payment' => 'This payment has already been reversed.']);
-        }
         return DB::transaction(function () use ($payment, $user, $reason): CrmInvoicePayment {
+            $payment = $this->findPaymentForUpdate($payment->id, $user);
+            if ($payment->status === InvoicePaymentStatus::Reversed) {
+                throw ValidationException::withMessages(['payment' => 'This payment has already been reversed.']);
+            }
             $payment->update(['status' => InvoicePaymentStatus::Reversed, 'reversed_by' => $user->id, 'reversed_at' => now(), 'reversal_reason' => $reason]);
-            $this->refreshBalance($payment->invoice()->firstOrFail(), $user);
+            $this->refreshBalance($this->findInvoiceForUpdate($payment->invoice_id, $user), $user);
             $this->audit->record('crm.invoice.payment_reversed', $payment, 'Invoice payment reversed', ['company_id' => $payment->company_id, 'invoice_id' => $payment->invoice_id]);
 
             return $payment->refresh();
@@ -162,17 +162,17 @@ class InvoiceService
 
     public function clearPayment(CrmInvoicePayment $payment, User $user): CrmInvoicePayment
     {
-        if ($payment->status !== InvoicePaymentStatus::Pending) {
-            throw ValidationException::withMessages(['payment' => 'Only pending payments can be marked as cleared.']);
-        }
-
         return DB::transaction(function () use ($payment, $user): CrmInvoicePayment {
+            $payment = $this->findPaymentForUpdate($payment->id, $user);
+            if ($payment->status !== InvoicePaymentStatus::Pending) {
+                throw ValidationException::withMessages(['payment' => 'Only pending payments can be marked as cleared.']);
+            }
             $payment->update([
                 'status' => InvoicePaymentStatus::Cleared,
                 'cleared_by' => $user->id,
                 'cleared_at' => now(),
             ]);
-            $this->refreshBalance($payment->invoice()->firstOrFail(), $user);
+            $this->refreshBalance($this->findInvoiceForUpdate($payment->invoice_id, $user), $user);
             $this->audit->record('crm.invoice.payment_cleared', $payment, 'Invoice payment cleared', [
                 'company_id' => $payment->company_id,
                 'invoice_id' => $payment->invoice_id,
@@ -237,6 +237,16 @@ class InvoiceService
         $totalCents = $this->cents((string) $invoice->grand_total);
         $invoice->update(['amount_paid' => $this->decimal($paidCents), 'balance_due' => $this->decimal(max(0, $totalCents - $paidCents)), 'updated_by' => $user->id]);
         $this->refreshStatus($invoice->refresh(), $user);
+    }
+
+    private function findInvoiceForUpdate(int $invoiceId, User $user): CrmInvoice
+    {
+        return CrmInvoice::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($invoiceId);
+    }
+
+    private function findPaymentForUpdate(int $paymentId, User $user): CrmInvoicePayment
+    {
+        return CrmInvoicePayment::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($paymentId);
     }
 
     private function ensureDraft(CrmInvoice $invoice): void { if (! $invoice->status?->isEditable()) { throw ValidationException::withMessages(['invoice' => 'Only draft invoices can be issued.']); } }

@@ -18,6 +18,7 @@ use App\Models\NotificationDelivery;
 use App\Models\User;
 use App\Services\Crm\InvoiceService;
 use App\Services\Crm\PublicInvoiceService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -78,6 +79,54 @@ class InvoicePaymentsFoundationTest extends TestCase
         app(InvoiceService::class)->clearPayment($payment, $manager);
         $this->assertSame('600.00', $invoice->refresh()->balance_due);
         $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->refresh()->status);
+    }
+
+    public function test_payment_retries_are_decimal_normalized_and_leave_invoice_totals_unchanged(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $invoice = $this->invoice($manager, 1000);
+        app(InvoiceService::class)->issue($invoice, $manager);
+        $totals = $invoice->refresh()->only(['subtotal', 'discount_total', 'tax_total', 'grand_total']);
+        $payload = ['amount' => '400', 'currency' => 'INR', 'payment_date' => today()->toDateString(), 'payment_method' => 'upi', 'transaction_reference' => 'UPI-RETRY'];
+
+        $payment = app(InvoiceService::class)->recordPayment($invoice, $manager, $payload);
+        $retry = app(InvoiceService::class)->recordPayment($invoice, $manager, array_replace($payload, ['amount' => '400.00']));
+
+        $this->assertSame($payment->id, $retry->id);
+        $this->assertDatabaseCount('crm_invoice_payments', 1);
+        $this->assertSame('400.00', $invoice->refresh()->amount_paid);
+        $this->assertSame('600.00', $invoice->balance_due);
+        $this->assertSame($totals, $invoice->only(array_keys($totals)));
+    }
+
+    public function test_payment_service_rejects_invalid_amounts_and_cross_tenant_payment_access(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $invoice = $this->invoice($manager, 1000);
+        app(InvoiceService::class)->issue($invoice, $manager);
+        $service = app(InvoiceService::class);
+
+        foreach (['0', '-1', '1000.01'] as $amount) {
+            try {
+                $service->recordPayment($invoice, $manager, ['amount' => $amount, 'currency' => 'INR', 'payment_date' => today()->toDateString(), 'payment_method' => 'cash', 'transaction_reference' => 'INVALID-'.$amount]);
+                $this->fail('An invalid payment amount was accepted.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('amount', $exception->errors());
+            }
+        }
+        $this->assertDatabaseCount('crm_invoice_payments', 0);
+
+        $payment = $service->recordPayment($invoice, $manager, ['amount' => '100', 'currency' => 'INR', 'payment_date' => today()->toDateString(), 'payment_method' => 'bank_transfer', 'transaction_reference' => 'PENDING-1', 'status' => 'pending']);
+        $otherManager = $this->user(UserRole::Manager);
+
+        try {
+            $service->clearPayment($payment, $otherManager);
+            $this->fail('Another tenant was allowed to clear a payment.');
+        } catch (ModelNotFoundException) {
+            $this->assertDatabaseHas('crm_invoice_payments', ['id' => $payment->id, 'company_id' => $manager->company_id, 'status' => 'pending']);
+            $this->assertSame('0.00', $invoice->refresh()->amount_paid);
+            $this->assertSame('1000.00', $invoice->balance_due);
+        }
     }
 
     public function test_public_invoice_is_hashed_noindex_and_client_safe(): void

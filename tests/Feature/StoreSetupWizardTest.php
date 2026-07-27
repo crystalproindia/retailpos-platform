@@ -13,6 +13,7 @@ use App\Services\Saas\StoreSetupWizardService;
 use App\Services\Saas\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class StoreSetupWizardTest extends TestCase
@@ -46,6 +47,20 @@ class StoreSetupWizardTest extends TestCase
         $this->assertSame('Grocery', $wizard->recommendations['categories'][0]['name']);
     }
 
+    public function test_signup_industry_subtypes_render_and_incomplete_setup_cannot_be_applied(): void
+    {
+        [, $user] = $this->tenant(true, 'grocery_supermarket');
+        $this->actingAs($user)->post(route('onboarding.store-setup.start'));
+        $this->actingAs($user)->get(route('onboarding.store-setup.show'))->assertOk()->assertSee('Mini mart')->assertSee('Wholesale grocery');
+        $this->actingAs($user)->from(route('onboarding.store-setup.show'))->post(route('onboarding.store-setup.apply'), ['categories' => ['Grocery']])->assertRedirect(route('onboarding.store-setup.show'))->assertSessionHasErrors('setup');
+        $wizard = StoreSetupWizard::query()->where('company_id', $user->company_id)->firstOrFail();
+        $wizard->update(['current_step' => 6]);
+        $this->actingAs($user)->from(route('onboarding.store-setup.show'))->post(route('onboarding.store-setup.apply'), ['categories' => ['Grocery']])->assertRedirect(route('onboarding.store-setup.show'))->assertSessionHasErrors('setup');
+        $this->actingAs($user)->post(route('onboarding.store-setup.save'), ['step' => 6, 'choice' => 'manual'])->assertRedirect();
+        $this->actingAs($user)->get(route('onboarding.store-setup.show'))->assertOk()->assertSee('Your Store Setup Plan');
+        $this->assertDatabaseHas('store_setup_wizards', ['company_id' => $user->company_id, 'status' => 'draft', 'current_step' => 7]);
+    }
+
     public function test_invalid_subtype_and_gst_format_are_rejected(): void
     {
         [, $user] = $this->tenant(true);
@@ -58,7 +73,7 @@ class StoreSetupWizardTest extends TestCase
     {
         [$company, $user] = $this->tenant(true, 'fashion_apparel');
         $wizard = app(StoreSetupWizardService::class)->wizard($user);
-        $wizard->update(['current_step' => 6, 'answers' => ['industry' => 'fashion_apparel', 'subtypes' => ['mens_clothing'], 'product_volume' => 'under_50', 'tax' => ['registered' => false, 'rates' => []], 'scanner' => ['choice' => 'manual_search'], 'printer' => ['type' => 'a4'], 'import' => ['choice' => 'manual']], 'recommendations' => app(\App\Services\Saas\StoreSetupRecommendationService::class)->make($company, ['industry' => 'fashion_apparel', 'printer' => ['type' => 'a4'], 'scanner' => ['choice' => 'manual_search'], 'tax' => ['registered' => false, 'rates' => []], 'product_volume' => 'under_50'])]);
+        $wizard->update(['current_step' => 7, 'answers' => ['industry' => 'fashion_apparel', 'subtypes' => ['mens_clothing'], 'product_volume' => 'under_50', 'tax' => ['registered' => false, 'rates' => []], 'scanner' => ['choice' => 'manual_search'], 'printer' => ['type' => 'a4'], 'import' => ['choice' => 'manual']], 'recommendations' => app(\App\Services\Saas\StoreSetupRecommendationService::class)->make($company, ['industry' => 'fashion_apparel', 'printer' => ['type' => 'a4'], 'scanner' => ['choice' => 'manual_search'], 'tax' => ['registered' => false, 'rates' => []], 'product_volume' => 'under_50'])]);
         $payload = ['categories' => ['Men', 'Women'], 'apply_tax' => 1, 'apply_template' => 1, 'apply_barcode' => 1];
         $this->actingAs($user)->post(route('onboarding.store-setup.apply'), $payload)->assertRedirect(route('onboarding.store-setup.complete'));
         $this->actingAs($user)->post(route('onboarding.store-setup.apply'), $payload)->assertRedirect(route('onboarding.store-setup.complete'));
@@ -71,12 +86,27 @@ class StoreSetupWizardTest extends TestCase
         [$company, $user] = $this->tenant(true, 'grocery_supermarket');
         $wizard = app(StoreSetupWizardService::class)->wizard($user);
         $answers = ['industry' => 'grocery_supermarket', 'subtypes' => ['grocery'], 'product_volume' => '50_250', 'tax' => ['registered' => true, 'gstin' => '27ABCDE1234F1Z5', 'state_code' => '27', 'state_name' => 'Maharashtra', 'rates' => ['5', '18']], 'scanner' => ['choice' => 'already_have', 'format' => 'code128', 'generate_missing' => true], 'printer' => ['type' => 'thermal'], 'import' => ['choice' => 'csv_template']];
-        $wizard->update(['current_step' => 6, 'answers' => $answers, 'recommendations' => app(\App\Services\Saas\StoreSetupRecommendationService::class)->make($company, $answers)]);
+        $wizard->update(['current_step' => 7, 'answers' => $answers, 'recommendations' => app(\App\Services\Saas\StoreSetupRecommendationService::class)->make($company, $answers)]);
         $this->actingAs($user)->post(route('onboarding.store-setup.apply'), ['categories' => ['Grocery'], 'apply_tax' => 1, 'apply_barcode' => 1])->assertRedirect();
         $this->assertDatabaseHas('gst_settings', ['company_id' => $company->id, 'gstin' => '27ABCDE1234F1Z5']);
         $this->assertDatabaseHas('inventory_tax_rates', ['company_id' => $company->id, 'rate' => 5]);
         $this->assertDatabaseHas('barcode_label_templates', ['company_id' => $company->id, 'name' => 'Store Setup Barcode Label']);
         $this->assertDatabaseMissing('products', ['company_id' => $company->id, 'barcode' => 'sample-scan']);
+    }
+
+    public function test_apply_regenerates_the_server_plan_and_rejects_cross_tenant_service_access(): void
+    {
+        [$company, $user] = $this->tenant(true, 'grocery_supermarket');
+        [, $otherUser] = $this->tenant(true);
+        $answers = ['industry' => 'grocery_supermarket', 'subtypes' => ['grocery'], 'product_volume' => '50_250', 'tax' => ['registered' => false, 'rates' => []], 'scanner' => ['choice' => 'manual_search'], 'printer' => ['type' => 'thermal'], 'import' => ['choice' => 'csv_template']];
+        $wizard = app(StoreSetupWizardService::class)->wizard($user);
+        $wizard->update(['current_step' => 7, 'answers' => $answers, 'recommendations' => []]);
+
+        $this->actingAs($user)->post(route('onboarding.store-setup.apply'), ['categories' => ['Grocery'], 'apply_template' => 1, 'template_key' => 'browser-injected-template', 'modules' => ['purchases']])->assertRedirect(route('onboarding.store-setup.complete'));
+        $this->assertDatabaseHas('invoice_template_settings', ['company_id' => $company->id, 'template_key' => 'compact_detailed_gst']);
+
+        $this->expectException(HttpException::class);
+        app(StoreSetupWizardService::class)->apply($otherUser, $wizard->fresh(), []);
     }
 
     public function test_sales_user_cannot_manage_tenant_setup_and_product_template_is_safe_csv(): void
@@ -86,7 +116,10 @@ class StoreSetupWizardTest extends TestCase
         $this->actingAs($sales)->get(route('onboarding.store-setup.show'))->assertForbidden();
         [, $admin] = $this->tenant(true);
         $response = $this->actingAs($admin)->get(route('onboarding.store-setup.template'))->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
-        $this->assertStringContainsString('Product name', $response->streamedContent());
+        $csv = $response->streamedContent();
+        $lines = preg_split('/\R/', trim($csv));
+        $this->assertSame(['Product name', 'SKU', 'Barcode', 'Category', 'Selling price', 'Purchase price', 'GST rate', 'Opening stock', 'Unit', 'HSN code', 'Reorder level'], str_getcsv($lines[0]));
+        $this->assertDoesNotMatchRegularExpression('/(?:^|,)[=+\-@]/m', $csv);
     }
 
     /** @return array{Company, User} */

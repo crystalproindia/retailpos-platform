@@ -42,7 +42,7 @@ class StoreSetupRecommendationService
             'modules' => $this->modules($company, $industry),
             'product_entry' => [
                 'method' => match ($volume) { 'under_50' => 'manual_or_template', '50_250', '251_1000' => 'csv_template', '1001_5000', 'over_5000' => 'bulk_import_boundary', default => 'choose_later' },
-                'reason' => match ($volume) { 'under_50' => 'A small catalogue is usually fastest to create manually.', '50_250', '251_1000' => 'A CSV template will reduce repetitive entry.', '1001_5000', 'over_5000' => 'Use a validated bulk import workflow when it is configured for your environment.', default => 'You can choose manual entry or the product template later.' },
+                'reason' => match ($volume) { 'under_50' => 'A small catalogue is usually fastest to create manually.', '50_250', '251_1000' => 'A CSV template will reduce repetitive entry.', '1001_5000', 'over_5000' => 'Prepare the CSV template now; validated bulk import will arrive in a dedicated future release.', default => 'You can choose manual entry or the product template later.' },
             ],
             'next_steps' => ['Add a product', 'Add a customer', 'Create your first invoice'],
         ];

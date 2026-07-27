@@ -18,7 +18,7 @@ class StoreSetupWizardController extends Controller
         if ($record->status === 'completed') return redirect()->route('dashboard');
         $displayStep = $request->integer('step');
         $displayStep = $displayStep >= 1 && $displayStep <= $record->current_step ? $displayStep : $record->current_step;
-        return view('command-center.onboarding.store-setup.show', ['setup' => $record, 'displayStep' => $displayStep, 'subtypes' => config('store-setup.subtypes.'.$record->industry_key, []), 'flags' => config('store_setup')]);
+        return view('command-center.onboarding.store-setup.show', ['setup' => $record, 'displayStep' => $displayStep, 'subtypes' => config('store_setup.subtypes.'.$record->industry_key, []), 'flags' => config('store_setup')]);
     }
 
     public function start(Request $request, StoreSetupWizardService $wizard): RedirectResponse

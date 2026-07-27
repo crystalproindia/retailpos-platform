@@ -62,7 +62,7 @@ class StoreSetupWizardService
         $answers = $wizard->answers ?? [];
         $answers = array_replace_recursive($answers, $this->validateStep($wizard, $step, $input));
         $recommendations = $this->recommendations->make($user->company, $answers);
-        $wizard->update(['status' => 'draft', 'skipped_at' => null, 'current_step' => min(6, max($wizard->current_step, $step + 1)), 'answers' => $answers, 'recommendations' => $recommendations, 'recommendation_version' => config('store_setup.version'), 'updated_by' => $user->id, 'last_resumed_at' => now()]);
+        $wizard->update(['status' => 'draft', 'skipped_at' => null, 'current_step' => min(7, max($wizard->current_step, $step + 1)), 'answers' => $answers, 'recommendations' => $recommendations, 'recommendation_version' => config('store_setup.version'), 'updated_by' => $user->id, 'last_resumed_at' => now()]);
         $this->audit->record('saas.store_setup.step_saved', $wizard, 'Store setup step saved.', ['company_id' => $user->company_id, 'step' => $step]);
         return $wizard->refresh();
     }
@@ -81,6 +81,7 @@ class StoreSetupWizardService
         return DB::transaction(function () use ($user, $wizard, $choices): StoreSetupWizard {
             $wizard = StoreSetupWizard::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($wizard->id);
             if ($wizard->status === 'completed') return $wizard;
+            if ($wizard->current_step < 7) throw ValidationException::withMessages(['setup' => 'Complete the six setup questions before preparing your store.']);
             $company = Company::query()->lockForUpdate()->findOrFail($user->company_id);
             $plan = $this->recommendations->make($company, $wizard->answers ?? []);
             $selectedCategories = collect($choices['categories'] ?? [])->filter()->values()->all();

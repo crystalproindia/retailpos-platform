@@ -34,9 +34,23 @@ The scanner test is a transient form field only and is never saved as product da
 
 All routes require authentication, CSRF protection, `store.setup.manage`, and matching tenant ownership. The apply transaction locks the tenant and setup record, and a completed record is safe to revisit without duplicating applied categories or tax rates. The feature does not accept file uploads, so unsupported spreadsheet types, file sizes, macros, and parsing never enter the application from this flow. There is no external analytics, printer, scanner-driver, or GST-verification dependency.
 
+The review stage is required before apply. The server regenerates the recommendation plan and accepts only its category names; arbitrary module identifiers and invoice-template identifiers submitted by a browser are ignored. Cross-tenant service access is rejected, and premium recommendations remain display-only upgrade suggestions.
+
+## Verification record
+
+Phase C verification used a fresh local SQLite database after the previous development file failed SQLite integrity and schema reads with `database disk image is malformed`. The original file was copied, byte-for-byte, to the ignored `database/backups/` directory before replacement. A fresh `php artisan migrate --seed --force` completed successfully. PHPUnit remains configured for its isolated in-memory SQLite database; generated application caches must be cleared before tests so local session/config caches do not override the PHPUnit environment.
+
+An isolated worktree at `4d5916f` reproduced the two `InvoicePaymentsFoundationTest` failures exactly: `test_pending_payment_does_not_reduce_balance_until_it_is_cleared` raises `Payments can only be recorded against an issued invoice`, and `test_draft_can_be_updated_but_issued_invoice_cannot_be_silently_changed` does not receive its expected validation exception. Neither the tested service nor test changed in Phase C, and no Phase C route or service is on their execution path. They remain a pre-existing invoice-payment defect, not a Store Setup regression.
+
+Local browser verification completed a Free 365 signup, authenticated handoff to the wizard, the six-step journey, invalid/valid GSTIN handling, scanner sample exclusion, thermal template recommendation, CSV-template download, review deselection, application, completion, defer/resume, and responsive widths from 360 to 768 pixels without horizontal overflow. Public signup was enabled only as a process-local verification flag; no deployment setting changed.
+
 - `STORE_SETUP_WIZARD_ENABLED=true`
 - `STORE_SETUP_PRODUCT_IMPORT_ENABLED=true`
 - `STORE_SETUP_SCANNER_TEST_ENABLED=true`
 - `STORE_SETUP_RECOMMENDATIONS_ENABLED=true`
 
 Disable the main flag to stop entry and redirects without deleting saved answers. Additive migrations should be deployed forward, then application caches cleared and rebuilt. No automatic rollback of applied tenant configuration is attempted.
+
+## Production prerequisites
+
+Before deployment, run migrations, clear generated caches, rebuild configuration/routes/views, and ensure a valid persistent database is configured. Enable public signup only after the email OTP delivery configuration and Terms/Privacy URLs have been reviewed. Keep `STORE_SETUP_WIZARD_ENABLED` enabled only when tenant administrators should be offered the flow. The wizard does not replace operating-system printer setup, official GST verification, or a secure spreadsheet-import lifecycle.

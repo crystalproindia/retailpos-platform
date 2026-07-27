@@ -24,7 +24,7 @@ class TenantProvisioningService
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function provision(array $data, User $actor): SaasTenantOnboarding
+    public function provision(array $data, ?User $actor): SaasTenantOnboarding
     {
         return DB::transaction(function () use ($data, $actor): SaasTenantOnboarding {
             $onboarding = SaasTenantOnboarding::query()->where('idempotency_key', $data['idempotency_key'])->lockForUpdate()->first();
@@ -32,10 +32,11 @@ class TenantProvisioningService
 
             $plan = SaasPlan::query()->where('status', 'active')->findOrFail($data['saas_plan_id']);
             $industry = $this->industries->selectable($data['industry']);
-            $mobile = $this->normalizeMobile($data['mobile']);
-            $email = filled($data['email'] ?? null) ? mb_strtolower((string) $data['email']) : $this->pendingEmail($mobile);
+            $mobile = filled($data['mobile'] ?? null) ? $this->normalizeMobile((string) $data['mobile']) : null;
+            $email = filled($data['email'] ?? null) ? mb_strtolower((string) $data['email']) : ($mobile ? $this->pendingEmail($mobile) : null);
+            if (! $email) throw ValidationException::withMessages(['owner' => 'Provide a verified email address or mobile number.']);
 
-            if (User::query()->where('email', $email)->orWhere('mobile', $mobile)->exists()) {
+            if (User::query()->where('email', $email)->when($mobile, fn ($query) => $query->orWhere('mobile', $mobile))->exists()) {
                 throw ValidationException::withMessages(['owner' => 'An account with this mobile number or email already exists.']);
             }
 
@@ -44,6 +45,7 @@ class TenantProvisioningService
                 'saas_plan_id' => $plan->id,
                 'status' => 'in_progress',
                 'current_stage' => 'provisioning',
+                'signup_source' => $data['signup_source'] ?? 'platform_admin',
                 'payload' => $this->safePayload($data),
             ]);
 
@@ -79,7 +81,8 @@ class TenantProvisioningService
                 'mobile' => $mobile,
                 'role' => UserRole::Administrator,
                 'is_active' => true,
-                'verification_status' => 'pending',
+                'verification_status' => ($data['verification_completed'] ?? false) ? 'verified' : 'pending',
+                'verification_completed_at' => ($data['verification_completed'] ?? false) ? now() : null,
                 'requires_password_change' => (bool) ($data['require_password_change'] ?? false),
                 'password' => Hash::make($data['password']),
             ]);
@@ -97,7 +100,7 @@ class TenantProvisioningService
 
             // Email delivery uses the existing configured infrastructure. Mobile
             // delivery remains provider-neutral until an SMS adapter is configured.
-            if (filled($data['email'] ?? null)) $this->verification->issue($administrator, 'email');
+            if (! ($data['verification_completed'] ?? false) && filled($data['email'] ?? null)) $this->verification->issue($administrator, 'email');
 
             $this->audit->record('saas.tenant.provisioned', $company, 'Tenant account provisioned.', [
                 'subscription_id' => $subscription->id,

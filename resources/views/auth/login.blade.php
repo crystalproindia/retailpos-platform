@@ -16,8 +16,8 @@
         @csrf
 
         <div>
-            <label for="email" class="block text-sm font-medium text-slate-700">Email</label>
-            <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="username"
+            <label for="email" class="block text-sm font-medium text-slate-700">Email or mobile number</label>
+            <input id="email" name="email" type="text" value="{{ old('email') }}" required autofocus autocomplete="username"
                 class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-200">
             @error('email')
                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>

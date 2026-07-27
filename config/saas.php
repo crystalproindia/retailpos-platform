@@ -12,6 +12,18 @@ return [
 
     'free365_plan_code' => 'free-365',
 
+    'public_signup' => [
+        'enabled' => filter_var(env('SAAS_PUBLIC_SIGNUP_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'email_otp_enabled' => filter_var(env('SAAS_PUBLIC_SIGNUP_EMAIL_OTP_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'mobile_otp_enabled' => filter_var(env('SAAS_PUBLIC_SIGNUP_MOBILE_OTP_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'mobile_otp_provider' => env('SAAS_MOBILE_OTP_PROVIDER'),
+        'session_ttl_minutes' => 30,
+        'terms_url' => env('SAAS_TERMS_URL', '/terms'),
+        'privacy_url' => env('SAAS_PRIVACY_URL', '/privacy'),
+        'terms_version' => env('SAAS_TERMS_VERSION', 'v1'),
+        'privacy_version' => env('SAAS_PRIVACY_VERSION', 'v1'),
+    ],
+
     'entitlement_aliases' => [
         'pos' => 'pos.billing',
         'sales_invoices' => 'sales.invoices',

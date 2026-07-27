@@ -136,6 +136,7 @@ use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\PublicProformaController;
 use App\Http\Controllers\PublicQuotationController;
 use App\Http\Controllers\PublicInvoiceController;
+use App\Http\Controllers\PublicSaasSignupController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -155,6 +156,15 @@ Route::prefix('i/{token}')->middleware('throttle:public-invoice')->group(functio
     Route::get('receipts/{payment}', [PublicInvoiceController::class, 'receipt'])->whereNumber('payment')->name('invoices.public.receipts.pdf');
 });
 Route::get('pi/{publicToken}', [PublicProformaController::class, 'show'])->name('proformas.public.show');
+
+Route::prefix('start-free')->name('saas.public-signup.')->group(function (): void {
+    Route::get('/', [PublicSaasSignupController::class, 'show'])->name('show');
+    Route::post('verification', [PublicSaasSignupController::class, 'begin'])->middleware('throttle:public-signup')->name('begin');
+    Route::post('verification/confirm', [PublicSaasSignupController::class, 'verify'])->middleware('throttle:public-signup-otp')->name('verify');
+    Route::post('verification/resend', [PublicSaasSignupController::class, 'resend'])->middleware('throttle:public-signup-otp')->name('resend');
+    Route::post('store', [PublicSaasSignupController::class, 'complete'])->middleware('throttle:public-signup')->name('complete');
+    Route::get('success', [PublicSaasSignupController::class, 'success'])->name('success');
+});
 
 Route::prefix('portal')->name('portal.')->group(function (): void {
     Route::middleware(['portal.guest'])->group(function (): void {

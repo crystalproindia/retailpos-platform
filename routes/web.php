@@ -122,6 +122,7 @@ use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use App\Http\Controllers\CommandCenter\CompanyProfileController;
 use App\Http\Controllers\CommandCenter\Free365OnboardingController;
+use App\Http\Controllers\CommandCenter\StoreSetupWizardController;
 use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingGatewayController;
@@ -215,6 +216,15 @@ Route::middleware('auth')->group(function (): void {
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('getting-started/store-setup')->name('onboarding.store-setup.')->group(function (): void {
+        Route::get('/', [StoreSetupWizardController::class, 'show'])->name('show');
+        Route::post('start', [StoreSetupWizardController::class, 'start'])->middleware('can:store.setup.manage')->name('start');
+        Route::post('save', [StoreSetupWizardController::class, 'save'])->middleware('can:store.setup.manage')->name('save');
+        Route::post('skip', [StoreSetupWizardController::class, 'skip'])->middleware('can:store.setup.manage')->name('skip');
+        Route::post('apply', [StoreSetupWizardController::class, 'apply'])->middleware('can:store.setup.manage')->name('apply');
+        Route::get('complete', [StoreSetupWizardController::class, 'complete'])->name('complete');
+        Route::get('product-template', [StoreSetupWizardController::class, 'template'])->middleware('can:store.setup.manage')->name('template');
+    });
     Route::post('settings/free365-onboarding/dismiss', [Free365OnboardingController::class, 'dismiss'])->name('free365-onboarding.dismiss');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
 

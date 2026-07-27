@@ -4,6 +4,7 @@ namespace App\Services\Saas;
 
 use App\Models\Company;
 use App\Models\Crm\CrmInvoice;
+use App\Models\StoreSetupWizard;
 use App\Models\Setting;
 use App\Models\User;
 
@@ -17,6 +18,7 @@ class Free365OnboardingService
 
         $items = [
             ['key' => 'account', 'label' => 'Account created', 'description' => 'Your RetailPOS account is active.', 'complete' => true, 'route' => null],
+            ['key' => 'store_setup', 'label' => 'Complete store setup', 'description' => 'Apply the recommended starter settings for your store.', 'complete' => StoreSetupWizard::query()->where('company_id', $company->id)->where('status', 'completed')->exists(), 'route' => 'onboarding.store-setup.show'],
             ['key' => 'store_name', 'label' => 'Update your store name', 'description' => 'Replace the temporary store name with your own.', 'complete' => ! $company->hasPlaceholderName(), 'route' => 'settings.company-profile.edit'],
             ['key' => 'company_details', 'label' => 'Complete company details', 'description' => 'Add your address and GST details before formal GST billing.', 'complete' => filled($company->address) && filled($company->tax_id), 'route' => 'settings.company-profile.edit'],
             ['key' => 'product', 'label' => 'Add your first product', 'description' => 'Build your catalog so your counter is ready.', 'complete' => $company->products()->exists(), 'route' => 'inventory.products.create'],

@@ -12,14 +12,17 @@ use App\Repositories\DashboardRepository;
 use App\Services\Cms\CmsWebsiteControlService;
 use App\Services\Crm\CrmExecutiveReportService;
 use App\Services\Saas\Free365OnboardingService;
+use App\Services\Saas\StoreSetupWizardService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CmsWebsiteControlService $websiteControl, CrmExecutiveReportService $reports, Free365OnboardingService $free365Onboarding): View
+    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CmsWebsiteControlService $websiteControl, CrmExecutiveReportService $reports, Free365OnboardingService $free365Onboarding, StoreSetupWizardService $storeSetup): View|RedirectResponse
     {
         $user = $request->user();
+        if ($storeSetup->shouldRedirect($user)) return redirect()->route('onboarding.store-setup.show');
 
         return view('command-center.dashboard', [
             'metrics' => $dashboardRepository->metricsFor($user),
@@ -31,6 +34,7 @@ class DashboardController extends Controller
             'businessHealth' => $user->can('crm.reports.view') ? $reports->dashboard($user) : null,
             'cmsDashboard' => $user->can('cms.view') ? $websiteControl->dashboard($user->company_id) : null,
             'free365Onboarding' => $free365Onboarding->checklist($user),
+            'storeSetupAvailable' => $storeSetup->enabled() && $storeSetup->canManage($user),
             'recentAuditLogs' => AuditLog::query()
                 ->with('user')
                 ->where('company_id', $user->company_id)

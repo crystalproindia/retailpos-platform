@@ -20,6 +20,7 @@ $managementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
+        'store.setup.manage' => $administratorRoles,
         'compliance.gst.view' => $posManagementRoles,
         'compliance.gst.settings.manage' => $administratorRoles,
         'compliance.gst.reports.view' => $posManagementRoles,

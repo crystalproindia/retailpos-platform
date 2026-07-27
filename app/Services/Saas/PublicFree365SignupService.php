@@ -2,6 +2,7 @@
 
 namespace App\Services\Saas;
 
+use App\Contracts\Saas\MobileOtpSender;
 use App\Mail\PublicSignupVerificationCode;
 use App\Models\SaasPlan;
 use App\Models\SaasPublicSignupSession;
@@ -107,7 +108,7 @@ class PublicFree365SignupService
                 throw ValidationException::withMessages(['code' => 'The verification code is incorrect.']);
             }
 
-            $this->assertAvailableContact($session->verification_method, $session->email ?: (string) $session->mobile);
+            $this->assertAvailableContact($session->verification_method, $session->email ?: (string) $session->mobile, $session->id);
             $session->update(['verified_at' => now(), 'verification_code_hash' => null]);
             $this->audit->record('saas.public_signup.otp_verified', $session, 'Public signup verification completed.', ['verification_method' => $session->verification_method]);
 
@@ -128,7 +129,7 @@ class PublicFree365SignupService
                 $this->audit->record('saas.public_signup.suspicious_request', $session, 'Public signup honeypot triggered.');
                 throw ValidationException::withMessages(['signup' => 'We could not complete this signup. Please try again.']);
             }
-            $this->assertAvailableContact($session->verification_method, $session->email ?: (string) $session->mobile);
+            $this->assertAvailableContact($session->verification_method, $session->email ?: (string) $session->mobile, $session->id);
 
             $plan = SaasPlan::query()->where('code', config('saas.free365_plan_code'))->where('status', 'active')->firstOrFail();
             $onboarding = $this->provisioning->provision([
@@ -199,16 +200,26 @@ class PublicFree365SignupService
     {
         return match ($method) {
             'email' => (bool) config('saas.public_signup.email_otp_enabled'),
-            'mobile' => (bool) config('saas.public_signup.mobile_otp_enabled') && filled(config('saas.public_signup.mobile_otp_provider')),
+            'mobile' => (bool) config('saas.public_signup.mobile_otp_enabled')
+                && filled(config('saas.public_signup.mobile_otp_provider'))
+                && app()->bound(MobileOtpSender::class)
+                && app(MobileOtpSender::class)->isConfigured(),
             default => false,
         };
     }
 
-    private function assertAvailableContact(string $method, string $contact): void
+    private function assertAvailableContact(string $method, string $contact, ?int $exceptSignupId = null): void
     {
         $query = User::query();
         $method === 'email' ? $query->where('email', $contact) : $query->where('mobile', $contact);
         if ($query->exists()) throw ValidationException::withMessages(['contact' => 'We could not continue with this contact. Log in, reset your password, or contact support.']);
+
+        $signup = SaasPublicSignupSession::query()
+            ->where($method, $contact)
+            ->where(fn ($query) => $query->whereNotNull('verified_at')->orWhereNotNull('provisioned_at'))
+            ->where('expires_at', '>', now())
+            ->when($exceptSignupId, fn ($query) => $query->whereKeyNot($exceptSignupId));
+        if ($signup->exists()) throw ValidationException::withMessages(['contact' => 'We could not continue with this contact. Log in, reset your password, or contact support.']);
     }
 
     private function throttleContact(string $method, string $contact): void
@@ -220,10 +231,13 @@ class PublicFree365SignupService
 
     private function deliver(SaasPublicSignupSession $session, string $code): void
     {
-        if ($session->verification_method !== 'email') {
-            throw ValidationException::withMessages(['verification_method' => 'Mobile verification is not configured yet.']);
+        if ($session->verification_method === 'email') {
+            Mail::to($session->email)->send(new PublicSignupVerificationCode($code));
+            return;
         }
-        Mail::to($session->email)->send(new PublicSignupVerificationCode($code));
+
+        if (! $this->isMethodAvailable('mobile')) throw ValidationException::withMessages(['verification_method' => 'Mobile verification is not configured yet.']);
+        app(MobileOtpSender::class)->send((string) $session->mobile, $code);
     }
 
     private function fingerprint(string $token): string

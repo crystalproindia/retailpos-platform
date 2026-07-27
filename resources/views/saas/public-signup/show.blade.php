@@ -1,4 +1,4 @@
-@extends('layouts.guest')
+@extends('layouts.public-signup')
 
 @section('title', 'Start Free RetailPOS')
 @section('content')
@@ -45,12 +45,12 @@
                     <p class="mt-1 text-sm text-slate-500">We only use this to securely create and protect your account.</p>
                     <div class="mt-4 space-y-3">
                         @if($methods['email'])
-                            <label class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50"><input type="radio" name="verification_method" value="email" checked class="mt-1 text-teal-600"><span><span class="block font-semibold text-slate-950">Email verification</span><span class="mt-1 block text-sm text-slate-500">Receive a one-time code by email.</span></span></label>
-                            <label class="block text-sm font-medium text-slate-700">Email address<input type="email" name="email" value="{{ old('email') }}" required autocomplete="email" class="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2.5 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"></label>
+                            <label class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50"><input data-method="email" type="radio" name="verification_method" value="email" @checked(old('verification_method', 'email') === 'email') class="mt-1 text-teal-600"><span><span class="block font-semibold text-slate-950">Email verification</span><span class="mt-1 block text-sm text-slate-500">Receive a one-time code by email.</span></span></label>
+                            <label data-method-field="email" class="block text-sm font-medium text-slate-700">Email address<input type="email" name="email" value="{{ old('email') }}" required autocomplete="email" class="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2.5 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"></label>
                         @endif
                         @if($methods['mobile'])
-                            <label class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50"><input type="radio" name="verification_method" value="mobile" class="mt-1 text-teal-600"><span><span class="block font-semibold text-slate-950">Mobile verification</span><span class="mt-1 block text-sm text-slate-500">Receive a one-time SMS code.</span></span></label>
-                            <label class="block text-sm font-medium text-slate-700">Mobile number<input type="tel" name="mobile" value="{{ old('mobile') }}" autocomplete="tel" class="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2.5 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"></label>
+                            <label class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50"><input data-method="mobile" type="radio" name="verification_method" value="mobile" @checked(old('verification_method') === 'mobile') class="mt-1 text-teal-600"><span><span class="block font-semibold text-slate-950">Mobile verification</span><span class="mt-1 block text-sm text-slate-500">Receive a one-time SMS code.</span></span></label>
+                            <label data-method-field="mobile" class="block text-sm font-medium text-slate-700">Mobile number<input type="tel" name="mobile" value="{{ old('mobile') }}" autocomplete="tel" class="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2.5 shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"></label>
                         @endif
                     </div>
                 </fieldset>
@@ -85,5 +85,13 @@
             document.getElementById('signup-password-confirmation').type = visible ? 'password' : 'text';
             this.textContent = visible ? 'Show' : 'Hide';
         });
+        const setMethod = (method) => document.querySelectorAll('[data-method-field]').forEach((field) => {
+            const active = field.dataset.methodField === method;
+            field.hidden = !active;
+            field.querySelector('input').required = active;
+        });
+        document.querySelectorAll('[data-method]').forEach((input) => input.addEventListener('change', () => setMethod(input.value)));
+        const chosenMethod = document.querySelector('[data-method]:checked');
+        if (chosenMethod) setMethod(chosenMethod.value);
     </script>
 @endsection

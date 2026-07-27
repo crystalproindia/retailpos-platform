@@ -25,3 +25,6 @@ Email verification uses the configured email foundation. Mobile verification rem
 3. Confirm `php artisan route:list --path=saas` includes `saas.tenants.create` and `saas.tenants.store`.
 4. Confirm outbound email policy before using the email verification option.
 5. Keep `SAAS_ENTITLEMENT_ENFORCEMENT=false` until package snapshots and support procedures are approved, then enable it deliberately.
+# Public signup caller
+
+`PublicFree365SignupService` is the public caller for `TenantProvisioningService`. It does not duplicate tenant creation. It verifies an email or configured mobile contact first, then passes a server-resolved Free 365 plan, selected industry, public signup source, and verified state into the existing atomic provisioner.

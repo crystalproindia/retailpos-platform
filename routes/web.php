@@ -121,6 +121,7 @@ use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
 use App\Http\Controllers\CommandCenter\CompanyProfileController;
+use App\Http\Controllers\CommandCenter\Free365OnboardingController;
 use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingGatewayController;
@@ -214,6 +215,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::post('settings/free365-onboarding/dismiss', [Free365OnboardingController::class, 'dismiss'])->name('free365-onboarding.dismiss');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
 
     Route::middleware('role:administrator')->prefix('account/subscription')->name('account.subscription.')->group(function (): void {

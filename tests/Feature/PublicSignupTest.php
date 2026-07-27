@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Contracts\Saas\MobileOtpSender;
 use App\Mail\PublicSignupVerificationCode;
 use App\Models\Branch;
 use App\Models\Company;
@@ -11,6 +12,7 @@ use App\Models\SaasPlan;
 use App\Models\SaasPublicSignupSession;
 use App\Models\User;
 use App\Services\Saas\PublicFree365SignupService;
+use App\Services\Saas\Free365OnboardingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -90,6 +92,10 @@ class PublicSignupTest extends TestCase
         $this->get(route('saas.public-signup.show'))->assertOk()->assertDontSee('Mobile verification');
         config()->set('saas.public_signup.mobile_otp_enabled', true);
         config()->set('saas.public_signup.mobile_otp_provider', 'test-provider');
+        $this->app->instance(MobileOtpSender::class, new class implements MobileOtpSender {
+            public function isConfigured(): bool { return true; }
+            public function send(string $mobile, string $code): void {}
+        });
         $this->get(route('saas.public-signup.show'))->assertOk()->assertSee('Mobile verification');
     }
 
@@ -99,6 +105,21 @@ class PublicSignupTest extends TestCase
         $user->update(['mobile' => '+919876543210', 'password' => Hash::make('password-with-enough-length')]);
         $this->post(route('login'), ['email' => '9876543210', 'password' => 'password-with-enough-length'])->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_free365_onboarding_checklist_is_tenant_scoped_and_store_name_reminder_clears(): void
+    {
+        [$company, $user] = $this->tenant();
+        $company->update(['name' => 'Your Store Name']);
+        app(\App\Services\Saas\SubscriptionService::class)->create($company, $this->freePlan(), $user);
+        $checklist = app(Free365OnboardingService::class)->checklist($user);
+        $this->assertNotNull($checklist);
+        $this->assertFalse(collect($checklist['items'])->firstWhere('key', 'store_name')['complete']);
+        $company->update(['name' => 'Asha Mart']);
+        $updated = app(Free365OnboardingService::class)->checklist($user);
+        $this->assertTrue(collect($updated['items'])->firstWhere('key', 'store_name')['complete']);
+        app(Free365OnboardingService::class)->dismiss($user);
+        $this->assertTrue(app(Free365OnboardingService::class)->checklist($user)['dismissed']);
     }
 
     private function freePlan(): SaasPlan

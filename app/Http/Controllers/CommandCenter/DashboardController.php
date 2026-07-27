@@ -11,12 +11,13 @@ use App\Repositories\Crm\CrmSupportTicketRepository;
 use App\Repositories\DashboardRepository;
 use App\Services\Cms\CmsWebsiteControlService;
 use App\Services\Crm\CrmExecutiveReportService;
+use App\Services\Saas\Free365OnboardingService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CmsWebsiteControlService $websiteControl, CrmExecutiveReportService $reports): View
+    public function __invoke(Request $request, DashboardRepository $dashboardRepository, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CmsWebsiteControlService $websiteControl, CrmExecutiveReportService $reports, Free365OnboardingService $free365Onboarding): View
     {
         $user = $request->user();
 
@@ -29,6 +30,7 @@ class DashboardController extends Controller
             'supportMetrics' => $user->can('crm.support.view') ? $supportTickets->dashboard($user) : null,
             'businessHealth' => $user->can('crm.reports.view') ? $reports->dashboard($user) : null,
             'cmsDashboard' => $user->can('cms.view') ? $websiteControl->dashboard($user->company_id) : null,
+            'free365Onboarding' => $free365Onboarding->checklist($user),
             'recentAuditLogs' => AuditLog::query()
                 ->with('user')
                 ->where('company_id', $user->company_id)

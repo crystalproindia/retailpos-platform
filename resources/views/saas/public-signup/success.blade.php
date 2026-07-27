@@ -1,4 +1,4 @@
-@extends('layouts.guest')
+@extends('layouts.public-signup')
 
 @section('title', 'Your RetailPOS store is ready')
 @section('content')

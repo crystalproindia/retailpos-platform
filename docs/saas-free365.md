@@ -26,3 +26,6 @@ Run migrations forward, clear configuration/route/view caches, and run `saas:pro
 ## Limitations
 
 Mobile OTP requires a provider-neutral SMS adapter and provider credentials. Email OTP records are ready for the configured email delivery infrastructure, but production delivery policy remains an operational configuration.
+# Public registration
+
+Free 365 can be offered through the public, feature-flagged `/start-free` flow. It always resolves the stable `free-365` plan code server-side, provisions one administrator and one primary outlet, and retains the existing 365-day and 25-finalised-invoice monthly limits. See [Public Free 365 Signup](public-free365-signup.md) for OTP, consent, duplicate-account, and deployment controls.

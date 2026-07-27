@@ -48,6 +48,10 @@
             @endforeach
         </section>
 
+        @if($free365Onboarding && ! $free365Onboarding['dismissed'])
+            @include('command-center.partials.free365-onboarding-checklist')
+        @endif
+
         @can('crm.leads.view')
             <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">

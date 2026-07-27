@@ -1,4 +1,4 @@
-@extends('layouts.guest')
+@extends('layouts.public-signup')
 
 @section('title', 'Free signup is unavailable')
 @section('content')

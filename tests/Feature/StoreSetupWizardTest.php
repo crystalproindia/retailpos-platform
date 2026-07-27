@@ -66,6 +66,19 @@ class StoreSetupWizardTest extends TestCase
         $this->assertDatabaseHas('store_setup_wizards', ['company_id' => $company->id, 'status' => 'completed']);
     }
 
+    public function test_confirmed_gst_and_scanner_preferences_apply_without_storing_sample_scan_data(): void
+    {
+        [$company, $user] = $this->tenant(true, 'grocery_supermarket');
+        $wizard = app(StoreSetupWizardService::class)->wizard($user);
+        $answers = ['industry' => 'grocery_supermarket', 'subtypes' => ['grocery'], 'product_volume' => '50_250', 'tax' => ['registered' => true, 'gstin' => '27ABCDE1234F1Z5', 'state_code' => '27', 'state_name' => 'Maharashtra', 'rates' => ['5', '18']], 'scanner' => ['choice' => 'already_have', 'format' => 'code128', 'generate_missing' => true], 'printer' => ['type' => 'thermal'], 'import' => ['choice' => 'csv_template']];
+        $wizard->update(['current_step' => 6, 'answers' => $answers, 'recommendations' => app(\App\Services\Saas\StoreSetupRecommendationService::class)->make($company, $answers)]);
+        $this->actingAs($user)->post(route('onboarding.store-setup.apply'), ['categories' => ['Grocery'], 'apply_tax' => 1, 'apply_barcode' => 1])->assertRedirect();
+        $this->assertDatabaseHas('gst_settings', ['company_id' => $company->id, 'gstin' => '27ABCDE1234F1Z5']);
+        $this->assertDatabaseHas('inventory_tax_rates', ['company_id' => $company->id, 'rate' => 5]);
+        $this->assertDatabaseHas('barcode_label_templates', ['company_id' => $company->id, 'name' => 'Store Setup Barcode Label']);
+        $this->assertDatabaseMissing('products', ['company_id' => $company->id, 'barcode' => 'sample-scan']);
+    }
+
     public function test_sales_user_cannot_manage_tenant_setup_and_product_template_is_safe_csv(): void
     {
         [$company] = $this->tenant(true);

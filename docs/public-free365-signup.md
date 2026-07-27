@@ -29,6 +29,8 @@ Existing email login remains unchanged. New users may sign in with their normali
 
 New public Free 365 tenants see a non-blocking, tenant-scoped setup checklist: store name, company/GST details, product, customer, first invoice, and sales review. The GST detail reminder is a readiness guard; this phase does not alter existing invoice financial rules.
 
+When enabled, the authenticated Store Setup Wizard directs a new tenant administrator to six resumable starter-configuration questions before the normal dashboard. It is skippable and uses only server-side deterministic recommendations. See [Store Setup Wizard](store-setup-wizard.md).
+
 ## Deployment and rollback
 
 Run the database migration before enabling the feature flag. To stop new signups immediately, set `SAAS_PUBLIC_SIGNUP_ENABLED=false` and clear configuration cache; existing tenants continue to work. Existing pending signup sessions naturally expire and do not provision tenants.

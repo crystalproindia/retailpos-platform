@@ -12,6 +12,9 @@ class StoreSetupRecommendationService
     /** @param array<string,mixed> $answers @return array<string,mixed> */
     public function make(Company $company, array $answers): array
     {
+        if (! config('store_setup.recommendations_enabled')) {
+            return ['version' => config('store_setup.version'), 'categories' => [], 'tax' => ['rates' => [], 'reason' => 'Recommendations are disabled for this environment.'], 'invoice_template' => ['key' => 'structured_gst_grid', 'name' => 'Structured GST Grid', 'reason' => 'Choose a design later from Invoice Designs.'], 'barcode' => ['enabled' => false, 'generate_missing' => false, 'reason' => 'Configure barcode preferences later.'], 'modules' => [], 'product_entry' => ['method' => 'choose_later', 'reason' => 'Choose your product-entry method later.'], 'next_steps' => ['Add a product', 'Add a customer']];
+        }
         $industry = (string) ($answers['industry'] ?? $company->industry ?? 'general_retail');
         $printer = (string) ($answers['printer']['type'] ?? 'unsure');
         $volume = (string) ($answers['product_volume'] ?? 'unsure');

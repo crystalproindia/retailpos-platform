@@ -1,5 +1,12 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## Intelligent Store Setup Wizard
+
+- `StoreSetupWizard` maps to `store_setup_wizards`, a one-record-per-company, tenant-scoped state machine for the six setup questions, safe answers, recommendations, idempotency, and completion/skipped markers.
+- `StoreSetupWizardService` validates and saves each step, regenerates deterministic recommendations server-side, applies selected categories and supported defaults transactionally, and records audit events.
+- `StoreSetupRecommendationService` uses the existing SaaS industry registry and entitlement service. Its controlled subtype/category configuration is `config/store_setup.php`; it is not a second industry registry.
+- `StoreSetupWizardController` serves `/getting-started/store-setup`, a CSV product-template handoff, review/apply, and completion. The Free 365 checklist exposes a Resume Setup action for authorised tenant administrators.
+
 ## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
 
 Phase 8A adds a provider-neutral SaaS domain without duplicating the existing `companies`, `branches`, `users`, invoice, payment, settings, permission, audit, notification, or navigation systems. `Company` remains the tenant boundary; a company has historical `saasSubscriptions`, and its existing branches and users remain tenant scoped.

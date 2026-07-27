@@ -87,9 +87,9 @@ class StoreSetupWizardService
             $allowedCategories = collect($plan['categories'])->pluck('name')->all();
             if (array_diff($selectedCategories, $allowedCategories)) throw ValidationException::withMessages(['categories' => 'Choose only categories in your current setup plan.']);
             $created = $this->createCategories($company, $selectedCategories);
-            if (($choices['apply_tax'] ?? false) === true) $this->applyTax($company, $wizard->answers ?? []);
-            if (($choices['apply_template'] ?? false) === true) $this->applyTemplate($company, $user, $plan['invoice_template']['key']);
-            if (($choices['apply_barcode'] ?? false) === true) $this->applyBarcodeDefaults($company, $user, $wizard->answers ?? []);
+            if (filter_var($choices['apply_tax'] ?? false, FILTER_VALIDATE_BOOL)) $this->applyTax($company, $wizard->answers ?? []);
+            if (filter_var($choices['apply_template'] ?? false, FILTER_VALIDATE_BOOL)) $this->applyTemplate($company, $user, $plan['invoice_template']['key']);
+            if (filter_var($choices['apply_barcode'] ?? false, FILTER_VALIDATE_BOOL)) $this->applyBarcodeDefaults($company, $user, $wizard->answers ?? []);
             $wizard->update(['status' => 'completed', 'current_step' => 7, 'recommendations' => $plan, 'recommendation_version' => config('store_setup.version'), 'applied_version' => config('store_setup.version'), 'completed_at' => now(), 'completed_by' => $user->id, 'updated_by' => $user->id]);
             $this->audit->record('saas.store_setup.completed', $wizard, 'Store setup completed.', ['company_id' => $company->id, 'categories_created' => count($created), 'duration_seconds' => now()->diffInSeconds($wizard->started_at ?? $wizard->created_at)]);
             return $wizard->refresh();
@@ -174,7 +174,7 @@ class StoreSetupWizardService
     private function applyTemplate(Company $company, User $user, string $templateKey): void
     {
         $setting = $this->templates->setting($company);
-        if (filled($setting->template_key)) return;
+        if ($setting->updated_by) return;
         $this->templates->update($company, $user, ['template_key' => $templateKey, 'brand_color' => '#0F766E', 'copy_label' => 'original', 'orientation' => 'portrait', 'options' => $this->templates->defaultOptions()]);
     }
 

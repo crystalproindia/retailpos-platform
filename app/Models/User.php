@@ -58,6 +58,11 @@ class User extends Authenticatable
         return $this->belongsTo(Branch::class);
     }
 
+    public function outletAssignments(): HasMany
+    {
+        return $this->hasMany(BranchUserAssignment::class);
+    }
+
     /**
      * @param  array<int, UserRole|string>  $roles
      */

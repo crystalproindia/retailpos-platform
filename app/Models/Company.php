@@ -50,6 +50,11 @@ class Company extends Model
         return $this->hasMany(Branch::class);
     }
 
+    public function outletAssignments(): HasMany
+    {
+        return $this->hasMany(BranchUserAssignment::class);
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);

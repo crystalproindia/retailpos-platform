@@ -9,6 +9,12 @@
 - Phase C verification hardens the Store Setup Wizard's rendered subtype lookup and requires the review stage before setup can be applied. `docs/store-setup-wizard.md` records the local SQLite repair procedure, isolated `4d5916f` invoice-test comparison, browser verification evidence, production prerequisites, and the intentionally deferred secure product-import lifecycle.
 - `docs/invoice-payments-foundation-fix.md` records the isolated invoice-payment foundation repair, its transaction-scoped tenant reloads, preserved financial invariants, and deployment considerations.
 
+## Multi-Outlet Operations
+
+- The existing `Branch` model is the customer-facing Outlet model; `Warehouse`, `StockLevel`, and `StockMovement` remain the existing inventory authority.
+- `BranchUserAssignment`, `OutletAccessService`, and `OutletService` provide tenant-scoped default-outlet, assignment, context, entitlement-limit, archival, audit, and safe warehouse provisioning foundations.
+- `StockTransfer` and `StockTransferItem` provide a draft, dispatch, and idempotent receipt lifecycle that writes stock only through the existing stock-level and movement boundaries. See `docs/multi-outlet-setup.md`.
+
 ## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
 
 Phase 8A adds a provider-neutral SaaS domain without duplicating the existing `companies`, `branches`, `users`, invoice, payment, settings, permission, audit, notification, or navigation systems. `Company` remains the tenant boundary; a company has historical `saasSubscriptions`, and its existing branches and users remain tenant scoped.

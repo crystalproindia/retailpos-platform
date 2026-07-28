@@ -29,3 +29,5 @@ The repair reloads and locks the invoice inside the transaction, scoped to the a
 ## Deployment and rollback
 
 This is application-code and test/documentation only: no migration or data backfill is required. Deploy normally after the full suite is green. Rollback is a normal application release rollback; existing payment rows and invoice totals are not changed by this repair.
+
+Multi-Outlet operations do not alter CRM invoice calculation, payment, receipt, or idempotency paths in this release. Existing invoices remain company scoped while outlet-specific CRM invoice numbering is deferred. See [Multi-Outlet Setup](multi-outlet-setup.md).

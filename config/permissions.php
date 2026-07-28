@@ -21,6 +21,10 @@ $managementRoles = ['administrator', 'manager'];
 return [
     'capabilities' => [
         'store.setup.manage' => $administratorRoles,
+        'outlets.view' => $posUserRoles,
+        'outlets.manage' => $managementRoles,
+        'outlets.assign' => $administratorRoles,
+        'outlets.context.switch' => $posUserRoles,
         'compliance.gst.view' => $posManagementRoles,
         'compliance.gst.settings.manage' => $administratorRoles,
         'compliance.gst.reports.view' => $posManagementRoles,
@@ -280,6 +284,10 @@ return [
         'inventory.stock.opening' => $inventoryManagementRoles,
         'inventory.stock.adjust' => $inventoryManagementRoles,
         'inventory.stock.approve_adjustment' => $inventoryManagementRoles,
+        'inventory.transfers.view' => $inventoryManagementRoles,
+        'inventory.transfers.create' => $inventoryManagementRoles,
+        'inventory.transfers.dispatch' => $inventoryManagementRoles,
+        'inventory.transfers.receive' => $inventoryManagementRoles,
         'inventory.barcode.manage' => $inventoryManagementRoles,
         'inventory.barcode.print' => $inventoryManagementRoles,
         'inventory.reorder.view' => $inventoryManagementRoles,

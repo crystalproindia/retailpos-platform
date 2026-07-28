@@ -54,3 +54,5 @@ Disable the main flag to stop entry and redirects without deleting saved answers
 ## Production prerequisites
 
 Before deployment, run migrations, clear generated caches, rebuild configuration/routes/views, and ensure a valid persistent database is configured. Enable public signup only after the email OTP delivery configuration and Terms/Privacy URLs have been reviewed. Keep `STORE_SETUP_WIZARD_ENABLED` enabled only when tenant administrators should be offered the flow. The wizard does not replace operating-system printer setup, official GST verification, or a secure spreadsheet-import lifecycle.
+
+After completion, authorised administrators may optionally open Multi-Outlet Setup to add another retail location. This does not add a seventh wizard step, alter saved answers, or force a single-outlet tenant into outlet configuration. See [Multi-Outlet Setup](multi-outlet-setup.md).

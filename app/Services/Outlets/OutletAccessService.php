@@ -22,7 +22,7 @@ class OutletAccessService
         $assigned = BranchUserAssignment::query()->where('company_id', $user->company_id)->where('user_id', $user->id)->where('is_active', true)->pluck('branch_id');
         if ($assigned->isNotEmpty()) return $query->whereIn('id', $assigned)->orderByDesc('is_primary')->orderBy('name')->get();
 
-        return $user->branch_id ? $query->whereKey($user->branch_id)->get() : collect();
+        return $user->branch_id ? $query->whereKey($user->branch_id)->get() : new Collection;
     }
 
     public function current(User $user): Branch

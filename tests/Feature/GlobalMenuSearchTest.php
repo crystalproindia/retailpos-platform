@@ -82,6 +82,23 @@ class GlobalMenuSearchTest extends TestCase
         $this->assertContains('invoice designs', $aliases['bill design']);
     }
 
+    public function test_inventory_transfer_navigation_is_discoverable_by_authorized_users_only(): void
+    {
+        foreach ([UserRole::Administrator, UserRole::Manager] as $role) {
+            $entry = app(GlobalMenuSearchService::class)->entriesFor($this->user($role))
+                ->firstWhere('route', 'inventory.transfers.index');
+
+            $this->assertNotNull($entry);
+            $this->assertSame('Stock Transfers', $entry['label']);
+            $this->assertContains('outlet transfer', $entry['aliases']);
+        }
+
+        foreach ([UserRole::Sales, UserRole::Staff] as $role) {
+            $this->assertFalse(app(GlobalMenuSearchService::class)->entriesFor($this->user($role))
+                ->contains('route', 'inventory.transfers.index'));
+        }
+    }
+
     public function test_search_control_and_mobile_trigger_render_from_the_shared_layout(): void
     {
         $administrator = $this->user(UserRole::Administrator);

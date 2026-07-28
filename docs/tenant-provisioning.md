@@ -23,6 +23,8 @@ Email verification uses the configured email foundation. Mobile verification rem
 1. Deploy the application code and run `php artisan migrate --force`.
 
 Public and platform-provisioned tenants remain compatible with the Store Setup Wizard. It creates tenant-scoped state after provisioning and never creates a second tenant or subscription.
+
+Provisioning's existing primary outlet is reused as the default Multi-Outlet record. No second outlet is created for newly provisioned tenants. See [Multi-Outlet Setup](multi-outlet-setup.md).
 2. Run `php artisan config:clear`, `php artisan route:clear`, and `php artisan view:clear` from the Laravel project directory.
 3. Confirm `php artisan route:list --path=saas` includes `saas.tenants.create` and `saas.tenants.store`.
 4. Confirm outbound email policy before using the email verification option.

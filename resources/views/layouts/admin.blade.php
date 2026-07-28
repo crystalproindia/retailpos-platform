@@ -21,6 +21,9 @@
             $tenantSubscriptionItems = $saasNavigation->tenantSubscriptionItems($user);
             $unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0;
             $recentNotifications = $user?->notifications()->latest()->limit(5)->get() ?? collect();
+            $outletAccess = app(\App\Services\Outlets\OutletAccessService::class);
+            $availableOutlets = $user ? $outletAccess->accessibleOutlets($user) : collect();
+            $currentOutlet = $availableOutlets->firstWhere('id', session('outlet_context_id')) ?? $availableOutlets->firstWhere('id', $user?->branch_id) ?? $availableOutlets->firstWhere('is_primary', true) ?? $availableOutlets->first();
         @endphp
 
         <div class="min-h-screen lg:grid lg:grid-cols-[auto_1fr]">
@@ -116,7 +119,7 @@
                 <div class="border-t border-slate-200 p-4 dark:border-slate-800" data-sidebar-label>
                     <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
                         <p class="truncate text-sm font-medium text-slate-900 dark:text-white">{{ $user?->company?->name ?? 'RetailPOS' }}</p>
-                        <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $user?->branch?->name ?? 'Primary branch' }}</p>
+                        <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $currentOutlet?->name ?? 'Main outlet' }}</p>
                     </div>
                 </div>
             </aside>
@@ -142,6 +145,15 @@
                         </div>
 
                         <div class="flex items-center gap-2">
+                            @if ($currentOutlet && $availableOutlets->count() > 1)
+                                <form method="POST" action="{{ route('outlet-context.switch') }}" class="hidden sm:block">
+                                    @csrf
+                                    <label class="sr-only" for="outlet-context">Working outlet</label>
+                                    <select id="outlet-context" name="outlet_id" onchange="this.form.submit()" class="max-w-40 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm font-medium text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                                        @foreach ($availableOutlets as $outlet)<option value="{{ $outlet->id }}" @selected($outlet->id === $currentOutlet->id)>{{ $outlet->name }}</option>@endforeach
+                                    </select>
+                                </form>
+                            @endif
                             <button type="button" data-global-menu-search-open class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 lg:hidden dark:hover:bg-slate-800 dark:hover:text-white" aria-haspopup="dialog" aria-controls="global-menu-search-dialog" aria-label="Search menus, modules or settings">
                                 <x-icon name="search" class="size-5" />
                             </button>

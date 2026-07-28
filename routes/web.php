@@ -84,8 +84,10 @@ use App\Http\Controllers\CommandCenter\Inventory\SalesChannelController;
 use App\Http\Controllers\CommandCenter\Inventory\StockAdjustmentController;
 use App\Http\Controllers\CommandCenter\Inventory\StockLedgerController;
 use App\Http\Controllers\CommandCenter\Inventory\StockLocationController;
+use App\Http\Controllers\CommandCenter\Inventory\StockTransferController;
 use App\Http\Controllers\CommandCenter\Inventory\WarehouseController;
 use App\Http\Controllers\CommandCenter\ModuleController;
+use App\Http\Controllers\CommandCenter\OutletController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController;
@@ -820,6 +822,10 @@ Route::middleware('auth')->group(function (): void {
         Route::post('locations/{location}/restore', [StockLocationController::class, 'restore'])->middleware('can:inventory.warehouses.manage')->name('locations.restore');
 
         Route::get('stock-ledger', StockLedgerController::class)->middleware('can:inventory.stock.view')->name('stock.ledger');
+        Route::get('transfers', [StockTransferController::class, 'index'])->middleware('can:inventory.transfers.view')->name('transfers.index');
+        Route::post('transfers', [StockTransferController::class, 'store'])->middleware('can:inventory.transfers.create')->name('transfers.store');
+        Route::post('transfers/{transfer}/dispatch', [StockTransferController::class, 'dispatch'])->middleware('can:inventory.transfers.dispatch')->name('transfers.dispatch');
+        Route::post('transfers/{transfer}/receive', [StockTransferController::class, 'receive'])->middleware('can:inventory.transfers.receive')->name('transfers.receive');
         Route::get('opening-stock', [OpeningStockController::class, 'create'])->middleware('can:inventory.stock.opening')->name('opening-stock.create');
         Route::post('opening-stock', [OpeningStockController::class, 'store'])->middleware('can:inventory.stock.opening')->name('opening-stock.store');
         Route::get('adjustments', [StockAdjustmentController::class, 'index'])->middleware('can:inventory.stock.adjust')->name('adjustments.index');
@@ -965,9 +971,21 @@ Route::middleware('auth')->group(function (): void {
 
     Route::redirect('settings', 'settings/general')->name('settings.index');
     Route::middleware('role:administrator,manager')->group(function (): void {
+        Route::get('settings/outlets', [OutletController::class, 'index'])->middleware('can:outlets.manage')->name('settings.outlets.index');
+        Route::get('settings/outlets/create', [OutletController::class, 'create'])->middleware('can:outlets.manage')->name('settings.outlets.create');
+        Route::post('settings/outlets', [OutletController::class, 'store'])->middleware('can:outlets.manage')->name('settings.outlets.store');
+        Route::get('settings/outlets/{outlet}/edit', [OutletController::class, 'edit'])->middleware('can:outlets.manage')->name('settings.outlets.edit');
+        Route::put('settings/outlets/{outlet}', [OutletController::class, 'update'])->middleware('can:outlets.manage')->name('settings.outlets.update');
+        Route::post('settings/outlets/{outlet}/archive', [OutletController::class, 'archive'])->middleware('can:outlets.manage')->name('settings.outlets.archive');
+        Route::post('settings/outlets/{outlet}/restore', [OutletController::class, 'restore'])->middleware('can:outlets.manage')->name('settings.outlets.restore');
+        Route::post('settings/outlets/{outlet}/make-default', [OutletController::class, 'makeDefault'])->middleware('can:outlets.manage')->name('settings.outlets.make-default');
+        Route::post('settings/outlets/{outlet}/assignments', [OutletController::class, 'assign'])->middleware('can:outlets.assign')->name('settings.outlets.assignments.store');
         Route::get('settings/company-profile', [CompanyProfileController::class, 'edit'])->middleware('can:company.profile.update')->name('settings.company-profile.edit');
         Route::put('settings/company-profile', [CompanyProfileController::class, 'update'])->middleware('can:company.profile.update')->name('settings.company-profile.update');
         Route::get('settings/{section}', [SettingsController::class, 'show'])->name('settings.show');
         Route::put('settings/{section}', [SettingsController::class, 'update'])->name('settings.update');
     });
+
+    Route::get('getting-started/outlets', [OutletController::class, 'setup'])->middleware('can:outlets.manage')->name('onboarding.outlets.show');
+    Route::post('outlet-context', [OutletController::class, 'switch'])->middleware('can:outlets.context.switch')->name('outlet-context.switch');
 });

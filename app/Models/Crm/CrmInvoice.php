@@ -4,6 +4,7 @@ namespace App\Models\Crm;
 
 use App\Enums\Crm\InvoiceStatus;
 use App\Models\Company;
+use App\Models\Branch;
 use App\Models\NotificationDelivery;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['company_id', 'quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'invoice_number', 'supplier_gstin_snapshot', 'supplier_state_code_snapshot', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'place_of_supply_state_code', 'tax_classification', 'tax_treatment_snapshot', 'currency', 'subtotal', 'discount_total', 'taxable_total', 'tax_total', 'cgst_total', 'sgst_total', 'igst_total', 'cess_total', 'adjustment_total', 'grand_total', 'amount_paid', 'balance_due', 'status', 'e_invoice_status', 'e_way_bill_status', 'safe_compliance_error', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'public_token_hash', 'public_token_expires_at', 'public_token_revoked_at', 'sent_at', 'first_viewed_at', 'last_viewed_at', 'public_view_count', 'paid_at', 'cancelled_at', 'do_not_remind_before', 'created_by', 'updated_by'])]
+#[Fillable(['company_id', 'branch_id', 'quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'invoice_number', 'supplier_gstin_snapshot', 'supplier_state_code_snapshot', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'place_of_supply_state_code', 'tax_classification', 'tax_treatment_snapshot', 'currency', 'subtotal', 'discount_total', 'taxable_total', 'tax_total', 'cgst_total', 'sgst_total', 'igst_total', 'cess_total', 'adjustment_total', 'grand_total', 'amount_paid', 'balance_due', 'status', 'e_invoice_status', 'e_way_bill_status', 'safe_compliance_error', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'public_token_hash', 'public_token_expires_at', 'public_token_revoked_at', 'sent_at', 'first_viewed_at', 'last_viewed_at', 'public_view_count', 'paid_at', 'cancelled_at', 'do_not_remind_before', 'created_by', 'updated_by'])]
 class CrmInvoice extends Model
 {
     protected function casts(): array
@@ -30,6 +31,7 @@ class CrmInvoice extends Model
     }
 
     public function company(): BelongsTo { return $this->belongsTo(Company::class); }
+    public function branch(): BelongsTo { return $this->belongsTo(Branch::class); }
     public function quotation(): BelongsTo { return $this->belongsTo(CrmQuotation::class); }
     public function opportunity(): BelongsTo { return $this->belongsTo(CrmOpportunity::class); }
     public function lead(): BelongsTo { return $this->belongsTo(CrmLead::class); }

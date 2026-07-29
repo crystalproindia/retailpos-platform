@@ -15,6 +15,7 @@ use App\Repositories\Pos\PosCatalogRepository;
 use App\Services\AuditLogger;
 use App\Services\Customers\CustomerInsightService;
 use App\Services\Events\DomainEventDispatcher;
+use App\Services\Outlets\OutletAccessService;
 use App\Services\Promotions\PromotionRuleEngine;
 use App\Services\Saas\UsageService;
 use Illuminate\Support\Facades\DB;
@@ -31,12 +32,14 @@ class PosCheckoutService
         private readonly AuditLogger $audit,
         private readonly DomainEventDispatcher $events,
         private readonly UsageService $usage,
+        private readonly OutletAccessService $outlets,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function hold(User $user, array $data): PosSale
     {
         return DB::transaction(function () use ($user, $data): PosSale {
+            $data['branch_id'] = $this->resolveOutletId($user, $data);
             [$lines, $totals] = $this->linesAndTotals($user, $data);
             $sale = $this->persistSale($user, $data, $lines, $totals, 'held');
             $this->audit->record('pos.sale.held', $sale, 'POS bill held');
@@ -52,9 +55,7 @@ class PosCheckoutService
         return DB::transaction(function () use ($user, $data): PosSale {
             $this->usage->assertWithinLimit($user->company, 'monthly_pos_transactions');
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
-            $branchId = (int) ($data['branch_id'] ?? $user->branch_id);
-            $branch = \App\Models\Branch::query()->where('company_id', $user->company_id)->findOrFail($branchId);
-            if (! $branch->is_active) throw ValidationException::withMessages(['branch_id' => 'Inactive branches cannot create POS sales.']);
+            $branchId = $this->resolveOutletId($user, $data);
             $data['branch_id'] = $branchId;
             $branchHasRegisters = \App\Models\Pos\PosRegister::query()->where('company_id', $user->company_id)->where('branch_id', $branchId)->where('is_active', true)->exists();
             if ($branchHasRegisters && empty($data['register_id'])) {
@@ -84,6 +85,7 @@ class PosCheckoutService
     {
         return DB::transaction(function () use ($sale, $user, $reason): PosSale {
             $sale = PosSale::query()->where('company_id', $user->company_id)->with('items.product')->lockForUpdate()->findOrFail($sale->id);
+            $this->assertSaleAccess($sale, $user);
             if ($sale->status !== 'completed') {
                 throw ValidationException::withMessages(['sale' => 'Only completed POS sales can be voided.']);
             }
@@ -172,5 +174,38 @@ class PosCheckoutService
     private function dispatch(string $key, User $user, PosSale $sale, array $payload = []): void
     {
         $this->events->dispatch(new PosDomainEvent($key, $user->company_id, $user->id, PosSale::class, $sale->id, $payload + ['sale_number' => $sale->sale_number]));
+    }
+
+    /** @param array<string, mixed> $data */
+    private function resolveOutletId(User $user, array $data): int
+    {
+        $outlet = $this->outlets->current($user);
+        $branchId = (int) ($data['branch_id'] ?? $outlet->id);
+        $branch = \App\Models\Branch::query()->where('company_id', $user->company_id)->find($branchId);
+        if (! $branch || ! $this->outlets->canAccess($user, $branch)) {
+            throw ValidationException::withMessages(['branch_id' => 'You are not assigned to this outlet.']);
+        }
+
+        return $branch->id;
+    }
+
+    private function assertSaleAccess(PosSale $sale, User $user): void
+    {
+        if ($sale->company_id !== $user->company_id) {
+            throw ValidationException::withMessages(['outlet' => 'This sale is not available to your company.']);
+        }
+
+        if ($sale->branch_id === null) {
+            if (! $this->outlets->hasCompanyWideAccess($user)) {
+                throw ValidationException::withMessages(['outlet' => 'Only a company administrator can change a historical sale without an outlet.']);
+            }
+
+            return;
+        }
+
+        $branch = \App\Models\Branch::query()->where('company_id', $user->company_id)->find($sale->branch_id);
+        if (! $branch || ! $this->outlets->canAccess($user, $branch)) {
+            throw ValidationException::withMessages(['outlet' => 'You are not assigned to this sale outlet.']);
+        }
     }
 }

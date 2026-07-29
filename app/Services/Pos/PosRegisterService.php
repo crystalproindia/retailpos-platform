@@ -8,20 +8,21 @@ use App\Models\Pos\PosRegisterSession;
 use App\Models\Pos\PosSale;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class PosRegisterService
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly OutletAccessService $outlets) {}
 
     /** @param array<string,mixed> $data */
     public function create(User $user, array $data): PosRegister
     {
         $branch = Branch::query()->where('company_id', $user->company_id)->findOrFail($data['branch_id']);
 
-        if (! $branch->is_active) {
-            throw ValidationException::withMessages(['branch_id' => 'Inactive branches cannot have a POS register.']);
+        if (! $this->outlets->canAccess($user, $branch)) {
+            throw ValidationException::withMessages(['branch_id' => 'You are not assigned to this outlet.']);
         }
 
         $register = PosRegister::create([
@@ -43,7 +44,7 @@ class PosRegisterService
         return DB::transaction(function () use ($register, $user, $openingCash, $notes): PosRegisterSession {
             $register = PosRegister::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($register->id);
             $branch = Branch::query()->where('company_id', $user->company_id)->findOrFail($register->branch_id);
-            if (! $register->is_active || ! $branch->is_active) {
+            if (! $register->is_active || ! $this->outlets->canAccess($user, $branch)) {
                 throw ValidationException::withMessages(['register' => 'The register and branch must be active before opening a session.']);
             }
             if ($register->current_session_id || $register->sessions()->where('status', 'open')->exists()) {
@@ -71,6 +72,10 @@ class PosRegisterService
     {
         return DB::transaction(function () use ($session, $user, $closingCash, $notes): PosRegisterSession {
             $session = PosRegisterSession::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($session->id);
+            $branch = Branch::query()->where('company_id', $user->company_id)->findOrFail($session->branch_id);
+            if (! $this->outlets->canAccess($user, $branch)) {
+                throw ValidationException::withMessages(['outlet' => 'You are not assigned to this register outlet.']);
+            }
             if ($session->status !== 'open') {
                 throw ValidationException::withMessages(['session' => 'This register session is already closed.']);
             }
@@ -89,8 +94,8 @@ class PosRegisterService
     {
         $register = PosRegister::query()->where('company_id', $user->company_id)->where('branch_id', $branchId)->where('is_active', true)->lockForUpdate()->findOrFail($registerId);
         $branch = Branch::query()->where('company_id', $user->company_id)->findOrFail($branchId);
-        if (! $branch->is_active) {
-            throw ValidationException::withMessages(['branch_id' => 'Inactive branches cannot create POS sales.']);
+        if (! $this->outlets->canAccess($user, $branch)) {
+            throw ValidationException::withMessages(['branch_id' => 'You are not assigned to this outlet.']);
         }
 
         return PosRegisterSession::query()->where('company_id', $user->company_id)->where('register_id', $register->id)->where('id', $register->current_session_id)->where('status', 'open')->lockForUpdate()->firstOrFail();

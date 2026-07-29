@@ -20,9 +20,13 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use App\Services\Outlets\OutletAccessService;
+use Illuminate\Validation\ValidationException;
 
 class CrmExecutiveReportService
 {
+    public function __construct(private readonly OutletAccessService $outlets) {}
+
     /** @param array<string, mixed> $filters */
     public function dashboard(User $user, array $filters = []): array
     {
@@ -207,21 +211,21 @@ class CrmExecutiveReportService
     private function customerSupportLoad(User $user, array $filters, array $range): Collection { return $this->inRange($this->tickets($user, $filters), 'created_at', $range)->with('customer')->whereNotNull('customer_id')->selectRaw('customer_id, COUNT(*) as value')->groupBy('customer_id')->orderByDesc('value')->limit(10)->get(); }
 
     /** @param array<string, mixed> $filters */
-    private function leads(User $user, array $filters): Builder { $query = CrmLead::query()->where('crm_leads.company_id', $user->company_id); $this->scopeLeads($query, $user, $filters); return $query; }
+    private function leads(User $user, array $filters): Builder { $query = CrmLead::query()->where('crm_leads.company_id', $user->company_id); $this->scopeOutletBranches($query, 'crm_leads.branch_id', $user, $filters); $this->scopeLeads($query, $user, $filters); return $query; }
     /** @param array<string, mixed> $filters */
     private function proformas(User $user, array $filters): Builder { $query = CrmProformaInvoice::query(); $this->scopeProformas($query, $user, $filters); return $query; }
     /** @param array<string, mixed> $filters */
-    private function onboardings(User $user, array $filters): Builder { $query = CrmCustomerOnboarding::query()->where('crm_customer_onboardings.company_id', $user->company_id); $this->scopeOnboardings($query, $user, $filters); return $query; }
+    private function onboardings(User $user, array $filters): Builder { $query = CrmCustomerOnboarding::query()->where('crm_customer_onboardings.company_id', $user->company_id); $this->scopeLeadRelationship($query, 'lead', $user, $filters); $this->scopeOnboardings($query, $user, $filters); return $query; }
     /** @param array<string, mixed> $filters */
-    private function tickets(User $user, array $filters): Builder { $query = CrmSupportTicket::query()->where('crm_support_tickets.company_id', $user->company_id); $this->scopeTickets($query, $user, $filters); return $query; }
+    private function tickets(User $user, array $filters): Builder { $query = CrmSupportTicket::query()->where('crm_support_tickets.company_id', $user->company_id); $this->scopeLeadRelationship($query, 'lead', $user, $filters); $this->scopeTickets($query, $user, $filters); return $query; }
     /** @param array<string, mixed> $filters */
-    private function customers(User $user, array $filters): Builder { $query = CrmCustomer::query()->where('crm_customers.company_id', $user->company_id); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->whereKey($filters['customer_id']); return $query; }
+    private function customers(User $user, array $filters): Builder { $query = CrmCustomer::query()->where('crm_customers.company_id', $user->company_id); $this->scopeLeadRelationship($query, 'lead', $user, $filters); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->whereKey($filters['customer_id']); return $query; }
     /** @param array<string, mixed> $filters */
-    private function quotations(User $user, array $filters): Builder { $query = CrmQuotation::query()->where('crm_quotations.company_id', $user->company_id); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->whereHas('lead', fn (Builder $lead) => $lead->where('customer_id', $filters['customer_id'])); return $query; }
+    private function quotations(User $user, array $filters): Builder { $query = CrmQuotation::query()->where('crm_quotations.company_id', $user->company_id); $this->scopeLeadRelationship($query, 'lead', $user, $filters); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->whereHas('lead', fn (Builder $lead) => $lead->where('customer_id', $filters['customer_id'])); return $query; }
     /** @param array<string, mixed> $filters */
     private function scopeLeads(Builder $query, User $user, array $filters): void { if ($this->isSales($user)) $query->where(fn (Builder $q) => $q->where('assigned_user_id', $user->id)->orWhere('created_by', $user->id)); if ($filters['assigned_user_id'] ?? null) $query->where('assigned_user_id', $filters['assigned_user_id']); if ($filters['source_id'] ?? null) $query->where('source_id', $filters['source_id']); if ($filters['status_id'] ?? null) $query->where('status_id', $filters['status_id']); if ($filters['customer_id'] ?? null) $query->where('customer_id', $filters['customer_id']); }
     /** @param array<string, mixed> $filters */
-    private function scopeProformas(Builder $query, User $user, array $filters): void { $query->where('crm_proforma_invoices.company_id', $user->company_id); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->where('customer_id', $filters['customer_id']); }
+    private function scopeProformas(Builder $query, User $user, array $filters): void { $query->where('crm_proforma_invoices.company_id', $user->company_id); $this->scopeLeadRelationship($query, 'lead', $user, $filters); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->where('customer_id', $filters['customer_id']); }
     /** @param array<string, mixed> $filters */
     private function scopeOnboardings(Builder $query, User $user, array $filters): void { if ($this->isSales($user)) $query->where(fn (Builder $q) => $q->where('assigned_to', $user->id)->orWhere('implementation_owner_id', $user->id)); if ($filters['assigned_user_id'] ?? null) $query->where(fn (Builder $q) => $q->where('assigned_to', $filters['assigned_user_id'])->orWhere('implementation_owner_id', $filters['assigned_user_id'])); if ($filters['customer_id'] ?? null) $query->where('customer_id', $filters['customer_id']); }
     /** @param array<string, mixed> $filters */
@@ -229,7 +233,7 @@ class CrmExecutiveReportService
     /** @param array<string, mixed> $filters */
     private function blockedTasks(User $user, array $filters): int { return \App\Models\Crm\CrmOnboardingTask::query()->where('status', 'blocked')->whereHas('onboarding', function (Builder $query) use ($user, $filters): void { $query->where('company_id', $user->company_id); $this->scopeOnboardings($query, $user, $filters); })->count(); }
     /** @param array<string, mixed> $filters */
-    private function portalUsers(User $user, array $filters): int { return CrmCustomerPortalUser::query()->whereHas('customer', function (Builder $query) use ($user, $filters): void { $query->where('company_id', $user->company_id); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->whereKey($filters['customer_id']); })->count(); }
+    private function portalUsers(User $user, array $filters): int { return CrmCustomerPortalUser::query()->whereHas('customer', function (Builder $query) use ($user, $filters): void { $query->where('company_id', $user->company_id); $this->scopeLeadRelationship($query, 'lead', $user, $filters); if ($this->isSales($user)) $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)); if ($filters['customer_id'] ?? null) $query->whereKey($filters['customer_id']); })->count(); }
     private function inRange(Builder $query, string $column, array $range): Builder { return $query->whereBetween($query->getModel()->qualifyColumn($column), [$range['from']->startOfDay(), $range['to']->endOfDay()]); }
     /** @param array<string, mixed> $filters */
     private function dateRange(array $filters): array { $preset = $filters['range'] ?? 'this_month'; $now = CarbonImmutable::now(); [$from, $to] = match ($preset) { 'last_month' => [$now->subMonth()->startOfMonth(), $now->subMonth()->endOfMonth()], 'last_3_months' => [$now->subMonths(2)->startOfMonth(), $now->endOfMonth()], 'last_6_months' => [$now->subMonths(5)->startOfMonth(), $now->endOfMonth()], 'this_year' => [$now->startOfYear(), $now->endOfYear()], 'custom' => [filled($filters['date_from'] ?? null) ? CarbonImmutable::parse($filters['date_from'])->startOfDay() : $now->startOfMonth(), filled($filters['date_to'] ?? null) ? CarbonImmutable::parse($filters['date_to'])->endOfDay() : $now->endOfDay()], default => [$now->startOfMonth(), $now->endOfMonth()] }; return compact('preset', 'from', 'to'); }
@@ -241,4 +245,50 @@ class CrmExecutiveReportService
     private function positives(array $areas): Collection { return collect($areas)->filter(fn (array $area) => $area['score'] >= 80)->sortByDesc('score')->take(3)->map(fn (array $area) => ['area' => $area['label'], 'score' => $area['score'], 'message' => "{$area['label']} is currently performing well."])->values(); }
     private function clamp(float $score): int { return (int) max(0, min(100, round($score))); }
     private function isSales(User $user): bool { return ($user->role instanceof UserRole ? $user->role : UserRole::tryFrom((string) $user->role)) === UserRole::Sales; }
+
+    /** @param array<string, mixed> $filters */
+    private function scopeLeadRelationship(Builder $query, string $relationship, User $user, array $filters): void
+    {
+        $outletIds = $this->reportOutletIds($user, $filters);
+        if ($outletIds === null) {
+            return;
+        }
+
+        $query->whereHas($relationship, fn (Builder $lead) => $lead->whereIn('branch_id', $outletIds));
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function scopeOutletBranches(Builder $query, string $column, User $user, array $filters): void
+    {
+        $outletIds = $this->reportOutletIds($user, $filters);
+        if ($outletIds !== null) {
+            $query->whereIn($column, $outletIds);
+        }
+    }
+
+    /** @param array<string, mixed> $filters @return array<int, int>|null */
+    private function reportOutletIds(User $user, array $filters): ?array
+    {
+        if (($filters['outlet_id'] ?? null) === 'all') {
+            if (! $this->outlets->hasCompanyWideAccess($user)) {
+                throw ValidationException::withMessages(['outlet_id' => 'Only a company administrator can view all outlets.']);
+            }
+
+            return null;
+        }
+
+        $available = $this->outlets->accessibleOutlets($user);
+        if ($available->isEmpty()) {
+            return [];
+        }
+
+        $outletId = isset($filters['outlet_id']) && $filters['outlet_id'] !== ''
+            ? (int) $filters['outlet_id']
+            : $this->outlets->current($user)->id;
+        if (! $available->contains('id', $outletId)) {
+            throw ValidationException::withMessages(['outlet_id' => 'That outlet is not available to this user.']);
+        }
+
+        return [$outletId];
+    }
 }

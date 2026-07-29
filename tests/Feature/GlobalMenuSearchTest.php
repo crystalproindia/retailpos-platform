@@ -101,6 +101,7 @@ class GlobalMenuSearchTest extends TestCase
 
     public function test_search_control_and_mobile_trigger_render_from_the_shared_layout(): void
     {
+        config(['store_setup.enabled' => false]);
         $administrator = $this->user(UserRole::Administrator);
 
         $this->actingAs($administrator)->get('/dashboard')

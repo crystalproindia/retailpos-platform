@@ -35,6 +35,11 @@ try {
     $repositoryRoot = requireOption($arguments, 'repository-root');
 
     $loader = require $repositoryRoot.'/vendor/autoload.php';
+    // Composer's optimized class map belongs to the caller checkout. Pin the one
+    // service used to create the pre-Phase-G invoice fixture to the detached app.
+    $loader->addClassMap([
+        'App\\Services\\Crm\\InvoiceService' => $appRoot.'/app/Services/Crm/InvoiceService.php',
+    ]);
     $loader->setPsr4('App\\', [$appRoot.'/app']);
     $loader->setPsr4('Database\\Factories\\', [$appRoot.'/database/factories']);
     $loader->setPsr4('Database\\Seeders\\', [$appRoot.'/database/seeders']);

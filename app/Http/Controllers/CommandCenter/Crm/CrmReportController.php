@@ -8,6 +8,7 @@ use App\Models\Crm\CrmLeadSource;
 use App\Models\Crm\CrmLeadStatus;
 use App\Models\User;
 use App\Services\Crm\CrmExecutiveReportService;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
@@ -65,6 +66,8 @@ class CrmReportController extends Controller
             'report' => $report,
             'data' => $report ? $reports->report($request->user(), $report, $filters) : $reports->dashboard($request->user(), $filters),
             'filterOptions' => [
+                'outlets' => app(OutletAccessService::class)->accessibleOutlets($request->user()),
+                'canViewAllOutlets' => app(OutletAccessService::class)->hasCompanyWideAccess($request->user()),
                 'users' => User::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
                 'sources' => CrmLeadSource::query()->where('company_id', $request->user()->company_id)->orderBy('sort_order')->get(['id', 'name']),
                 'statuses' => CrmLeadStatus::query()->where('company_id', $request->user()->company_id)->orderBy('sort_order')->get(['id', 'name']),
@@ -76,6 +79,6 @@ class CrmReportController extends Controller
     /** @return array<string, mixed> */
     private function filters(Request $request): array
     {
-        return $request->validate(['range' => ['nullable', 'in:this_month,last_month,last_3_months,last_6_months,this_year,custom'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date', 'after_or_equal:date_from'], 'assigned_user_id' => ['nullable', 'integer'], 'source_id' => ['nullable', 'integer'], 'customer_id' => ['nullable', 'integer'], 'status_id' => ['nullable', 'integer']]);
+        return $request->validate(['range' => ['nullable', 'in:this_month,last_month,last_3_months,last_6_months,this_year,custom'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date', 'after_or_equal:date_from'], 'outlet_id' => ['nullable', 'string'], 'assigned_user_id' => ['nullable', 'integer'], 'source_id' => ['nullable', 'integer'], 'customer_id' => ['nullable', 'integer'], 'status_id' => ['nullable', 'integer']]);
     }
 }

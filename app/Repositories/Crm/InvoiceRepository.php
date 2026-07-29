@@ -5,12 +5,14 @@ namespace App\Repositories\Crm;
 use App\Enums\UserRole;
 use App\Models\Crm\CrmInvoice;
 use App\Models\User;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class InvoiceRepository
 {
+    public function __construct(private readonly OutletAccessService $outlets) {}
     /** @param array<string,mixed> $filters */
     public function paginate(User $user, array $filters = []): LengthAwarePaginator
     {
@@ -53,7 +55,11 @@ class InvoiceRepository
     private function queryForUser(User $user): Builder
     {
         $role = $user->role instanceof UserRole ? $user->role : UserRole::tryFrom((string) $user->role);
+        $outletIds = $this->outlets->accessibleOutlets($user)->pluck('id');
+
         return CrmInvoice::query()->where('company_id', $user->company_id)
+            // Legacy invoices predate outlet ownership and remain readable under their existing role policy.
+            ->where(fn (Builder $query) => $query->whereNull('branch_id')->orWhereIn('branch_id', $outletIds))
             ->when($role === UserRole::Sales, fn (Builder $query) => $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)));
     }
 

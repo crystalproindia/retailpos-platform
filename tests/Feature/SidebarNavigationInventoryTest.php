@@ -154,6 +154,7 @@ class SidebarNavigationInventoryTest extends TestCase
 
     public function test_shared_desktop_and_mobile_layout_uses_the_same_authorised_registry(): void
     {
+        config(['store_setup.enabled' => false]);
         $response = $this->actingAs($this->user(UserRole::Administrator))->get('/dashboard');
 
         $response->assertOk()

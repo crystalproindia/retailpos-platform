@@ -12,6 +12,7 @@ use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Outlets\OutletAccessService;
 use App\Services\Saas\UsageService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -19,16 +20,22 @@ use Illuminate\Validation\ValidationException;
 
 class InvoiceService
 {
-    public function __construct(private readonly AuditLogger $audit, private readonly UsageService $usage) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly UsageService $usage,
+        private readonly OutletAccessService $outlets,
+    ) {}
 
     /** @param array<string,mixed> $data */
     public function create(User $user, array $data): CrmInvoice
     {
         return DB::transaction(function () use ($user, $data): CrmInvoice {
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
+            $outlet = $this->outlets->current($user);
             $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
             $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + [
                 'company_id' => $user->company_id,
+                'branch_id' => $outlet->id,
                 'invoice_number' => $this->nextNumber($user->company_id),
                 'status' => InvoiceStatus::Draft,
                 'amount_paid' => '0.00',
@@ -78,6 +85,7 @@ class InvoiceService
     {
         return DB::transaction(function () use ($invoice, $user): CrmInvoice {
             $invoice = CrmInvoice::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($invoice->id);
+            $this->assertMutationAccess($invoice, $user);
             $this->ensureDraft($invoice);
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
             $invoice->update(['status' => InvoiceStatus::Issued, 'issue_date' => $invoice->issue_date ?? today(), 'updated_by' => $user->id]);
@@ -132,7 +140,7 @@ class InvoiceService
                 return $existing;
             }
             $payment = $invoice->payments()->create(Arr::only($data, ['amount', 'currency', 'payment_date', 'payment_method', 'transaction_reference', 'bank_name', 'cheque_number', 'notes', 'status']) + [
-                'company_id' => $invoice->company_id, 'payment_reference' => $this->nextPaymentReference($invoice->company_id),
+                'company_id' => $invoice->company_id, 'branch_id' => $invoice->branch_id, 'payment_reference' => $this->nextPaymentReference($invoice->company_id),
                 'receipt_number' => $this->nextReceiptNumber($invoice->company_id), 'recorded_by' => $user->id,
                 'cleared_by' => ($data['status'] ?? 'recorded') === 'cleared' ? $user->id : null,
                 'cleared_at' => ($data['status'] ?? 'recorded') === 'cleared' ? now() : null, 'idempotency_key' => $key,
@@ -184,6 +192,7 @@ class InvoiceService
 
     public function cancel(CrmInvoice $invoice, User $user): CrmInvoice
     {
+        $this->assertMutationAccess($invoice, $user);
         if ($invoice->amount_paid > 0) { throw ValidationException::withMessages(['invoice' => 'An invoice with payments cannot be cancelled without reversing its payments.']); }
         $invoice->update(['status' => InvoiceStatus::Cancelled, 'cancelled_at' => now(), 'updated_by' => $user->id]);
         $this->audit->record('crm.invoice.cancelled', $invoice, 'Invoice cancelled', ['company_id' => $invoice->company_id]);
@@ -241,12 +250,38 @@ class InvoiceService
 
     private function findInvoiceForUpdate(int $invoiceId, User $user): CrmInvoice
     {
-        return CrmInvoice::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($invoiceId);
+        $invoice = CrmInvoice::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($invoiceId);
+        $this->assertMutationAccess($invoice, $user);
+
+        return $invoice;
     }
 
     private function findPaymentForUpdate(int $paymentId, User $user): CrmInvoicePayment
     {
-        return CrmInvoicePayment::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($paymentId);
+        $payment = CrmInvoicePayment::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($paymentId);
+        $this->assertMutationAccess($payment->invoice()->firstOrFail(), $user);
+
+        return $payment;
+    }
+
+    private function assertMutationAccess(CrmInvoice $invoice, User $user): void
+    {
+        if ($invoice->company_id !== $user->company_id) {
+            throw ValidationException::withMessages(['outlet' => 'This invoice is not available to your company.']);
+        }
+
+        if ($invoice->branch_id === null) {
+            if (! $this->outlets->hasCompanyWideAccess($user)) {
+                throw ValidationException::withMessages(['outlet' => 'Only a company administrator can change a historical invoice without an outlet.']);
+            }
+
+            return;
+        }
+
+        $outlet = $invoice->branch()->first();
+        if (! $outlet || ! $this->outlets->canAccess($user, $outlet)) {
+            throw ValidationException::withMessages(['outlet' => 'You are not assigned to this invoice outlet.']);
+        }
     }
 
     private function ensureDraft(CrmInvoice $invoice): void { if (! $invoice->status?->isEditable()) { throw ValidationException::withMessages(['invoice' => 'Only draft invoices can be issued.']); } }

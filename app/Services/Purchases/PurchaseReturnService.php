@@ -8,10 +8,14 @@ use App\Models\Purchases\GoodsReceipt;
 use App\Models\Purchases\PurchaseApprovalLog;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\User;
+use App\Models\Inventory\Warehouse;
+use App\Models\Inventory\StockLocation;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
 use App\Services\Inventory\StockService;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseReturnService
 {
@@ -21,6 +25,7 @@ class PurchaseReturnService
         private readonly StockService $stockService,
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly OutletAccessService $outlets,
     ) {}
 
     /**
@@ -29,14 +34,40 @@ class PurchaseReturnService
     public function create(User $user, array $data): PurchaseReturn
     {
         return DB::transaction(function () use ($user, $data): PurchaseReturn {
+            $outlet = $this->outlets->current($user);
             $receipt = empty($data['goods_receipt_id'])
                 ? null
                 : GoodsReceipt::query()->where('company_id', $user->company_id)->findOrFail((int) $data['goods_receipt_id']);
+            $warehouseId = $receipt?->warehouse_id ?? (int) $data['warehouse_id'];
+            $warehouse = Warehouse::query()
+                ->where('company_id', $user->company_id)
+                ->where('branch_id', $outlet->id)
+                ->where('is_active', true)
+                ->find($warehouseId);
+            if (! $warehouse) {
+                throw ValidationException::withMessages(['warehouse_id' => 'Choose a warehouse in your current outlet.']);
+            }
+
+            foreach ($data['items'] as $item) {
+                if (empty($item['stock_location_id'])) {
+                    continue;
+                }
+
+                $locationExists = StockLocation::query()
+                    ->where('company_id', $user->company_id)
+                    ->where('warehouse_id', $warehouse->id)
+                    ->where('is_active', true)
+                    ->whereKey((int) $item['stock_location_id'])
+                    ->exists();
+                if (! $locationExists) {
+                    throw ValidationException::withMessages(['items' => 'Each stock location must belong to the selected warehouse.']);
+                }
+            }
 
             $return = PurchaseReturn::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $user->branch_id,
-                'warehouse_id' => $receipt?->warehouse_id ?? $data['warehouse_id'],
+                'branch_id' => $outlet->id,
+                'warehouse_id' => $warehouse->id,
                 'supplier_id' => $receipt?->supplier_id ?? $data['supplier_id'],
                 'goods_receipt_id' => $receipt?->id,
                 'return_number' => $this->numbers->next($user->company_id, 'return'),
@@ -66,6 +97,7 @@ class PurchaseReturnService
 
     public function approve(PurchaseReturn $return, User $user): PurchaseReturn
     {
+        $this->assertOutletAccess($return, $user);
         $from = $return->status->value;
         $return->update([
             'status' => PurchaseReturnStatus::Approved->value,
@@ -81,6 +113,7 @@ class PurchaseReturnService
 
     public function complete(PurchaseReturn $return, User $user): PurchaseReturn
     {
+        $this->assertOutletAccess($return, $user);
         if ($return->status === PurchaseReturnStatus::Completed) {
             return $return;
         }
@@ -125,6 +158,26 @@ class PurchaseReturnService
             'to_status' => $to,
             'user_id' => $user->id,
         ]);
+    }
+
+    private function assertOutletAccess(PurchaseReturn $return, User $user): void
+    {
+        if ($return->company_id !== $user->company_id) {
+            throw ValidationException::withMessages(['outlet' => 'This return is not available to your company.']);
+        }
+
+        if ($return->branch_id === null) {
+            if (! $this->outlets->hasCompanyWideAccess($user)) {
+                throw ValidationException::withMessages(['outlet' => 'Only a company administrator can change a historical return without an outlet.']);
+            }
+
+            return;
+        }
+
+        $outlet = $return->branch()->first();
+        if (! $outlet || ! $this->outlets->canAccess($user, $outlet)) {
+            throw ValidationException::withMessages(['outlet' => 'You are not assigned to this return outlet.']);
+        }
     }
 
     /**

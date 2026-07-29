@@ -1,0 +1,59 @@
+@extends('layouts.admin')
+
+@section('title', 'Invoice Designs')
+@section('page-title', 'Invoice Designs')
+@section('breadcrumbs')
+    <span>/</span><a href="{{ route('sales.invoices.index') }}">Invoices</a><span>/</span><span>Designs</span>
+@endsection
+
+@section('content')
+    <form method="POST" action="{{ route('sales.invoices.templates.update') }}" class="mx-auto max-w-6xl space-y-6">
+        @csrf
+        @method('PUT')
+
+        <section class="border-b border-slate-200 pb-6 dark:border-slate-800">
+            <p class="text-sm font-semibold text-teal-700 dark:text-teal-300">Settings</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">Invoice designs</h1>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Choose the presentation your customers receive. Amounts, GST records, invoice numbers, and payment records stay exactly as they were recorded.</p>
+        </section>
+
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            @foreach($templates as $key => $template)
+                <label class="group cursor-pointer rounded-lg border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-md dark:bg-slate-900 @if($setting->template_key === $key) border-teal-600 ring-2 ring-teal-100 dark:ring-teal-900/50 @else border-slate-200 dark:border-slate-800 @endif">
+                    <input class="sr-only" type="radio" name="template_key" value="{{ $key }}" @checked($setting->template_key === $key)>
+                    <div class="relative h-32 overflow-hidden border border-slate-200 bg-white p-3 text-[8px] text-slate-600 shadow-inner dark:border-slate-700">
+                        @if($key === 'structured_gst_grid')
+                            <div class="border-b-2 border-slate-900 pb-2 font-bold text-slate-900">BUSINESS NAME <span class="float-right">TAX INVOICE</span></div><div class="mt-2 grid grid-cols-2 gap-1"><span class="border border-slate-700 p-1">Bill to</span><span class="border border-slate-700 p-1">Invoice details</span></div><div class="mt-2 h-10 border border-slate-700 bg-[linear-gradient(#fff_24%,#334155_25%,#fff_26%,#fff_49%,#334155_50%,#fff_51%,#fff_74%,#334155_75%,#fff_76%)]"></div>
+                        @elseif($key === 'premium_elegant')
+                            <div class="border-b border-amber-300 pb-2 text-sm font-semibold text-amber-800">BRAND NAME <span class="float-right text-[8px]">Tax Invoice</span></div><div class="mt-3 rounded border border-amber-100 bg-amber-50 p-2">Customer and invoice details</div><div class="mt-2 h-7 border-b border-amber-200"></div><div class="mt-2 ml-auto w-1/2 rounded border border-amber-200 bg-amber-50 p-1 text-right">Total due</div>
+                        @elseif($key === 'compact_detailed_gst')
+                            <div class="bg-slate-900 p-2 font-bold text-white">TAX INVOICE <span class="float-right">RPOS-0001</span></div><div class="mt-2 grid grid-cols-4 gap-px bg-slate-600 text-[7px]"><span class="bg-white p-1">Issue</span><span class="bg-white p-1">Due</span><span class="bg-white p-1">POS</span><span class="bg-white p-1">GST</span></div><div class="mt-2 h-9 border border-slate-500 bg-[repeating-linear-gradient(0deg,#fff,#fff_8px,#cbd5e1_9px)]"></div>
+                        @elseif($key === 'modern_split_panel')
+                            <div class="flex gap-2"><div class="flex-1 pt-1 text-sm font-bold text-teal-700">BRAND</div><div class="w-1/3 bg-slate-800 p-2 text-white">Tax<br>Invoice</div></div><div class="mt-2 grid grid-cols-2 gap-2"><span class="bg-slate-100 p-2">Customer</span><span class="bg-slate-100 p-2">Schedule</span></div><div class="mt-2 h-6 border-b border-slate-200"></div><div class="mt-2 ml-auto w-1/2 bg-teal-50 p-2 text-right text-teal-800">Balance</div>
+                        @else
+                            <div class="bg-slate-800 p-2 font-bold text-white">CORPORATE NAME <span class="float-right">TAX INVOICE</span></div><div class="mt-2 grid grid-cols-4 gap-px bg-slate-400"><span class="bg-white p-1">Date</span><span class="bg-white p-1">Branch</span><span class="bg-white p-1">GSTIN</span><span class="bg-white p-1">Status</span></div><div class="mt-2 h-7 border border-slate-400"></div><div class="mt-2 border-l-4 border-emerald-600 bg-emerald-50 p-1 text-right">Payable</div>
+                        @endif
+                    </div>
+                    <div class="mt-3 flex items-start justify-between gap-2"><div><p class="font-semibold text-slate-900 dark:text-white">{{ $template['name'] }}</p><p class="mt-1 min-h-10 text-xs leading-5 text-slate-500">{{ $template['businesses'] }}</p></div>@if($setting->template_key === $key)<span class="rounded-full bg-teal-100 px-2 py-1 text-[10px] font-semibold text-teal-800">Selected</span>@endif</div>
+                    <div class="mt-2 flex flex-wrap gap-1 text-[10px] font-medium text-slate-500"><span class="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ str($template['density'])->headline() }}</span><span class="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ str($template['gst_detail'])->headline() }} GST</span></div>
+                </label>
+            @endforeach
+        </section>
+
+        <section class="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-start justify-between gap-4"><div><h2 class="font-semibold text-slate-950 dark:text-white">Preview</h2><p class="mt-1 text-sm text-slate-500">The design keeps its own hierarchy for supplier details, customer blocks, item rows, GST summary, and payment balance.</p></div>@if($previewInvoice)<a target="_blank" rel="noopener" href="{{ route('sales.invoices.templates.preview', $previewInvoice) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Preview latest invoice</a>@endif</div>
+                <div class="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950"><div class="flex items-start justify-between border-b-2 border-teal-600 pb-4"><div><p class="text-lg font-semibold text-slate-900 dark:text-white">Your company</p><p class="mt-1 text-xs text-slate-500">Supplier, branch, and GST details</p></div><div class="text-right text-xs"><strong>TAX INVOICE</strong><br>RPOS-SAMPLE-001</div></div><div class="mt-4 grid gap-3 sm:grid-cols-2"><div class="rounded border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"><strong>Bill to</strong><br><span class="text-slate-500">Sample customer and address</span></div><div class="rounded border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"><strong>Invoice details</strong><br><span class="text-slate-500">Issue date, due date, place of supply</span></div></div><div class="mt-4 h-20 rounded border border-slate-300 bg-[repeating-linear-gradient(0deg,#fff,#fff_20px,#e2e8f0_21px)] dark:border-slate-700"></div><div class="mt-4 grid gap-3 sm:grid-cols-3"><span class="rounded bg-slate-200 p-2 text-xs dark:bg-slate-800">Intra-state sample</span><span class="rounded bg-slate-200 p-2 text-xs dark:bg-slate-800">Interstate sample</span><span class="rounded bg-slate-200 p-2 text-xs dark:bg-slate-800">Multi-rate sample</span></div></div>
+                @if(! $previewInvoice)<p class="mt-4 text-sm text-slate-500">Create or issue an invoice to open an authorized real-invoice preview.</p>@endif
+            </div>
+            <div class="space-y-4">
+                <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><h2 class="font-semibold text-slate-950 dark:text-white">Brand and printing</h2><div class="mt-4 grid gap-4"><label class="text-sm font-medium">Brand colour<input type="color" name="brand_color" value="{{ old('brand_color', $setting->brand_color) }}" class="mt-2 block h-10 w-full"></label><label class="text-sm font-medium">Copy label<select name="copy_label" class="mt-2 block w-full rounded-lg border-slate-300 dark:border-slate-700">@foreach(['original','duplicate','triplicate'] as $value)<option value="{{ $value }}" @selected($setting->copy_label === $value)>{{ str($value)->headline() }}</option>@endforeach</select></label><label class="text-sm font-medium">Print orientation<select name="orientation" class="mt-2 block w-full rounded-lg border-slate-300 dark:border-slate-700"><option value="portrait" @selected($setting->orientation === 'portrait')>Portrait</option><option value="landscape" @selected($setting->orientation === 'landscape')>Landscape</option></select></label></div></section>
+                <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><h2 class="font-semibold text-slate-950 dark:text-white">Payment QR</h2><p class="mt-1 text-sm text-slate-500">A local QR image is embedded only while a trusted invoice balance remains.</p><label class="mt-4 block text-sm font-medium">UPI ID or payment URL<input name="payment_qr_uri" value="{{ old('payment_qr_uri', $setting->payment_qr_uri) }}" placeholder="merchant@upi or https://..." class="mt-2 block w-full rounded-lg border-slate-300 dark:border-slate-700"><span class="mt-1 block text-xs font-normal text-slate-500">Use a UPI ID, UPI payment URI, or approved HTTPS checkout URL. Do not enter credentials or private tokens.</span></label></section>
+            </div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div><h2 class="font-semibold text-slate-950 dark:text-white">What appears on your invoice</h2><p class="mt-1 text-sm text-slate-500">Company, billing, bank, signature, and terms content comes from the existing company and invoice records. Turn presentation sections on or off below where appropriate.</p></div><div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">@foreach($defaults as $option => $default)<label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800"><input type="hidden" name="options[{{ $option }}]" value="0"><input class="mt-0.5" type="checkbox" name="options[{{ $option }}]" value="1" @checked(old('options.'.$option, data_get($setting->options, $option, $default))) @disabled(in_array($option, ['show_gst_breakup', 'show_gst_summary', 'show_hsn_sac']))><span><span class="font-medium text-slate-900 dark:text-white">{{ str($option)->replace('_', ' ')->headline() }}</span>@if(in_array($option, ['show_gst_breakup', 'show_gst_summary', 'show_hsn_sac']))<span class="mt-1 block text-xs text-slate-500">Required for GST-ready invoice output.</span>@endif</span></label>@endforeach</div></section>
+
+        <div class="sticky bottom-4 flex justify-end"><button class="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950">Save invoice design</button></div>
+    </form>
+@endsection

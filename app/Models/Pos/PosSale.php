@@ -11,21 +11,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['company_id', 'branch_id', 'customer_id', 'sale_number', 'offline_uuid', 'offline_reference', 'synced_from_offline', 'offline_created_at', 'device_id', 'status', 'subtotal', 'discount_amount', 'tax_amount', 'total_amount', 'paid_amount', 'change_amount', 'notes', 'device_type', 'held_by', 'completed_by', 'held_at', 'completed_at'])]
+#[Fillable(['company_id', 'branch_id', 'register_id', 'register_session_id', 'customer_id', 'customer_name_snapshot', 'customer_mobile_snapshot', 'sale_number', 'receipt_number', 'offline_uuid', 'offline_reference', 'completion_key', 'synced_from_offline', 'offline_created_at', 'device_id', 'status', 'currency', 'sale_type', 'subtotal', 'discount_amount', 'item_discount_total', 'bill_discount_total', 'tax_amount', 'rounding_adjustment', 'total_amount', 'paid_amount', 'change_amount', 'balance_due', 'notes', 'device_type', 'held_by', 'completed_by', 'voided_by', 'held_at', 'completed_at', 'sold_at', 'voided_at', 'void_reason'])]
 class PosSale extends Model
 {
     protected $attributes = ['status' => 'held', 'subtotal' => 0, 'discount_amount' => 0, 'tax_amount' => 0, 'total_amount' => 0, 'paid_amount' => 0, 'change_amount' => 0, 'device_type' => 'desktop'];
 
     protected function casts(): array
     {
-        return ['subtotal' => 'decimal:2', 'discount_amount' => 'decimal:2', 'tax_amount' => 'decimal:2', 'total_amount' => 'decimal:2', 'paid_amount' => 'decimal:2', 'change_amount' => 'decimal:2', 'synced_from_offline' => 'boolean', 'offline_created_at' => 'datetime', 'held_at' => 'datetime', 'completed_at' => 'datetime'];
+        return ['subtotal' => 'decimal:2', 'discount_amount' => 'decimal:2', 'item_discount_total' => 'decimal:2', 'bill_discount_total' => 'decimal:2', 'tax_amount' => 'decimal:2', 'rounding_adjustment' => 'decimal:2', 'total_amount' => 'decimal:2', 'paid_amount' => 'decimal:2', 'change_amount' => 'decimal:2', 'balance_due' => 'decimal:2', 'synced_from_offline' => 'boolean', 'offline_created_at' => 'datetime', 'held_at' => 'datetime', 'completed_at' => 'datetime', 'sold_at' => 'datetime', 'voided_at' => 'datetime'];
     }
 
     public function company(): BelongsTo { return $this->belongsTo(Company::class); }
     public function branch(): BelongsTo { return $this->belongsTo(Branch::class); }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
+    public function register(): BelongsTo { return $this->belongsTo(PosRegister::class, 'register_id'); }
+    public function registerSession(): BelongsTo { return $this->belongsTo(PosRegisterSession::class, 'register_session_id'); }
     public function holder(): BelongsTo { return $this->belongsTo(User::class, 'held_by'); }
     public function completer(): BelongsTo { return $this->belongsTo(User::class, 'completed_by'); }
+    public function voider(): BelongsTo { return $this->belongsTo(User::class, 'voided_by'); }
     public function items(): HasMany { return $this->hasMany(PosSaleItem::class); }
     public function payments(): HasMany { return $this->hasMany(PosPayment::class); }
 }

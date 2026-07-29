@@ -18,12 +18,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['company_id', 'branch_id', 'name', 'email', 'role', 'is_active', 'password', 'last_login_at'])]
+#[Fillable(['company_id', 'branch_id', 'name', 'email', 'mobile', 'role', 'is_active', 'is_platform_admin', 'verification_status', 'verification_completed_at', 'requires_password_change', 'password', 'last_login_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $attributes = [
+        'is_platform_admin' => false,
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -36,6 +40,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
+            'is_platform_admin' => 'boolean',
+            'verification_completed_at' => 'datetime',
+            'requires_password_change' => 'boolean',
             'role' => UserRole::class,
             'password' => 'hashed',
         ];
@@ -49,6 +56,11 @@ class User extends Authenticatable
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function outletAssignments(): HasMany
+    {
+        return $this->hasMany(BranchUserAssignment::class);
     }
 
     /**
@@ -106,5 +118,10 @@ class User extends Authenticatable
     public function notificationPreferences(): HasMany
     {
         return $this->hasMany(NotificationPreference::class);
+    }
+
+    public function accountVerifications(): HasMany
+    {
+        return $this->hasMany(AccountVerification::class);
     }
 }

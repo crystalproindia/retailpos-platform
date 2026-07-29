@@ -1,8 +1,19 @@
 <form class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" method="GET">
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
         <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Period<select name="range" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="this_month" @selected(request('range','this_month') === 'this_month')>This month</option><option value="last_month" @selected(request('range') === 'last_month')>Last month</option><option value="last_3_months" @selected(request('range') === 'last_3_months')>Last 3 months</option><option value="last_6_months" @selected(request('range') === 'last_6_months')>Last 6 months</option><option value="this_year" @selected(request('range') === 'this_year')>This year</option><option value="custom" @selected(request('range') === 'custom')>Custom dates</option></select></label>
         <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">From<input type="date" name="date_from" value="{{ request('date_from') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"></label>
         <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">To<input type="date" name="date_to" value="{{ request('date_to') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"></label>
+        <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            Outlet
+            <select name="outlet_id" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">
+                @if ($filterOptions['canViewAllOutlets'])
+                    <option value="all" @selected(request('outlet_id') === 'all')>All outlets</option>
+                @endif
+                @foreach ($filterOptions['outlets'] as $outlet)
+                    <option value="{{ $outlet->id }}" @selected((string) request('outlet_id', session('outlet_context_id')) === (string) $outlet->id)>{{ $outlet->name }}</option>
+                @endforeach
+            </select>
+        </label>
         <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Assigned user<select name="assigned_user_id" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">All users</option>@foreach($filterOptions['users'] as $user)<option value="{{ $user->id }}" @selected((string)request('assigned_user_id') === (string)$user->id)>{{ $user->name }}</option>@endforeach</select></label>
         <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Source<select name="source_id" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">All sources</option>@foreach($filterOptions['sources'] as $source)<option value="{{ $source->id }}" @selected((string)request('source_id') === (string)$source->id)>{{ $source->name }}</option>@endforeach</select></label>
         <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Customer<select name="customer_id" class="mt-1 block w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">All customers</option>@foreach($filterOptions['customers'] as $customer)<option value="{{ $customer->id }}" @selected((string)request('customer_id') === (string)$customer->id)>{{ $customer->company_name }}</option>@endforeach</select></label>

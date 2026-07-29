@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sidebarOpenButtons = [...document.querySelectorAll('[data-sidebar-open]')];
     const sidebarCloseButtons = [...document.querySelectorAll('[data-sidebar-close], [data-sidebar-overlay]')];
+    const sidebar = document.querySelector('[data-sidebar]');
     const mobileNavigation = window.matchMedia('(max-width: 1023px)');
     let sidebarTrigger = null;
 
@@ -63,6 +64,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     sidebarCloseButtons.forEach((button) => {
         button.addEventListener('click', () => closeSidebar());
+    });
+
+    sidebar?.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', () => {
+            if (mobileNavigation.matches) {
+                closeSidebar({ restoreFocus: false });
+            }
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && mobileNavigation.matches) {
+            closeSidebar();
+        }
     });
 
     mobileNavigation.addEventListener('change', (event) => {
@@ -114,6 +129,195 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1600);
         });
     });
+
+    const menuDialog = document.querySelector('[data-global-menu-dialog]');
+
+    if (menuDialog) {
+        const menuInput = menuDialog.querySelector('[data-global-menu-search-input]');
+        const menuResults = [...menuDialog.querySelectorAll('[data-global-menu-result]')];
+        const menuGroups = [...menuDialog.querySelectorAll('[data-global-menu-group]')];
+        const menuEmpty = menuDialog.querySelector('[data-global-menu-empty]');
+        const menuRecent = menuDialog.querySelector('[data-global-menu-recent]');
+        const menuRecentItems = menuDialog.querySelector('[data-global-menu-recent-items]');
+        const menuAliases = (() => {
+            try { return JSON.parse(document.querySelector('#global-menu-search-aliases')?.textContent || '{}'); } catch { return {}; }
+        })();
+        const recentKey = menuDialog.dataset.globalMenuRecentKey;
+        let menuTrigger = null;
+        let activeMenuResult = -1;
+
+        const normalizeMenuSearch = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const menuWords = (value) => normalizeMenuSearch(value).split(' ').filter(Boolean);
+        const editDistance = (left, right) => {
+            const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+            for (let row = 1; row <= left.length; row += 1) {
+                let diagonal = previous[0]; previous[0] = row;
+                for (let column = 1; column <= right.length; column += 1) {
+                    const nextDiagonal = previous[column];
+                    previous[column] = Math.min(previous[column] + 1, previous[column - 1] + 1, diagonal + (left[row - 1] === right[column - 1] ? 0 : 1));
+                    diagonal = nextDiagonal;
+                }
+            }
+            return previous[right.length];
+        };
+        const matchesMenuToken = (haystack, token) => haystack.includes(token) || (token.length >= 4 && haystack.split(' ').some((word) => word.length >= 4 && editDistance(word, token) <= 1));
+        const escapeMenuHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]));
+        const highlightMenuLabel = (node, value, query) => {
+            if (!node) return;
+            const normalized = normalizeMenuSearch(query);
+            const position = normalized ? value.toLowerCase().indexOf(normalized) : -1;
+            node.innerHTML = position < 0 ? escapeMenuHtml(value) : `${escapeMenuHtml(value.slice(0, position))}<mark class="rounded bg-amber-100 px-0.5 text-inherit dark:bg-amber-400/25">${escapeMenuHtml(value.slice(position, position + normalized.length))}</mark>${escapeMenuHtml(value.slice(position + normalized.length))}`;
+        };
+        const loadRecentMenus = () => {
+            try { return JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch { return []; }
+        };
+        const storeRecentMenus = (recent) => {
+            try { localStorage.setItem(recentKey, JSON.stringify(recent)); } catch { /* Browser storage is optional. */ }
+        };
+        const clearRecentMenus = () => {
+            try { localStorage.removeItem(recentKey); } catch { /* Browser storage is optional. */ }
+        };
+        const saveRecentMenu = (item) => {
+            const recent = loadRecentMenus().filter((entry) => entry.navigationKey !== item.dataset.navigationKey);
+            recent.unshift({ navigationKey: item.dataset.navigationKey, route: item.dataset.route, label: item.dataset.label, breadcrumb: item.dataset.breadcrumb, url: item.dataset.url });
+            storeRecentMenus(recent.slice(0, 5));
+        };
+        const selectableMenuResults = () => menuResults.filter((item) => !item.hidden);
+        const setActiveMenuResult = (index) => {
+            const visible = selectableMenuResults();
+            activeMenuResult = visible.length ? (index + visible.length) % visible.length : -1;
+            visible.forEach((item, itemIndex) => {
+                const active = itemIndex === activeMenuResult;
+                item.setAttribute('aria-selected', String(active));
+                item.classList.toggle('bg-slate-100', active);
+                item.classList.toggle('dark:bg-slate-800', active);
+                if (active) item.scrollIntoView({ block: 'nearest' });
+            });
+        };
+        const renderRecentMenus = () => {
+            if (!menuRecent || !menuRecentItems) return;
+            menuRecentItems.replaceChildren();
+            const sources = new Map(menuResults.map((item) => [item.dataset.navigationKey, item]));
+            const recent = loadRecentMenus().map((entry) => sources.get(entry.navigationKey)).filter(Boolean).slice(0, 5);
+            storeRecentMenus(recent.map((item) => ({
+                navigationKey: item.dataset.navigationKey,
+                route: item.dataset.route,
+                label: item.dataset.label,
+                breadcrumb: item.dataset.breadcrumb,
+                url: item.dataset.url,
+            })));
+            menuRecent.classList.toggle('hidden', recent.length === 0 || Boolean(menuInput?.value.trim()));
+            recent.forEach((source) => {
+                const clone = source.cloneNode(true);
+                clone.hidden = false;
+                clone.dataset.globalMenuRecentResult = 'true';
+                clone.addEventListener('click', () => openMenuDestination(source));
+                menuRecentItems.appendChild(clone);
+            });
+        };
+        const filterMenuResults = () => {
+            const query = menuInput?.value || '';
+            const normalized = normalizeMenuSearch(query);
+            const terms = menuWords(query);
+            const aliasSets = Object.entries(menuAliases)
+                .filter(([alias]) => normalized === normalizeMenuSearch(alias) || normalized.includes(normalizeMenuSearch(alias)))
+                .map(([, aliases]) => aliases.flatMap(menuWords));
+            const matchSets = [terms, ...aliasSets].filter((set) => set.length);
+            let visibleCount = 0;
+            menuResults.forEach((item, index) => {
+                const haystack = normalizeMenuSearch(item.dataset.search);
+                const matching = !normalized || matchSets.some((set) => set.every((term) => matchesMenuToken(haystack, term)));
+                const suggested = !normalized && index < 8;
+                item.hidden = !(matching && (normalized || suggested));
+                if (!item.hidden) visibleCount += 1;
+                highlightMenuLabel(item.querySelector('[data-global-menu-result-label]'), item.dataset.label, query);
+            });
+            menuGroups.forEach((group) => group.classList.toggle('hidden', ![...group.querySelectorAll('[data-global-menu-result]')].some((item) => !item.hidden)));
+            menuEmpty?.classList.toggle('hidden', visibleCount > 0 || !normalized);
+            renderRecentMenus();
+            setActiveMenuResult(0);
+        };
+        const closeMenuSearch = ({ restoreFocus = true } = {}) => {
+            if (menuDialog.classList.contains('hidden')) return;
+            menuDialog.classList.add('hidden');
+            menuDialog.setAttribute('aria-hidden', 'true');
+            body.classList.remove('global-menu-search-open');
+            if (restoreFocus && menuTrigger instanceof HTMLElement) menuTrigger.focus();
+            menuTrigger = null;
+        };
+        const openMenuSearch = (trigger) => {
+            menuTrigger = trigger;
+            closeDropdowns();
+            menuDialog.classList.remove('hidden');
+            menuDialog.setAttribute('aria-hidden', 'false');
+            body.classList.add('global-menu-search-open');
+            if (menuInput) menuInput.value = '';
+            filterMenuResults();
+            window.requestAnimationFrame(() => menuInput?.focus());
+        };
+        const openMenuDestination = (item) => {
+            saveRecentMenu(item);
+            window.location.assign(item.dataset.url);
+        };
+
+        document.querySelectorAll('[data-global-menu-search-open]').forEach((button) => button.addEventListener('click', () => openMenuSearch(button)));
+        menuDialog.querySelectorAll('[data-global-menu-search-close]').forEach((button) => button.addEventListener('click', () => closeMenuSearch()));
+        menuDialog.querySelector('[data-global-menu-search-clear]')?.addEventListener('click', () => { if (menuInput) { menuInput.value = ''; filterMenuResults(); menuInput.focus(); } });
+        menuDialog.querySelector('[data-global-menu-clear-recent]')?.addEventListener('click', () => { clearRecentMenus(); renderRecentMenus(); });
+        menuResults.forEach((item) => item.addEventListener('click', () => openMenuDestination(item)));
+        menuInput?.addEventListener('input', filterMenuResults);
+        menuInput?.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); setActiveMenuResult(activeMenuResult + 1); }
+            if (event.key === 'ArrowUp') { event.preventDefault(); setActiveMenuResult(activeMenuResult - 1); }
+            if (event.key === 'Enter' && activeMenuResult >= 0) { event.preventDefault(); openMenuDestination(selectableMenuResults()[activeMenuResult]); }
+        });
+        document.addEventListener('keydown', (event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openMenuSearch(document.activeElement); return; }
+            if (event.key === 'Escape' && !menuDialog.classList.contains('hidden')) { event.preventDefault(); closeMenuSearch(); }
+            if (event.key === 'Tab' && !menuDialog.classList.contains('hidden')) {
+                const focusable = [...menuDialog.querySelectorAll('button:not([hidden]), input:not([hidden])')]
+                    .filter((element) => !element.disabled && element.offsetParent !== null);
+                if (!focusable.length) return;
+                const current = focusable.indexOf(document.activeElement);
+                if (event.shiftKey && current <= 0) { event.preventDefault(); focusable.at(-1).focus(); }
+                if (!event.shiftKey && current === focusable.length - 1) { event.preventDefault(); focusable[0].focus(); }
+            }
+        });
+        if (navigator.platform?.toLowerCase().includes('mac')) {
+            document.querySelectorAll('.mac-shortcut').forEach((item) => item.classList.remove('hidden'));
+            document.querySelectorAll('.non-mac-shortcut').forEach((item) => item.classList.add('hidden'));
+        } else {
+            document.querySelectorAll('.mac-shortcut').forEach((item) => item.classList.add('hidden'));
+            document.querySelectorAll('.non-mac-shortcut').forEach((item) => item.classList.remove('hidden'));
+        }
+    }
+
+    const invoiceReminderModal = document.querySelector('[data-invoice-reminder-modal]');
+
+    if (invoiceReminderModal) {
+        const reminderOpen = document.querySelector('[data-invoice-reminder-open]');
+        let reminderTrigger = null;
+        const closeReminderModal = () => {
+            if (invoiceReminderModal.classList.contains('hidden')) return;
+            invoiceReminderModal.classList.add('hidden');
+            body.classList.remove('invoice-reminder-modal-open');
+            reminderTrigger?.focus();
+            reminderTrigger = null;
+        };
+        const openReminderModal = (trigger) => {
+            reminderTrigger = trigger;
+            closeDropdowns();
+            invoiceReminderModal.classList.remove('hidden');
+            body.classList.add('invoice-reminder-modal-open');
+            window.requestAnimationFrame(() => invoiceReminderModal.querySelector('select, textarea, button')?.focus());
+        };
+
+        reminderOpen?.addEventListener('click', () => openReminderModal(reminderOpen));
+        invoiceReminderModal.querySelectorAll('[data-invoice-reminder-close]').forEach((button) => button.addEventListener('click', closeReminderModal));
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !invoiceReminderModal.classList.contains('hidden')) closeReminderModal();
+        });
+    }
 
     const updateContentItemFields = (container) => {
         const type = container.querySelector('[data-content-section-type]')?.value;
@@ -645,6 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.innerHTML = `<input type="hidden" name="_token" value="${csrf}">`;
         const append = (name, value) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value ?? ''; form.append(input); };
         append('customer_id', state.customer?.id || '');
+        append('register_id', [...document.querySelectorAll('[data-pos-register]')].map((input) => input.value).find(Boolean) || '');
         append('device_type', posApp.dataset.posMode === 'mobile' || window.matchMedia('(max-width: 1023px)').matches ? 'mobile' : 'desktop');
         append('manual_discount_amount', manualDiscount());
         append('coupon_code', document.querySelector('[data-pos-coupon]')?.value || '');

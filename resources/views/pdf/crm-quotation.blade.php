@@ -36,7 +36,6 @@
 
     @if($quotation->notes)<div class="panel section"><h2>Notes</h2>{!! nl2br(e($quotation->notes)) !!}</div>@endif
     @if($quotation->terms_conditions)<div class="panel section"><h2>Terms and conditions</h2>{!! nl2br(e($quotation->terms_conditions)) !!}</div>@endif
-    @if($quotation->public_url)<div class="section"><h2>View proposal online</h2><div class="link">{{ $quotation->public_url }}</div></div>@endif
-    <div class="footer">RetailPOS.biz · Powered by CrystalPro · Questions? Contact your RetailPOS sales representative.</div>
+    <div class="footer">RetailPOS.biz · India +91 8072682244 · Malaysia +60 104305163 · Singapore +65 92475024 · info@retailpos.biz · global@retailpos.biz</div>
 </body>
 </html>

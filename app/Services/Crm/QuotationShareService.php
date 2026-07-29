@@ -5,27 +5,25 @@ namespace App\Services\Crm;
 use App\Enums\Crm\ActivityType;
 use App\Enums\Crm\LeadPriority;
 use App\Enums\Crm\QuotationStatus;
-use App\Mail\CrmQuotationShareMail;
 use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmQuotation;
 use App\Models\Crm\CrmQuotationShare;
 use App\Models\User;
 use App\Services\AuditLogger;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
+use App\Services\Notifications\EmailDeliveryService;
 
 class QuotationShareService
 {
     public function __construct(
         private readonly AuditLogger $auditLogger,
-        private readonly QuotationPdfService $pdf,
         private readonly QuotationService $quotations,
+        private readonly EmailDeliveryService $emailDelivery,
     ) {}
 
     /** @return array{message: string, url: ?string, phone: ?string} */
-    public function whatsappPayload(CrmQuotation $quotation): array
+    public function whatsappPayload(CrmQuotation $quotation, ?string $publicLink = null): array
     {
-        $publicLink = $quotation->public_url ?: 'A secure proposal link will be generated before sending.';
+        $publicLink ??= 'A secure proposal link will be generated before sending.';
         $message = collect([
             'Hello '.($quotation->customer_name ?: $quotation->customer_company ?: 'there').', please find your RetailPOS proposal '.$quotation->quotation_number.'.',
             'You can view it here: '.$publicLink,
@@ -45,8 +43,9 @@ class QuotationShareService
     /** @return array{message: string, url: ?string, phone: ?string} */
     public function prepareWhatsApp(CrmQuotation $quotation, User $user): array
     {
-        $quotation = $this->quotations->generatePublicLink($quotation, $user);
-        $payload = $this->whatsappPayload($quotation);
+        $link = $this->quotations->issuePublicLink($quotation, $user);
+        $quotation = $link->quotation;
+        $payload = $this->whatsappPayload($quotation, $link->url);
         $recipient = $payload['phone'];
 
         $quotation->shares()->create([
@@ -59,7 +58,7 @@ class QuotationShareService
         $this->recordActivity($quotation, $user, 'Quotation share message prepared for WhatsApp.');
         $this->auditLogger->record('crm.quotation.whatsapp_prepared', $quotation, 'Quotation WhatsApp share message prepared', [
             'company_id' => $quotation->company_id,
-            'recipient' => $recipient,
+            'has_recipient' => $recipient !== null,
         ]);
 
         return $payload;
@@ -67,11 +66,12 @@ class QuotationShareService
 
     /** @param array{to_email: string, subject: string, message_body: string, attach_pdf?: bool} $data
      * @param array<int, string> $cc
-     * @return array{sent: bool, attachment_unavailable: bool}
+     * @return array{queued: bool, configured: bool, attachment_unavailable: bool}
      */
     public function sendEmail(CrmQuotation $quotation, User $user, array $data, array $cc = []): array
     {
-        $quotation = $this->quotations->generatePublicLink($quotation, $user);
+        $link = $this->quotations->issuePublicLink($quotation, $user);
+        $quotation = $link->quotation;
         $share = $quotation->shares()->create([
             'channel' => 'email',
             'recipient' => $data['to_email'],
@@ -79,57 +79,52 @@ class QuotationShareService
             'metadata' => ['cc' => $cc, 'attachment_requested' => (bool) ($data['attach_pdf'] ?? false)],
             'created_by' => $user->id,
         ]);
-        $attachmentUnavailable = false;
-        $pdfBinary = null;
+        $delivery = $this->emailDelivery->queue(
+            companyId: $quotation->company_id,
+            recipient: $data['to_email'],
+            subject: $data['subject'],
+            templateKey: 'quotation_sent',
+            payload: [
+                'heading' => 'Your RetailPOS quotation is ready',
+                'greeting' => 'Hello '.($quotation->customer_name ?: $quotation->customer_company ?: 'there').',',
+                'message' => $data['message_body'],
+                'details' => [
+                    'Quotation' => $quotation->quotation_number,
+                    'Total' => $quotation->currency.' '.number_format((float) $quotation->grand_total, 2),
+                    'Valid until' => $quotation->valid_until?->format('d M Y') ?: 'Not specified',
+                ],
+                'action_url' => $link->url,
+                'action_label' => 'View quotation',
+            ],
+            related: $quotation,
+            createdBy: $user,
+            idempotencyKey: 'quotation-email:'.$quotation->id.':'.hash('sha256', strtolower($data['to_email']).'|'.$data['subject'].'|'.$data['message_body']),
+            recipientName: $quotation->customer_name,
+        );
 
-        if ($data['attach_pdf'] ?? false) {
-            try {
-                $pdfBinary = $this->pdf->binary($quotation);
-            } catch (Throwable $exception) {
-                report($exception);
-                $attachmentUnavailable = true;
-            }
+        if ($quotation->status === QuotationStatus::Draft && $delivery->status !== 'skipped_not_configured') {
+            $quotation = $this->quotations->markSent($quotation, $user);
         }
+        $share->update([
+            'status' => $delivery->status,
+            'sent_at' => $delivery->status === 'sent' ? now() : null,
+            'metadata' => array_merge($share->metadata ?? [], [
+                'delivery_id' => $delivery->id,
+                'attachment_included' => false,
+                'attachment_unavailable' => (bool) ($data['attach_pdf'] ?? false),
+            ]),
+        ]);
+        $this->recordActivity($quotation, $user, "Quotation {$quotation->quotation_number} email queued.");
+        $this->auditLogger->record('crm.quotation.email_queued', $quotation, 'Quotation email queued', [
+            'company_id' => $quotation->company_id,
+            'delivery_id' => $delivery->id,
+        ]);
 
-        try {
-            $mail = Mail::to($data['to_email']);
-            if ($cc !== []) {
-                $mail->cc($cc);
-            }
-            $mail->send(new CrmQuotationShareMail(
-                quotation: $quotation,
-                emailSubject: $data['subject'],
-                messageBody: $data['message_body'],
-                pdfBinary: $pdfBinary,
-                pdfFilename: $pdfBinary ? $this->pdf->filename($quotation) : null,
-            ));
-
-            if ($quotation->status === QuotationStatus::Draft) {
-                $quotation = $this->quotations->markSent($quotation, $user);
-            }
-
-            $share->update([
-                'status' => 'sent',
-                'sent_at' => now(),
-                'metadata' => array_merge($share->metadata ?? [], ['attachment_included' => $pdfBinary !== null]),
-            ]);
-            $this->recordActivity($quotation, $user, "Quotation {$quotation->quotation_number} sent by email to {$data['to_email']}.");
-            $this->auditLogger->record('crm.quotation.email_sent', $quotation, 'Quotation sent by email', [
-                'company_id' => $quotation->company_id,
-                'recipient' => $data['to_email'],
-            ]);
-
-            return ['sent' => true, 'attachment_unavailable' => $attachmentUnavailable];
-        } catch (Throwable $exception) {
-            report($exception);
-            $share->update([
-                'status' => 'failed',
-                'failed_at' => now(),
-                'metadata' => array_merge($share->metadata ?? [], ['failure' => 'mail_delivery_failed']),
-            ]);
-
-            return ['sent' => false, 'attachment_unavailable' => $attachmentUnavailable];
-        }
+        return [
+            'queued' => $delivery->status === 'queued',
+            'configured' => $delivery->status !== 'skipped_not_configured',
+            'attachment_unavailable' => (bool) ($data['attach_pdf'] ?? false),
+        ];
     }
 
     public function recordPdfDownload(CrmQuotation $quotation, User $user): void
@@ -143,9 +138,9 @@ class QuotationShareService
     }
 
     /** @return array{to_email: string, subject: string, message_body: string} */
-    public function emailDefaults(CrmQuotation $quotation): array
+    public function emailDefaults(CrmQuotation $quotation, ?string $publicLink = null): array
     {
-        $publicLink = $quotation->public_url ?: 'A secure proposal link will be included when this email is sent.';
+        $publicLink ??= 'A secure proposal link will be included when this email is sent.';
 
         return [
             'to_email' => $quotation->customer_email ?: '',

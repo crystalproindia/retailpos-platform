@@ -1,4 +1,77 @@
-# RetailPOS Platform - Phase 1 / 1.5 / 1.6 / 2 / 3 Project Structure
+# RetailPOS Platform - Command Center Project Structure
+
+## Intelligent Store Setup Wizard
+
+- `StoreSetupWizard` maps to `store_setup_wizards`, a one-record-per-company, tenant-scoped state machine for the six setup questions, safe answers, recommendations, idempotency, and completion/skipped markers.
+- `StoreSetupWizardService` validates and saves each step, regenerates deterministic recommendations server-side, applies selected categories and supported defaults transactionally, and records audit events.
+- `StoreSetupRecommendationService` uses the existing SaaS industry registry and entitlement service. Its controlled subtype/category configuration is `config/store_setup.php`; it is not a second industry registry.
+- `StoreSetupWizardController` serves `/getting-started/store-setup`, a CSV product-template handoff, review/apply, and completion. The Free 365 checklist exposes a Resume Setup action for authorised tenant administrators.
+- Phase C verification hardens the Store Setup Wizard's rendered subtype lookup and requires the review stage before setup can be applied. `docs/store-setup-wizard.md` records the local SQLite repair procedure, isolated `4d5916f` invoice-test comparison, browser verification evidence, production prerequisites, and the intentionally deferred secure product-import lifecycle.
+- `docs/invoice-payments-foundation-fix.md` records the isolated invoice-payment foundation repair, its transaction-scoped tenant reloads, preserved financial invariants, and deployment considerations.
+
+## Multi-Outlet Operations
+
+- The existing `Branch` model is the customer-facing Outlet model; `Warehouse`, `StockLevel`, and `StockMovement` remain the existing inventory authority.
+- `BranchUserAssignment`, `OutletAccessService`, and `OutletService` provide tenant-scoped default-outlet, assignment, context, entitlement-limit, archival, audit, and safe warehouse provisioning foundations.
+- `StockTransfer` and `StockTransferItem` provide a draft, dispatch, and idempotent receipt lifecycle that writes stock only through the existing stock-level and movement boundaries. See `docs/multi-outlet-setup.md`.
+- `scripts/verify-phase-g-history.sh` and `scripts/phase-g-history.php` provide the isolated SQLite historical-migration harness. It creates supported data at `e5f1810`, applies the Phase G migrations from `e9f46ba`, compares machine-readable snapshots, retries the safe outlet backfill boundary, and checks SQLite integrity.
+- Phase G.1 completes the remaining authorization boundaries. New CRM invoices and payments persist `branch_id`; invoice/payment reads are outlet-scoped, while branchless historical mutations remain administrator-only. POS sales and registers, stock adjustments, purchase returns, and their underlying warehouse/location relationships enforce the active outlet at service and repository boundaries.
+- `CrmExecutiveReportService` defaults to the current accessible outlet, returns no scoped data for an unassigned user, and permits `outlet_id=all` only for a company administrator. `database/migrations/2026_07_29_020000_add_outlet_scope_to_crm_invoices_and_payments.php` is forward-only and preserves existing records.
+
+## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
+
+Phase 8A adds a provider-neutral SaaS domain without duplicating the existing `companies`, `branches`, `users`, invoice, payment, settings, permission, audit, notification, or navigation systems. `Company` remains the tenant boundary; a company has historical `saasSubscriptions`, and its existing branches and users remain tenant scoped.
+
+### SaaS Models and Tables
+
+- `SaasPlan`, `SaasPlanFeature`, `SaasPlanLimit`, and `SaasPlanVersion` map to `saas_plans`, `saas_plan_features`, `saas_plan_limits`, and `saas_plan_versions`.
+  - Plans are soft-deleted, versioned on each save, and use stable feature keys. Empty limit values mean unlimited; zero is never treated as unlimited.
+- `SaasSubscription` and `SaasSubscriptionEvent` map to `saas_subscriptions` and `saas_subscription_events`.
+  - Subscriptions retain immutable price, tax, feature, and limit snapshots; lifecycle changes are handled only by `SubscriptionService` and recorded as events/audit records.
+- `SaasTenantOverride` supports time-bounded, auditable per-tenant feature and limit overrides.
+- `SaasTenantOnboarding` records idempotent platform-assisted tenant creation and allows a failed/incomplete workflow to be reviewed safely.
+- The Phase 8A migrations add optional country, tax, industry, and billing-contact attributes to `companies`, an explicit `users.is_platform_admin` flag, SaaS tables, and a forward-only grandfathering backfill. Existing tenants receive an active complimentary `legacy-unlimited` subscription with all registered features and unlimited limits.
+
+### Services and Middleware
+
+- `PlanService`: saves plan features/limits atomically, produces immutable plan versions, and duplicates plans as drafts.
+- `SubscriptionService`: creates subscriptions, produces unguessable subscription numbers, records lifecycle events, preserves snapshots, and clears entitlement cache on changes.
+- `TenantOnboardingService`: creates the company, primary branch, primary administrator, and first subscription in one transaction keyed by an idempotency UUID. It never stores the submitted password in onboarding payload.
+- `EntitlementService`: resolves tenant access by active subscription, feature snapshot, and time-bounded override. It is the single source for future feature checks.
+- `UsageService`: recalculates user, branch, warehouse, product, monthly invoice, and monthly POS transaction usage from source records; it does not rely on drift-prone counters.
+- `platform-admin`: requires `is_platform_admin`, deliberately separate from tenant `administrator` role.
+- `subscription.active` and `subscription.feature`: opt-in route middleware. `SAAS_ENTITLEMENT_ENFORCEMENT=false` by default, so existing modules stay available until a reviewed rollout deliberately attaches their feature middleware.
+
+### SaaS Routes and Screens
+
+- Platform-only routes under `/saas`: dashboard, plans, subscriptions, tenant detail/status controls, and assisted onboarding.
+- Tenant-administrator routes under `/account/subscription`: current plan, trial/renewal state, snapshot usage, subscription history, and provider-neutral upgrade/downgrade/cancellation requests.
+- Platform screens are intentionally not registered in the tenant Module Registry/sidebar. A tenant admin therefore cannot discover or access platform operations merely by holding a tenant administrator role.
+
+### Provider-Neutral and Rollout Limits
+
+- No Razorpay, Stripe, Cashfree, PhonePe, Google Calendar, or Google Meet integration is added or enabled.
+- No gateway credentials, charging, proration, provider webhooks, reseller commission, custom domain, or white-label provisioning is implemented in this phase.
+- Usage services and entitlement middleware are ready for a controlled, module-by-module enforcement rollout, but no existing operational route is globally locked by this release.
+- Renewal reminders and posted subscription invoices are intentionally deferred until a provider-neutral billing document and queued notification specification is approved; dashboard revenue values therefore remain labelled as readiness/estimate data rather than realised revenue.
+
+## POS Core Operations
+
+The counter-POS foundation uses `pos_sales`, `pos_sale_items`, and `pos_payments` independently of CRM invoices. The operational extension adds `pos_registers` and `pos_register_sessions`, branch/store metadata, register/session/receipt snapshots on new POS sales, transactional stock restoration for voids, and PDF receipts. `PosRegisterService`, `PosCheckoutService`, and `PosReceiptPdfService` own the register, completion, void, and receipt concerns; routes live under `/pos`, including `/pos/registers`, receipt PDF, and void actions. Details and compatibility limits are documented in `docs/pos-core-foundation.md`.
+
+## Invoices, Payments and Receipts
+
+The sales invoice foundation adds tenant-scoped invoice, item-snapshot, and payment records without replacing quotations, CRM customers, contacts, opportunities, email delivery, audit history, or the existing proforma flow. It supports approved-quotation conversion, manual draft invoices, issue/send/view/overdue/paid lifecycle calculation, partial payment recording, reversals, customer-safe invoice and receipt PDFs, secure hashed public links, manual reminders, and WhatsApp share links.
+
+Core additions are `CrmInvoice`, `CrmInvoiceItem`, `CrmInvoicePayment`, `InvoiceRepository`, `InvoiceService`, `InvoicePdfService`, `InvoiceShareService`, and `PublicInvoiceService`; admin routes live under `/sales/invoices` and public customer views under `/i/{token}`. `crm_invoices`, `crm_invoice_items`, and `crm_invoice_payments` are indexed by company and collection workflow fields. See `docs/invoices-payments-and-receipts.md` for lifecycle, security, queue operations, tax/GST limits, and deployment guidance.
+
+## Sales Pipeline and Quotations
+
+The sales foundation reuses the CRM lead, status, audit, activity, PDF, notification, and email-delivery systems rather than duplicating them. `crm_opportunities` and `crm_opportunity_stage_histories` provide tenant-scoped commercial deal tracking. `crm_activities` is extended for follow-up lifecycle fields, reminders, timezone, opportunity links, completion, and cancellation.
+
+Quotation records now support optional opportunity links, secure hashed public-link state, view/decision tracking, immutable customer decisions, and item snapshots for unit and fixed/percentage discounts. Public quotation routes live under `/q/{token}` and are rate-limited, noindex, and customer-safe. `/sales/pipeline`, `/sales/follow-ups`, `/sales/quotations`, and `/sales/opportunities` provide sales entry points while preserving the existing CRM views and role policy.
+
+See `docs/sales-pipeline-and-quotations.md` for workflow, security, delivery, deployment, and troubleshooting details.
 
 This document describes the Command Center foundation built in Phase 1, the dynamic Module Registry foundation added in Phase 1.5, the Enterprise CMS foundation added in Phase 1.6, and the Enterprise CRM foundation added in Phase 2.
 
@@ -2989,6 +3062,67 @@ The email foundation extends the existing Notification Center rather than introd
 
 Administrators manage `/settings/integrations/email`, including test delivery, password retention/removal, and company disablement. Administrators and managers can view the tenant-scoped `/settings/email-deliveries` log, with safe status/error display and failed-delivery retry. Capabilities are `integrations.email.view`, `integrations.email.manage`, `email.deliveries.view`, `email.deliveries.retry`, and `email.test.send`. Test email requests are rate limited, recipients are validated, and no SMTP value is emitted to audit data.
 
-Lead-received internal notifications and demo confirmation, reschedule, and cancellation templates are connected through the domain-event listener. Lead/demo records remain durable when SMTP is missing or delivery fails; the delivery is marked `skipped_not_configured` or `failed` without changing CRM state. Google Calendar/Meet sync code, credentials, and configuration remain untouched and paused.
+Lead-received internal notifications and demo confirmation, reschedule, and cancellation templates are connected through the domain-event listener. Lead/demo records remain durable when SMTP is missing or delivery fails; the delivery is marked `skipped_not_configured` or `failed` without changing CRM state.
 
 Current limitation: delivery confirms the local mail transport accepted the message (`sent`); provider webhooks for final inbox delivery, bounce classification, and suppression lists remain future integrations.
+# GST Compliance Foundation
+
+`app/Models/Compliance` contains tenant GST settings and GST note models. `app/Services/Compliance` contains structural GSTIN validation and the explicit state-based GST calculator. `database/migrations/2026_07_20_020000_create_gst_compliance_foundation.php` adds GST settings, masters, notes, periods, export history, and additive CRM invoice readiness fields. See `docs/gst-indian-compliance-foundation.md` for the provider and accountant-review boundary.
+
+# Command Center Navigation
+
+The sidebar and mobile drawer are generated from `config/modules.php` through `app/Support/Modules/ModuleRegistry.php`. The registry includes completed POS, Sales Invoice, GST & Compliance, CMS, email, notifications, and operations routes, while paused Google Calendar/Meet navigation remains excluded. See `docs/command-center-navigation.md`.
+
+# Purchase Invoice and Supplier Payables Foundation
+
+Phase 1A extends, rather than replaces, the existing supplier, purchase order, GRN, receiving, stock-posting, return, approval, dashboard, and registry modules. The additive tables are `purchase_invoices`, `purchase_invoice_items`, `supplier_payments`, and `supplier_payment_allocations`, with a follow-up migration adding workflow, idempotency, and numbering fields.
+
+The purchase domain now contains invoice and payment services plus payable/ageing calculations. Purchase invoices are created from accepted GRN quantities, retain tax and product snapshots, and become payable only when approved. Supplier payments can be allocated across approved invoices or kept as advances; reversal is auditable and restores outstanding amounts transactionally. See `docs/purchases/` for the architecture, workflows, GST boundary, permissions, testing, and production runbook.
+# Phase 8A — SaaS Core
+
+The SaaS foundation lives in `app/Models/Saas*`, `app/Services/Saas`, `app/Console/Commands/Saas`, `app/Http/Controllers/CommandCenter/Saas`, and `resources/views/command-center/saas`. It provides versioned plans, tenant-bound subscription snapshots, lifecycle events, onboarding, grandfathering, entitlement and usage services, platform-only administration, tenant subscription UI, white-label readiness, and reseller/tenant assignment history.
+
+# SaaS Phase A — Free 365 and Quick Provisioning
+
+`saas_industries` is the configurable stable-key industry registry. `account_verifications` stores hashed, expiring, one-time account verification codes. `TenantProvisioningService` is the atomic creation path shared by platform-admin account creation and future public signup; it creates the company, primary outlet, owner, selected subscription, pending verification record, and audit event in one transaction. `AccountVerificationService`, `IndustryRegistry`, `EntitlementService`, and `UsageService` enforce secure verification, enabled-industry selection, package access, and tenant-timezone monthly invoice usage.
+
+Free 365 is the editable `free-365` package: 365 days from activation, one active user/outlet, core POS/sales/products/customers/inventory/GST/dashboard access, no automatic renewal, and 25 shared finalised CRM/POS invoices per tenant calendar month. Expiry retains login and authorised read/export paths but blocks writes. See `docs/saas-free365.md` and `docs/tenant-provisioning.md`.
+
+See `docs/saas/` for architecture, plan/entitlement behavior, lifecycle and scheduler operations, usage enforcement, white-label and reseller boundaries, security, testing, and production recovery.
+
+# Phase 8B — SaaS Billing
+
+SaaS billing extends the Phase 8A subscription layer without reusing CRM, POS, or purchase payments. `saas_subscription_invoices`, `saas_subscription_invoice_items`, `saas_billing_payments`, and `saas_billing_refunds` hold the immutable billing ledger. `saas_billing_checkout_sessions` holds short-lived server-authored checkout state and `saas_billing_webhook_events` holds encrypted, verified inbound provider events.
+
+`SaasSubscriptionInvoiceService` owns invoice issue, manual collection, gateway payment allocation, and lifecycle renewal. `SaasBillingNumberService` uses the existing GST document-series table. `SaasInvoiceTaxService` delegates GST to the existing calculator. The provider-neutral `PaymentGateway` contract is implemented by a test-mode-only `RazorpayPaymentGateway`; encrypted credentials use the existing `IntegrationConnection` store. The platform Billing screens are under `/saas/billing`; tenant billing is under `/account/subscription/billing` and remains company-scoped. Billing scheduler commands generate invoices, process overdue invoices, queue reminders through the existing email delivery system, and reconcile payment records.
+
+See `docs/saas-billing/` for architecture, GST, test-mode gateway setup, webhooks, refunds, reconciliation, security, testing, and production operations. No live gateway credentials or Google Calendar/Meet changes are included.
+
+# CRM Invoice Template Designs
+
+CRM invoice presentation is configured per company in invoice_template_settings. The CRM invoice template, balance presentation, payment QR, and PDF services form the display boundary for the five selected PDF layouts in resources/views/invoice-templates.
+
+The Sales invoice workspace exposes settings, a tenant-authorized inline preview route, CRM browser print, PDF download, and the existing secure public PDF path. Invoice calculations, stored GST snapshots, invoice numbering, payment allocation, accounting records, SaaS billing PDFs, and Google Calendar/Meet remain unchanged. See docs/invoice-templates for architecture, templates, settings, GST presentation, PDF rendering, and tests.
+
+# Phase 8C — Invoice Delivery and Communication Hardening
+
+The customer Sales Invoice send action now queues the selected tenant invoice design as an in-memory PDF attachment through the established `EmailDeliveryService` and `SendNotificationDeliveryJob`. `InvoiceEmailAttachmentService` validates the delivery's CRM invoice reference and company boundary before invoking the existing `InvoicePdfService`, so email attachments, print, preview, download, and protected public PDF links share the same design, GST, totals, and payment-QR rendering path. The secure public link remains in the email body.
+
+`notification_deliveries` remains the only delivery ledger, now with append-only `notification_delivery_events` for lifecycle history. The lifecycle is queued, processing, sent, delivered, temporarily failed, permanently failed, bounced, rejected, or cancelled. `sent` records SMTP acceptance; `delivered` requires a signed provider event. The disabled-by-default, provider-neutral `/api/email-delivery/{provider}/webhook` contract verifies HMAC, timestamp, replay ID, company, provider, and provider message reference without storing raw provider payloads. PDFs are generated only in the queue worker and never stored as duplicate files. The invoice detail page exposes a tenant-scoped delivery history and one authorised resend action only after a temporary or permanent failure; invoice financial status is unaffected.
+
+No database migration, SaaS billing PDF change, Google Calendar/Meet work, or external PDF service is introduced. See [Invoice Delivery Hardening](docs/invoice-delivery.md) for architecture, security controls, limitations, deployment, and rollback guidance.
+
+# Phase 8E — Email Provider Readiness and Global Menu Search
+
+`EmailDeliveryProviderRegistry` and `EmailDeliveryWebhookDiagnostics` make the existing provider-neutral webhook contract operationally observable without inventing a provider adapter. The repository currently identifies generic SMTP only; `EMAIL_DELIVERY_PROVIDER` is intentionally empty and provider-confirmed delivery remains unavailable until a supported adapter, credentials, and verification contract are selected. Safe diagnostics in Email Delivery expose webhook state, selected provider, accepted/rejected event times, signature failures, processed events, and ignored duplicates without storing webhook bodies or secrets.
+
+`GlobalMenuSearchService` builds a user-scoped navigation-only index from `ModuleRegistry::sidebarForUser()` and the existing SaaS navigation registry. The shared desktop sidebar and mobile header launch the same keyboard-accessible command palette. The browser receives only permitted route metadata, aliases, icons, and breadcrumbs; it performs no per-keystroke request and never indexes customer, invoice, product, or other record data. See [Global Menu Search](docs/global-menu-search.md) for aliases, accessibility, recent-menu handling, and security boundaries.
+
+# Phase 8F — Invoice Reminders and Customer Communication
+
+The CRM sales invoice reminder foundation uses `crm_invoice_reminder_settings` and `crm_invoice_reminder_rules` for tenant-scoped automatic timing, wording, attachment, secure-link, and cooldown controls. The existing `notification_deliveries` ledger now records a nullable reminder stage and source, keeping original invoice delivery and reminder activity visibly distinct without duplicating the email lifecycle.
+
+`InvoiceReminderService` owns manual and automatic eligibility, safe wording, secure-link issue, fatigue protection, idempotent queueing, and the send-time automatic eligibility recheck. `invoices:dispatch-reminders` runs hourly through Laravel Scheduler and is bounded, company-filterable, and dry-run capable. Active Invoice Design PDFs are generated in memory at send time; reminder links are protected, hashed, and short-lived. See [Invoice Payment Reminders](docs/invoice-reminders.md) for the authorization, Hostinger cron, retry, timezone, and generic SMTP boundaries.
+# SaaS Public Free 365 Signup
+
+`app/Services/Saas/PublicFree365SignupService.php` manages short-lived public signup sessions and delegates final creation to `TenantProvisioningService`. `saas_public_signup_sessions` holds only the minimum verified-signup state. Public routes are under `/start-free`; views are in `resources/views/saas/public-signup`. The `Free365OnboardingService` adds a non-blocking tenant-scoped first-login checklist to the Command Center dashboard.

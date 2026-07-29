@@ -1,0 +1,9 @@
+@extends('layouts.admin')
+@section('title', 'Resellers')
+@section('page-title', 'Resellers')
+@section('breadcrumbs')<span>/</span><span>Platform</span><span>/</span><span>Resellers</span>@endsection
+@section('content')
+    @include('command-center.saas.partials.nav')
+    <div class="mb-5 flex justify-end"><a href="{{ route('saas.resellers.create') }}" class="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">New reseller</a></div>
+    <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800"><thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800"><tr><th class="px-5 py-3">Partner</th><th class="px-5 py-3">Contact</th><th class="px-5 py-3">Status</th><th class="px-5 py-3">Assigned tenants</th><th class="px-5 py-3"></th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-800">@forelse($resellers as $reseller)<tr><td class="px-5 py-4"><p class="font-medium text-slate-950 dark:text-white">{{ $reseller->company_name }}</p><p class="mt-1 text-xs text-slate-500">{{ $reseller->partner_code }}</p></td><td class="px-5 py-4">{{ $reseller->contact_person ?: '—' }}<p class="mt-1 text-xs text-slate-500">{{ $reseller->email }}</p></td><td class="px-5 py-4"><x-status-badge :status="$reseller->status" /></td><td class="px-5 py-4">{{ $reseller->active_tenants_count }}</td><td class="px-5 py-4 text-right"><a class="font-medium text-sky-700 dark:text-sky-300" href="{{ route('saas.resellers.show', $reseller) }}">View</a></td></tr>@empty<tr><td colspan="5" class="px-5 py-10 text-center text-slate-500">No reseller records yet.</td></tr>@endforelse</tbody></table></div></div><div class="mt-4">{{ $resellers->links() }}</div>
+@endsection

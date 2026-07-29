@@ -213,6 +213,7 @@ class CmsSeoAdminFoundationTest extends TestCase
 
     public function test_cms_metrics_are_visible_on_the_command_center_dashboard_for_managers(): void
     {
+        config(['store_setup.enabled' => false]);
         $manager = $this->user(UserRole::Manager);
         CmsPage::create([
             'company_id' => $manager->company_id,

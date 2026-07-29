@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'crm_lead_id', 'crm_company_id', 'crm_contact_id', 'assigned_user_id', 'created_by', 'type', 'subject', 'description', 'scheduled_at', 'completed_at', 'outcome', 'priority'])]
+#[Fillable(['company_id', 'crm_lead_id', 'opportunity_id', 'crm_company_id', 'crm_contact_id', 'assigned_user_id', 'created_by', 'type', 'subject', 'description', 'scheduled_at', 'reminder_at', 'timezone', 'completed_at', 'completed_by', 'cancelled_at', 'cancelled_by', 'outcome', 'priority', 'follow_up_status'])]
 class CrmActivity extends Model
 {
     use Auditable, SoftDeletes;
@@ -23,7 +23,9 @@ class CrmActivity extends Model
             'type' => ActivityType::class,
             'priority' => LeadPriority::class,
             'scheduled_at' => 'datetime',
+            'reminder_at' => 'datetime',
             'completed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -35,6 +37,11 @@ class CrmActivity extends Model
     public function lead(): BelongsTo
     {
         return $this->belongsTo(CrmLead::class, 'crm_lead_id');
+    }
+
+    public function opportunity(): BelongsTo
+    {
+        return $this->belongsTo(CrmOpportunity::class, 'opportunity_id');
     }
 
     public function crmCompany(): BelongsTo
@@ -57,8 +64,16 @@ class CrmActivity extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function completedBy(): BelongsTo { return $this->belongsTo(User::class, 'completed_by'); }
+    public function cancelledBy(): BelongsTo { return $this->belongsTo(User::class, 'cancelled_by'); }
+
     public function isCompleted(): bool
     {
         return $this->completed_at !== null;
+    }
+
+    public function isOverdue(): bool
+    {
+        return $this->completed_at === null && $this->cancelled_at === null && $this->scheduled_at?->isPast();
     }
 }

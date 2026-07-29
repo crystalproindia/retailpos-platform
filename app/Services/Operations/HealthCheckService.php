@@ -35,7 +35,7 @@ class HealthCheckService
             $this->check('storage', 'Storage write/read', 'Infrastructure', fn (): array => $this->storageCheck()),
             $this->check('scheduler', 'Scheduler availability', 'Operations', fn (): array => $this->schedulerCheck()),
             $this->countCheck('failed_jobs', 'Failed jobs', 'Queue', $this->tableCount('failed_jobs')),
-            $this->countCheck('notification_delivery_failures', 'Notification delivery failures', 'Notifications', $this->modelCount(NotificationDelivery::class, ['status' => 'failed'])),
+            $this->countCheck('notification_delivery_failures', 'Notification delivery failures', 'Notifications', NotificationDelivery::query()->whereIn('status', ['temporarily_failed', 'permanently_failed', 'bounced', 'rejected', 'failed'])->count()),
             $this->countCheck('webhook_delivery_failures', 'Webhook delivery failures', 'Notifications', $this->modelCount(WebhookDelivery::class, ['status' => 'failed'])),
             $this->countCheck('domain_event_failures', 'Domain event failures', 'Events', $this->modelCount(DomainEventLog::class, ['status' => 'failed'])),
             $this->check('php_version', 'PHP version', 'Runtime', fn (): array => [

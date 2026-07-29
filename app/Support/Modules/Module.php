@@ -3,6 +3,8 @@
 namespace App\Support\Modules;
 
 use App\Enums\UserRole;
+use App\Models\User;
+use App\Services\Saas\EntitlementService;
 
 class Module
 {
@@ -28,6 +30,10 @@ class Module
         public readonly ?string $licenseKey = null,
         public readonly ?string $parentId = null,
         public readonly array $children = [],
+        public readonly ?string $permission = null,
+        public readonly array $searchAliases = [],
+        public readonly bool $searchable = true,
+        public readonly bool $navigable = true,
     ) {
         //
     }
@@ -52,6 +58,9 @@ class Module
             badge: $attributes['badge'] ?? null,
             licenseKey: $attributes['license_key'] ?? null,
             parentId: $attributes['parent_id'] ?? null,
+            permission: $attributes['permission'] ?? null,
+            searchAliases: array_values($attributes['search_aliases'] ?? []),
+            searchable: (bool) ($attributes['searchable'] ?? true),
         );
     }
 
@@ -66,15 +75,38 @@ class Module
         return in_array($roleValue, $this->roles, true);
     }
 
+    public function allowedForUser(User $user): bool
+    {
+        if (! $this->allowedFor($user->role) || ($this->permission && ! $user->can($this->permission))) {
+            return false;
+        }
+
+        if (! config('saas.enforcement_enabled', false) || ! $this->licenseKey || ! $user->company) {
+            return true;
+        }
+
+        return app(EntitlementService::class)->allows($user->company, $this->licenseKey);
+    }
+
     public function url(): string
     {
         return route($this->route, $this->routeParameters);
     }
 
+    public function navigationIdentity(): string
+    {
+        return 'module:'.$this->id;
+    }
+
     public function isActive(): bool
     {
         if ($this->route === 'settings.show') {
-            return request()->routeIs('settings.*');
+            return request()->routeIs('settings.*')
+                || request()->routeIs('sales.invoices.templates.*');
+        }
+
+        if ($this->route === 'sales.invoices.templates.index') {
+            return request()->routeIs('sales.invoices.templates.*');
         }
 
         if (str_starts_with($this->route, 'cms.')) {
@@ -89,12 +121,28 @@ class Module
             return request()->routeIs('crm.*');
         }
 
+        if (str_starts_with($this->route, 'sales.')) {
+            return request()->routeIs('sales.*');
+        }
+
+        if (str_starts_with($this->route, 'pos.')) {
+            return request()->routeIs('pos.*');
+        }
+
+        if (str_starts_with($this->route, 'customers.')) {
+            return request()->routeIs('customers.*');
+        }
+
         if (str_starts_with($this->route, 'notifications.')) {
             return request()->routeIs('notifications.*');
         }
 
         if (str_starts_with($this->route, 'operations.')) {
             return request()->routeIs('operations.*');
+        }
+
+        if (str_starts_with($this->route, 'compliance.')) {
+            return request()->routeIs('compliance.*');
         }
 
         if (str_starts_with($this->route, 'inventory.')) {
@@ -117,7 +165,7 @@ class Module
     /**
      * @param  array<int, Module>  $children
      */
-    public function withChildren(array $children): self
+    public function withChildren(array $children, ?bool $navigable = null): self
     {
         return new self(
             id: $this->id,
@@ -135,6 +183,10 @@ class Module
             licenseKey: $this->licenseKey,
             parentId: $this->parentId,
             children: $children,
+            permission: $this->permission,
+            searchAliases: $this->searchAliases,
+            searchable: $this->searchable,
+            navigable: $navigable ?? $this->navigable,
         );
     }
 }

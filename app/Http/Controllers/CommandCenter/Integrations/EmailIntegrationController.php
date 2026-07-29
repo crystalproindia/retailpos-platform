@@ -8,6 +8,8 @@ use App\Models\NotificationDelivery;
 use App\Repositories\Integrations\CompanyEmailSettingsRepository;
 use App\Services\AuditLogger;
 use App\Services\Notifications\EmailDeliveryService;
+use App\Services\Notifications\EmailDeliveryProviderRegistry;
+use App\Services\Notifications\EmailDeliveryWebhookDiagnostics;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,15 +17,17 @@ use Illuminate\View\View;
 
 class EmailIntegrationController extends Controller
 {
-    public function index(Request $request, EmailDeliveryService $delivery): View
+    public function index(Request $request, EmailDeliveryService $delivery, EmailDeliveryProviderRegistry $providers, EmailDeliveryWebhookDiagnostics $diagnostics): View
     {
         $companyId = $request->user()->company_id;
 
         return view('command-center.integrations.email.index', [
             'setting' => app(CompanyEmailSettingsRepository::class)->forCompany($companyId),
             'configuration' => $delivery->configuration($companyId),
-            'lastSuccess' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->where('status', 'sent')->latest('delivered_at')->first(),
-            'lastFailure' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->where('status', 'failed')->latest('failed_at')->first(),
+            'lastSuccess' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->whereIn('status', ['sent', 'delivered'])->latest('sent_at')->first(),
+            'lastFailure' => NotificationDelivery::query()->where('company_id', $companyId)->where('channel', 'email')->whereIn('status', ['temporarily_failed', 'permanently_failed', 'bounced', 'rejected', 'failed'])->latest('failed_at')->first(),
+            'providerConfiguration' => $providers->configuration(),
+            'webhookDiagnostics' => $diagnostics->snapshot(),
         ]);
     }
 

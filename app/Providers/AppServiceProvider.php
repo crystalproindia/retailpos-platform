@@ -56,14 +56,33 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('email-test', fn ($request) => Limit::perMinute(3)
             ->by('email-test:'.($request->user()?->id ?? $request->ip())));
 
+        RateLimiter::for('email-delivery-webhook', fn ($request) => Limit::perMinute(60)
+            ->by('email-delivery-webhook:'.$request->ip()));
+
+        RateLimiter::for('public-quotation', fn ($request) => Limit::perMinute(30)
+            ->by('public-quotation:'.$request->ip()));
+
+        RateLimiter::for('public-invoice', fn ($request) => Limit::perMinute(30)
+            ->by('public-invoice:'.$request->ip()));
+
+        RateLimiter::for('public-signup', fn ($request) => Limit::perMinute(10)
+            ->by('public-signup:'.$request->ip()));
+
+        RateLimiter::for('public-signup-otp', fn ($request) => Limit::perMinute(6)
+            ->by('public-signup-otp:'.$request->ip()));
+
         Gate::policy(CrmLead::class, CrmLeadPolicy::class);
         Gate::policy(CrmCompany::class, CrmCompanyPolicy::class);
         Gate::policy(CrmContact::class, CrmContactPolicy::class);
         Gate::policy(CrmActivity::class, CrmActivityPolicy::class);
 
         collect(config('permissions.capabilities', []))->each(function (array $roles, string $capability): void {
-            Gate::define($capability, function (User $user) use ($roles): bool {
+            Gate::define($capability, function (User $user) use ($roles, $capability): bool {
                 $role = $user->role instanceof UserRole ? $user->role->value : $user->role;
+
+                if (str_starts_with($capability, 'saas.')) {
+                    return $user->is_platform_admin && in_array($role, $roles, true);
+                }
 
                 return in_array($role, $roles, true);
             });

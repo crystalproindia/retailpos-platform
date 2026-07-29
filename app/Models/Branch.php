@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['company_id', 'name', 'code', 'email', 'phone', 'address', 'city', 'state', 'country', 'is_primary', 'is_active'])]
+#[Fillable(['company_id', 'name', 'legal_name', 'code', 'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'country_code', 'tax_number', 'timezone', 'currency', 'invoice_prefix', 'receipt_prefix', 'is_primary', 'is_active', 'created_by', 'updated_by', 'archived_at'])]
 class Branch extends Model
 {
     use Auditable, HasFactory;
@@ -25,6 +25,7 @@ class Branch extends Model
         return [
             'is_primary' => 'boolean',
             'is_active' => 'boolean',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -66,5 +67,10 @@ class Branch extends Model
     public function posSales(): HasMany
     {
         return $this->hasMany(PosSale::class);
+    }
+
+    public function userAssignments(): HasMany
+    {
+        return $this->hasMany(BranchUserAssignment::class);
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\AccountVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CommandCenter\Cms\CmsArticleController;
@@ -29,6 +30,9 @@ use App\Http\Controllers\CommandCenter\Cms\CmsSettingsController as CmsAdminSett
 use App\Http\Controllers\CommandCenter\Cms\CmsTestimonialController;
 use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
 use App\Http\Controllers\CommandCenter\Cms\CmsTrustMetricController;
+use App\Http\Controllers\CommandCenter\Compliance\GstSettingsController;
+use App\Http\Controllers\CommandCenter\Compliance\GstNoteController;
+use App\Http\Controllers\CommandCenter\Compliance\GstComplianceController;
 use App\Http\Controllers\CommandCenter\Crm\ActivityController;
 use App\Http\Controllers\CommandCenter\Crm\AiLeadAssistantController;
 use App\Http\Controllers\CommandCenter\Crm\ContactController;
@@ -43,6 +47,10 @@ use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
+use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
+use App\Http\Controllers\CommandCenter\Crm\InvoiceReminderSettingsController;
+use App\Http\Controllers\CommandCenter\Crm\InvoiceTemplateController;
+use App\Http\Controllers\CommandCenter\Crm\OpportunityController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaShareController;
@@ -76,8 +84,10 @@ use App\Http\Controllers\CommandCenter\Inventory\SalesChannelController;
 use App\Http\Controllers\CommandCenter\Inventory\StockAdjustmentController;
 use App\Http\Controllers\CommandCenter\Inventory\StockLedgerController;
 use App\Http\Controllers\CommandCenter\Inventory\StockLocationController;
+use App\Http\Controllers\CommandCenter\Inventory\StockTransferController;
 use App\Http\Controllers\CommandCenter\Inventory\WarehouseController;
 use App\Http\Controllers\CommandCenter\ModuleController;
+use App\Http\Controllers\CommandCenter\OutletController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController;
@@ -91,6 +101,7 @@ use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
 use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
 use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
 use App\Http\Controllers\CommandCenter\Pos\PosController;
+use App\Http\Controllers\CommandCenter\Pos\PosRegisterController;
 use App\Http\Controllers\CommandCenter\Pos\PosOfflineController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionCampaignController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionCouponController;
@@ -101,17 +112,35 @@ use App\Http\Controllers\CommandCenter\Promotions\PromotionSimulatorController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionUsageController;
 use App\Http\Controllers\CommandCenter\Purchases\GoodsReceiptController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseDashboardController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseInvoiceController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseOrderController;
+use App\Http\Controllers\CommandCenter\Purchases\PurchaseReportController;
+use App\Http\Controllers\CommandCenter\Purchases\SupplierPaymentController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseRequestController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseReturnController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
 use App\Http\Controllers\CommandCenter\SettingsController;
+use App\Http\Controllers\CommandCenter\CompanyProfileController;
+use App\Http\Controllers\CommandCenter\Free365OnboardingController;
+use App\Http\Controllers\CommandCenter\StoreSetupWizardController;
+use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
+use App\Http\Controllers\CommandCenter\Saas\SaasBillingController;
+use App\Http\Controllers\CommandCenter\Saas\SaasBillingGatewayController;
+use App\Http\Controllers\CommandCenter\Saas\SaasPlanController;
+use App\Http\Controllers\CommandCenter\Saas\SaasResellerController;
+use App\Http\Controllers\CommandCenter\Saas\SaasSubscriptionController;
+use App\Http\Controllers\CommandCenter\Saas\SaasTenantOnboardingController;
+use App\Http\Controllers\CommandCenter\Saas\TenantSubscriptionController;
+use App\Http\Controllers\CommandCenter\Saas\TenantBillingController;
+use App\Http\Controllers\CommandCenter\Saas\WhiteLabelController;
 use App\Http\Controllers\Portal\CustomerPortalAccessController;
 use App\Http\Controllers\Portal\CustomerPortalController;
 use App\Http\Controllers\PublicProformaController;
 use App\Http\Controllers\PublicQuotationController;
+use App\Http\Controllers\PublicInvoiceController;
+use App\Http\Controllers\PublicSaasSignupController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -120,8 +149,26 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
-Route::get('q/{publicToken}', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
+Route::prefix('q/{publicToken}')->middleware('throttle:public-quotation')->group(function (): void {
+    Route::get('/', [PublicQuotationController::class, 'show'])->name('quotations.public.show');
+    Route::get('pdf', [PublicQuotationController::class, 'pdf'])->name('quotations.public.pdf');
+    Route::post('decision', [PublicQuotationController::class, 'respond'])->name('quotations.public.decision');
+});
+Route::prefix('i/{token}')->middleware('throttle:public-invoice')->group(function (): void {
+    Route::get('/', [PublicInvoiceController::class, 'show'])->name('invoices.public.show');
+    Route::get('pdf', [PublicInvoiceController::class, 'pdf'])->name('invoices.public.pdf');
+    Route::get('receipts/{payment}', [PublicInvoiceController::class, 'receipt'])->whereNumber('payment')->name('invoices.public.receipts.pdf');
+});
 Route::get('pi/{publicToken}', [PublicProformaController::class, 'show'])->name('proformas.public.show');
+
+Route::prefix('start-free')->name('saas.public-signup.')->group(function (): void {
+    Route::get('/', [PublicSaasSignupController::class, 'show'])->name('show');
+    Route::post('verification', [PublicSaasSignupController::class, 'begin'])->middleware('throttle:public-signup')->name('begin');
+    Route::post('verification/confirm', [PublicSaasSignupController::class, 'verify'])->middleware('throttle:public-signup-otp')->name('verify');
+    Route::post('verification/resend', [PublicSaasSignupController::class, 'resend'])->middleware('throttle:public-signup-otp')->name('resend');
+    Route::post('store', [PublicSaasSignupController::class, 'complete'])->middleware('throttle:public-signup')->name('complete');
+    Route::get('success', [PublicSaasSignupController::class, 'success'])->name('success');
+});
 
 Route::prefix('portal')->name('portal.')->group(function (): void {
     Route::middleware(['portal.guest'])->group(function (): void {
@@ -166,8 +213,85 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
+    Route::get('account/verification', [AccountVerificationController::class, 'show'])->name('account.verification.show');
+    Route::post('account/verification', [AccountVerificationController::class, 'verify'])->middleware('throttle:10,1')->name('account.verification.verify');
+    Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
+
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('getting-started/store-setup')->name('onboarding.store-setup.')->group(function (): void {
+        Route::get('/', [StoreSetupWizardController::class, 'show'])->name('show');
+        Route::post('start', [StoreSetupWizardController::class, 'start'])->middleware('can:store.setup.manage')->name('start');
+        Route::post('save', [StoreSetupWizardController::class, 'save'])->middleware('can:store.setup.manage')->name('save');
+        Route::post('skip', [StoreSetupWizardController::class, 'skip'])->middleware('can:store.setup.manage')->name('skip');
+        Route::post('apply', [StoreSetupWizardController::class, 'apply'])->middleware('can:store.setup.manage')->name('apply');
+        Route::get('complete', [StoreSetupWizardController::class, 'complete'])->name('complete');
+        Route::get('product-template', [StoreSetupWizardController::class, 'template'])->middleware('can:store.setup.manage')->name('template');
+    });
+    Route::post('settings/free365-onboarding/dismiss', [Free365OnboardingController::class, 'dismiss'])->name('free365-onboarding.dismiss');
     Route::get('modules/{module}', ModuleController::class)->name('modules.show');
+
+    Route::middleware('role:administrator')->prefix('account/subscription')->name('account.subscription.')->group(function (): void {
+        Route::get('/', [TenantSubscriptionController::class, 'index'])->middleware('can:subscription.view')->name('index');
+        Route::post('requests', [TenantSubscriptionController::class, 'requestChange'])->middleware('can:subscription.request-plan-change')->name('requests.store');
+        Route::get('billing', [TenantBillingController::class, 'index'])->middleware('can:subscription.billing.view')->name('billing.index');
+        Route::get('billing/invoices/{invoice}', [TenantBillingController::class, 'show'])->middleware('can:subscription.billing.view')->name('billing.show');
+        Route::get('billing/invoices/{invoice}/pdf', [TenantBillingController::class, 'pdf'])->middleware('can:subscription.billing.view')->name('billing.pdf');
+        Route::post('billing/invoices/{invoice}/checkout', [TenantBillingController::class, 'checkout'])->middleware(['can:subscription.billing.pay', 'throttle:10,1'])->name('billing.checkout');
+        Route::get('billing/invoices/{invoice}/checkout/{session}', [TenantBillingController::class, 'checkoutShow'])->middleware('can:subscription.billing.pay')->name('billing.checkout.show');
+        Route::post('billing/invoices/{invoice}/checkout/{session}/callback', [TenantBillingController::class, 'callback'])->middleware(['can:subscription.billing.pay', 'throttle:10,1'])->name('billing.checkout.callback');
+        Route::get('billing/invoices/{invoice}/receipts/{payment}', [TenantBillingController::class, 'receipt'])->middleware('can:subscription.billing.receipts.view')->name('billing.receipt');
+        Route::get('white-label', [WhiteLabelController::class, 'edit'])->name('white-label.edit');
+        Route::put('white-label', [WhiteLabelController::class, 'update'])->name('white-label.update');
+    });
+
+    Route::middleware('platform-admin')->prefix('saas')->name('saas.')->group(function (): void {
+        Route::get('/', SaasDashboardController::class)->middleware('can:saas.dashboard.view')->name('dashboard');
+        Route::get('billing', [SaasBillingController::class, 'index'])->middleware('can:saas.billing.view')->name('billing.index');
+        Route::get('billing/invoices', [SaasBillingController::class, 'index'])->middleware('can:saas.billing.view')->name('billing.invoices.index');
+        Route::get('billing/payments', [SaasBillingController::class, 'payments'])->middleware('can:saas.billing.view')->name('billing.payments.index');
+        Route::get('billing/refunds', [SaasBillingController::class, 'refunds'])->middleware('can:saas.billing.refund')->name('billing.refunds.index');
+        Route::get('billing/reconciliation', [SaasBillingController::class, 'reconciliation'])->middleware('can:saas.billing.reconcile')->name('billing.reconciliation.index');
+        Route::get('billing/reports', [SaasBillingController::class, 'reports'])->middleware('can:saas.billing.view')->name('billing.reports');
+        Route::get('billing/invoices/{invoice}', [SaasBillingController::class, 'show'])->middleware('can:saas.billing.view')->name('billing.show');
+        Route::post('billing/invoices/{invoice}/issue', [SaasBillingController::class, 'issue'])->middleware('can:saas.billing.issue')->name('billing.issue');
+        Route::post('billing/invoices/{invoice}/void', [SaasBillingController::class, 'void'])->middleware('can:saas.billing.void')->name('billing.void');
+        Route::post('billing/invoices/{invoice}/payments', [SaasBillingController::class, 'payment'])->middleware('can:saas.billing.record-payment')->name('billing.payments.store');
+        Route::get('billing/invoices/{invoice}/pdf', [SaasBillingController::class, 'pdf'])->middleware('can:saas.billing.view')->name('billing.pdf');
+        Route::get('billing/invoices/{invoice}/receipts/{payment}', [SaasBillingController::class, 'receipt'])->middleware('can:saas.billing.view')->name('billing.receipt');
+        Route::post('billing/payments/{payment}/refunds', [SaasBillingController::class, 'requestRefund'])->middleware('can:saas.billing.refund')->name('billing.refunds.store');
+        Route::post('billing/refunds/{refund}/approve', [SaasBillingController::class, 'approveRefund'])->middleware('can:saas.billing.refund')->name('billing.refunds.approve');
+        Route::get('billing/gateway', [SaasBillingGatewayController::class, 'index'])->middleware('can:saas.billing.gateway.manage')->name('billing.gateway.index');
+        Route::put('billing/gateway', [SaasBillingGatewayController::class, 'update'])->middleware('can:saas.billing.gateway.manage')->name('billing.gateway.update');
+        Route::post('billing/gateway/test', [SaasBillingGatewayController::class, 'test'])->middleware('can:saas.billing.gateway.manage')->name('billing.gateway.test');
+        Route::get('plans', [SaasPlanController::class, 'index'])->middleware('can:saas.plans.view')->name('plans.index');
+        Route::get('plans/create', [SaasPlanController::class, 'create'])->middleware('can:saas.plans.create')->name('plans.create');
+        Route::post('plans', [SaasPlanController::class, 'store'])->middleware('can:saas.plans.create')->name('plans.store');
+        Route::get('plans/{plan}', [SaasPlanController::class, 'show'])->middleware('can:saas.plans.view')->name('plans.show');
+        Route::get('plans/{plan}/edit', [SaasPlanController::class, 'edit'])->middleware('can:saas.plans.update')->name('plans.edit');
+        Route::put('plans/{plan}', [SaasPlanController::class, 'update'])->middleware('can:saas.plans.update')->name('plans.update');
+        Route::post('plans/{plan}/duplicate', [SaasPlanController::class, 'duplicate'])->middleware('can:saas.plans.create')->name('plans.duplicate');
+        Route::post('plans/{plan}/archive', [SaasPlanController::class, 'archive'])->middleware('can:saas.plans.archive')->name('plans.archive');
+        Route::get('subscriptions', [SaasSubscriptionController::class, 'index'])->middleware('can:saas.subscriptions.view')->name('subscriptions.index');
+        Route::post('subscriptions/{subscription}/transition', [SaasSubscriptionController::class, 'transition'])->middleware('can:saas.subscriptions.update')->name('subscriptions.transition');
+        Route::post('subscriptions/{subscription}/renew', [SaasSubscriptionController::class, 'renew'])->middleware('can:saas.subscriptions.renew')->name('subscriptions.renew');
+        Route::post('subscriptions/{subscription}/trials/extend', [SaasSubscriptionController::class, 'extendTrial'])->middleware('can:saas.trials.extend')->name('subscriptions.trials.extend');
+        Route::post('subscriptions/{subscription}/plan-change', [SaasSubscriptionController::class, 'changePlan'])->middleware('can:saas.subscriptions.update')->name('subscriptions.plan-change');
+        Route::delete('subscriptions/{subscription}/plan-change', [SaasSubscriptionController::class, 'cancelPlanChange'])->middleware('can:saas.subscriptions.update')->name('subscriptions.plan-change.cancel');
+        Route::get('tenants/create', [SaasTenantOnboardingController::class, 'create'])->middleware('can:saas.tenants.create')->name('tenants.create');
+        Route::post('tenants', [SaasTenantOnboardingController::class, 'store'])->middleware('can:saas.tenants.create')->name('tenants.store');
+        Route::get('tenants/{company}', [SaasSubscriptionController::class, 'show'])->middleware('can:saas.tenants.view')->name('tenants.show');
+        Route::get('onboarding', [SaasTenantOnboardingController::class, 'index'])->middleware('can:saas.onboarding.manage')->name('onboarding.index');
+        Route::get('onboarding/create', [SaasTenantOnboardingController::class, 'create'])->middleware('can:saas.tenants.create')->name('onboarding.create');
+        Route::post('onboarding', [SaasTenantOnboardingController::class, 'store'])->middleware('can:saas.onboarding.manage')->name('onboarding.store');
+        Route::get('resellers', [SaasResellerController::class, 'index'])->middleware('can:saas.resellers.view')->name('resellers.index');
+        Route::get('resellers/create', [SaasResellerController::class, 'create'])->middleware('can:saas.resellers.manage')->name('resellers.create');
+        Route::post('resellers', [SaasResellerController::class, 'store'])->middleware('can:saas.resellers.manage')->name('resellers.store');
+        Route::get('resellers/{reseller}', [SaasResellerController::class, 'show'])->middleware('can:saas.resellers.view')->name('resellers.show');
+        Route::get('resellers/{reseller}/edit', [SaasResellerController::class, 'edit'])->middleware('can:saas.resellers.manage')->name('resellers.edit');
+        Route::put('resellers/{reseller}', [SaasResellerController::class, 'update'])->middleware('can:saas.resellers.manage')->name('resellers.update');
+        Route::post('resellers/{reseller}/tenants', [SaasResellerController::class, 'assign'])->middleware('can:saas.resellers.manage')->name('resellers.tenants.assign');
+        Route::delete('resellers/{reseller}/tenants/{assignment}', [SaasResellerController::class, 'unassign'])->middleware('can:saas.resellers.manage')->name('resellers.tenants.unassign');
+    });
 
     Route::prefix('integrations/google')->name('integrations.google.')->group(function (): void {
         Route::get('/', [GoogleCalendarIntegrationController::class, 'index'])->middleware('can:integrations.google.view')->name('index');
@@ -221,6 +345,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject'])->middleware('can:crm.quotations.reject')->name('quotations.reject');
         Route::post('quotations/{quotation}/convert', [QuotationController::class, 'convert'])->middleware('can:crm.quotations.update')->name('quotations.convert');
         Route::post('quotations/{quotation}/public-link', [QuotationController::class, 'publicLink'])->middleware('can:crm.quotations.update')->name('quotations.public-link');
+        Route::post('quotations/{quotation}/revision', [QuotationController::class, 'revision'])->middleware('can:crm.quotations.update')->name('quotations.revision');
         Route::get('quotations/{quotation}/pdf', [QuotationShareController::class, 'downloadPdf'])->middleware('can:crm.quotations.view')->name('quotations.pdf.download');
         Route::get('quotations/{quotation}/pdf/preview', [QuotationShareController::class, 'previewPdf'])->middleware('can:crm.quotations.view')->name('quotations.pdf.preview');
         Route::get('quotations/{quotation}/email/create', [QuotationShareController::class, 'createEmail'])->middleware('can:crm.quotations.send')->name('quotations.email.create');
@@ -306,8 +431,49 @@ Route::middleware('auth')->group(function (): void {
         Route::post('activities', [ActivityController::class, 'store'])->middleware('can:crm.activities.manage')->name('activities.store');
         Route::post('activities/{activity}/complete', [ActivityController::class, 'complete'])->middleware('can:crm.activities.manage')->name('activities.complete');
         Route::patch('activities/{activity}/reschedule', [ActivityController::class, 'reschedule'])->middleware('can:crm.activities.manage')->name('activities.reschedule');
+        Route::post('activities/{activity}/cancel', [ActivityController::class, 'cancel'])->middleware('can:sales.followups.manage')->name('activities.cancel');
 
         Route::get('follow-ups', FollowUpController::class)->middleware('can:crm.activities.manage')->name('followups.index');
+    });
+
+    Route::middleware(['role:administrator,manager,sales'])->prefix('sales')->name('sales.')->group(function (): void {
+        Route::get('pipeline', fn () => redirect()->route('crm.pipeline.index'))->middleware('can:sales.pipeline.view')->name('pipeline.index');
+        Route::get('follow-ups', fn () => redirect()->route('crm.followups.index'))->middleware('can:sales.followups.view')->name('followups.index');
+        Route::get('quotations', fn () => redirect()->route('crm.quotations.index'))->middleware('can:sales.quotations.view')->name('quotations.index');
+        Route::get('leads/{lead}/opportunities/create', [OpportunityController::class, 'create'])->middleware('can:sales.opportunities.create')->name('opportunities.create');
+        Route::post('leads/{lead}/opportunities', [OpportunityController::class, 'store'])->middleware('can:sales.opportunities.create')->name('opportunities.store');
+        Route::get('opportunities', [OpportunityController::class, 'index'])->middleware('can:sales.opportunities.view')->name('opportunities.index');
+        Route::post('opportunities/{opportunity}/move', [OpportunityController::class, 'move'])->middleware('can:sales.opportunities.update')->name('opportunities.move');
+        Route::get('invoices', [InvoiceController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.index');
+        Route::get('invoices/designs', [InvoiceTemplateController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.templates.index');
+        Route::put('invoices/designs', [InvoiceTemplateController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.templates.update');
+        Route::get('invoices/designs/preview/{invoice}', [InvoiceTemplateController::class, 'preview'])->middleware('can:sales.invoices.view')->name('invoices.templates.preview');
+        Route::get('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'index'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings');
+        Route::put('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'update'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.update');
+        Route::post('invoices/reminders/settings/restore-defaults', [InvoiceReminderSettingsController::class, 'restore'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.restore');
+        Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
+        Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');
+        Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('can:sales.finance.export')->name('invoices.export');
+        Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->middleware('can:sales.invoices.update')->name('invoices.edit');
+        Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.update');
+        Route::get('quotations/{quotation}/invoices/create', [InvoiceController::class, 'createFromQuotation'])->middleware('can:sales.invoices.create')->name('invoices.create-from-quotation');
+        Route::post('quotations/{quotation}/invoices', [InvoiceController::class, 'storeFromQuotation'])->middleware('can:sales.invoices.create')->name('invoices.store-from-quotation');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('can:sales.invoices.view')->name('invoices.show');
+        Route::post('invoices/{invoice}/issue', [InvoiceController::class, 'issue'])->middleware('can:sales.invoices.issue')->name('invoices.issue');
+        Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'payment'])->middleware('can:sales.payments.record')->name('invoices.payments.store');
+        Route::post('invoices/{invoice}/payments/{payment}/clear', [InvoiceController::class, 'clear'])->middleware('can:sales.payments.clear')->name('invoices.payments.clear');
+        Route::post('invoices/{invoice}/payments/{payment}/reverse', [InvoiceController::class, 'reverse'])->middleware('can:sales.payments.reverse')->name('invoices.payments.reverse');
+        Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('can:sales.invoices.cancel')->name('invoices.cancel');
+        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->middleware('can:sales.invoices.pdf')->name('invoices.print');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('can:sales.invoices.pdf')->name('invoices.pdf');
+        Route::get('invoices/{invoice}/receipts/{payment}', [InvoiceController::class, 'receipt'])->middleware('can:sales.receipts.pdf')->name('invoices.receipts.pdf');
+        Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->middleware('can:sales.invoices.send')->name('invoices.send');
+        Route::post('invoices/{invoice}/email-deliveries/{delivery}/resend', [InvoiceController::class, 'resend'])->middleware('can:sales.invoices.send')->name('invoices.email-deliveries.resend');
+        Route::get('invoices/{invoice}/whatsapp', [InvoiceController::class, 'whatsapp'])->middleware('can:sales.invoices.send')->name('invoices.whatsapp');
+        Route::post('invoices/{invoice}/reminder', [InvoiceController::class, 'reminder'])->middleware('can:sales.reminders.send')->name('invoices.reminder');
+        Route::post('invoices/{invoice}/public-link/revoke', [InvoiceController::class, 'revokeLink'])->middleware('can:sales.invoices.public_link')->name('invoices.public-link.revoke');
+        Route::post('invoices/{invoice}/payments/{payment}/receipt/send', [InvoiceController::class, 'sendReceipt'])->middleware('can:sales.receipts.send')->name('invoices.receipts.send');
+        Route::get('invoices/{invoice}/payments/{payment}/receipt/whatsapp', [InvoiceController::class, 'receiptWhatsapp'])->middleware('can:sales.receipts.send')->name('invoices.receipts.whatsapp');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:customers.view'])->prefix('customers')->name('customers.')->group(function (): void {
@@ -341,6 +507,10 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:pos.view'])->prefix('pos')->name('pos.')->group(function (): void {
+        Route::get('registers', [PosRegisterController::class, 'index'])->middleware('can:pos.registers.view')->name('registers.index');
+        Route::post('registers', [PosRegisterController::class, 'store'])->middleware('can:pos.registers.manage')->name('registers.store');
+        Route::post('registers/{register}/open', [PosRegisterController::class, 'open'])->whereNumber('register')->middleware('can:pos.sessions.open')->name('registers.open');
+        Route::post('register-sessions/{session}/close', [PosRegisterController::class, 'close'])->whereNumber('session')->middleware('can:pos.sessions.close')->name('registers.sessions.close');
         Route::get('/', [PosController::class, 'index'])->name('index');
         Route::get('dashboard', [PosController::class, 'dashboard'])->name('dashboard');
         Route::get('terminal', [PosController::class, 'terminal'])->name('terminal');
@@ -354,6 +524,7 @@ Route::middleware('auth')->group(function (): void {
             Route::post('records/{record}/retry', [PosOfflineController::class, 'retry'])->whereNumber('record')->middleware(['role:administrator,manager', 'can:pos.offline.retry'])->name('records.retry');
         });
         Route::get('held', [PosController::class, 'heldBills'])->middleware('can:pos.hold')->name('held.index');
+        Route::get('sales', [PosController::class, 'salesHistory'])->middleware('can:pos.sales.view')->name('sales.index');
         Route::get('catalog', [PosController::class, 'catalog'])->name('catalog');
         Route::get('customers/lookup', [PosController::class, 'customer'])->name('customers.lookup');
         Route::post('customers/quick-create', [PosController::class, 'quickCustomer'])->middleware('can:pos.customers.create')->name('customers.quick-create');
@@ -361,6 +532,24 @@ Route::middleware('auth')->group(function (): void {
         Route::post('checkout', [PosController::class, 'complete'])->middleware('can:pos.checkout')->name('checkout');
         Route::get('held/{sale}', [PosController::class, 'resume'])->whereNumber('sale')->middleware('can:pos.hold')->name('held.resume');
         Route::get('receipts/{sale}', [PosController::class, 'receipt'])->whereNumber('sale')->name('receipts.show');
+        Route::get('receipts/{sale}/pdf', [PosController::class, 'receiptPdf'])->whereNumber('sale')->middleware('can:pos.receipts.view')->name('receipts.pdf');
+        Route::post('sales/{sale}/void', [PosController::class, 'void'])->whereNumber('sale')->middleware('can:pos.sales.void')->name('sales.void');
+    });
+
+    Route::middleware(['role:administrator,manager', 'can:compliance.gst.view'])->prefix('compliance/gst')->name('compliance.gst.')->group(function (): void {
+        Route::get('/', [GstComplianceController::class, 'dashboard'])->name('dashboard');
+        Route::get('settings', [GstSettingsController::class, 'index'])->name('settings.index');
+        Route::put('settings', [GstSettingsController::class, 'update'])->middleware('can:compliance.gst.settings.manage')->name('settings.update');
+        Route::get('notes', [GstNoteController::class, 'index'])->middleware('can:compliance.credit_notes.view')->name('notes.index');
+        Route::post('notes', [GstNoteController::class, 'store'])->middleware('can:compliance.credit_notes.create')->name('notes.store');
+        Route::get('reports/{report?}', [GstComplianceController::class, 'reports'])->middleware('can:compliance.gst.reports.view')->name('reports.index');
+        Route::get('exports', [GstComplianceController::class, 'exports'])->middleware('can:compliance.gst.exports.create')->name('exports.index');
+        Route::post('exports/download', [GstComplianceController::class, 'downloadExport'])->middleware('can:compliance.gst.exports.create')->name('exports.download');
+        Route::get('filing-guide', [GstComplianceController::class, 'guide'])->name('guide');
+        Route::get('periods', [GstComplianceController::class, 'periods'])->middleware('can:compliance.gst.periods.review')->name('periods.index');
+        Route::put('periods/{period}', [GstComplianceController::class, 'transitionPeriod'])->middleware('can:compliance.gst.periods.lock')->name('periods.transition');
+        Route::get('document-series', [GstComplianceController::class, 'series'])->name('series.index');
+        Route::get('e-way-bills', [GstComplianceController::class, 'eway'])->middleware('can:compliance.ewaybill.validate')->name('eway.index');
     });
 
     Route::middleware(['role:administrator,manager', 'can:cms.view'])->prefix('cms')->name('cms.')->group(function (): void {
@@ -633,6 +822,10 @@ Route::middleware('auth')->group(function (): void {
         Route::post('locations/{location}/restore', [StockLocationController::class, 'restore'])->middleware('can:inventory.warehouses.manage')->name('locations.restore');
 
         Route::get('stock-ledger', StockLedgerController::class)->middleware('can:inventory.stock.view')->name('stock.ledger');
+        Route::get('transfers', [StockTransferController::class, 'index'])->middleware('can:inventory.transfers.view')->name('transfers.index');
+        Route::post('transfers', [StockTransferController::class, 'store'])->middleware('can:inventory.transfers.create')->name('transfers.store');
+        Route::post('transfers/{transfer}/dispatch', [StockTransferController::class, 'dispatch'])->middleware('can:inventory.transfers.dispatch')->name('transfers.dispatch');
+        Route::post('transfers/{transfer}/receive', [StockTransferController::class, 'receive'])->middleware('can:inventory.transfers.receive')->name('transfers.receive');
         Route::get('opening-stock', [OpeningStockController::class, 'create'])->middleware('can:inventory.stock.opening')->name('opening-stock.create');
         Route::post('opening-stock', [OpeningStockController::class, 'store'])->middleware('can:inventory.stock.opening')->name('opening-stock.store');
         Route::get('adjustments', [StockAdjustmentController::class, 'index'])->middleware('can:inventory.stock.adjust')->name('adjustments.index');
@@ -710,6 +903,23 @@ Route::middleware('auth')->group(function (): void {
         Route::get('grn/{goodsReceipt}', [GoodsReceiptController::class, 'show'])->middleware('can:purchases.grn.view')->name('grn.show');
         Route::post('grn/{goodsReceipt}/receive', [GoodsReceiptController::class, 'receive'])->middleware('can:purchases.grn.receive')->name('grn.receive');
 
+        Route::get('invoices', [PurchaseInvoiceController::class, 'index'])->middleware('can:purchase-invoices.view')->name('invoices.index');
+        Route::get('invoices/create', [PurchaseInvoiceController::class, 'create'])->middleware('can:purchase-invoices.create')->name('invoices.create');
+        Route::post('invoices', [PurchaseInvoiceController::class, 'store'])->middleware('can:purchase-invoices.create')->name('invoices.store');
+        Route::get('invoices/{purchaseInvoice}', [PurchaseInvoiceController::class, 'show'])->middleware('can:purchase-invoices.view')->name('invoices.show');
+        Route::post('invoices/{purchaseInvoice}/verify', [PurchaseInvoiceController::class, 'verify'])->middleware('can:purchase-invoices.verify')->name('invoices.verify');
+        Route::post('invoices/{purchaseInvoice}/approve', [PurchaseInvoiceController::class, 'approve'])->middleware('can:purchase-invoices.approve')->name('invoices.approve');
+        Route::post('invoices/{purchaseInvoice}/cancel', [PurchaseInvoiceController::class, 'cancel'])->middleware('can:purchase-invoices.cancel')->name('invoices.cancel');
+
+        Route::get('payments', [SupplierPaymentController::class, 'index'])->middleware('can:supplier-payments.view')->name('payments.index');
+        Route::get('payments/create', [SupplierPaymentController::class, 'create'])->middleware('can:supplier-payments.create')->name('payments.create');
+        Route::post('payments', [SupplierPaymentController::class, 'store'])->middleware('can:supplier-payments.create')->name('payments.store');
+        Route::get('payments/{supplierPayment}', [SupplierPaymentController::class, 'show'])->middleware('can:supplier-payments.view')->name('payments.show');
+        Route::post('payments/{supplierPayment}/reverse', [SupplierPaymentController::class, 'reverse'])->middleware('can:supplier-payments.reverse')->name('payments.reverse');
+
+        Route::get('reports', [PurchaseReportController::class, 'index'])->middleware('can:purchase-reports.view')->name('reports.index');
+        Route::get('reports/input-gst', [PurchaseReportController::class, 'inputGst'])->middleware('can:input-gst-reports.view')->name('reports.input-gst');
+
         Route::get('returns', [PurchaseReturnController::class, 'index'])->middleware('can:purchases.returns.view')->name('returns.index');
         Route::get('returns/create', [PurchaseReturnController::class, 'create'])->middleware('can:purchases.returns.create')->name('returns.create');
         Route::post('returns', [PurchaseReturnController::class, 'store'])->middleware('can:purchases.returns.create')->name('returns.store');
@@ -761,7 +971,21 @@ Route::middleware('auth')->group(function (): void {
 
     Route::redirect('settings', 'settings/general')->name('settings.index');
     Route::middleware('role:administrator,manager')->group(function (): void {
+        Route::get('settings/outlets', [OutletController::class, 'index'])->middleware('can:outlets.manage')->name('settings.outlets.index');
+        Route::get('settings/outlets/create', [OutletController::class, 'create'])->middleware('can:outlets.manage')->name('settings.outlets.create');
+        Route::post('settings/outlets', [OutletController::class, 'store'])->middleware('can:outlets.manage')->name('settings.outlets.store');
+        Route::get('settings/outlets/{outlet}/edit', [OutletController::class, 'edit'])->middleware('can:outlets.manage')->name('settings.outlets.edit');
+        Route::put('settings/outlets/{outlet}', [OutletController::class, 'update'])->middleware('can:outlets.manage')->name('settings.outlets.update');
+        Route::post('settings/outlets/{outlet}/archive', [OutletController::class, 'archive'])->middleware('can:outlets.manage')->name('settings.outlets.archive');
+        Route::post('settings/outlets/{outlet}/restore', [OutletController::class, 'restore'])->middleware('can:outlets.manage')->name('settings.outlets.restore');
+        Route::post('settings/outlets/{outlet}/make-default', [OutletController::class, 'makeDefault'])->middleware('can:outlets.manage')->name('settings.outlets.make-default');
+        Route::post('settings/outlets/{outlet}/assignments', [OutletController::class, 'assign'])->middleware('can:outlets.assign')->name('settings.outlets.assignments.store');
+        Route::get('settings/company-profile', [CompanyProfileController::class, 'edit'])->middleware('can:company.profile.update')->name('settings.company-profile.edit');
+        Route::put('settings/company-profile', [CompanyProfileController::class, 'update'])->middleware('can:company.profile.update')->name('settings.company-profile.update');
         Route::get('settings/{section}', [SettingsController::class, 'show'])->name('settings.show');
         Route::put('settings/{section}', [SettingsController::class, 'update'])->name('settings.update');
     });
+
+    Route::get('getting-started/outlets', [OutletController::class, 'setup'])->middleware('can:outlets.manage')->name('onboarding.outlets.show');
+    Route::post('outlet-context', [OutletController::class, 'switch'])->middleware('can:outlets.context.switch')->name('outlet-context.switch');
 });

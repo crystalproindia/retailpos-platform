@@ -6,16 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\PosCheckoutRequest;
 use App\Http\Requests\Pos\PosQuickCustomerRequest;
 use App\Models\Customers\Customer;
+use App\Models\Pos\PosRegister;
+use App\Models\Pos\PosSale;
 use App\Repositories\Pos\PosCatalogRepository;
 use App\Repositories\Pos\PosSaleRepository;
 use App\Services\Pos\CustomerProductSuggestionService;
 use App\Services\Pos\PosCheckoutService;
 use App\Services\Pos\PosCustomerLookupService;
 use App\Services\Pos\PosDashboardService;
+use App\Services\Pos\PosReceiptPdfService;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Http\Response;
 
 class PosController extends Controller
 {
@@ -34,35 +39,70 @@ class PosController extends Controller
         return $this->workspace($request, $catalog, $sales, $dashboard, 'mobile');
     }
 
-    public function dashboard(Request $request, PosDashboardService $dashboard): View
+    public function dashboard(Request $request, PosDashboardService $dashboard, OutletAccessService $outlets): View
     {
-        return view('command-center.pos.dashboard', ['summary' => $dashboard->summary($request->user()->company_id, $request->user()->branch_id)]);
+        return view('command-center.pos.dashboard', ['summary' => $dashboard->summary($request->user()->company_id, $outlets->current($request->user())->id)]);
     }
 
     public function heldBills(Request $request, PosSaleRepository $sales): View
     {
-        return view('command-center.pos.held', ['heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id, $request->string('q')->toString())]);
+        return view('command-center.pos.held', ['heldSales' => $sales->heldForUser($request->user(), $request->string('q')->toString())]);
     }
 
-    public function catalog(Request $request, PosCatalogRepository $catalog): JsonResponse
+    public function salesHistory(Request $request): View
     {
-        return response()->json(['products' => $catalog->search($request->user()->company_id, $request->user()->branch_id, $request->string('q')->toString())->map(fn ($product) => $this->productPayload($product))->values()]);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:completed,voided'],
+            'payment_method' => ['nullable', 'in:cash,card,upi,bank_transfer,wallet,credit,other'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $outletIds = app(OutletAccessService::class)->accessibleOutlets($request->user())->pluck('id');
+        $sales = PosSale::query()
+            ->with(['branch', 'register', 'customer', 'completer', 'payments'])
+            ->where('company_id', $request->user()->company_id)
+            ->where(fn ($query) => $query->whereNull('branch_id')->orWhereIn('branch_id', $outletIds))
+            ->whereIn('status', ['completed', 'voided'])
+            ->when($filters['q'] ?? null, function ($query, string $search): void {
+                $query->where(function ($sales) use ($search): void {
+                    $sales->where('receipt_number', 'like', "%{$search}%")
+                        ->orWhere('sale_number', 'like', "%{$search}%")
+                        ->orWhere('customer_name_snapshot', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn ($customer) => $customer->where('display_name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
+                });
+            })
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['payment_method'] ?? null, fn ($query, string $method) => $query->whereHas('payments', fn ($payments) => $payments->where('payment_method', $method)))
+            ->when($filters['from'] ?? null, fn ($query, string $from) => $query->whereDate('completed_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, string $to) => $query->whereDate('completed_at', '<=', $to))
+            ->latest('completed_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('command-center.pos.sales.index', compact('sales', 'filters'));
     }
 
-    public function customer(Request $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions): JsonResponse
+    public function catalog(Request $request, PosCatalogRepository $catalog, OutletAccessService $outlets): JsonResponse
+    {
+        return response()->json(['products' => $catalog->search($request->user()->company_id, $outlets->current($request->user())->id, $request->string('q')->toString())->map(fn ($product) => $this->productPayload($product))->values()]);
+    }
+
+    public function customer(Request $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions, OutletAccessService $outlets): JsonResponse
     {
         $request->validate(['mobile' => ['required', 'string', 'min:6', 'max:50']]);
         $customer = $lookup->findByMobile($request->user()->company_id, (string) $request->mobile);
         if (! $customer) return response()->json(['customer' => null, 'suggestions' => []]);
 
-        return response()->json(['customer' => $this->customerPayload($customer), 'suggestions' => collect($suggestions->suggestions($customer, $request->user()->branch_id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())]);
+        return response()->json(['customer' => $this->customerPayload($customer), 'suggestions' => collect($suggestions->suggestions($customer, $outlets->current($request->user())->id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())]);
     }
 
-    public function quickCustomer(PosQuickCustomerRequest $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions): JsonResponse
+    public function quickCustomer(PosQuickCustomerRequest $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions, OutletAccessService $outlets): JsonResponse
     {
         $customer = $lookup->quickCreate($request->user(), $request->validated());
 
-        return response()->json(['customer' => $this->customerPayload($customer), 'suggestions' => collect($suggestions->suggestions($customer, $request->user()->branch_id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())], 201);
+        return response()->json(['customer' => $this->customerPayload($customer), 'suggestions' => collect($suggestions->suggestions($customer, $outlets->current($request->user())->id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())], 201);
     }
 
     public function hold(PosCheckoutRequest $request, PosCheckoutService $checkout): RedirectResponse
@@ -81,7 +121,7 @@ class PosController extends Controller
 
     public function resume(Request $request, PosSaleRepository $sales, PosCatalogRepository $catalog, PosDashboardService $dashboard, int $sale): View
     {
-        $resumedSale = $sales->findForCompany($request->user()->company_id, $sale);
+        $resumedSale = $sales->findForUser($request->user(), $sale);
         abort_unless($resumedSale->status === 'held' && $resumedSale->held_by === $request->user()->id, 403);
 
         return $this->workspace($request, $catalog, $sales, $dashboard, 'terminal', $resumedSale);
@@ -89,10 +129,26 @@ class PosController extends Controller
 
     public function receipt(Request $request, PosSaleRepository $sales, int $sale): View
     {
-        $sale = $sales->findForCompany($request->user()->company_id, $sale);
-        abort_unless($sale->status === 'completed', 404);
+        $sale = $sales->findForUser($request->user(), $sale);
+        abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
 
         return view('command-center.pos.receipt', compact('sale'));
+    }
+
+    public function receiptPdf(Request $request, PosSaleRepository $sales, PosReceiptPdfService $pdf, int $sale): Response
+    {
+        $sale = $sales->findForUser($request->user(), $sale);
+        abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
+
+        return $pdf->document($sale)->download($pdf->filename($sale));
+    }
+
+    public function void(Request $request, PosSaleRepository $sales, PosCheckoutService $checkout, int $sale): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+        $sale = $checkout->void($sales->findForUser($request->user(), $sale), $request->user(), $data['reason']);
+
+        return redirect()->route('pos.receipts.show', $sale)->with('status', 'Sale voided and stock restored.');
     }
 
     /** @return array<string, mixed> */
@@ -104,15 +160,17 @@ class PosController extends Controller
     /** @return array<string, mixed> */
     private function workspace(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, PosDashboardService $dashboard, string $mode = 'desktop', mixed $resumedSale = null): View
     {
-        $products = $catalog->search($request->user()->company_id, $request->user()->branch_id, $request->string('search')->toString());
+        $outlet = app(OutletAccessService::class)->current($request->user());
+        $products = $catalog->search($request->user()->company_id, $outlet->id, $request->string('search')->toString());
 
         return view('command-center.pos.index', [
             'products' => $products,
             'categories' => $products->pluck('category')->filter()->unique('id')->values(),
-            'heldSales' => $sales->heldForUser($request->user()->company_id, $request->user()->id),
+            'heldSales' => $sales->heldForUser($request->user()),
             'resumedSale' => $resumedSale,
             'posMode' => $mode,
-            'popularProductIds' => $dashboard->popularProductIds($request->user()->company_id, $request->user()->branch_id),
+            'popularProductIds' => $dashboard->popularProductIds($request->user()->company_id, $outlet->id),
+            'openRegisters' => PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $outlet->id)->where('is_active', true)->whereNotNull('current_session_id')->orderBy('name')->get(),
         ]);
     }
 

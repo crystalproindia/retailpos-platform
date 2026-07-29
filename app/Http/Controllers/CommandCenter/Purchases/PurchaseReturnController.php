@@ -9,6 +9,7 @@ use App\Repositories\Purchases\GoodsReceiptRepository;
 use App\Repositories\Purchases\PurchaseReturnRepository;
 use App\Repositories\Purchases\SupplierRepository;
 use App\Services\Purchases\PurchaseReturnService;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,17 +20,19 @@ class PurchaseReturnController extends Controller
     public function index(Request $request, PurchaseReturnRepository $returns): View
     {
         return view('command-center.purchases.returns.index', [
-            'returns' => $returns->paginateForCompany($request->user()->company_id),
+            'returns' => $returns->paginateForUser($request->user()),
         ]);
     }
 
-    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, GoodsReceiptRepository $receipts, InventoryLookupRepository $lookups): View
+    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, GoodsReceiptRepository $receipts, InventoryLookupRepository $lookups, OutletAccessService $outlets): View
     {
+        $outlet = $outlets->current($request->user());
+        $options = $lookups->formOptions($request->user()->company_id);
         return view('command-center.purchases.returns.create', [
             'products' => $products->activeForCompany($request->user()->company_id),
             'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
-            'receipts' => $receipts->paginateForCompany($request->user()->company_id),
-            'warehouses' => $lookups->formOptions($request->user()->company_id)['warehouses'],
+            'receipts' => $receipts->paginateForUser($request->user()),
+            'warehouses' => $options['warehouses']->where('branch_id', $outlet->id)->values(),
             'locations' => $lookups->formOptions($request->user()->company_id)['locations'],
         ]);
     }
@@ -44,20 +47,20 @@ class PurchaseReturnController extends Controller
     public function show(Request $request, PurchaseReturnRepository $returns, int $purchaseReturn): View
     {
         return view('command-center.purchases.returns.show', [
-            'return' => $returns->findForCompany($request->user()->company_id, $purchaseReturn),
+            'return' => $returns->findForUser($request->user(), $purchaseReturn),
         ]);
     }
 
     public function approve(Request $request, PurchaseReturnService $service, PurchaseReturnRepository $returns, int $purchaseReturn): RedirectResponse
     {
-        $service->approve($returns->findForCompany($request->user()->company_id, $purchaseReturn), $request->user());
+        $service->approve($returns->findForUser($request->user(), $purchaseReturn), $request->user());
 
         return back()->with('status', 'Purchase return approved.');
     }
 
     public function complete(Request $request, PurchaseReturnService $service, PurchaseReturnRepository $returns, int $purchaseReturn): RedirectResponse
     {
-        $service->complete($returns->findForCompany($request->user()->company_id, $purchaseReturn), $request->user());
+        $service->complete($returns->findForUser($request->user(), $purchaseReturn), $request->user());
 
         return back()->with('status', 'Purchase return completed.');
     }

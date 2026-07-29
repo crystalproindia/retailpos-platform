@@ -67,11 +67,13 @@ class CrmQuotationTest extends TestCase
             ->assertOk()
             ->assertSee($quotation->quotation_number);
 
-        $this->actingAs($manager)->post("/crm/quotations/{$quotation->id}/public-link")->assertRedirect();
+        $response = $this->actingAs($manager)->post("/crm/quotations/{$quotation->id}/public-link")->assertRedirect();
         $quotation->refresh();
+        $token = basename(parse_url($response->getSession()->get('publicQuotationUrl'), PHP_URL_PATH));
 
-        $this->assertNotNull($quotation->public_token);
-        $this->get('/q/'.$quotation->public_token)->assertOk()->assertSee($quotation->quotation_number)->assertSee('Northstar Retail');
+        $this->assertNotNull($quotation->public_token_hash);
+        $this->assertNull($quotation->public_token);
+        $this->get('/q/'.$token)->assertOk()->assertSee($quotation->quotation_number)->assertSee('Northstar Retail');
         $this->get('/q/not-a-valid-public-token')->assertNotFound();
     }
 

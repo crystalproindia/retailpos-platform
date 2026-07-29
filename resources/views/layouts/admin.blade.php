@@ -12,9 +12,18 @@
     <body class="min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100 {{ request()->routeIs('cms.*') ? 'cms-light-workspace' : '' }}">
         @php
             $user = auth()->user();
-            $moduleGroups = app(\App\Support\Modules\ModuleRegistry::class)->grouped($user?->role);
+            $moduleGroups = $user ? app(\App\Support\Modules\ModuleRegistry::class)->sidebarForUser($user)->groupBy('category') : collect();
+            $saasNavigation = app(\App\Support\Navigation\SaasNavigationRegistry::class);
+            $globalMenuSearch = app(\App\Services\Navigation\GlobalMenuSearchService::class);
+            $globalMenuEntries = $user ? $globalMenuSearch->entriesFor($user) : collect();
+            $globalMenuGroups = $globalMenuEntries->groupBy('group');
+            $platformSaasItems = $saasNavigation->platformItems($user);
+            $tenantSubscriptionItems = $saasNavigation->tenantSubscriptionItems($user);
             $unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0;
             $recentNotifications = $user?->notifications()->latest()->limit(5)->get() ?? collect();
+            $outletAccess = app(\App\Services\Outlets\OutletAccessService::class);
+            $availableOutlets = $user ? $outletAccess->accessibleOutlets($user) : collect();
+            $currentOutlet = $availableOutlets->firstWhere('id', session('outlet_context_id')) ?? $availableOutlets->firstWhere('id', $user?->branch_id) ?? $availableOutlets->firstWhere('is_primary', true) ?? $availableOutlets->first();
         @endphp
 
         <div class="min-h-screen lg:grid lg:grid-cols-[auto_1fr]">
@@ -31,6 +40,14 @@
                     </a>
                     <button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 lg:hidden dark:hover:bg-slate-800 dark:hover:text-white" data-sidebar-close aria-label="Close sidebar">
                         <x-icon name="x" class="size-5" />
+                    </button>
+                </div>
+
+                <div class="px-3 pt-3">
+                    <button type="button" data-global-menu-search-open class="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-500 transition hover:border-slate-300 hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-haspopup="dialog" aria-controls="global-menu-search-dialog">
+                        <x-icon name="search" class="size-5 shrink-0" />
+                        <span class="min-w-0 flex-1 truncate" data-sidebar-label>Search menus, modules or settings...</span>
+                        <span class="hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-slate-500 sm:inline dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400" data-sidebar-label><span class="hidden mac-shortcut">⌘</span><span class="mac-shortcut">K</span><span class="hidden non-mac-shortcut">Ctrl K</span></span>
                     </button>
                 </div>
 
@@ -53,7 +70,7 @@
                                     };
                                 @endphp
 
-                                <a href="{{ $module->url() }}"
+                                <a @if ($module->navigable) href="{{ $module->url() }}" @else aria-disabled="true" role="group" @endif
                                     class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
                                     title="{{ $module->name }}">
                                     <x-icon :name="$module->icon" class="size-5 shrink-0" />
@@ -76,12 +93,33 @@
                             @endforeach
                         </div>
                     @endforeach
+
+                    @if ($platformSaasItems)
+                        <div class="space-y-1">
+                            <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>SaaS Management</p>
+                            @foreach ($platformSaasItems as $item)
+                                <a href="{{ $saasNavigation->url($item) }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $saasNavigation->isActive($item) ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}">
+                                    <x-icon :name="$item['icon']" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $item['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @elseif ($tenantSubscriptionItems)
+                        <div class="space-y-1">
+                            <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>Subscription</p>
+                            @foreach ($tenantSubscriptionItems as $item)
+                                <a href="{{ $saasNavigation->url($item) }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $saasNavigation->isActive($item) ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"><x-icon :name="$item['icon']" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $item['label'] }}</span></a>
+                            @endforeach
+                            @if (app(\App\Services\Saas\EntitlementService::class)->allows($user->company, 'white_label'))
+                                <a href="{{ route('account.subscription.white-label.edit') }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ request()->routeIs('account.subscription.white-label.*') ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"><x-icon name="palette" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>White-label Settings</span></a>
+                            @endif
+                        </div>
+                    @endif
                 </nav>
 
                 <div class="border-t border-slate-200 p-4 dark:border-slate-800" data-sidebar-label>
                     <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
                         <p class="truncate text-sm font-medium text-slate-900 dark:text-white">{{ $user?->company?->name ?? 'RetailPOS' }}</p>
-                        <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $user?->branch?->name ?? 'Primary branch' }}</p>
+                        <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $currentOutlet?->name ?? 'Main outlet' }}</p>
                     </div>
                 </div>
             </aside>
@@ -107,6 +145,18 @@
                         </div>
 
                         <div class="flex items-center gap-2">
+                            @if ($currentOutlet && $availableOutlets->count() > 1)
+                                <form method="POST" action="{{ route('outlet-context.switch') }}" class="hidden sm:block">
+                                    @csrf
+                                    <label class="sr-only" for="outlet-context">Working outlet</label>
+                                    <select id="outlet-context" name="outlet_id" onchange="this.form.submit()" class="max-w-40 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm font-medium text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                                        @foreach ($availableOutlets as $outlet)<option value="{{ $outlet->id }}" @selected($outlet->id === $currentOutlet->id)>{{ $outlet->name }}</option>@endforeach
+                                    </select>
+                                </form>
+                            @endif
+                            <button type="button" data-global-menu-search-open class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 lg:hidden dark:hover:bg-slate-800 dark:hover:text-white" aria-haspopup="dialog" aria-controls="global-menu-search-dialog" aria-label="Search menus, modules or settings">
+                                <x-icon name="search" class="size-5" />
+                            </button>
                             <div class="relative">
                                 <button type="button" class="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white" data-dropdown-button="notifications-menu" aria-label="Notifications">
                                     <x-icon name="bell" class="size-5" />
@@ -187,5 +237,32 @@
                 </main>
             </div>
         </div>
+
+        <div id="global-menu-search-dialog" class="fixed inset-0 z-50 hidden" data-global-menu-dialog data-global-menu-recent-key="retailpos.menu-search.recent.{{ $user?->company_id }}.{{ $user?->id }}" aria-hidden="true">
+            <div class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" data-global-menu-search-close></div>
+            <section class="absolute inset-x-0 bottom-0 mx-auto flex max-h-[min(88vh,44rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-xl border border-slate-200 bg-white shadow-2xl sm:inset-x-4 sm:bottom-auto sm:top-[12vh] sm:rounded-xl dark:border-slate-800 dark:bg-slate-900" role="dialog" aria-modal="true" aria-labelledby="global-menu-search-title" data-global-menu-panel tabindex="-1">
+                <div class="border-b border-slate-200 p-4 dark:border-slate-800">
+                    <div class="flex items-center gap-3"><x-icon name="search" class="size-5 shrink-0 text-slate-400" /><label id="global-menu-search-title" class="sr-only" for="global-menu-search-input">Search menus, modules or settings</label><input id="global-menu-search-input" type="search" autocomplete="off" data-global-menu-search-input placeholder="Search menus, modules or settings..." class="min-w-0 flex-1 border-0 bg-transparent p-0 text-base shadow-none focus:ring-0 dark:bg-transparent"><button type="button" data-global-menu-search-clear class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white" aria-label="Clear search"><x-icon name="x" class="size-4" /></button><button type="button" data-global-menu-search-close class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white" aria-label="Close menu search"><x-icon name="x" class="size-5" /></button></div>
+                    <p class="mt-3 text-xs text-slate-500 dark:text-slate-400"><kbd class="rounded border border-slate-200 px-1.5 py-0.5 dark:border-slate-700">↑↓</kbd> to move <kbd class="ml-1 rounded border border-slate-200 px-1.5 py-0.5 dark:border-slate-700">Enter</kbd> to open <kbd class="ml-1 rounded border border-slate-200 px-1.5 py-0.5 dark:border-slate-700">Esc</kbd> to close</p>
+                </div>
+                <div class="min-h-0 flex-1 overflow-y-auto p-3" data-global-menu-results>
+                    <div class="hidden" data-global-menu-recent><div class="flex items-center justify-between px-2 pb-2 pt-1"><p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Recent</p><button type="button" data-global-menu-clear-recent class="text-xs font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">Clear</button></div><div class="space-y-1" data-global-menu-recent-items></div></div>
+                    @foreach ($globalMenuGroups as $group => $entries)
+                        <div class="space-y-1" data-global-menu-group data-global-menu-group-name="{{ $group }}">
+                            <p class="px-2 pb-2 pt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{{ $group }}</p>
+                            @foreach ($entries as $entry)
+                                <button type="button" data-global-menu-result data-navigation-key="{{ $entry['navigation_key'] }}" data-route="{{ $entry['route'] }}" data-url="{{ $entry['url'] }}" data-label="{{ $entry['label'] }}" data-breadcrumb="{{ $entry['breadcrumb'] }}" data-aliases="{{ implode(' ', $entry['aliases']) }}" data-search="{{ strtolower($entry['label'].' '.$entry['route'].' '.$entry['breadcrumb'].' '.implode(' ', $entry['aliases'])) }}" class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800" aria-selected="false">
+                                    <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><x-icon :name="$entry['icon']" class="size-5" /></span>
+                                    <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-slate-900 dark:text-white" data-global-menu-result-label>{{ $entry['label'] }}</span><span class="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400" data-global-menu-result-breadcrumb>{{ $entry['breadcrumb'] }}</span></span>
+                                    <x-icon name="chevron-right" class="size-4 shrink-0 text-slate-400" />
+                                </button>
+                            @endforeach
+                        </div>
+                    @endforeach
+                    <div class="hidden px-4 py-12 text-center" data-global-menu-empty><p class="font-semibold text-slate-900 dark:text-white">No matching menu found</p><p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Try Invoice, Stock, GST, Customer, or Settings.</p></div>
+                </div>
+            </section>
+        </div>
+        <script id="global-menu-search-aliases" type="application/json">@json($globalMenuSearch->aliases())</script>
     </body>
 </html>

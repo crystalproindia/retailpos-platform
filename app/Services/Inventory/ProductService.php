@@ -8,6 +8,7 @@ use App\Models\Inventory\Product;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
+use App\Services\Saas\UsageService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +18,7 @@ class ProductService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly UsageService $usage,
     ) {}
 
     /**
@@ -25,6 +27,7 @@ class ProductService
     public function create(User $user, array $data): Product
     {
         return DB::transaction(function () use ($user, $data): Product {
+            $this->usage->assertWithinLimit($user->company, 'products');
             $product = Product::create($this->payload($user, $data) + [
                 'company_id' => $user->company_id,
                 'branch_id' => $data['branch_id'] ?? $user->branch_id,

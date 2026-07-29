@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Crm;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreQuotationRequest extends FormRequest
 {
@@ -36,8 +37,11 @@ class StoreQuotationRequest extends FormRequest
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string', 'max:5000'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:9999999'],
+            'items.*.unit' => ['nullable', 'string', 'max:32'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:999999999'],
             'items.*.discount_amount' => ['nullable', 'numeric', 'min:0', 'max:999999999'],
+            'items.*.discount_type' => ['nullable', Rule::in(['fixed', 'percentage'])],
+            'items.*.discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
     }

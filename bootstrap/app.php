@@ -21,7 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
         __DIR__.'/../app/Console/Commands',
     ])
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureActiveSubscription::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\EnsureActiveSubscription::class);
         $middleware->alias([
+            'platform-admin' => \App\Http\Middleware\EnsurePlatformAdministrator::class,
+            'subscription.active' => \App\Http\Middleware\EnsureActiveSubscription::class,
+            'subscription.feature' => \App\Http\Middleware\EnsureSubscriptionFeature::class,
             'role' => EnsureUserHasRole::class,
             'public.lead.token' => EnsurePublicLeadToken::class,
             'public.lead.payload' => RejectOversizedPublicLeadPayload::class,

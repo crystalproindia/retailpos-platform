@@ -18,9 +18,9 @@ use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
+use App\Support\Crm\PublicQuotationLink;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class QuotationService
@@ -114,26 +114,84 @@ class QuotationService
         });
     }
 
-    public function generatePublicLink(CrmQuotation $quotation, User $user, bool $regenerate = false): CrmQuotation
+    public function createRevision(CrmQuotation $quotation, User $user): CrmQuotation
     {
-        return DB::transaction(function () use ($quotation, $user, $regenerate): CrmQuotation {
-            if (! $quotation->public_token || $regenerate) {
+        return DB::transaction(function () use ($quotation, $user): CrmQuotation {
+            $quotation->loadMissing('items');
+            $revision = $quotation->replicate([
+                'quotation_number', 'status', 'public_token', 'public_url', 'public_token_hash', 'public_token_expires_at',
+                'public_token_revoked_at', 'first_viewed_at', 'last_viewed_at', 'public_view_count', 'public_responded_at',
+                'public_response_name', 'public_response_message', 'rejection_reason', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at',
+            ]);
+            $revision->fill([
+                'quotation_number' => $this->nextQuotationNumber($quotation->company_id),
+                'status' => QuotationStatus::Draft,
+                'version_number' => max(1, (int) $quotation->version_number) + 1,
+                'parent_quotation_id' => $quotation->id,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+            $revision->save();
+            foreach ($quotation->items as $item) {
+                $revision->items()->create($item->only([
+                    'name', 'description', 'quantity', 'unit', 'unit_price', 'discount_amount', 'discount_type',
+                    'discount_percentage', 'tax_rate', 'tax_amount', 'line_total', 'sort_order',
+                ]));
+            }
+            $lead = $quotation->lead()->firstOrFail();
+            $this->recordActivity($lead, $user, "Quotation {$revision->quotation_number} created as revision of {$quotation->quotation_number}.");
+            $this->auditLogger->record('crm.quotation.revised', $revision, 'Quotation revision created', [
+                'company_id' => $quotation->company_id, 'parent_quotation_id' => $quotation->id,
+            ]);
+
+            return $revision->load(['lead', 'items', 'parentQuotation']);
+        });
+    }
+
+    public function issuePublicLink(CrmQuotation $quotation, User $user, bool $regenerate = false): PublicQuotationLink
+    {
+        return DB::transaction(function () use ($quotation, $user, $regenerate): PublicQuotationLink {
+            if (! $quotation->public_token_hash || $regenerate || $quotation->public_token_revoked_at !== null) {
                 do {
-                    $token = Str::random(48);
-                } while (CrmQuotation::query()->where('public_token', $token)->exists());
+                    $token = bin2hex(random_bytes(32));
+                    $hash = hash('sha256', $token);
+                } while (CrmQuotation::query()->where('public_token_hash', $hash)->exists());
 
                 $quotation->update([
-                    'public_token' => $token,
-                    'public_url' => route('quotations.public.show', $token),
+                    'public_token' => null,
+                    'public_url' => null,
+                    'public_token_hash' => $hash,
+                    'public_token_revoked_at' => null,
+                    'public_token_expires_at' => $quotation->valid_until?->copy()->endOfDay(),
                     'updated_by' => $user->id,
                 ]);
                 $activity = ($regenerate ? 'Public link regenerated for quotation ' : 'Public link generated for quotation ').$quotation->quotation_number.'.';
                 $this->recordActivity($quotation->lead()->firstOrFail(), $user, $activity);
                 $this->auditLogger->record('crm.quotation.'.($regenerate ? 'public_link_regenerated' : 'public_link_generated'), $quotation, rtrim($activity, '.'), ['company_id' => $quotation->company_id, 'lead_id' => $quotation->lead_id]);
+            } else {
+                // A previously issued plaintext URL cannot be recovered from its stored hash.
+                $token = bin2hex(random_bytes(32));
+                $hash = hash('sha256', $token);
+                $quotation->update([
+                    'public_token_hash' => $hash,
+                    'public_token_expires_at' => $quotation->valid_until?->copy()->endOfDay(),
+                    'updated_by' => $user->id,
+                ]);
             }
 
-            return $quotation->refresh()->load(['lead', 'items', 'creator', 'updater']);
+            return new PublicQuotationLink(
+                quotation: $quotation->refresh()->load(['lead', 'items', 'creator', 'updater']),
+                url: route('quotations.public.show', $token),
+            );
         });
+    }
+
+    public function revokePublicLink(CrmQuotation $quotation, User $user): CrmQuotation
+    {
+        $quotation->update(['public_token_revoked_at' => now(), 'updated_by' => $user->id]);
+        $this->auditLogger->record('crm.quotation.public_link_revoked', $quotation, 'Public quotation link revoked', ['company_id' => $quotation->company_id]);
+
+        return $quotation->refresh();
     }
 
     /** @param array<int, array<string, mixed>> $items
@@ -150,7 +208,12 @@ class QuotationService
             $quantity = round((float) $item['quantity'], 3);
             $unitPrice = round((float) $item['unit_price'], 2);
             $gross = round($quantity * $unitPrice, 2);
-            $discount = min(round((float) ($item['discount_amount'] ?? 0), 2), $gross);
+            $discountType = $item['discount_type'] ?? 'fixed';
+            $discountPercentage = round((float) ($item['discount_percentage'] ?? 0), 3);
+            $requestedDiscount = $discountType === 'percentage'
+                ? round($gross * $discountPercentage / 100, 2)
+                : round((float) ($item['discount_amount'] ?? 0), 2);
+            $discount = min($requestedDiscount, $gross);
             $taxRate = round((float) ($item['tax_rate'] ?? 0), 3);
             $taxAmount = round(($gross - $discount) * $taxRate / 100, 2);
             $lineTotal = round($gross - $discount + $taxAmount, 2);
@@ -162,8 +225,11 @@ class QuotationService
                 'name' => $item['name'],
                 'description' => $item['description'] ?? null,
                 'quantity' => $quantity,
+                'unit' => $item['unit'] ?? 'unit',
                 'unit_price' => $unitPrice,
                 'discount_amount' => $discount,
+                'discount_type' => $discountType,
+                'discount_percentage' => $discountType === 'percentage' ? $discountPercentage : 0,
                 'tax_rate' => $taxRate,
                 'tax_amount' => $taxAmount,
                 'line_total' => $lineTotal,
@@ -243,7 +309,7 @@ class QuotationService
     private function updateLeadWorkflow(CrmLead $lead, QuotationStatus $status): void
     {
         $stage = match ($status) {
-            QuotationStatus::Sent => LeadStageType::Proposal,
+            QuotationStatus::Sent, QuotationStatus::Viewed => LeadStageType::Proposal,
             QuotationStatus::Accepted => LeadStageType::Won,
             default => null,
         };

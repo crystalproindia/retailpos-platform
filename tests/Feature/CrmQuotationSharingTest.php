@@ -6,7 +6,7 @@ use App\Enums\Crm\LeadPriority;
 use App\Enums\Crm\LeadStageType;
 use App\Enums\Crm\QuotationStatus;
 use App\Enums\UserRole;
-use App\Mail\CrmQuotationShareMail;
+use App\Models\CompanyEmailSetting;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Crm\CrmLead;
@@ -16,8 +16,7 @@ use App\Models\Crm\CrmQuotation;
 use App\Models\Crm\CrmQuotationShare;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
-use RuntimeException;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CrmQuotationSharingTest extends TestCase
@@ -63,19 +62,25 @@ class CrmQuotationSharingTest extends TestCase
         $manager = $this->user(UserRole::Manager);
         $quotation = $this->quotation($manager, ['internal_remarks' => 'Internal commission and margin discussion.']);
 
-        $this->actingAs($manager)->post("/crm/quotations/{$quotation->id}/public-link")->assertRedirect();
+        $response = $this->actingAs($manager)->post("/crm/quotations/{$quotation->id}/public-link")->assertRedirect();
         $quotation->refresh();
+        $token = basename(parse_url($response->getSession()->get('publicQuotationUrl'), PHP_URL_PATH));
 
-        $this->get('/q/'.$quotation->public_token)
+        $this->assertNull($quotation->public_token);
+        $this->assertNull($quotation->public_url);
+        $this->assertSame(hash('sha256', $token), $quotation->public_token_hash);
+        $this->get('/q/'.$token)
             ->assertOk()
             ->assertSee($quotation->quotation_number)
             ->assertDontSee('Internal commission and margin discussion.');
         $this->get('/q/not-a-real-proposal-token')->assertNotFound();
 
-        $this->actingAs($manager)
+        $regenerated = $this->actingAs($manager)
             ->post("/crm/quotations/{$quotation->id}/public-link", ['regenerate' => 1])
             ->assertRedirect();
-        $this->assertNotSame($quotation->public_token, $quotation->refresh()->public_token);
+        $newToken = basename(parse_url($regenerated->getSession()->get('publicQuotationUrl'), PHP_URL_PATH));
+        $this->assertNotSame($token, $newToken);
+        $this->assertSame(hash('sha256', $newToken), $quotation->refresh()->public_token_hash);
     }
 
     public function test_whatsapp_share_generates_a_safe_click_to_send_url_and_handles_missing_phone(): void
@@ -97,44 +102,43 @@ class CrmQuotationSharingTest extends TestCase
         $this->assertDatabaseHas('crm_quotation_shares', ['quotation_id' => $missingPhone->id, 'channel' => 'whatsapp', 'recipient' => null, 'status' => 'prepared']);
     }
 
-    public function test_email_form_loads_and_sending_marks_a_draft_quotation_as_sent_with_history(): void
+    public function test_email_form_loads_and_queues_delivery_through_the_email_foundation(): void
     {
-        Mail::fake();
+        Queue::fake();
         $manager = $this->user(UserRole::Manager);
+        CompanyEmailSetting::create(['company_id' => $manager->company_id, 'is_enabled' => true, 'host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls', 'username' => 'mailer@example.test', 'password' => 'secret', 'from_address' => 'hello@example.test']);
         $quotation = $this->quotation($manager);
 
         $this->actingAs($manager)->get("/crm/quotations/{$quotation->id}/email/create")
             ->assertOk()
             ->assertSee('Send proposal by email')
             ->assertSee($quotation->customer_email);
-        $this->assertNotNull($quotation->refresh()->public_url);
+        $this->assertNotNull($quotation->refresh()->public_token_hash);
+        $this->assertNull($quotation->refresh()->public_url);
 
         $this->actingAs($manager)
             ->post("/crm/quotations/{$quotation->id}/email/send", $this->emailPayload())
             ->assertRedirect("/crm/quotations/{$quotation->id}");
 
-        Mail::assertSent(CrmQuotationShareMail::class, function (CrmQuotationShareMail $mail): bool {
-            return $mail->hasTo('asha@example.test') && $mail->emailSubject === 'RetailPOS Proposal - Custom';
-        });
         $this->assertSame(QuotationStatus::Sent, $quotation->refresh()->status);
         $this->assertNotNull($quotation->sent_at);
-        $this->assertDatabaseHas('crm_quotation_shares', ['quotation_id' => $quotation->id, 'channel' => 'email', 'recipient' => 'asha@example.test', 'status' => 'sent']);
-        $this->assertDatabaseHas('crm_activities', ['crm_lead_id' => $quotation->lead_id, 'subject' => "Quotation {$quotation->quotation_number} sent by email to asha@example.test."]);
+        $this->assertDatabaseHas('notification_deliveries', ['related_id' => $quotation->id, 'template_key' => 'quotation_sent', 'recipient' => 'asha@example.test', 'status' => 'queued']);
+        $this->assertDatabaseHas('crm_quotation_shares', ['quotation_id' => $quotation->id, 'channel' => 'email', 'recipient' => 'asha@example.test', 'status' => 'queued']);
+        $this->assertDatabaseHas('crm_activities', ['crm_lead_id' => $quotation->lead_id, 'subject' => "Quotation {$quotation->quotation_number} email queued."]);
     }
 
-    public function test_email_failure_records_share_failure_without_changing_quotation_status(): void
+    public function test_missing_smtp_is_logged_without_changing_quotation_status(): void
     {
         $manager = $this->user(UserRole::Manager);
         $quotation = $this->quotation($manager);
-        Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('Transport is unavailable'));
-
         $this->actingAs($manager)
             ->post("/crm/quotations/{$quotation->id}/email/send", $this->emailPayload())
             ->assertRedirect("/crm/quotations/{$quotation->id}")
             ->assertSessionHas('error');
 
         $this->assertSame(QuotationStatus::Draft, $quotation->refresh()->status);
-        $this->assertDatabaseHas('crm_quotation_shares', ['quotation_id' => $quotation->id, 'channel' => 'email', 'recipient' => 'asha@example.test', 'status' => 'failed']);
+        $this->assertDatabaseHas('notification_deliveries', ['related_id' => $quotation->id, 'template_key' => 'quotation_sent', 'status' => 'skipped_not_configured']);
+        $this->assertDatabaseHas('crm_quotation_shares', ['quotation_id' => $quotation->id, 'channel' => 'email', 'recipient' => 'asha@example.test', 'status' => 'skipped_not_configured']);
     }
 
     /** @param array<string, mixed> $overrides */

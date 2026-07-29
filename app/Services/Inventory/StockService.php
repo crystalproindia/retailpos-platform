@@ -9,11 +9,14 @@ use App\Events\Domain\Inventory\StockAdjusted;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\StockAdjustment;
 use App\Models\Inventory\StockLevel;
+use App\Models\Inventory\StockLocation;
 use App\Models\Inventory\StockMovement;
+use App\Models\Inventory\Warehouse;
 use App\Models\User;
 use App\Repositories\Inventory\StockRepository;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +27,7 @@ class StockService
         private readonly StockRepository $stocks,
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly OutletAccessService $outlets,
     ) {}
 
     /**
@@ -34,6 +38,7 @@ class StockService
         return DB::transaction(function () use ($user, $data): StockMovement {
             $product = Product::query()->where('company_id', $user->company_id)->findOrFail((int) $data['product_id']);
             $locationId = $data['stock_location_id'] ?? null;
+            $this->assertLocationBelongsToWarehouse($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null);
 
             $duplicate = StockMovement::query()
                 ->where('company_id', $user->company_id)
@@ -97,10 +102,19 @@ class StockService
     public function createAdjustment(User $user, array $data): StockAdjustment
     {
         return DB::transaction(function () use ($user, $data): StockAdjustment {
+            $outlet = $this->outlets->current($user);
+            $warehouse = Warehouse::query()
+                ->where('company_id', $user->company_id)
+                ->where('branch_id', $outlet->id)
+                ->where('is_active', true)
+                ->find((int) $data['warehouse_id']);
+            if (! $warehouse) {
+                throw ValidationException::withMessages(['warehouse_id' => 'Choose an active warehouse in your current outlet.']);
+            }
             $adjustment = StockAdjustment::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $user->branch_id,
-                'warehouse_id' => $data['warehouse_id'],
+                'branch_id' => $outlet->id,
+                'warehouse_id' => $warehouse->id,
                 'adjustment_number' => 'ADJ-'.now()->format('Ymd').'-'.Str::upper(Str::random(5)),
                 'status' => StockAdjustment::STATUS_DRAFT,
                 'reason' => $data['reason'],
@@ -109,6 +123,8 @@ class StockService
             ]);
 
             foreach ($data['items'] as $item) {
+                $locationId = isset($item['stock_location_id']) ? (int) $item['stock_location_id'] : null;
+                $this->assertLocationBelongsToWarehouse($user->company_id, $warehouse->id, $locationId);
                 $level = $this->stocks->level($user->company_id, (int) $data['warehouse_id'], isset($item['stock_location_id']) ? (int) $item['stock_location_id'] : null, (int) $item['product_id']);
                 $adjusted = (float) $item['adjusted_quantity'];
                 $current = (float) $level->quantity_on_hand;
@@ -136,6 +152,10 @@ class StockService
         }
 
         return DB::transaction(function () use ($adjustment, $user): StockAdjustment {
+            $outlet = $this->outlets->current($user);
+            if ($adjustment->company_id !== $user->company_id || $adjustment->branch_id !== $outlet->id || ! $this->outlets->canAccess($user, $outlet)) {
+                throw ValidationException::withMessages(['outlet' => 'You are not assigned to this adjustment outlet.']);
+            }
             $adjustment->load('items.product');
 
             foreach ($adjustment->items as $item) {
@@ -223,6 +243,7 @@ class StockService
         return DB::transaction(function () use ($user, $data, $movementType, $direction): StockMovement {
             $product = Product::query()->where('company_id', $user->company_id)->findOrFail((int) $data['product_id']);
             $locationId = $data['stock_location_id'] ?? null;
+            $this->assertLocationBelongsToWarehouse($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null);
             $level = $this->stocks->level($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null, $product->id);
             $before = (float) $level->quantity_on_hand;
             $quantity = (float) $data['quantity'];
@@ -272,6 +293,24 @@ class StockService
             'quantity_available' => $quantity - $reserved,
             'last_stock_movement_at' => now(),
         ]);
+    }
+
+    private function assertLocationBelongsToWarehouse(int $companyId, int $warehouseId, ?int $locationId): void
+    {
+        if ($locationId === null) {
+            return;
+        }
+
+        $locationExists = StockLocation::query()
+            ->where('company_id', $companyId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('is_active', true)
+            ->whereKey($locationId)
+            ->exists();
+
+        if (! $locationExists) {
+            throw ValidationException::withMessages(['stock_location_id' => 'Choose an active stock location in the selected warehouse.']);
+        }
     }
 
     private function dispatchStockThresholdEvents(Product $product, StockLevel $level, User $user): void

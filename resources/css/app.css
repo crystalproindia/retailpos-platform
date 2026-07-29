@@ -23,6 +23,14 @@
         min-width: 320px;
     }
 
+    body.global-menu-search-open {
+        overflow: hidden;
+    }
+
+    body.invoice-reminder-modal-open {
+        overflow: hidden;
+    }
+
     input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
     select,
     textarea {
@@ -86,6 +94,20 @@
 }
 
 @layer components {
+    [data-global-menu-dialog] > section {
+        animation: global-menu-search-enter 160ms ease-out;
+    }
+
+    @keyframes global-menu-search-enter {
+        from { opacity: 0; transform: translateY(0.75rem); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [data-global-menu-dialog] > section {
+            animation: none;
+        }
+    }
     .pipeline-card {
         cursor: grab;
     }

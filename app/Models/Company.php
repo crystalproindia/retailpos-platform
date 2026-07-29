@@ -8,6 +8,7 @@ use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
+use App\Models\Crm\CrmInvoiceReminderSetting;
 use App\Models\Crm\CrmQuotation;
 use App\Models\Customers\Customer;
 use App\Models\Customers\CustomerGroup;
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'legal_name', 'tax_id', 'email', 'phone', 'address', 'timezone', 'currency', 'is_active'])]
+#[Fillable(['name', 'legal_name', 'trade_name', 'tax_id', 'email', 'phone', 'address', 'city', 'state', 'country', 'postal_code', 'timezone', 'currency', 'tax_registration_type', 'industry', 'billing_contact_name', 'billing_contact_email', 'is_active'])]
 class Company extends Model
 {
     /** @use HasFactory<CompanyFactory> */
@@ -47,6 +48,11 @@ class Company extends Model
     public function branches(): HasMany
     {
         return $this->hasMany(Branch::class);
+    }
+
+    public function outletAssignments(): HasMany
+    {
+        return $this->hasMany(BranchUserAssignment::class);
     }
 
     public function users(): HasMany
@@ -172,5 +178,45 @@ class Company extends Model
     public function posSales(): HasMany
     {
         return $this->hasMany(PosSale::class);
+    }
+
+    public function saasSubscriptions(): HasMany
+    {
+        return $this->hasMany(SaasSubscription::class);
+    }
+
+    public function saasSubscriptionInvoices(): HasMany
+    {
+        return $this->hasMany(SaasSubscriptionInvoice::class);
+    }
+
+    public function saasBillingPayments(): HasMany
+    {
+        return $this->hasMany(SaasBillingPayment::class);
+    }
+
+    public function saasBillingCheckoutSessions(): HasMany
+    {
+        return $this->hasMany(SaasBillingCheckoutSession::class);
+    }
+
+    public function invoiceTemplateSettings(): HasMany
+    {
+        return $this->hasMany(InvoiceTemplateSetting::class);
+    }
+
+    public function invoiceReminderSettings(): HasMany
+    {
+        return $this->hasMany(CrmInvoiceReminderSetting::class);
+    }
+
+    public function saasResellerAssignments(): HasMany
+    {
+        return $this->hasMany(SaasResellerTenantAssignment::class);
+    }
+
+    public function hasPlaceholderName(): bool
+    {
+        return $this->name === 'Your Store Name';
     }
 }

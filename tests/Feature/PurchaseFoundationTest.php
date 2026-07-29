@@ -18,11 +18,13 @@ use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
 use App\Models\Purchases\GoodsReceipt;
 use App\Models\Purchases\PurchaseOrder;
+use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseRequest;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\Purchases\PurchaseSettings;
 use App\Models\Purchases\Supplier;
 use App\Models\Purchases\SupplierProduct;
+use App\Models\Purchases\SupplierPayment;
 use App\Models\Purchases\SupplierScoreSnapshot;
 use App\Models\User;
 use App\Support\Modules\ModuleRegistry;
@@ -307,6 +309,56 @@ class PurchaseFoundationTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', ['company_id' => $company->id, 'po_number' => 'PO-000024']);
         $this->assertDatabaseHas('goods_receipts', ['company_id' => $company->id, 'grn_number' => 'GRN-000011']);
         $this->assertDatabaseHas('purchase_returns', ['company_id' => $company->id, 'return_number' => 'PRN-000005']);
+    }
+
+    public function test_purchase_invoice_is_grn_matched_and_approved_before_it_becomes_payable(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+        $receipt = GoodsReceipt::create([
+            'company_id' => $manager->company_id, 'branch_id' => $manager->branch_id, 'warehouse_id' => $fixtures['warehouse']->id,
+            'supplier_id' => $fixtures['supplier']->id, 'grn_number' => 'GRN-INV-001', 'receipt_date' => now(), 'status' => 'received', 'received_by' => $manager->id,
+        ]);
+        $line = $receipt->items()->create(['product_id' => $fixtures['product']->id, 'ordered_quantity' => 5, 'received_quantity' => 5, 'accepted_quantity' => 5, 'rejected_quantity' => 0, 'unit_cost' => 100]);
+
+        $this->actingAs($manager)->post('/purchases/invoices', [
+            'supplier_id' => $fixtures['supplier']->id, 'supplier_invoice_number' => 'SUP-INV-1', 'supplier_invoice_date' => now()->toDateString(),
+            'supplier_state_code' => 'KA', 'place_of_supply_state_code' => 'KA', 'idempotency_key' => 'invoice-test-one',
+            'items' => [['goods_receipt_item_id' => $line->id, 'quantity' => 3, 'unit_price' => 100, 'tax_rate' => 18]],
+        ])->assertRedirect();
+        $invoice = PurchaseInvoice::query()->firstOrFail();
+        $this->assertSame('draft', $invoice->status);
+        $this->assertSame('354.00', $invoice->grand_total);
+        $this->actingAs($manager)->post("/purchases/invoices/{$invoice->id}/approve")->assertRedirect();
+        $this->assertSame('approved', $invoice->refresh()->status);
+        $this->assertSame('354.00', $invoice->outstanding_total);
+
+        $this->actingAs($manager)->post('/purchases/invoices', [
+            'supplier_id' => $fixtures['supplier']->id, 'supplier_invoice_number' => 'SUP-INV-2', 'supplier_invoice_date' => now()->toDateString(),
+            'items' => [['goods_receipt_item_id' => $line->id, 'quantity' => 3, 'unit_price' => 100, 'tax_rate' => 0]],
+        ])->assertSessionHasErrors('items');
+    }
+
+    public function test_supplier_payment_allocates_and_reversal_restores_purchase_invoice_outstanding(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+        $invoice = PurchaseInvoice::create([
+            'company_id' => $manager->company_id, 'branch_id' => $manager->branch_id, 'supplier_id' => $fixtures['supplier']->id,
+            'invoice_number' => 'PINV-TEST-001', 'supplier_invoice_number' => 'SUP-PAY-001', 'supplier_invoice_date' => now(), 'financial_year' => '2026-27',
+            'status' => 'approved', 'currency' => 'INR', 'grand_total' => 500, 'outstanding_total' => 500, 'created_by' => $manager->id, 'approved_by' => $manager->id, 'approved_at' => now(),
+        ]);
+        $this->actingAs($manager)->post('/purchases/payments', [
+            'supplier_id' => $fixtures['supplier']->id, 'payment_date' => now()->toDateString(), 'payment_type' => 'invoice_payment', 'payment_method' => 'bank_transfer', 'amount' => 200,
+            'idempotency_key' => 'payment-test-one', 'allocations' => [['purchase_invoice_id' => $invoice->id, 'amount' => 200]],
+        ])->assertRedirect();
+        $payment = SupplierPayment::query()->firstOrFail();
+        $this->assertSame('200.00', $invoice->refresh()->paid_total);
+        $this->assertSame('300.00', $invoice->outstanding_total);
+        $administrator = $this->user(UserRole::Administrator, $manager->company, $manager->branch);
+        $this->actingAs($administrator)->post("/purchases/payments/{$payment->id}/reverse", ['reason' => 'Bank transfer failed'])->assertRedirect();
+        $this->assertSame('500.00', $invoice->refresh()->outstanding_total);
+        $this->assertSame('reversed', $payment->refresh()->status);
     }
 
     private function user(UserRole $role, ?Company $company = null, ?Branch $branch = null): User

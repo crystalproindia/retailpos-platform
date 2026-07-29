@@ -30,6 +30,8 @@ class PurchaseNumberService
                 'po' => ['po_prefix', 'next_po_number'],
                 'grn' => ['grn_prefix', 'next_grn_number'],
                 'return' => ['return_prefix', 'next_return_number'],
+                'invoice' => ['invoice_prefix', 'next_invoice_number'],
+                'payment' => ['payment_prefix', 'next_payment_number'],
                 default => ['pr_prefix', 'next_pr_number'],
             };
 

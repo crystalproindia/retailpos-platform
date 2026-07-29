@@ -14,6 +14,8 @@
 - The existing `Branch` model is the customer-facing Outlet model; `Warehouse`, `StockLevel`, and `StockMovement` remain the existing inventory authority.
 - `BranchUserAssignment`, `OutletAccessService`, and `OutletService` provide tenant-scoped default-outlet, assignment, context, entitlement-limit, archival, audit, and safe warehouse provisioning foundations.
 - `StockTransfer` and `StockTransferItem` provide a draft, dispatch, and idempotent receipt lifecycle that writes stock only through the existing stock-level and movement boundaries. See `docs/multi-outlet-setup.md`.
+- `scripts/verify-phase-g-history.sh` and `scripts/phase-g-history.php` provide the isolated SQLite historical-migration harness. It creates supported data at `e5f1810`, applies the Phase G migrations from `e9f46ba`, compares machine-readable snapshots, retries the safe outlet backfill boundary, and checks SQLite integrity.
+- The 29 July 2026 browser-readiness record is in `docs/multi-outlet-setup.md`. It verifies the implemented outlet/assignment/context/transfer and Free365 setup boundaries and records the remaining company-scoped inventory-adjustment, CRM invoice/payment, and reporting blockers. Phase G is not production-approved for complete multi-outlet operations until those boundaries are implemented and reverified.
 
 ## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
 

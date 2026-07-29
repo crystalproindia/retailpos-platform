@@ -21,7 +21,10 @@ class StockTransferController extends Controller
 
     public function store(Request $request, StockTransferService $transfers): RedirectResponse
     {
-        $data = $request->validate(['source_branch_id' => ['required', 'integer'], 'destination_branch_id' => ['required', 'integer', 'different:source_branch_id'], 'notes' => ['nullable', 'string', 'max:3000'], 'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', Rule::exists('products', 'id')->where('company_id', $request->user()->company_id)], 'items.*.quantity' => ['required', 'numeric', 'gt:0']]);
+        $data = $request->validate(
+            ['source_branch_id' => ['required', 'integer'], 'destination_branch_id' => ['required', 'integer', 'different:source_branch_id'], 'notes' => ['nullable', 'string', 'max:3000'], 'items' => ['required', 'array', 'min:1'], 'items.*.product_id' => ['required', 'integer', Rule::exists('products', 'id')->where('company_id', $request->user()->company_id)], 'items.*.quantity' => ['required', 'numeric', 'gt:0']],
+            ['destination_branch_id.different' => 'Choose a different destination outlet.', 'items.*.quantity.gt' => 'Transfer quantities must be greater than zero.'],
+        );
         $transfer = $transfers->create($request->user(), $data);
         return redirect()->route('inventory.transfers.index')->with('status', 'Transfer '.$transfer->transfer_number.' saved as a draft.');
     }

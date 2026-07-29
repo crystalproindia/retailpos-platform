@@ -28,6 +28,17 @@ class MultiOutletFoundationTest extends TestCase
         $this->assertSame($main->id, Branch::query()->where('company_id', $manager->company_id)->where('is_primary', true)->sole()->id);
     }
 
+    public function test_outlet_create_form_renders_without_native_confirmation_dialogs(): void
+    {
+        [$manager] = $this->userWithMainOutlet(UserRole::Manager);
+
+        $this->actingAs($manager)
+            ->get('/settings/outlets/create')
+            ->assertOk()
+            ->assertSee('Create outlet')
+            ->assertDontSee('confirm(', false);
+    }
+
     public function test_duplicate_code_cross_tenant_access_and_unassigned_context_are_rejected(): void
     {
         [$manager] = $this->userWithMainOutlet(UserRole::Manager);

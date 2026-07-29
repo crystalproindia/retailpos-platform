@@ -15,7 +15,8 @@
 - `BranchUserAssignment`, `OutletAccessService`, and `OutletService` provide tenant-scoped default-outlet, assignment, context, entitlement-limit, archival, audit, and safe warehouse provisioning foundations.
 - `StockTransfer` and `StockTransferItem` provide a draft, dispatch, and idempotent receipt lifecycle that writes stock only through the existing stock-level and movement boundaries. See `docs/multi-outlet-setup.md`.
 - `scripts/verify-phase-g-history.sh` and `scripts/phase-g-history.php` provide the isolated SQLite historical-migration harness. It creates supported data at `e5f1810`, applies the Phase G migrations from `e9f46ba`, compares machine-readable snapshots, retries the safe outlet backfill boundary, and checks SQLite integrity.
-- The 29 July 2026 browser-readiness record is in `docs/multi-outlet-setup.md`. It verifies the implemented outlet/assignment/context/transfer and Free365 setup boundaries and records the remaining company-scoped inventory-adjustment, CRM invoice/payment, and reporting blockers. Phase G is not production-approved for complete multi-outlet operations until those boundaries are implemented and reverified.
+- Phase G.1 completes the remaining authorization boundaries. New CRM invoices and payments persist `branch_id`; invoice/payment reads are outlet-scoped, while branchless historical mutations remain administrator-only. POS sales and registers, stock adjustments, purchase returns, and their underlying warehouse/location relationships enforce the active outlet at service and repository boundaries.
+- `CrmExecutiveReportService` defaults to the current accessible outlet, returns no scoped data for an unassigned user, and permits `outlet_id=all` only for a company administrator. `database/migrations/2026_07_29_020000_add_outlet_scope_to_crm_invoices_and_payments.php` is forward-only and preserves existing records.
 
 ## SaaS Core, Subscription Plans and Tenant Onboarding (Phase 8A)
 

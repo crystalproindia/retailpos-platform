@@ -24,7 +24,7 @@ class GoogleCalendarDemoSyncService
     {
         $demo->loadMissing(['lead', 'assignedTo']);
         $isUpdate = filled($demo->external_calendar_event_id);
-        $demo->update(['calendar_sync_status' => 'pending']);
+        $demo->update(['calendar_sync_status' => 'pending', 'calendar_sync_error' => null, 'calendar_sync_attempts' => $demo->calendar_sync_attempts + 1]);
 
         try {
             $event = $this->googleCalendar->syncDemo($demo, $createMeet);
@@ -37,6 +37,7 @@ class GoogleCalendarDemoSyncService
                 'external_meeting_link' => $meetingLink ?: $demo->external_meeting_link,
                 'meeting_link' => $meetingLink ?: $demo->meeting_link,
                 'calendar_sync_status' => 'synced',
+                'calendar_sync_error' => null,
                 'calendar_synced_at' => now(),
             ]);
             $this->googleCalendar->markSynced($demo->company_id);
@@ -109,7 +110,8 @@ class GoogleCalendarDemoSyncService
 
     private function markFailed(DemoSchedule $demo, User $actor, string $message): GoogleCalendarSyncResult
     {
-        $demo->update(['calendar_sync_status' => 'failed']);
+        $demo->update(['calendar_sync_status' => 'failed', 'calendar_sync_error' => $this->safeError($message)]);
+        $this->googleCalendar->markSyncFailed($demo->company_id, $message);
         $this->recordActivity($demo, $actor, 'Google Calendar sync failed', 'Google Calendar sync failed. '.$message);
         $this->auditLogger->record('crm.demo.google_calendar_sync_failed', $demo, 'Google Calendar sync failed', [
             'company_id' => $demo->company_id,
@@ -124,6 +126,11 @@ class GoogleCalendarDemoSyncService
         ));
 
         return new GoogleCalendarSyncResult(false, $message);
+    }
+
+    private function safeError(string $message): string
+    {
+        return str($message)->limit(500, '')->toString();
     }
 
     private function recordActivity(DemoSchedule $demo, User $actor, string $subject, string $description): void

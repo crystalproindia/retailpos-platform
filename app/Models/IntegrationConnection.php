@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['company_id', 'provider', 'name', 'account_email', 'access_token', 'refresh_token', 'token_expires_at', 'scopes', 'settings', 'status', 'connected_by', 'connected_at', 'last_synced_at', 'disconnected_at'])]
+#[Fillable(['company_id', 'provider', 'name', 'account_email', 'access_token', 'refresh_token', 'token_expires_at', 'scopes', 'settings', 'status', 'connected_by', 'connected_at', 'last_synced_at', 'last_sync_status', 'last_sync_error', 'disconnected_at'])]
 class IntegrationConnection extends Model
 {
     protected function casts(): array

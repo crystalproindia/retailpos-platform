@@ -33,6 +33,16 @@
                     <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Last calendar sync</p>
                     <p class="mt-2 font-semibold text-slate-950 dark:text-white">{{ $connection?->last_synced_at?->format('d M Y, h:i A') ?? 'No calendar events synced yet' }}</p>
                 </div>
+                <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Calendar and timezone</p>
+                    <p class="mt-2 font-semibold text-slate-950 dark:text-white">{{ $connection?->settings['calendar_id'] ?? 'Not selected' }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $connection?->settings['timezone'] ?? config('app.timezone') }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Latest sync status</p>
+                    <p class="mt-2 font-semibold text-slate-950 dark:text-white">{{ $connection?->last_sync_status ? str($connection->last_sync_status)->replace('_', ' ')->headline() : 'No result recorded' }}</p>
+                    @if($connection?->last_sync_error)<p class="mt-1 text-sm text-rose-700 dark:text-rose-300">{{ $connection->last_sync_error }}</p>@endif
+                </div>
             </div>
 
             @if (! $configured)
@@ -61,11 +71,14 @@
             <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Calendar Settings</h2>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Use <span class="font-mono">primary</span> for the connected account&apos;s default calendar, or enter a shared calendar ID.</p>
-                <form method="POST" action="{{ route('integrations.google.settings.update') }}" class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <form method="POST" action="{{ route('integrations.google.settings.update') }}" class="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     @csrf
                     @method('PUT')
                     <label class="block min-w-0 flex-1 text-sm font-medium text-slate-700 dark:text-slate-300">Calendar ID
                         <input name="calendar_id" value="{{ $calendarId }}" required class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    </label>
+                    <label class="block min-w-0 text-sm font-medium text-slate-700 dark:text-slate-300">Timezone
+                        <input name="timezone" value="{{ old('timezone', $connection?->settings['timezone'] ?? config('app.timezone')) }}" required class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     </label>
                     <button class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">Save calendar</button>
                 </form>

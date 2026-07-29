@@ -46,6 +46,10 @@ class DemoScheduleController extends Controller
                 ->with($result->succeeded ? 'status' : 'error', $result->succeeded ? 'Demo scheduled and synced to Google Calendar.' : 'Demo scheduled internally. '.$result->message);
         }
 
+        if (! $connected) {
+            $schedule->update(['calendar_sync_status' => 'skipped_not_configured', 'calendar_sync_error' => null]);
+        }
+
         $message = $connected
             ? 'Demo scheduled internally.'
             : 'Demo scheduled internally. Connect Google Calendar to sync events.';

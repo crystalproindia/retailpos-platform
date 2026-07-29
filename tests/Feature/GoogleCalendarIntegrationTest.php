@@ -178,6 +178,8 @@ class GoogleCalendarIntegrationTest extends TestCase
         $this->assertDatabaseHas('crm_activities', ['crm_lead_id' => $lead->id, 'subject' => 'Google Calendar sync failed']);
         $this->assertDatabaseHas('audit_logs', ['event' => 'crm.demo.google_calendar_sync_failed', 'auditable_id' => $demo->id]);
         $this->assertTrue($administrator->notifications()->where('data->event_key', 'crm.demo.google_calendar_sync_failed')->exists());
+        $this->assertSame(1, $demo->calendar_sync_attempts);
+        $this->assertNotEmpty($demo->calendar_sync_error);
     }
 
     public function test_rescheduled_and_cancelled_synced_demos_update_google_calendar_without_breaking_internal_lifecycle(): void
@@ -217,6 +219,26 @@ class GoogleCalendarIntegrationTest extends TestCase
         $this->assertSame(DemoScheduleStatus::Cancelled, $demo->refresh()->status);
         $this->assertSame('cancelled', $demo->calendar_sync_status);
         Http::assertSent(fn (ClientRequest $request): bool => $request->method() === 'DELETE' && str_contains($request->url(), 'google-event-456'));
+    }
+
+    public function test_local_conflict_is_rejected_and_unconfigured_google_falls_back_safely(): void
+    {
+        config(['services.google_calendar.client_id' => null, 'services.google_calendar.client_secret' => null]);
+        $administrator = $this->user(UserRole::Administrator);
+        $lead = $this->lead($administrator);
+        $this->demo($administrator, $lead);
+
+        $this->actingAs($administrator)
+            ->post("/crm/leads/{$lead->id}/demos", $this->schedulePayload($administrator))
+            ->assertSessionHasErrors('start_time');
+
+        $this->assertDatabaseCount('demo_schedules', 1);
+
+        $this->actingAs($administrator)
+            ->post("/crm/leads/{$lead->id}/demos", $this->schedulePayload($administrator, ['start_time' => '11:00', 'end_time' => '11:30']))
+            ->assertRedirect("/crm/leads/{$lead->id}");
+
+        $this->assertDatabaseHas('demo_schedules', ['company_id' => $administrator->company_id, 'calendar_sync_status' => 'skipped_not_configured']);
     }
 
     private function connectedGoogleCalendar(User $user): IntegrationConnection

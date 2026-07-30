@@ -3,8 +3,9 @@
 @section('page-title', 'Reports')
 @section('content')
 <div class="space-y-6">
-    <form class="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-900">
+    <form class="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 dark:border-slate-800 dark:bg-slate-900">
         <select name="outlet_id" class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">Current outlet</option>@if($canViewAllOutlets)<option value="all" @selected(request('outlet_id') === 'all')>All outlets</option>@endif @foreach($outlets as $outlet)<option value="{{ $outlet->id }}" @selected((string) request('outlet_id') === (string) $outlet->id)>{{ $outlet->name }}</option>@endforeach</select>
+        <select name="warehouse_id" class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">All warehouses</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}" @selected((string) request('warehouse_id') === (string) $warehouse->id)>{{ $warehouse->name }}</option>@endforeach</select>
         <input type="date" name="date_from" value="{{ request('date_from', $overview['range']['from']->toDateString()) }}" class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">
         <input type="date" name="date_to" value="{{ request('date_to', $overview['range']['to']->toDateString()) }}" class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">
         <button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Apply filters</button>

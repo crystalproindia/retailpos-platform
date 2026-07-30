@@ -8,11 +8,21 @@ are limited to their current or explicitly assigned outlet.
 Supported current reports cover completed POS sales, CRM invoice receivables, approved
 purchase invoices, cleared or recorded CRM invoice payments, approved purchase returns,
 current stock valuation, and invoice GST totals. Date ranges use the company timezone
-and are limited to 366 days. CSV exports use the same report result and protect
-spreadsheet formula-like values.
+and are limited to 366 days. Date-only source records use inclusive date boundaries.
+CSV exports use the same report result and protect spreadsheet formula-like values.
+
+The Reports hub also accepts an optional warehouse filter. It is constrained to the
+current company and authorized outlet scope, so an outlet manager cannot use it to
+reach another outlet. Purchase totals show both the approved-invoice gross total and
+the net total after approved purchase returns in the same scope and date range.
+Outstanding invoices include current, 1-30, 31-60, 61-90, and 91+ day aging buckets
+using the company timezone. Legacy CRM payments without a branch inherit their report
+scope and displayed outlet from the linked CRM invoice; branchless legacy data remains
+company-wide-administrator only when it cannot be attributed to an authorized outlet.
 
 Current stock valuation is quantity on hand multiplied by each product current cost
-price. It is not historical FIFO or weighted-average valuation. Gross profit, sales
+price. Aggregated values and detail rows are rounded consistently to integer minor
+units; the platform does not use floating-point totals. It is not historical FIFO or weighted-average valuation. Gross profit, sales
 returns and refunds, and historical stock valuation remain explicitly unavailable
 until reliable source ledgers and invoice-level cost snapshots exist. GST output is a
 preparation aid and must be reviewed before filing.

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\CommandCenter;
 
 use App\Http\Controllers\Controller;
+use App\Models\Inventory\Warehouse;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Reports\RetailReportingService;
 use Illuminate\Http\Request;
@@ -39,11 +40,23 @@ class ReportsController extends Controller
 
     private function payload(Request $request, RetailReportingService $reports, OutletAccessService $outlets): array
     {
-        return ['overview' => $reports->overview($request->user(), $this->filters($request)), 'outlets' => $outlets->accessibleOutlets($request->user()), 'canViewAllOutlets' => $outlets->hasCompanyWideAccess($request->user())];
+        $availableOutlets = $outlets->accessibleOutlets($request->user());
+
+        return [
+            'overview' => $reports->overview($request->user(), $this->filters($request)),
+            'outlets' => $availableOutlets,
+            'warehouses' => Warehouse::query()
+                ->where('company_id', $request->user()->company_id)
+                ->when(! $outlets->hasCompanyWideAccess($request->user()), fn ($query) => $query->whereIn('branch_id', $availableOutlets->modelKeys()))
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'branch_id', 'name']),
+            'canViewAllOutlets' => $outlets->hasCompanyWideAccess($request->user()),
+        ];
     }
 
     private function filters(Request $request): array
     {
-        return $request->validate(['outlet_id' => ['nullable', 'string'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date', 'after_or_equal:date_from']]);
+        return $request->validate(['outlet_id' => ['nullable', 'string'], 'warehouse_id' => ['nullable', 'integer'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date', 'after_or_equal:date_from']]);
     }
 }

@@ -3129,11 +3129,13 @@ The CRM sales invoice reminder foundation uses `crm_invoice_reminder_settings` a
 
 # Phase H — Reporting Foundation
 
-The /reports hub resolves the tenant, company timezone, bounded date range, and
-authorized outlet scope through OutletAccessService; administrators alone can select
-All Outlets. RetailReportingService returns minor-unit monetary totals for completed
-POS sales, CRM invoice receivables, purchases, payments, approved purchase returns,
-current stock valuation, and invoice GST. CSV exports use the same scoped data and
-neutralize formula-like cells. Unsupported historical valuation, gross profit, and
+The /reports hub resolves the tenant, company timezone, bounded date range, authorized
+outlet scope, and optional authorized warehouse scope through OutletAccessService;
+administrators alone can select All Outlets. RetailReportingService returns
+minor-unit monetary totals for completed POS sales, CRM invoice receivables, gross and
+net purchases after approved purchase returns, payments, current stock valuation, and
+invoice GST. It also provides invoice aging buckets and derives legacy branchless
+payment scope from the linked CRM invoice. CSV exports use the same scoped detail rows
+and neutralize formula-like cells. Unsupported historical valuation, gross profit, and
 sales-return/refund metrics remain labelled as unavailable rather than estimated. See
 docs/phase-h-reporting-analytics.md.

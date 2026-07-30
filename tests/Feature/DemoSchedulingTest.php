@@ -77,6 +77,27 @@ class DemoSchedulingTest extends TestCase
             ->assertSessionHasErrors('end_time');
     }
 
+    public function test_internal_demo_scheduling_does_not_expose_google_calendar_or_meet(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->fixtures($manager);
+        $lead = $this->lead($manager, $fixtures);
+
+        $this->actingAs($manager)
+            ->get("/crm/leads/{$lead->id}/demos/create")
+            ->assertOk()
+            ->assertDontSee('Google Calendar')
+            ->assertDontSee('Google Meet');
+
+        $this->actingAs($manager)
+            ->post("/crm/leads/{$lead->id}/demos", $this->demoPayload($manager, [
+                'meeting_mode' => DemoMeetingMode::GoogleMeetLater->value,
+            ]))
+            ->assertSessionHasErrors('meeting_mode');
+
+        $this->get('/integrations/google')->assertNotFound();
+    }
+
     public function test_demo_can_be_rescheduled_completed_and_cancelled(): void
     {
         $manager = $this->user(UserRole::Manager);

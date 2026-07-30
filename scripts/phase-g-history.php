@@ -35,10 +35,12 @@ try {
     $repositoryRoot = requireOption($arguments, 'repository-root');
 
     $loader = require $repositoryRoot.'/vendor/autoload.php';
-    // Composer's optimized class map belongs to the caller checkout. Pin the one
-    // service used to create the pre-Phase-G invoice fixture to the detached app.
+    // Composer's optimized class map belongs to the caller checkout. Pin classes
+    // referenced by the detached historical route set to the detached app.
     $loader->addClassMap([
         'App\\Services\\Crm\\InvoiceService' => $appRoot.'/app/Services/Crm/InvoiceService.php',
+        'App\\Http\\Controllers\\CommandCenter\\Crm\\DemoGoogleCalendarSyncController' => $appRoot.'/app/Http/Controllers/CommandCenter/Crm/DemoGoogleCalendarSyncController.php',
+        'App\\Http\\Controllers\\CommandCenter\\Integrations\\GoogleCalendarIntegrationController' => $appRoot.'/app/Http/Controllers/CommandCenter/Integrations/GoogleCalendarIntegrationController.php',
     ]);
     $loader->setPsr4('App\\', [$appRoot.'/app']);
     $loader->setPsr4('Database\\Factories\\', [$appRoot.'/database/factories']);

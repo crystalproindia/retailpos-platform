@@ -27,7 +27,7 @@ class RecipientResolver
             ->where('company_id', $event->companyId())
             ->where('is_active', true);
 
-        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.pipeline.stage_changed', 'crm.lead_score.hot', 'crm.lead_score.at_risk', 'crm.lead_followup_overdue', 'crm.payment_followup_required', 'crm.demo.scheduled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created'], true)
+        if (in_array($event->eventKey(), ['crm.lead.created', 'crm.lead.assigned', 'crm.lead.status_changed', 'crm.pipeline.stage_changed', 'crm.lead_score.hot', 'crm.lead_score.at_risk', 'crm.lead_followup_overdue', 'crm.payment_followup_required', 'crm.demo.scheduled', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created'], true)
             && ! $this->settings->leadAlertsEnabled($event->companyId())) {
             return collect();
         }
@@ -40,7 +40,7 @@ class RecipientResolver
         $users = match ($event->eventKey()) {
             'pos.sale.held', 'pos.sale.completed', 'pos.offline.bill.queued', 'pos.offline.sync.started', 'pos.offline.sync.completed', 'pos.offline.sync.failed', 'pos.offline.sync.record_failed', 'pos.offline.sync.warning' => $this->managers($event->companyId()),
             'crm.lead.assigned' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null]),
-            'crm.demo.scheduled', 'crm.demo.rescheduled', 'crm.demo.cancelled', 'crm.demo.google_calendar_synced', 'crm.demo.google_calendar_sync_failed', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
+            'crm.demo.scheduled', 'crm.demo.rescheduled', 'crm.demo.cancelled', 'crm.quotation.created', 'crm.quotation.sent', 'crm.quotation.accepted', 'crm.quotation.rejected', 'crm.proforma.created', 'crm.proforma.sent', 'crm.proforma.payment_recorded', 'crm.proforma.fully_paid', 'crm.proforma.share_failed', 'crm.customer.created' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),
             'crm.lead.status_changed' => $this->usersByIds($query, [$payload['assigned_user_id'] ?? null])
                 ->merge($this->managers($event->companyId())),

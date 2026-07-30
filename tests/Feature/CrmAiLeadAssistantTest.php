@@ -40,7 +40,7 @@ class CrmAiLeadAssistantTest extends TestCase
             'starts_at' => now()->addDay(),
             'ends_at' => now()->addDay()->addHour(),
             'timezone' => config('app.timezone'),
-            'meeting_mode' => 'google_meet_later',
+            'meeting_mode' => 'external_link',
             'status' => DemoScheduleStatus::Scheduled,
         ]);
         CrmQuotation::create([

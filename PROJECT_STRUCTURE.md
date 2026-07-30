@@ -3126,3 +3126,14 @@ The CRM sales invoice reminder foundation uses `crm_invoice_reminder_settings` a
 # SaaS Public Free 365 Signup
 
 `app/Services/Saas/PublicFree365SignupService.php` manages short-lived public signup sessions and delegates final creation to `TenantProvisioningService`. `saas_public_signup_sessions` holds only the minimum verified-signup state. Public routes are under `/start-free`; views are in `resources/views/saas/public-signup`. The `Free365OnboardingService` adds a non-blocking tenant-scoped first-login checklist to the Command Center dashboard.
+
+# Phase H — Reporting Foundation
+
+The /reports hub resolves the tenant, company timezone, bounded date range, and
+authorized outlet scope through OutletAccessService; administrators alone can select
+All Outlets. RetailReportingService returns minor-unit monetary totals for completed
+POS sales, CRM invoice receivables, purchases, payments, approved purchase returns,
+current stock valuation, and invoice GST. CSV exports use the same scoped data and
+neutralize formula-like cells. Unsupported historical valuation, gross profit, and
+sales-return/refund metrics remain labelled as unavailable rather than estimated. See
+docs/phase-h-reporting-analytics.md.

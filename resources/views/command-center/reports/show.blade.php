@@ -1,0 +1,6 @@
+@extends('layouts.admin')
+@section('title', 'Report')
+@section('page-title', str($report['selected_report'])->headline())
+@section('content')
+<div class="space-y-5"><a href="{{ route('reports.index', request()->query()) }}" class="text-sm font-semibold text-teal-700">Back to reports</a><div class="flex items-center justify-between"><p class="text-sm text-slate-500">{{ $report['scope']['label'] }} · {{ $report['range']['timezone'] }}</p><a href="{{ route('reports.export', [$report['selected_report']] + request()->query()) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Export CSV</a></div><div class="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"><table class="min-w-full text-sm"><tbody>@foreach($report['detail'] as $key=>$value) @if(!is_array($value))<tr class="border-b border-slate-100 dark:border-slate-800"><th class="px-4 py-3 text-left font-medium text-slate-500">{{ str($key)->replace('_',' ')->headline() }}</th><td class="px-4 py-3 text-right text-slate-950 dark:text-white">{{ is_int($value) ? number_format($value / 100, 2) : $value }}</td></tr>@endif @endforeach</tbody></table></div></div>
+@endsection

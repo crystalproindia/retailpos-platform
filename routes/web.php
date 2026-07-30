@@ -63,6 +63,7 @@ use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\DashboardController;
+use App\Http\Controllers\CommandCenter\ReportsController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailDeliveryLogController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailIntegrationController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
@@ -216,6 +217,11 @@ Route::middleware('auth')->group(function (): void {
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('reports')->name('reports.')->middleware('can:crm.reports.view')->group(function (): void {
+        Route::get('/', [ReportsController::class, 'index'])->name('index');
+        Route::get('{report}', [ReportsController::class, 'show'])->whereIn('report', ['sales', 'purchases', 'inventory', 'profitability', 'gst', 'payments', 'outstanding', 'returns'])->name('show');
+        Route::get('{report}/export', [ReportsController::class, 'export'])->whereIn('report', ['sales', 'purchases', 'inventory', 'profitability', 'gst', 'payments', 'outstanding', 'returns'])->middleware('can:crm.reports.export')->name('export');
+    });
     Route::prefix('getting-started/store-setup')->name('onboarding.store-setup.')->group(function (): void {
         Route::get('/', [StoreSetupWizardController::class, 'show'])->name('show');
         Route::post('start', [StoreSetupWizardController::class, 'start'])->middleware('can:store.setup.manage')->name('start');

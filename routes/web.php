@@ -43,7 +43,6 @@ use App\Http\Controllers\CommandCenter\Crm\CrmOnboardingController;
 use App\Http\Controllers\CommandCenter\Crm\CrmReportController;
 use App\Http\Controllers\CommandCenter\Crm\CrmSupportTicketController;
 use App\Http\Controllers\CommandCenter\Crm\CustomerPortalAccessController as CrmCustomerPortalAccessController;
-use App\Http\Controllers\CommandCenter\Crm\DemoGoogleCalendarSyncController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
@@ -64,9 +63,9 @@ use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\DashboardController;
+use App\Http\Controllers\CommandCenter\ReportsController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailDeliveryLogController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailIntegrationController;
-use App\Http\Controllers\CommandCenter\Integrations\GoogleCalendarIntegrationController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodePrintBatchController;
 use App\Http\Controllers\CommandCenter\Inventory\ChannelProductMappingController;
@@ -218,6 +217,11 @@ Route::middleware('auth')->group(function (): void {
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('reports')->name('reports.')->middleware('can:crm.reports.view')->group(function (): void {
+        Route::get('/', [ReportsController::class, 'index'])->name('index');
+        Route::get('{report}', [ReportsController::class, 'show'])->whereIn('report', ['sales', 'purchases', 'inventory', 'movements', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->name('show');
+        Route::get('{report}/export', [ReportsController::class, 'export'])->whereIn('report', ['sales', 'purchases', 'inventory', 'movements', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->middleware('can:crm.reports.export')->name('export');
+    });
     Route::prefix('getting-started/store-setup')->name('onboarding.store-setup.')->group(function (): void {
         Route::get('/', [StoreSetupWizardController::class, 'show'])->name('show');
         Route::post('start', [StoreSetupWizardController::class, 'start'])->middleware('can:store.setup.manage')->name('start');
@@ -293,15 +297,6 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('resellers/{reseller}/tenants/{assignment}', [SaasResellerController::class, 'unassign'])->middleware('can:saas.resellers.manage')->name('resellers.tenants.unassign');
     });
 
-    Route::prefix('integrations/google')->name('integrations.google.')->group(function (): void {
-        Route::get('/', [GoogleCalendarIntegrationController::class, 'index'])->middleware('can:integrations.google.view')->name('index');
-        Route::get('connect', [GoogleCalendarIntegrationController::class, 'connect'])->middleware('can:integrations.google.connect')->name('connect');
-        Route::get('callback', [GoogleCalendarIntegrationController::class, 'callback'])->middleware('can:integrations.google.connect')->name('callback');
-        Route::post('disconnect', [GoogleCalendarIntegrationController::class, 'disconnect'])->middleware('can:integrations.google.disconnect')->name('disconnect');
-        Route::post('test', [GoogleCalendarIntegrationController::class, 'test'])->middleware('can:integrations.google.connect')->name('test');
-        Route::put('settings', [GoogleCalendarIntegrationController::class, 'updateSettings'])->middleware('can:integrations.google.connect')->name('settings.update');
-    });
-
     Route::prefix('settings')->name('settings.')->group(function (): void {
         Route::get('integrations/email', [EmailIntegrationController::class, 'index'])->middleware('can:integrations.email.view')->name('integrations.email.index');
         Route::put('integrations/email', [EmailIntegrationController::class, 'update'])->middleware('can:integrations.email.manage')->name('integrations.email.update');
@@ -334,7 +329,6 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('demos/{demo}/reschedule', [DemoScheduleController::class, 'reschedule'])->middleware('can:crm.demos.update')->name('demos.reschedule');
         Route::post('demos/{demo}/complete', [DemoScheduleController::class, 'complete'])->middleware('can:crm.demos.complete')->name('demos.complete');
         Route::post('demos/{demo}/cancel', [DemoScheduleController::class, 'cancel'])->middleware('can:crm.demos.cancel')->name('demos.cancel');
-        Route::post('demos/{demo}/sync-google-calendar', DemoGoogleCalendarSyncController::class)->middleware('can:crm.demos.sync_calendar')->name('demos.sync-google-calendar');
         Route::get('quotations', [QuotationController::class, 'index'])->middleware('can:crm.quotations.view')->name('quotations.index');
         Route::get('leads/{lead}/quotations/create', [QuotationController::class, 'create'])->middleware('can:crm.quotations.create')->name('quotations.create');
         Route::post('leads/{lead}/quotations', [QuotationController::class, 'store'])->middleware('can:crm.quotations.create')->name('quotations.store');

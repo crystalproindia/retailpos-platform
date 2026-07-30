@@ -25,14 +25,12 @@ class StoreDemoScheduleRequest extends FormRequest
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'timezone' => ['required', 'timezone'],
-            'meeting_mode' => ['required', Rule::enum(DemoMeetingMode::class)],
+            'meeting_mode' => ['required', Rule::in(array_map(static fn (DemoMeetingMode $mode): string => $mode->value, DemoMeetingMode::availableForScheduling()))],
             'meeting_link' => ['nullable', 'url', 'max:2048'],
             'assigned_to' => ['required', Rule::exists('users', 'id')->where('company_id', $companyId)],
             'customer_email' => ['nullable', 'email', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:5000'],
-            'sync_to_google' => ['nullable', 'boolean'],
-            'create_google_meet' => ['nullable', 'boolean'],
         ];
     }
 }

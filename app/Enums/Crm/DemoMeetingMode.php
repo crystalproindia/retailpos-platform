@@ -9,6 +9,17 @@ enum DemoMeetingMode: string
     case InPerson = 'in_person';
     case ExternalLink = 'external_link';
 
+    /**
+     * @return list<self>
+     */
+    public static function availableForScheduling(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            static fn (self $mode): bool => $mode !== self::GoogleMeetLater,
+        ));
+    }
+
     public function label(): string
     {
         return match ($this) {

@@ -64,6 +64,16 @@ POS already stores a branch and remains outlet-aware. CRM sales invoices, purcha
 
 The Store Setup completion and Company Profile expose optional outlet setup. The existing six-step wizard, Free 365 signup, provisioning transaction, invoice design, reminders, delivery, and product CSV limitation remain unchanged. The header switcher appears only when a user has more than one authorised active outlet.
 
+### Phase H reporting addendum
+
+The shared `/reports` hub now applies the same outlet boundary to sales, purchases,
+current inventory, stock movements, GST, payments, outstanding receivables, purchase
+returns, outlet performance, cashier performance, and CSV exports. Administrators
+alone may use All Outlets; managers cannot use an unassigned outlet or an All Outlets
+parameter. Historical rows for an archived outlet remain visible only through an
+Administrator's consolidated scope. See `docs/phase-h-reporting-analytics.md` for
+the report-source, filter, export, and known-data limitations.
+
 ## Final browser verification — 29 July 2026
 
 The final walkthrough used an isolated persistent SQLite database, synthetic tenants, local file sessions, and a local-only mail log. It did not load production credentials, production MySQL, or customer data. The administrator, manager, sales/cashier, and a second-tenant user boundaries were exercised.

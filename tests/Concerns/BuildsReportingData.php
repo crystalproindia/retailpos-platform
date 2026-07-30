@@ -10,12 +10,18 @@ use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
+use App\Models\Customers\Customer;
+use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\InventoryUnit;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\StockLevel;
+use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosSale;
+use App\Models\Pos\PosSaleItem;
+use App\Models\Pos\PosPayment;
 use App\Models\Purchases\PurchaseInvoice;
+use App\Models\Purchases\PurchaseInvoiceItem;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\Purchases\PurchaseReturnItem;
 use App\Models\Purchases\Supplier;
@@ -118,6 +124,64 @@ trait BuildsReportingData
         ]);
     }
 
+    protected function reportCategory(Company $company, string $name): InventoryCategory
+    {
+        $key = $this->reportKey('CATEGORY');
+
+        return InventoryCategory::create([
+            'company_id' => $company->id,
+            'name' => $name,
+            'slug' => strtolower($key),
+            'is_active' => true,
+        ]);
+    }
+
+    protected function reportCustomer(Company $company, Branch $branch, string $name): Customer
+    {
+        $key = $this->reportKey('CUSTOMER');
+
+        return Customer::create([
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'customer_number' => $key,
+            'first_name' => $name,
+            'display_name' => $name,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+    }
+
+    protected function reportSaleItem(PosSale $sale, Product $product, ?InventoryCategory $category = null, string $quantity = '1.000', ?string $lineTotal = null): PosSaleItem
+    {
+        $lineTotal ??= $sale->total_amount;
+
+        return PosSaleItem::create([
+            'company_id' => $sale->company_id,
+            'pos_sale_id' => $sale->id,
+            'product_id' => $product->id,
+            'category_id' => $category?->id,
+            'product_name' => $product->name,
+            'sku' => $product->sku,
+            'quantity' => $quantity,
+            'unit_price' => $lineTotal,
+            'discount_amount' => '0.00',
+            'tax_amount' => '0.00',
+            'line_total' => $lineTotal,
+        ]);
+    }
+
+    protected function reportPosPayment(PosSale $sale, User $user, string $method, ?string $amount = null): PosPayment
+    {
+        return PosPayment::create([
+            'company_id' => $sale->company_id,
+            'pos_sale_id' => $sale->id,
+            'payment_method' => $method,
+            'amount' => $amount ?? $sale->total_amount,
+            'paid_at' => $sale->sold_at ?? now(),
+            'created_by' => $user->id,
+        ]);
+    }
+
     protected function reportStockLevel(Company $company, Branch $branch, Warehouse $warehouse, Product $product, string $quantity, string $minimumStock = '0.000'): StockLevel
     {
         return StockLevel::create([
@@ -129,6 +193,25 @@ trait BuildsReportingData
             'quantity_reserved' => '0.000',
             'quantity_available' => $quantity,
             'minimum_stock' => $minimumStock,
+        ]);
+    }
+
+    protected function reportStockMovement(Company $company, Branch $branch, Warehouse $warehouse, Product $product, User $user, string $type, string $direction, string $quantity, string $before, string $after, mixed $occurredAt = null): StockMovement
+    {
+        return StockMovement::create([
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $product->id,
+            'movement_type' => $type,
+            'direction' => $direction,
+            'quantity' => $quantity,
+            'quantity_before' => $before,
+            'quantity_after' => $after,
+            'unit_cost' => $product->cost_price,
+            'reason' => 'Reporting test movement',
+            'created_by' => $user->id,
+            'occurred_at' => $occurredAt ?? now(),
         ]);
     }
 
@@ -153,6 +236,21 @@ trait BuildsReportingData
             'paid_total' => '0.00',
             'outstanding_total' => $total,
             'created_by' => $user->id,
+        ]);
+    }
+
+    protected function reportPurchaseInvoiceItem(PurchaseInvoice $invoice, Product $product, string $quantity = '1.000', ?string $lineTotal = null): PurchaseInvoiceItem
+    {
+        $lineTotal ??= $invoice->grand_total;
+
+        return PurchaseInvoiceItem::create([
+            'purchase_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'name_snapshot' => $product->name,
+            'quantity' => $quantity,
+            'unit_price' => $lineTotal,
+            'taxable_value' => $lineTotal,
+            'line_total' => $lineTotal,
         ]);
     }
 

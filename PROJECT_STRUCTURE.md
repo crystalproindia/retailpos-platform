@@ -3127,15 +3127,25 @@ The CRM sales invoice reminder foundation uses `crm_invoice_reminder_settings` a
 
 `app/Services/Saas/PublicFree365SignupService.php` manages short-lived public signup sessions and delegates final creation to `TenantProvisioningService`. `saas_public_signup_sessions` holds only the minimum verified-signup state. Public routes are under `/start-free`; views are in `resources/views/saas/public-signup`. The `Free365OnboardingService` adds a non-blocking tenant-scoped first-login checklist to the Command Center dashboard.
 
-# Phase H — Reporting Foundation
+# Phase H — Reporting and Analytics
 
-The /reports hub resolves the tenant, company timezone, bounded date range, authorized
-outlet scope, and optional authorized warehouse scope through OutletAccessService;
-administrators alone can select All Outlets. RetailReportingService returns
-minor-unit monetary totals for completed POS sales, CRM invoice receivables, gross and
-net purchases after approved purchase returns, payments, current stock valuation, and
-invoice GST. It also provides invoice aging buckets and derives legacy branchless
-payment scope from the linked CRM invoice. CSV exports use the same scoped detail rows
-and neutralize formula-like cells. Unsupported historical valuation, gross profit, and
-sales-return/refund metrics remain labelled as unavailable rather than estimated. See
-docs/phase-h-reporting-analytics.md.
+`/reports` is an authorised, tenant-scoped reporting hub. `RetailReportingService`
+uses `OutletAccessService` for the selected outlet, date range, and warehouse scope;
+only an Administrator can select All Outlets. It supports completed POS sales,
+purchases after approved returns, current stock valuation, stock movements, GST,
+payments, outstanding receivables/aging, purchase returns, outlet performance, and
+cashier performance. Each row path is capped at 500 records and shares its filters
+with the summary and CSV export.
+
+The report detail view supplies responsive mobile rows, desktop tables, accessible
+focus states, empty-result feedback, a generated-at/timezone/scope CSV header, and
+formula-injection protection. Advanced filters cover the applicable product,
+category, customer, supplier, cashier, payment method, status, sale channel,
+discount, stock status, movement type, and tax-classification source fields. IDs are
+validated within the acting company before querying; data filters do not bypass
+outlet authorisation. `ReportValueFormatter` converts only named monetary fields
+from integer minor units, preserving counts and quantities as their real values.
+
+Current-cost stock valuation, gross-profit/margin, sales returns/refunds, historical
+valuation, trends, and charts remain openly unavailable until reliable source
+ledgers and an approved KPI model exist. See `docs/phase-h-reporting-analytics.md`.

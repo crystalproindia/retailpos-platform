@@ -48,14 +48,14 @@ class RetailReportingService
                 'low_stock_count' => $stock['low_stock_count'],
             ],
             'reports' => [
-                'sales' => $sales + $invoices,
-                'purchases' => $purchases,
-                'inventory' => $stock,
+                'sales' => $sales + $invoices + ['rows' => $this->salesRows($user, $scope, $range)],
+                'purchases' => $purchases + ['rows' => $this->purchaseRows($user, $scope, $range)],
+                'inventory' => $stock + ['rows' => $this->stockRows($user, $scope)],
                 'profitability' => ['net_sales' => $sales['net_sales'], 'cost_of_goods_sold' => null, 'gross_profit' => null, 'notice' => 'Gross profit is unavailable until a reliable invoice-level cost snapshot exists.'],
                 'gst' => $this->gst($user, $scope, $range),
-                'payments' => $payments,
-                'outstanding' => $invoices,
-                'returns' => $returns,
+                'payments' => $payments + ['rows' => $this->paymentRows($user, $scope, $range)],
+                'outstanding' => $invoices + ['rows' => $this->outstandingRows($user, $scope, $range)],
+                'returns' => $returns + ['rows' => $this->returnRows($user, $scope, $range)],
                 'outlets' => $outlets,
                 'cashiers' => $cashiers,
             ],
@@ -151,6 +151,46 @@ class RetailReportingService
         return ['taxable_sales' => $this->minor((clone $query)->sum('taxable_total')), 'cgst' => $this->minor((clone $query)->sum('cgst_total')), 'sgst' => $this->minor((clone $query)->sum('sgst_total')), 'igst' => $this->minor((clone $query)->sum('igst_total')), 'cess' => $this->minor((clone $query)->sum('cess_total')), 'notice' => 'Preparation aid only. Review incomplete GSTIN, place-of-supply, and HSN/SAC data before filing.'];
     }
 
+    private function salesRows(User $user, array $scope, array $range): array
+    {
+        return $this->branchScope(PosSale::query()->where('company_id', $user->company_id)->where('status', 'completed')->whereBetween('sold_at', [$range['from'], $range['to']]), $scope['ids'])
+            ->with('branch:id,name')->latest('sold_at')->limit(500)->get()
+            ->map(fn (PosSale $sale) => ['date' => $sale->sold_at?->setTimezone($range['timezone'])->toDateString(), 'reference' => $sale->sale_number, 'outlet' => $sale->branch?->name, 'net_sales' => $this->minor($sale->total_amount), 'paid' => $this->minor($sale->paid_amount), 'status' => $sale->status])->all();
+    }
+
+    private function purchaseRows(User $user, array $scope, array $range): array
+    {
+        return $this->branchScope(PurchaseInvoice::query()->where('company_id', $user->company_id)->whereNotIn('status', ['cancelled', 'draft'])->whereBetween('supplier_invoice_date', [$range['from']->toDateString(), $range['to']->toDateString()]), $scope['ids'])
+            ->with(['supplier:id,name', 'branch:id,name'])->latest('supplier_invoice_date')->limit(500)->get()
+            ->map(fn (PurchaseInvoice $invoice) => ['date' => $invoice->supplier_invoice_date?->toDateString(), 'reference' => $invoice->invoice_number, 'supplier' => $invoice->supplier?->name, 'outlet' => $invoice->branch?->name, 'total' => $this->minor($invoice->grand_total), 'outstanding' => $this->minor($invoice->outstanding_total), 'status' => $invoice->status])->all();
+    }
+
+    private function stockRows(User $user, array $scope): array
+    {
+        return $this->branchScope(StockLevel::query()->where('company_id', $user->company_id), $scope['ids'])->with(['product:id,name,sku,cost_price', 'branch:id,name'])->orderByDesc('quantity_on_hand')->limit(500)->get()
+            ->map(fn (StockLevel $level) => ['product' => $level->product?->name, 'sku' => $level->product?->sku, 'outlet' => $level->branch?->name, 'quantity' => (string) $level->quantity_on_hand, 'unit_cost' => $this->minor($level->product?->cost_price), 'value' => $this->quantityValue($level->quantity_on_hand, $level->product?->cost_price)])->all();
+    }
+
+    private function paymentRows(User $user, array $scope, array $range): array
+    {
+        return $this->branchScope(CrmInvoicePayment::query()->where('company_id', $user->company_id)->whereNotIn('status', ['failed', 'reversed'])->whereBetween('payment_date', [$range['from']->toDateString(), $range['to']->toDateString()]), $scope['ids'])
+            ->with(['invoice:id,invoice_number', 'branch:id,name', 'recorder:id,name'])->latest('payment_date')->limit(500)->get()
+            ->map(fn (CrmInvoicePayment $payment) => ['date' => $payment->payment_date?->toDateString(), 'reference' => $payment->payment_reference, 'invoice' => $payment->invoice?->invoice_number, 'outlet' => $payment->branch?->name, 'method' => $payment->payment_method, 'amount' => $this->minor($payment->amount), 'status' => $payment->status?->value ?? $payment->status])->all();
+    }
+
+    private function outstandingRows(User $user, array $scope, array $range): array
+    {
+        return $this->branchScope(CrmInvoice::query()->where('company_id', $user->company_id)->whereNotIn('status', ['cancelled', 'void'])->where('balance_due', '>', 0)->whereBetween('issue_date', [$range['from']->toDateString(), $range['to']->toDateString()]), $scope['ids'])
+            ->with(['branch:id,name', 'customer:id,company_name'])->orderByDesc('balance_due')->limit(500)->get()
+            ->map(fn (CrmInvoice $invoice) => ['invoice' => $invoice->invoice_number, 'customer' => $invoice->customer?->company_name ?? $invoice->billing_name, 'outlet' => $invoice->branch?->name, 'due_date' => $invoice->due_date?->toDateString(), 'outstanding' => $this->minor($invoice->balance_due), 'status' => $invoice->status?->value ?? $invoice->status])->all();
+    }
+
+    private function returnRows(User $user, array $scope, array $range): array
+    {
+        return PurchaseReturnItem::query()->with(['purchaseReturn.branch:id,name', 'purchaseReturn.supplier:id,name', 'product:id,name'])->whereHas('purchaseReturn', function (Builder $returns) use ($user, $scope, $range): void { $this->branchScope($returns->where('company_id', $user->company_id)->where('status', 'approved')->whereBetween('return_date', [$range['from']->toDateString(), $range['to']->toDateString()]), $scope['ids']); })->limit(500)->get()
+            ->map(fn (PurchaseReturnItem $item) => ['date' => $item->purchaseReturn?->return_date?->toDateString(), 'reference' => $item->purchaseReturn?->return_number, 'supplier' => $item->purchaseReturn?->supplier?->name, 'product' => $item->product?->name, 'outlet' => $item->purchaseReturn?->branch?->name, 'quantity' => (string) $item->quantity, 'value' => $this->quantityValue($item->quantity, $item->unit_cost)])->all();
+    }
+
     private function outletPerformance(User $user, array $scope, array $range): array
     {
         $sales = $this->branchScope(PosSale::query()->where('pos_sales.company_id', $user->company_id)->where('status', 'completed')->whereBetween('sold_at', [$range['from'], $range['to']]), $scope['ids'])
@@ -175,4 +215,5 @@ class RetailReportingService
 
     private function branchScope(Builder $query, ?array $ids): Builder { return $ids === null ? $query : $query->whereIn($query->getModel()->qualifyColumn('branch_id'), $ids); }
     private function minor(mixed $value): int { $value = (string) ($value ?? '0'); [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, ''); return ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0'); }
+    private function quantityValue(mixed $quantity, mixed $unitCost): int { $value = (string) ($quantity ?? '0'); [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, ''); $thousandths = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0'); return intdiv($thousandths * $this->minor($unitCost), 1000); }
 }

@@ -36,7 +36,6 @@ class DemoScheduleService
     {
         return DB::transaction(function () use ($lead, $user, $data): DemoSchedule {
             [$startsAt, $endsAt] = $this->times($data);
-            $this->ensureNoLocalConflict($lead->company_id, $startsAt, $endsAt);
             $previousStatusId = $lead->status_id;
             $status = $this->demoScheduledStatus($lead->company_id);
 
@@ -78,7 +77,6 @@ class DemoScheduleService
         return DB::transaction(function () use ($schedule, $user, $data): DemoSchedule {
             $this->ensureActive($schedule);
             [$startsAt, $endsAt] = $this->times($data);
-            $this->ensureNoLocalConflict($schedule->company_id, $startsAt, $endsAt, $schedule->id);
             $lead = $schedule->lead()->firstOrFail();
 
             $schedule->update(Arr::only($this->schedulePayload($lead, $user, $data, $startsAt, $endsAt), [
@@ -250,7 +248,6 @@ class DemoScheduleService
             throw ValidationException::withMessages(['demo' => 'Only scheduled or rescheduled demos can be updated.']);
         }
     }
-
     private function ensureNoLocalConflict(int $companyId, CarbonImmutable $startsAt, CarbonImmutable $endsAt, ?int $exceptId = null): void
     {
         $conflict = DemoSchedule::query()

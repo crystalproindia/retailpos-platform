@@ -24,11 +24,14 @@ class ReportsController extends Controller
     public function export(Request $request, RetailReportingService $reports, string $report)
     {
         $data = $reports->report($request->user(), $report, $this->filters($request));
-        $rows = collect($data['detail'])->except('notice', 'source', 'method')->map(fn ($value, $key) => ['Metric' => str($key)->replace('_', ' ')->headline()->toString(), 'Value' => is_int($value) ? number_format($value / 100, 2, '.', '') : (string) $value]);
+        $detail = collect($data['detail'])->except('notice', 'source', 'method');
+        $rows = $detail->has('rows')
+            ? collect($detail->get('rows'))->map(fn (array $row) => array_map(fn ($value) => is_int($value) ? number_format($value / 100, 2, '.', '') : (string) $value, $row))
+            : $detail->map(fn ($value, $key) => ['Metric' => str($key)->replace('_', ' ')->headline()->toString(), 'Value' => is_int($value) ? number_format($value / 100, 2, '.', '') : (string) $value]);
 
         return Response::streamDownload(function () use ($rows): void {
             $stream = fopen('php://output', 'w');
-            fputcsv($stream, ['Metric', 'Value']);
+            fputcsv($stream, array_keys($rows->first() ?? ['Metric' => null, 'Value' => null]));
             $rows->each(fn (array $row) => fputcsv($stream, array_map(fn ($value) => preg_match('/^[=+\\-@]/', (string) $value) ? "'".$value : $value, $row)));
             fclose($stream);
         }, "retailpos-{$report}-".now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv']);

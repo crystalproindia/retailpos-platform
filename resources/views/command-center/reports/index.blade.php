@@ -18,7 +18,7 @@
         @endforeach
     </div>
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        @foreach(['sales'=>'Sales','purchases'=>'Purchases','inventory'=>'Inventory','profitability'=>'Gross Profit','gst'=>'GST & Tax','payments'=>'Payments','outstanding'=>'Outstanding','returns'=>'Returns'] as $key=>$label)
+        @foreach(['sales'=>'Sales','purchases'=>'Purchases','inventory'=>'Inventory','profitability'=>'Gross Profit','gst'=>'GST & Tax','payments'=>'Payments','outstanding'=>'Outstanding','returns'=>'Returns','outlets'=>'Outlet Performance','cashiers'=>'Cashier Performance'] as $key=>$label)
         <a href="{{ route('reports.show', [$key] + request()->query()) }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900"><h2 class="font-semibold text-slate-950 dark:text-white">{{ $label }}</h2><p class="mt-1 text-sm text-slate-500">Authorized, filter-consistent reporting with CSV export.</p></a>
         @endforeach
     </div>

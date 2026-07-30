@@ -29,6 +29,8 @@ class RetailReportingService
         $payments = $this->payments($user, $scope, $range);
         $returns = $this->returns($user, $scope, $range);
         $stock = $this->stock($user, $scope);
+        $outlets = $this->outletPerformance($user, $scope, $range);
+        $cashiers = $this->cashierPerformance($user, $scope, $range);
 
         return [
             'scope' => $scope,
@@ -54,6 +56,8 @@ class RetailReportingService
                 'payments' => $payments,
                 'outstanding' => $invoices,
                 'returns' => $returns,
+                'outlets' => $outlets,
+                'cashiers' => $cashiers,
             ],
         ];
     }
@@ -145,6 +149,28 @@ class RetailReportingService
     {
         $query = $this->branchScope(CrmInvoice::query()->where('company_id', $user->company_id)->whereNotIn('status', ['cancelled', 'void'])->whereBetween('issue_date', [$range['from']->toDateString(), $range['to']->toDateString()]), $scope['ids']);
         return ['taxable_sales' => $this->minor((clone $query)->sum('taxable_total')), 'cgst' => $this->minor((clone $query)->sum('cgst_total')), 'sgst' => $this->minor((clone $query)->sum('sgst_total')), 'igst' => $this->minor((clone $query)->sum('igst_total')), 'cess' => $this->minor((clone $query)->sum('cess_total')), 'notice' => 'Preparation aid only. Review incomplete GSTIN, place-of-supply, and HSN/SAC data before filing.'];
+    }
+
+    private function outletPerformance(User $user, array $scope, array $range): array
+    {
+        $sales = $this->branchScope(PosSale::query()->where('pos_sales.company_id', $user->company_id)->where('status', 'completed')->whereBetween('sold_at', [$range['from'], $range['to']]), $scope['ids'])
+            ->join('branches', 'branches.id', '=', 'pos_sales.branch_id')
+            ->selectRaw('branches.id, branches.name, COUNT(*) as sale_count, COALESCE(SUM(pos_sales.total_amount), 0) as net_sales')
+            ->groupBy('branches.id', 'branches.name')->orderByDesc('net_sales')->get()
+            ->map(fn ($row) => ['outlet' => $row->name, 'sales_count' => (int) $row->sale_count, 'net_sales' => $this->minor($row->net_sales)]);
+
+        return ['rows' => $sales, 'notice' => 'Outlet comparisons include only authorized outlets and completed POS sales.'];
+    }
+
+    private function cashierPerformance(User $user, array $scope, array $range): array
+    {
+        $sales = $this->branchScope(PosSale::query()->where('pos_sales.company_id', $user->company_id)->where('status', 'completed')->whereBetween('sold_at', [$range['from'], $range['to']]), $scope['ids'])
+            ->leftJoin('users', 'users.id', '=', 'pos_sales.completed_by')
+            ->selectRaw("COALESCE(users.name, 'Unassigned') as cashier, COUNT(*) as sale_count, COALESCE(SUM(pos_sales.total_amount), 0) as net_sales")
+            ->groupBy('users.id', 'users.name')->orderByDesc('net_sales')->get()
+            ->map(fn ($row) => ['cashier' => $row->cashier, 'sales_count' => (int) $row->sale_count, 'net_sales' => $this->minor($row->net_sales)]);
+
+        return ['rows' => $sales, 'notice' => 'Operational sales metrics only; this report does not make quality judgments.'];
     }
 
     private function branchScope(Builder $query, ?array $ids): Builder { return $ids === null ? $query : $query->whereIn($query->getModel()->qualifyColumn('branch_id'), $ids); }

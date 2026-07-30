@@ -219,8 +219,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::prefix('reports')->name('reports.')->middleware('can:crm.reports.view')->group(function (): void {
         Route::get('/', [ReportsController::class, 'index'])->name('index');
-        Route::get('{report}', [ReportsController::class, 'show'])->whereIn('report', ['sales', 'purchases', 'inventory', 'profitability', 'gst', 'payments', 'outstanding', 'returns'])->name('show');
-        Route::get('{report}/export', [ReportsController::class, 'export'])->whereIn('report', ['sales', 'purchases', 'inventory', 'profitability', 'gst', 'payments', 'outstanding', 'returns'])->middleware('can:crm.reports.export')->name('export');
+        Route::get('{report}', [ReportsController::class, 'show'])->whereIn('report', ['sales', 'purchases', 'inventory', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->name('show');
+        Route::get('{report}/export', [ReportsController::class, 'export'])->whereIn('report', ['sales', 'purchases', 'inventory', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->middleware('can:crm.reports.export')->name('export');
     });
     Route::prefix('getting-started/store-setup')->name('onboarding.store-setup.')->group(function (): void {
         Route::get('/', [StoreSetupWizardController::class, 'show'])->name('show');

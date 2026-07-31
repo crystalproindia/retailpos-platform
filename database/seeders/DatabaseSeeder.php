@@ -753,6 +753,7 @@ class DatabaseSeeder extends Seeder
                     'is_won' => $status['is_won'] ?? false,
                     'is_lost' => $status['is_lost'] ?? false,
                     'is_active' => true,
+                    'is_default' => $status['name'] === 'New',
                     'sort_order' => $status['sort_order'],
                 ],
             ),

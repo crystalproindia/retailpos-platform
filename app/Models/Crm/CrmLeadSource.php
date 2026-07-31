@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'name', 'slug', 'description', 'color', 'tone', 'is_active', 'sort_order'])]
+#[Fillable(['company_id', 'name', 'slug', 'description', 'color', 'tone', 'is_active', 'is_default', 'sort_order'])]
 class CrmLeadSource extends Model
 {
     use Auditable, SoftDeletes;
@@ -19,6 +19,7 @@ class CrmLeadSource extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_default' => 'boolean',
         ];
     }
 

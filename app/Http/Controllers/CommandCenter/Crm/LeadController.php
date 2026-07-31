@@ -45,16 +45,20 @@ class LeadController extends Controller
 
     public function create(Request $request, LeadRepository $leadRepository, CrmCompanyRepository $companyRepository, ContactRepository $contactRepository): View
     {
-        $status = $leadRepository->statusesForCompany($request->user()->company_id)->first();
+        $statuses = $leadRepository->statusesForCompany($request->user()->company_id);
+        $sources = $leadRepository->sourcesForCompany($request->user()->company_id);
+        $status = $statuses->firstWhere('is_default', true) ?? $statuses->first();
+        $source = $sources->firstWhere('is_default', true);
 
         return view('command-center.crm.leads.create', [
             'lead' => new CrmLead([
                 'status_id' => $status?->id,
+                'source_id' => $source?->id,
                 'priority' => LeadPriority::Medium,
                 'currency' => 'INR',
             ]),
-            'statuses' => $leadRepository->statusesForCompany($request->user()->company_id),
-            'sources' => $leadRepository->sourcesForCompany($request->user()->company_id),
+            'statuses' => $statuses,
+            'sources' => $sources,
             'tags' => $leadRepository->tagsForCompany($request->user()->company_id),
             'users' => $this->usersForCompany($request->user()->company_id),
             'crmCompanies' => $companyRepository->optionsForUser($request->user()),
@@ -84,10 +88,12 @@ class LeadController extends Controller
 
     public function edit(Request $request, LeadRepository $leadRepository, CrmCompanyRepository $companyRepository, ContactRepository $contactRepository, int $lead): View
     {
+        $lead = $leadRepository->findForUser($request->user(), $lead, true);
+
         return view('command-center.crm.leads.edit', [
-            'lead' => $leadRepository->findForUser($request->user(), $lead, true),
-            'statuses' => $leadRepository->statusesForCompany($request->user()->company_id),
-            'sources' => $leadRepository->sourcesForCompany($request->user()->company_id),
+            'lead' => $lead,
+            'statuses' => $leadRepository->statusesForCompany($request->user()->company_id, $lead->status_id),
+            'sources' => $leadRepository->sourcesForCompany($request->user()->company_id, $lead->source_id),
             'tags' => $leadRepository->tagsForCompany($request->user()->company_id),
             'users' => $this->usersForCompany($request->user()->company_id),
             'crmCompanies' => $companyRepository->optionsForUser($request->user()),

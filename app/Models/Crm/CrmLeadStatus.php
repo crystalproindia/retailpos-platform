@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'name', 'slug', 'stage_type', 'color', 'tone', 'probability', 'is_won', 'is_lost', 'is_active', 'sort_order'])]
+#[Fillable(['company_id', 'name', 'slug', 'stage_type', 'color', 'tone', 'probability', 'is_won', 'is_lost', 'is_active', 'is_default', 'sort_order'])]
 class CrmLeadStatus extends Model
 {
     use Auditable, SoftDeletes;
@@ -23,6 +23,7 @@ class CrmLeadStatus extends Model
             'is_won' => 'boolean',
             'is_lost' => 'boolean',
             'is_active' => 'boolean',
+            'is_default' => 'boolean',
         ];
     }
 

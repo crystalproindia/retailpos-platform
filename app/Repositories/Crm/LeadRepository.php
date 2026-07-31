@@ -135,11 +135,12 @@ class LeadRepository
     /**
      * @return Collection<int, CrmLeadSource>
      */
-    public function sourcesForCompany(int $companyId): Collection
+    public function sourcesForCompany(int $companyId, ?int $includeSourceId = null): Collection
     {
         return CrmLeadSource::query()
             ->where('company_id', $companyId)
-            ->where('is_active', true)
+            ->where(fn (Builder $query) => $query->where('is_active', true)->when($includeSourceId, fn (Builder $query) => $query->orWhereKey($includeSourceId)))
+            ->orderByDesc('is_default')
             ->orderBy('sort_order')
             ->get();
     }
@@ -147,11 +148,12 @@ class LeadRepository
     /**
      * @return Collection<int, CrmLeadStatus>
      */
-    public function statusesForCompany(int $companyId): Collection
+    public function statusesForCompany(int $companyId, ?int $includeStatusId = null): Collection
     {
         return CrmLeadStatus::query()
             ->where('company_id', $companyId)
-            ->where('is_active', true)
+            ->where(fn (Builder $query) => $query->where('is_active', true)->when($includeStatusId, fn (Builder $query) => $query->orWhereKey($includeStatusId)))
+            ->orderByDesc('is_default')
             ->orderBy('sort_order')
             ->get();
     }

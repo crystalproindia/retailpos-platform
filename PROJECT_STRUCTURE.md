@@ -1,5 +1,9 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## Navigation State And CRM Lead Master Data
+
+The shared Command Center navigation preserves per-user, per-company sidebar scroll, expanded groups, and desktop collapse state in browser-local storage without changing server authorization. CRM Settings provides tenant-scoped lead-status and lead-source management with ordering, defaults, lifecycle safeguards, audit logging, and active-only lead-form selection. See `docs/navigation-and-crm-master-data.md` for the operational contract and deployment note.
+
 ## Intelligent Store Setup Wizard
 
 - `StoreSetupWizard` maps to `store_setup_wizards`, a one-record-per-company, tenant-scoped state machine for the six setup questions, safe answers, recommendations, idempotency, and completion/skipped markers.

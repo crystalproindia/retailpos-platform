@@ -50,6 +50,22 @@ class ResponsiveNavigationTest extends TestCase
         $this->assertStringContainsString('closeSidebar({ restoreFocus: false })', $scripts);
     }
 
+    public function test_sidebar_persists_per_user_scroll_and_group_state_without_affecting_authorization(): void
+    {
+        $first = $this->user();
+        $response = $this->actingAs($first)->get('/dashboard');
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $response->assertOk()
+            ->assertSee('data-sidebar-state-key="retailpos.sidebar.v2.'.$first->company_id.'.'.$first->id.'"', false)
+            ->assertSee('data-sidebar-scroll', false)
+            ->assertSee('data-sidebar-group', false);
+        $this->assertStringContainsString('validSidebarGroupIds', $script);
+        $this->assertStringContainsString("desktop: { collapsed: false, scrollTop: 0, groups: {} }", $script);
+        $this->assertStringContainsString("mobile: { scrollTop: 0, groups: {} }", $script);
+        $this->assertStringContainsString('scrollIntoView', $script);
+    }
+
     public function test_invoice_designs_uses_the_shared_settings_navigation_for_management_roles_only(): void
     {
         $administrator = $this->user();

@@ -29,7 +29,7 @@
         <div class="min-h-screen lg:grid lg:grid-cols-[auto_1fr]">
             <div class="fixed inset-0 z-30 hidden bg-slate-950/50 backdrop-blur-sm lg:hidden" data-sidebar-overlay></div>
 
-            <aside id="command-center-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white transition-all duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 dark:border-slate-800 dark:bg-slate-900" data-sidebar>
+            <aside id="command-center-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white transition-all duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 dark:border-slate-800 dark:bg-slate-900" data-sidebar data-sidebar-state-key="retailpos.sidebar.v2.{{ $user?->company_id }}.{{ $user?->id }}">
                 <div class="flex h-16 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800" data-sidebar-brand>
                     <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-3">
                         <span class="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">RP</span>
@@ -51,7 +51,7 @@
                     </button>
                 </div>
 
-                <nav class="flex-1 space-y-5 overflow-y-auto p-3">
+                <nav class="flex-1 space-y-5 overflow-y-auto p-3" data-sidebar-scroll>
                     @foreach ($moduleGroups as $category => $modules)
                         <div class="space-y-1">
                             <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>{{ $category }}</p>
@@ -70,25 +70,41 @@
                                     };
                                 @endphp
 
-                                <a @if ($module->navigable) href="{{ $module->url() }}" @else aria-disabled="true" role="group" @endif
-                                    class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
-                                    title="{{ $module->name }}">
-                                    <x-icon :name="$module->icon" class="size-5 shrink-0" />
-                                    <span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $module->name }}</span>
-                                    @if ($module->badge)
-                                        <span class="rounded-full px-2 py-0.5 text-[0.65rem] font-semibold {{ $badgeClass }}" data-sidebar-label>{{ $module->badge['label'] }}</span>
-                                    @endif
-                                </a>
-
                                 @if ($module->children)
-                                    <div class="ml-8 space-y-1" data-sidebar-label>
+                                    <div data-sidebar-group data-sidebar-group-id="{{ $module->id }}" data-sidebar-group-active="{{ $isActive ? 'true' : 'false' }}">
+                                        <div class="flex items-center gap-1">
+                                            <a @if ($module->navigable) href="{{ $module->url() }}" @else aria-disabled="true" role="group" @endif
+                                                class="group flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
+                                                title="{{ $module->name }}">
+                                                <x-icon :name="$module->icon" class="size-5 shrink-0" />
+                                                <span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $module->name }}</span>
+                                                @if ($module->badge)
+                                                    <span class="rounded-full px-2 py-0.5 text-[0.65rem] font-semibold {{ $badgeClass }}" data-sidebar-label>{{ $module->badge['label'] }}</span>
+                                                @endif
+                                            </a>
+                                            <button type="button" class="shrink-0 rounded-md p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-teal-500/40 dark:hover:bg-slate-800 dark:hover:text-white" data-sidebar-group-toggle aria-expanded="{{ $isActive ? 'true' : 'false' }}" aria-controls="sidebar-group-{{ $module->id }}" aria-label="Toggle {{ $module->name }} menu" data-sidebar-label>
+                                                <x-icon name="chevron-down" class="size-4 transition-transform" data-sidebar-group-icon />
+                                            </button>
+                                        </div>
+                                        <div id="sidebar-group-{{ $module->id }}" class="ml-8 space-y-1 {{ $isActive ? '' : 'hidden' }}" data-sidebar-group-panel data-sidebar-label>
                                         @foreach ($module->children as $child)
                                             <a href="{{ $child->url() }}"
-                                                class="block rounded-md px-3 py-2 text-sm transition {{ $child->isActive() ? 'bg-slate-100 font-medium text-slate-950 dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white' }}">
+                                                class="block rounded-md px-3 py-2 text-sm transition {{ $child->isActive() ? 'bg-slate-100 font-medium text-slate-950 dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white' }}" @if ($child->isActive()) data-sidebar-active-item @endif>
                                                 {{ $child->name }}
                                             </a>
                                         @endforeach
                                     </div>
+                                    </div>
+                                @else
+                                    <a @if ($module->navigable) href="{{ $module->url() }}" @else aria-disabled="true" role="group" @endif
+                                        class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $isActive ? 'bg-slate-950 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' }}"
+                                        title="{{ $module->name }}" @if ($isActive) data-sidebar-active-item @endif>
+                                        <x-icon :name="$module->icon" class="size-5 shrink-0" />
+                                        <span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $module->name }}</span>
+                                        @if ($module->badge)
+                                            <span class="rounded-full px-2 py-0.5 text-[0.65rem] font-semibold {{ $badgeClass }}" data-sidebar-label>{{ $module->badge['label'] }}</span>
+                                        @endif
+                                    </a>
                                 @endif
                             @endforeach
                         </div>

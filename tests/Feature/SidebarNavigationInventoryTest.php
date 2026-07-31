@@ -20,7 +20,7 @@ class SidebarNavigationInventoryTest extends TestCase
 
         $this->assertSame([
             'dashboard' => [],
-            'crm' => ['crm-dashboard', 'contacts', 'leads', 'demo-requests', 'crm-quotations', 'crm-customers', 'crm-proformas', 'crm-onboarding', 'crm-companies', 'crm-pipeline', 'crm-activities', 'crm-follow-ups'],
+            'crm' => ['crm-dashboard', 'contacts', 'leads', 'demo-requests', 'crm-quotations', 'crm-customers', 'crm-proformas', 'crm-onboarding', 'crm-companies', 'crm-pipeline', 'crm-activities', 'crm-follow-ups', 'crm-settings'],
             'sales' => ['sales-invoices', 'sales-opportunities'],
             'pos' => ['pos-dashboard', 'pos-billing', 'pos-held', 'pos-offline', 'pos-sales', 'pos-registers'],
             'customers' => ['customer-dashboard', 'customer-records', 'customer-groups', 'customer-loyalty', 'customer-birthdays', 'customer-insights', 'customer-inactive', 'customer-lost', 'customer-returns', 'customer-wallet', 'customer-settings'],

@@ -46,6 +46,7 @@ use App\Http\Controllers\CommandCenter\Crm\CustomerPortalAccessController as Crm
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
+use App\Http\Controllers\CommandCenter\Crm\LeadMasterDataController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceReminderSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceTemplateController;
@@ -310,6 +311,30 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware(['role:administrator,manager,sales', 'can:crm.view'])->prefix('crm')->name('crm.')->group(function (): void {
         Route::get('/', CrmDashboardController::class)->name('dashboard');
+        Route::prefix('settings')->middleware('can:crm.settings.manage')->name('settings.')->group(function (): void {
+            Route::get('/', [LeadMasterDataController::class, 'index'])->name('index');
+
+            Route::get('lead-statuses', [LeadMasterDataController::class, 'statuses'])->name('statuses.index');
+            Route::post('lead-statuses', [LeadMasterDataController::class, 'storeStatus'])->name('statuses.store');
+            Route::patch('lead-statuses/reorder', [LeadMasterDataController::class, 'reorderStatuses'])->name('statuses.reorder');
+            Route::post('lead-statuses/{status}/move/{direction}', [LeadMasterDataController::class, 'moveStatus'])->whereIn('direction', ['up', 'down'])->name('statuses.move');
+            Route::get('lead-statuses/{status}/edit', [LeadMasterDataController::class, 'editStatus'])->name('statuses.edit');
+            Route::put('lead-statuses/{status}', [LeadMasterDataController::class, 'updateStatus'])->name('statuses.update');
+            Route::post('lead-statuses/{status}/toggle', [LeadMasterDataController::class, 'toggleStatus'])->name('statuses.toggle');
+            Route::post('lead-statuses/{status}/default', [LeadMasterDataController::class, 'defaultStatus'])->name('statuses.default');
+            Route::delete('lead-statuses/{status}', [LeadMasterDataController::class, 'destroyStatus'])->name('statuses.destroy');
+
+            Route::get('lead-sources', [LeadMasterDataController::class, 'sources'])->name('sources.index');
+            Route::post('lead-sources', [LeadMasterDataController::class, 'storeSource'])->name('sources.store');
+            Route::patch('lead-sources/reorder', [LeadMasterDataController::class, 'reorderSources'])->name('sources.reorder');
+            Route::post('lead-sources/{source}/move/{direction}', [LeadMasterDataController::class, 'moveSource'])->whereIn('direction', ['up', 'down'])->name('sources.move');
+            Route::get('lead-sources/{source}/edit', [LeadMasterDataController::class, 'editSource'])->name('sources.edit');
+            Route::put('lead-sources/{source}', [LeadMasterDataController::class, 'updateSource'])->name('sources.update');
+            Route::post('lead-sources/{source}/toggle', [LeadMasterDataController::class, 'toggleSource'])->name('sources.toggle');
+            Route::post('lead-sources/{source}/default', [LeadMasterDataController::class, 'defaultSource'])->name('sources.default');
+            Route::delete('lead-sources/{source}', [LeadMasterDataController::class, 'destroySource'])->name('sources.destroy');
+        });
+
         Route::get('reports', [CrmReportController::class, 'index'])->middleware('can:crm.reports.view')->name('reports.index');
         Route::get('reports/executive', [CrmReportController::class, 'executive'])->middleware('can:crm.reports.executive')->name('reports.executive');
         Route::get('reports/visualization', [CrmReportController::class, 'visualization'])->middleware('can:crm.reports.view')->name('reports.visualization');

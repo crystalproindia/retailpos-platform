@@ -110,56 +110,69 @@ class Module
         }
 
         if (str_starts_with($this->route, 'cms.')) {
-            return request()->routeIs('cms.*');
+            return $this->familyRouteIsActive('cms');
         }
 
         if (str_starts_with($this->route, 'website.')) {
-            return request()->routeIs('website.*');
+            return $this->familyRouteIsActive('website');
         }
 
         if (str_starts_with($this->route, 'crm.')) {
-            return request()->routeIs('crm.*');
+            return $this->familyRouteIsActive('crm');
         }
 
         if (str_starts_with($this->route, 'sales.')) {
-            return request()->routeIs('sales.*');
+            return $this->familyRouteIsActive('sales');
         }
 
         if (str_starts_with($this->route, 'pos.')) {
-            return request()->routeIs('pos.*');
+            return $this->familyRouteIsActive('pos');
         }
 
         if (str_starts_with($this->route, 'customers.')) {
-            return request()->routeIs('customers.*');
+            return $this->familyRouteIsActive('customers');
         }
 
         if (str_starts_with($this->route, 'notifications.')) {
-            return request()->routeIs('notifications.*');
+            return $this->familyRouteIsActive('notifications');
         }
 
         if (str_starts_with($this->route, 'operations.')) {
-            return request()->routeIs('operations.*');
+            return $this->familyRouteIsActive('operations');
         }
 
         if (str_starts_with($this->route, 'compliance.')) {
-            return request()->routeIs('compliance.*');
+            return $this->familyRouteIsActive('compliance');
         }
 
         if (str_starts_with($this->route, 'inventory.')) {
-            return request()->routeIs('inventory.*');
+            return $this->familyRouteIsActive('inventory');
         }
 
         if (str_starts_with($this->route, 'purchases.')) {
-            return request()->routeIs('purchases.*');
+            return $this->familyRouteIsActive('purchases');
         }
 
         if (str_starts_with($this->route, 'promotions.')) {
-            return request()->routeIs('promotions.*');
+            return $this->familyRouteIsActive('promotions');
         }
 
         return request()->routeIs($this->route)
             && collect($this->routeParameters)
                 ->every(fn (mixed $value, string $key): bool => request()->route($key) === $value);
+    }
+
+    private function familyRouteIsActive(string $family): bool
+    {
+        if ($this->parentId === null) {
+            return request()->routeIs($family.'.*');
+        }
+
+        if (str_ends_with($this->route, '.index')) {
+            return request()->routeIs(substr($this->route, 0, -strlen('.index')).'.*');
+        }
+
+        return request()->routeIs($this->route);
     }
 
     /**

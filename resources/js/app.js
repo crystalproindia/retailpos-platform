@@ -19,15 +19,145 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme();
 
     const body = document.body;
-    const sidebarCollapsed = localStorage.getItem('retailpos.sidebar.collapsed') === 'true';
-
-    body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-
     const sidebarOpenButtons = [...document.querySelectorAll('[data-sidebar-open]')];
     const sidebarCloseButtons = [...document.querySelectorAll('[data-sidebar-close], [data-sidebar-overlay]')];
     const sidebar = document.querySelector('[data-sidebar]');
+    const sidebarScroll = sidebar?.querySelector('[data-sidebar-scroll]');
+    const sidebarStateKey = sidebar?.dataset.sidebarStateKey;
     const mobileNavigation = window.matchMedia('(max-width: 1023px)');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let sidebarTrigger = null;
+    let sidebarStateWriteTimeout = null;
+
+    const emptySidebarState = () => ({
+        desktop: { collapsed: false, scrollTop: 0, groups: {} },
+        mobile: { scrollTop: 0, groups: {} },
+    });
+
+    const loadSidebarState = () => {
+        if (!sidebarStateKey) return emptySidebarState();
+
+        try {
+            const stored = JSON.parse(localStorage.getItem(sidebarStateKey) || 'null');
+
+            if (!stored || typeof stored !== 'object') return emptySidebarState();
+
+            return {
+                desktop: {
+                    collapsed: Boolean(stored.desktop?.collapsed),
+                    scrollTop: Number.isFinite(stored.desktop?.scrollTop) ? Math.max(0, stored.desktop.scrollTop) : 0,
+                    groups: stored.desktop?.groups && typeof stored.desktop.groups === 'object' ? stored.desktop.groups : {},
+                },
+                mobile: {
+                    scrollTop: Number.isFinite(stored.mobile?.scrollTop) ? Math.max(0, stored.mobile.scrollTop) : 0,
+                    groups: stored.mobile?.groups && typeof stored.mobile.groups === 'object' ? stored.mobile.groups : {},
+                },
+            };
+        } catch {
+            return emptySidebarState();
+        }
+    };
+
+    const sidebarState = loadSidebarState();
+    const sidebarMode = () => mobileNavigation.matches ? 'mobile' : 'desktop';
+    const saveSidebarState = () => {
+        if (!sidebarStateKey) return;
+
+        try {
+            localStorage.setItem(sidebarStateKey, JSON.stringify(sidebarState));
+        } catch {
+            // Sidebar continuity is an enhancement and must never block navigation.
+        }
+    };
+    const scheduleSidebarStateSave = () => {
+        window.clearTimeout(sidebarStateWriteTimeout);
+        sidebarStateWriteTimeout = window.setTimeout(saveSidebarState, 180);
+    };
+    const persistSidebarScroll = () => {
+        if (!sidebarScroll) return;
+
+        sidebarState[sidebarMode()].scrollTop = Math.max(0, sidebarScroll.scrollTop);
+        scheduleSidebarStateSave();
+    };
+    const sidebarGroups = [...(sidebar?.querySelectorAll('[data-sidebar-group]') || [])];
+    const validSidebarGroupIds = new Set(sidebarGroups.map((group) => group.dataset.sidebarGroupId).filter(Boolean));
+    const normaliseSidebarGroups = (mode) => Object.fromEntries(
+        Object.entries(sidebarState[mode].groups)
+            .filter(([id, expanded]) => validSidebarGroupIds.has(id) && typeof expanded === 'boolean')
+    );
+    sidebarState.desktop.groups = normaliseSidebarGroups('desktop');
+    sidebarState.mobile.groups = normaliseSidebarGroups('mobile');
+
+    const setSidebarGroupExpanded = (group, expanded, { persist = true } = {}) => {
+        const id = group.dataset.sidebarGroupId;
+        const panel = group.querySelector('[data-sidebar-group-panel]');
+        const toggle = group.querySelector('[data-sidebar-group-toggle]');
+        const icon = group.querySelector('[data-sidebar-group-icon]');
+
+        if (!id || !panel || !toggle) return;
+
+        panel.classList.toggle('hidden', !expanded);
+        toggle.setAttribute('aria-expanded', String(expanded));
+        icon?.classList.toggle('rotate-180', expanded);
+
+        if (persist) {
+            sidebarState[sidebarMode()].groups[id] = expanded;
+            saveSidebarState();
+        }
+    };
+    const applySidebarGroups = (mode) => {
+        sidebarGroups.forEach((group) => {
+            const id = group.dataset.sidebarGroupId;
+            const active = group.dataset.sidebarGroupActive === 'true';
+            const saved = id ? sidebarState[mode].groups[id] : false;
+
+            // The active route is always reachable, regardless of stale client state.
+            setSidebarGroupExpanded(group, active || saved === true, { persist: false });
+        });
+    };
+    const activeSidebarItemIsVisible = () => {
+        const activeItem = sidebarScroll?.querySelector('[data-sidebar-active-item]');
+
+        if (!activeItem || !sidebarScroll) return true;
+
+        const container = sidebarScroll.getBoundingClientRect();
+        const item = activeItem.getBoundingClientRect();
+
+        return item.top >= container.top && item.bottom <= container.bottom;
+    };
+    const restoreSidebarState = (mode) => {
+        if (!sidebarScroll) return;
+
+        applySidebarGroups(mode);
+        body.classList.toggle('sidebar-collapsed', mode === 'desktop' && sidebarState.desktop.collapsed);
+
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+            sidebarScroll.scrollTop = Math.min(sidebarState[mode].scrollTop, Math.max(0, sidebarScroll.scrollHeight - sidebarScroll.clientHeight));
+
+            if (!activeSidebarItemIsVisible()) {
+                sidebarScroll.querySelector('[data-sidebar-active-item]')?.scrollIntoView({
+                    block: 'nearest',
+                    behavior: reducedMotion.matches ? 'auto' : 'smooth',
+                });
+            }
+        }));
+    };
+
+    restoreSidebarState('desktop');
+
+    sidebarScroll?.addEventListener('scroll', persistSidebarScroll, { passive: true });
+    window.addEventListener('pagehide', () => {
+        persistSidebarScroll();
+        saveSidebarState();
+    });
+
+    sidebarGroups.forEach((group) => {
+        group.querySelector('[data-sidebar-group-toggle]')?.addEventListener('click', () => {
+            const panel = group.querySelector('[data-sidebar-group-panel]');
+
+            setSidebarGroupExpanded(group, panel?.classList.contains('hidden'));
+        });
+    });
 
     const setSidebarExpanded = (expanded) => {
         sidebarOpenButtons.forEach((button) => button.setAttribute('aria-expanded', String(expanded)));
@@ -36,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSidebar = ({ restoreFocus = true } = {}) => {
         const wasOpen = body.classList.contains('sidebar-mobile-open');
 
+        if (wasOpen) persistSidebarScroll();
         body.classList.remove('sidebar-mobile-open');
         setSidebarExpanded(false);
 
@@ -55,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body.classList.add('sidebar-mobile-open');
         setSidebarExpanded(true);
 
+        restoreSidebarState('mobile');
         window.requestAnimationFrame(() => document.querySelector('[data-sidebar-close]')?.focus());
     };
 
@@ -68,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     sidebar?.querySelectorAll('a').forEach((link) => {
         link.addEventListener('click', () => {
+            persistSidebarScroll();
             if (mobileNavigation.matches) {
                 closeSidebar({ restoreFocus: false });
             }
@@ -83,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mobileNavigation.addEventListener('change', (event) => {
         if (!event.matches) {
             closeSidebar({ restoreFocus: false });
+            restoreSidebarState('desktop');
         }
     });
 
@@ -91,7 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const collapsed = !body.classList.contains('sidebar-collapsed');
 
             body.classList.toggle('sidebar-collapsed', collapsed);
-            localStorage.setItem('retailpos.sidebar.collapsed', String(collapsed));
+            sidebarState.desktop.collapsed = collapsed;
+            saveSidebarState();
         });
     });
 
@@ -129,6 +264,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1600);
         });
     });
+
+    const confirmDialog = document.querySelector('[data-confirm-dialog]');
+
+    if (confirmDialog instanceof HTMLDialogElement) {
+        const confirmForm = confirmDialog.querySelector('[data-confirm-form]');
+        const confirmMethod = confirmDialog.querySelector('[data-confirm-method]');
+        const confirmTitle = confirmDialog.querySelector('[data-confirm-title]');
+        const confirmMessage = confirmDialog.querySelector('[data-confirm-message]');
+        let confirmTrigger = null;
+
+        const closeConfirmDialog = () => {
+            if (!confirmDialog.open) return;
+            confirmDialog.close();
+            confirmTrigger?.focus();
+            confirmTrigger = null;
+        };
+
+        document.querySelectorAll('[data-confirm-trigger]').forEach((button) => {
+            button.addEventListener('click', () => {
+                if (!confirmForm || !button.dataset.confirmAction) return;
+
+                confirmTrigger = button;
+                confirmForm.action = button.dataset.confirmAction;
+                if (confirmMethod) confirmMethod.value = button.dataset.confirmMethod || 'DELETE';
+                if (confirmTitle) confirmTitle.textContent = button.dataset.confirmTitle || 'Confirm this action?';
+                if (confirmMessage) confirmMessage.textContent = button.dataset.confirmMessage || 'This action cannot be undone.';
+                confirmDialog.showModal();
+                window.requestAnimationFrame(() => confirmDialog.querySelector('[data-confirm-cancel]')?.focus());
+            });
+        });
+
+        confirmDialog.querySelector('[data-confirm-cancel]')?.addEventListener('click', closeConfirmDialog);
+        confirmDialog.addEventListener('click', (event) => {
+            if (event.target === confirmDialog) closeConfirmDialog();
+        });
+    }
 
     const menuDialog = document.querySelector('[data-global-menu-dialog]');
 

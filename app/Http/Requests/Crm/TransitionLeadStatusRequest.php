@@ -18,7 +18,7 @@ class TransitionLeadStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status_id' => ['required', Rule::exists('crm_lead_statuses', 'id')->where('company_id', $this->user()?->company_id)],
+            'status_id' => ['required', Rule::exists('crm_lead_statuses', 'id')->where('company_id', $this->user()?->company_id)->where('is_active', true)],
         ];
     }
 }

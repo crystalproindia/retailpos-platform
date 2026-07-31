@@ -23,7 +23,7 @@ class BulkLeadActionRequest extends FormRequest
             'action' => ['required', Rule::in(['status', 'assign'])],
             'ids' => ['required', 'array', 'max:50'],
             'ids.*' => ['integer', Rule::exists('crm_leads', 'id')->where('company_id', $companyId)],
-            'status_id' => ['required_if:action,status', 'nullable', Rule::exists('crm_lead_statuses', 'id')->where('company_id', $companyId)],
+            'status_id' => ['required_if:action,status', 'nullable', Rule::exists('crm_lead_statuses', 'id')->where('company_id', $companyId)->where('is_active', true)],
             'assigned_user_id' => ['required_if:action,assign', 'nullable', Rule::exists('users', 'id')->where('company_id', $companyId)],
         ];
     }

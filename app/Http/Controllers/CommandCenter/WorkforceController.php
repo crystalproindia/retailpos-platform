@@ -197,7 +197,11 @@ class WorkforceController extends Controller
     {
         return view('command-center.workforce.roles.index', [
             'roles' => WorkforceRole::query()->with(['permissions'])->withCount('users')->where('company_id', $request->user()->company_id)->orderBy('name')->get(),
-            'permissions' => config('permissions.capabilities', []),
+            'permissions' => collect(config('permissions.capabilities', []))
+                ->map(fn (array $roles): array => collect($roles)
+                    ->map(fn (string $role): string => (string) str($role)->headline())
+                    ->all())
+                ->all(),
             'baseRoles' => [UserRole::Manager, UserRole::Sales, UserRole::Staff],
         ]);
     }
@@ -283,7 +287,10 @@ class WorkforceController extends Controller
 
     public function self(Request $request, WorkforcePerformanceService $performance): View
     {
-        abort_unless($request->user()->employee, 404);
+        if (! $request->user()->employee) {
+            return view('command-center.workforce.employees.self-unlinked');
+        }
+
         $employee = $request->user()->employee->load(['primaryBranch', 'outletAssignments.branch', 'reviews', 'recognitions']);
 
         return view('command-center.workforce.employees.self', ['employee' => $employee, 'metrics' => $performance->forEmployee($request->user(), $employee)]);

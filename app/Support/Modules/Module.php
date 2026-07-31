@@ -157,6 +157,10 @@ class Module
             return $this->familyRouteIsActive('promotions');
         }
 
+        if (str_starts_with($this->route, 'workforce.')) {
+            return $this->familyRouteIsActive('workforce');
+        }
+
         return request()->routeIs($this->route)
             && collect($this->routeParameters)
                 ->every(fn (mixed $value, string $key): bool => request()->route($key) === $value);

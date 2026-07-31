@@ -20,6 +20,12 @@ $managementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
+        'workforce.view' => ['administrator', 'manager'],
+        'workforce.manage' => ['administrator'],
+        'workforce.self.view' => ['administrator', 'manager', 'sales', 'staff'],
+        'workforce.reviews.manage' => ['administrator', 'manager'],
+        'workforce.recognition.manage' => ['administrator', 'manager'],
+        'workforce.export' => ['administrator', 'manager'],
         'store.setup.manage' => $administratorRoles,
         'outlets.view' => $posUserRoles,
         'outlets.manage' => $managementRoles,

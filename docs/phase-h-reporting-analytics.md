@@ -94,3 +94,7 @@ After `npm run build`, synchronise
 `/home/u237933956/domains/app.retailpos.biz/public_html/build/`.
 The live application does not serve Vite assets from the repository public folder.
 Do not enable Google Calendar or Google Meet as part of a reporting deployment.
+
+## Workforce compatibility
+
+The Phase I workforce profile reuses the cashier data returned by `RetailReportingService` for completed POS sales and its current authorized outlet scope. The report now includes the source `cashier_id` alongside the existing display name and minor-unit values, allowing a linked employee profile to identify its own row without duplicating a sales calculation. Workforce screens must continue to label this as operational context rather than an overall employee-performance score.

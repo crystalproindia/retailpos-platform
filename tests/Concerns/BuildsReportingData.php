@@ -17,9 +17,9 @@ use App\Models\Inventory\Product;
 use App\Models\Inventory\StockLevel;
 use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
+use App\Models\Pos\PosPayment;
 use App\Models\Pos\PosSale;
 use App\Models\Pos\PosSaleItem;
-use App\Models\Pos\PosPayment;
 use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseInvoiceItem;
 use App\Models\Purchases\PurchaseReturn;
@@ -27,6 +27,7 @@ use App\Models\Purchases\PurchaseReturnItem;
 use App\Models\Purchases\Supplier;
 use App\Models\User;
 use App\Services\Reports\RetailReportingService;
+use Carbon\CarbonImmutable;
 
 trait BuildsReportingData
 {
@@ -65,8 +66,8 @@ trait BuildsReportingData
             'total_amount' => $total,
             'paid_amount' => $total,
             'change_amount' => '0.00',
-            'sold_at' => $soldAt ?? now(),
-            'completed_at' => $status === 'completed' ? ($soldAt ?? now()) : null,
+            'sold_at' => $soldAt ? CarbonImmutable::parse($soldAt)->utc() : now(),
+            'completed_at' => $status === 'completed' ? ($soldAt ? CarbonImmutable::parse($soldAt)->utc() : now()) : null,
             'completed_by' => $user->id,
         ]);
     }
@@ -211,13 +212,13 @@ trait BuildsReportingData
             'unit_cost' => $product->cost_price,
             'reason' => 'Reporting test movement',
             'created_by' => $user->id,
-            'occurred_at' => $occurredAt ?? now(),
+            'occurred_at' => $occurredAt ? CarbonImmutable::parse($occurredAt)->utc() : now(),
         ]);
     }
 
     protected function reportPurchaseInvoice(Company $company, Branch $branch, Warehouse $warehouse, Supplier $supplier, User $user, string $number, string $total, string $status = 'approved', mixed $date = null): PurchaseInvoice
     {
-        $date ??= today();
+        $date ??= today($company->timezone ?: config('app.timezone'));
 
         return PurchaseInvoice::create([
             'company_id' => $company->id,
@@ -269,7 +270,7 @@ trait BuildsReportingData
             'amount_paid' => '0.00',
             'balance_due' => $balanceDue,
             'status' => $status,
-            'issue_date' => $issueDate ?? today(),
+            'issue_date' => $issueDate ?? today($company->timezone ?: config('app.timezone')),
             'due_date' => $dueDate,
         ]);
     }
@@ -283,7 +284,7 @@ trait BuildsReportingData
             'payment_reference' => $reference,
             'amount' => $amount,
             'currency' => 'INR',
-            'payment_date' => $date ?? today(),
+            'payment_date' => $date ?? today($company->timezone ?: config('app.timezone')),
             'payment_method' => 'cash',
             'status' => $status,
         ]);
@@ -298,7 +299,7 @@ trait BuildsReportingData
             'supplier_id' => $supplier->id,
             'return_number' => $number,
             'status' => $status,
-            'return_date' => $date ?? today(),
+            'return_date' => $date ?? today($company->timezone ?: config('app.timezone')),
             'reason' => 'Reporting test return',
             'created_by' => $user->id,
             'approved_by' => $status === PurchaseReturnStatus::Approved->value ? $user->id : null,
@@ -318,10 +319,12 @@ trait BuildsReportingData
     /** @param array<string, mixed> $filters */
     protected function reportFor(User $user, string $report, array $filters = []): array
     {
+        $timezone = $user->company?->timezone ?: config('app.timezone');
+
         return app(RetailReportingService::class)->report($user, $report, $filters + [
             'outlet_id' => $user->branch_id,
-            'date_from' => now()->subDays(365)->toDateString(),
-            'date_to' => now()->toDateString(),
+            'date_from' => now($timezone)->subDays(365)->toDateString(),
+            'date_to' => now($timezone)->toDateString(),
         ]);
     }
 

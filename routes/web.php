@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\AccountVerificationController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CommandCenter\Cms\CmsArticleController;
@@ -30,9 +30,10 @@ use App\Http\Controllers\CommandCenter\Cms\CmsSettingsController as CmsAdminSett
 use App\Http\Controllers\CommandCenter\Cms\CmsTestimonialController;
 use App\Http\Controllers\CommandCenter\Cms\CmsThemeController;
 use App\Http\Controllers\CommandCenter\Cms\CmsTrustMetricController;
-use App\Http\Controllers\CommandCenter\Compliance\GstSettingsController;
-use App\Http\Controllers\CommandCenter\Compliance\GstNoteController;
+use App\Http\Controllers\CommandCenter\CompanyProfileController;
 use App\Http\Controllers\CommandCenter\Compliance\GstComplianceController;
+use App\Http\Controllers\CommandCenter\Compliance\GstNoteController;
+use App\Http\Controllers\CommandCenter\Compliance\GstSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\ActivityController;
 use App\Http\Controllers\CommandCenter\Crm\AiLeadAssistantController;
 use App\Http\Controllers\CommandCenter\Crm\ContactController;
@@ -45,11 +46,11 @@ use App\Http\Controllers\CommandCenter\Crm\CrmSupportTicketController;
 use App\Http\Controllers\CommandCenter\Crm\CustomerPortalAccessController as CrmCustomerPortalAccessController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
-use App\Http\Controllers\CommandCenter\Crm\LeadController;
-use App\Http\Controllers\CommandCenter\Crm\LeadMasterDataController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceReminderSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceTemplateController;
+use App\Http\Controllers\CommandCenter\Crm\LeadController;
+use App\Http\Controllers\CommandCenter\Crm\LeadMasterDataController;
 use App\Http\Controllers\CommandCenter\Crm\OpportunityController;
 use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
@@ -64,7 +65,7 @@ use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\DashboardController;
-use App\Http\Controllers\CommandCenter\ReportsController;
+use App\Http\Controllers\CommandCenter\Free365OnboardingController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailDeliveryLogController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailIntegrationController;
 use App\Http\Controllers\CommandCenter\Inventory\BarcodeLabelTemplateController;
@@ -87,7 +88,6 @@ use App\Http\Controllers\CommandCenter\Inventory\StockLocationController;
 use App\Http\Controllers\CommandCenter\Inventory\StockTransferController;
 use App\Http\Controllers\CommandCenter\Inventory\WarehouseController;
 use App\Http\Controllers\CommandCenter\ModuleController;
-use App\Http\Controllers\CommandCenter\OutletController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController;
@@ -100,9 +100,10 @@ use App\Http\Controllers\CommandCenter\Operations\HealthCheckController;
 use App\Http\Controllers\CommandCenter\Operations\OperationsDashboardController;
 use App\Http\Controllers\CommandCenter\Operations\QueueMonitorController;
 use App\Http\Controllers\CommandCenter\Operations\ScheduleMonitorController;
+use App\Http\Controllers\CommandCenter\OutletController;
 use App\Http\Controllers\CommandCenter\Pos\PosController;
-use App\Http\Controllers\CommandCenter\Pos\PosRegisterController;
 use App\Http\Controllers\CommandCenter\Pos\PosOfflineController;
+use App\Http\Controllers\CommandCenter\Pos\PosRegisterController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionCampaignController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionCouponController;
 use App\Http\Controllers\CommandCenter\Promotions\PromotionDashboardController;
@@ -115,31 +116,31 @@ use App\Http\Controllers\CommandCenter\Purchases\PurchaseDashboardController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseInvoiceController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseOrderController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseReportController;
-use App\Http\Controllers\CommandCenter\Purchases\SupplierPaymentController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseRequestController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseReturnController;
 use App\Http\Controllers\CommandCenter\Purchases\PurchaseSettingsController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierController;
 use App\Http\Controllers\CommandCenter\Purchases\SupplierDashboardController;
-use App\Http\Controllers\CommandCenter\SettingsController;
-use App\Http\Controllers\CommandCenter\CompanyProfileController;
-use App\Http\Controllers\CommandCenter\Free365OnboardingController;
-use App\Http\Controllers\CommandCenter\StoreSetupWizardController;
-use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
+use App\Http\Controllers\CommandCenter\Purchases\SupplierPaymentController;
+use App\Http\Controllers\CommandCenter\ReportsController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingController;
 use App\Http\Controllers\CommandCenter\Saas\SaasBillingGatewayController;
+use App\Http\Controllers\CommandCenter\Saas\SaasDashboardController;
 use App\Http\Controllers\CommandCenter\Saas\SaasPlanController;
 use App\Http\Controllers\CommandCenter\Saas\SaasResellerController;
 use App\Http\Controllers\CommandCenter\Saas\SaasSubscriptionController;
 use App\Http\Controllers\CommandCenter\Saas\SaasTenantOnboardingController;
-use App\Http\Controllers\CommandCenter\Saas\TenantSubscriptionController;
 use App\Http\Controllers\CommandCenter\Saas\TenantBillingController;
+use App\Http\Controllers\CommandCenter\Saas\TenantSubscriptionController;
 use App\Http\Controllers\CommandCenter\Saas\WhiteLabelController;
+use App\Http\Controllers\CommandCenter\SettingsController;
+use App\Http\Controllers\CommandCenter\StoreSetupWizardController;
+use App\Http\Controllers\CommandCenter\WorkforceController;
 use App\Http\Controllers\Portal\CustomerPortalAccessController;
 use App\Http\Controllers\Portal\CustomerPortalController;
+use App\Http\Controllers\PublicInvoiceController;
 use App\Http\Controllers\PublicProformaController;
 use App\Http\Controllers\PublicQuotationController;
-use App\Http\Controllers\PublicInvoiceController;
 use App\Http\Controllers\PublicSaasSignupController;
 use Illuminate\Support\Facades\Route;
 
@@ -199,6 +200,13 @@ Route::prefix('portal')->name('portal.')->group(function (): void {
     });
 });
 
+Route::get('workforce/invitations/{token}', [WorkforceController::class, 'showInvitation'])
+    ->middleware('throttle:workforce-invitation')
+    ->name('workforce.invitation.show');
+Route::post('workforce/invitations/{token}', [WorkforceController::class, 'acceptInvitation'])
+    ->middleware('throttle:workforce-invitation')
+    ->name('workforce.invitation.accept');
+
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
@@ -210,7 +218,7 @@ Route::middleware('guest')->group(function (): void {
     Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
 });
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', 'workforce.account.active'])->group(function (): void {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::get('account/verification', [AccountVerificationController::class, 'show'])->name('account.verification.show');
@@ -989,6 +997,29 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::redirect('settings', 'settings/general')->name('settings.index');
+    Route::get('workforce/me', [WorkforceController::class, 'self'])->middleware('can:workforce.self.view')->name('workforce.self');
+    Route::middleware(['role:administrator,manager', 'can:workforce.view'])->prefix('workforce')->name('workforce.')->group(function (): void {
+        Route::get('/', [WorkforceController::class, 'dashboard'])->name('dashboard');
+        Route::get('employees', [WorkforceController::class, 'employees'])->name('employees.index');
+        Route::get('employees/export', [WorkforceController::class, 'export'])->middleware('can:workforce.export')->name('employees.export');
+        Route::get('employees/create', [WorkforceController::class, 'createEmployee'])->middleware('can:workforce.manage')->name('employees.create');
+        Route::post('employees', [WorkforceController::class, 'storeEmployee'])->middleware('can:workforce.manage')->name('employees.store');
+        Route::get('employees/{employee}', [WorkforceController::class, 'showEmployee'])->name('employees.show');
+        Route::get('employees/{employee}/edit', [WorkforceController::class, 'editEmployee'])->middleware('can:workforce.manage')->name('employees.edit');
+        Route::put('employees/{employee}', [WorkforceController::class, 'updateEmployee'])->middleware('can:workforce.manage')->name('employees.update');
+        Route::post('employees/{employee}/archive', [WorkforceController::class, 'archiveEmployee'])->middleware('can:workforce.manage')->name('employees.archive');
+        Route::get('employees/{employee}/user/create', [WorkforceController::class, 'createUser'])->middleware('can:workforce.manage')->name('users.create');
+        Route::post('employees/{employee}/user', [WorkforceController::class, 'storeUser'])->middleware('can:workforce.manage')->name('users.store');
+        Route::post('employees/{employee}/invite', [WorkforceController::class, 'invite'])->middleware(['can:workforce.manage', 'throttle:workforce-invitation'])->name('invitations.store');
+        Route::post('invitations/{invitation}/cancel', [WorkforceController::class, 'cancelInvitation'])->middleware('can:workforce.manage')->name('invitations.cancel');
+        Route::post('employees/{employee}/reviews', [WorkforceController::class, 'storeReview'])->middleware('can:workforce.reviews.manage')->name('reviews.store');
+        Route::post('employees/{employee}/recognition', [WorkforceController::class, 'storeRecognition'])->middleware('can:workforce.recognition.manage')->name('recognitions.store');
+        Route::get('users', [WorkforceController::class, 'accounts'])->middleware('can:workforce.manage')->name('users.index');
+        Route::post('users/{user}/state', [WorkforceController::class, 'state'])->middleware('can:workforce.manage')->name('users.state');
+        Route::post('users/{user}/role', [WorkforceController::class, 'assignRole'])->middleware('can:workforce.manage')->name('users.role');
+        Route::get('roles', [WorkforceController::class, 'roles'])->middleware('can:workforce.manage')->name('roles.index');
+        Route::post('roles', [WorkforceController::class, 'storeRole'])->middleware('can:workforce.manage')->name('roles.store');
+    });
     Route::middleware('role:administrator,manager')->group(function (): void {
         Route::get('settings/outlets', [OutletController::class, 'index'])->middleware('can:outlets.manage')->name('settings.outlets.index');
         Route::get('settings/outlets/create', [OutletController::class, 'create'])->middleware('can:outlets.manage')->name('settings.outlets.create');

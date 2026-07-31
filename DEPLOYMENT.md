@@ -293,6 +293,15 @@ ssh -p 65002 u237933956@82.112.239.90 "cd domains/retailpos.biz/retailpos-platfo
 
 The committed source does not contain `public/build`; deploy the build from the same commit as the PHP application. Confirm `public_html/app/.htaccess` is the standard Laravel public `.htaccess` file. Do not add rewrite rules that expose the private Laravel root.
 
+For the current `app.retailpos.biz` release layout, the required public asset synchronization target is:
+
+```text
+retailpos-platform/public/build/
+→ /home/u237933956/domains/app.retailpos.biz/public_html/build/
+```
+
+Confirm the subdomain document root and its `public/build/manifest.json` point at the same build before clearing Laravel caches. Do not reuse an older asset directory after a workforce or navigation release.
+
 ## Live smoke-test checklist
 
 Complete this checklist with a real HTTPS browser session after deployment and before a client demo:

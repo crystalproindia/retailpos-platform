@@ -1,8 +1,12 @@
 <?php
 
-use App\Http\Middleware\EnsurePublicLeadToken;
-use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureCustomerPortalAccess;
+use App\Http\Middleware\EnsurePlatformAdministrator;
+use App\Http\Middleware\EnsurePublicLeadToken;
+use App\Http\Middleware\EnsureSubscriptionFeature;
+use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\EnsureWorkforceAccountIsActive;
 use App\Http\Middleware\RedirectIfCustomerPortalAuthenticated;
 use App\Http\Middleware\RejectOversizedPublicLeadPayload;
 use Illuminate\Foundation\Application;
@@ -21,12 +25,13 @@ return Application::configure(basePath: dirname(__DIR__))
         __DIR__.'/../app/Console/Commands',
     ])
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureActiveSubscription::class);
-        $middleware->appendToGroup('api', \App\Http\Middleware\EnsureActiveSubscription::class);
+        $middleware->appendToGroup('web', EnsureActiveSubscription::class);
+        $middleware->appendToGroup('api', EnsureActiveSubscription::class);
         $middleware->alias([
-            'platform-admin' => \App\Http\Middleware\EnsurePlatformAdministrator::class,
-            'subscription.active' => \App\Http\Middleware\EnsureActiveSubscription::class,
-            'subscription.feature' => \App\Http\Middleware\EnsureSubscriptionFeature::class,
+            'platform-admin' => EnsurePlatformAdministrator::class,
+            'subscription.active' => EnsureActiveSubscription::class,
+            'subscription.feature' => EnsureSubscriptionFeature::class,
+            'workforce.account.active' => EnsureWorkforceAccountIsActive::class,
             'role' => EnsureUserHasRole::class,
             'public.lead.token' => EnsurePublicLeadToken::class,
             'public.lead.payload' => RejectOversizedPublicLeadPayload::class,

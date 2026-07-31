@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['company_id', 'branch_id', 'name', 'email', 'mobile', 'role', 'is_active', 'is_platform_admin', 'verification_status', 'verification_completed_at', 'requires_password_change', 'password', 'last_login_at'])]
+#[Fillable(['company_id', 'branch_id', 'workforce_employee_id', 'workforce_role_id', 'name', 'email', 'mobile', 'role', 'is_active', 'account_status', 'suspended_at', 'is_platform_admin', 'verification_status', 'verification_completed_at', 'requires_password_change', 'password', 'last_login_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -39,6 +39,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'suspended_at' => 'datetime',
             'is_active' => 'boolean',
             'is_platform_admin' => 'boolean',
             'verification_completed_at' => 'datetime',
@@ -56,6 +57,16 @@ class User extends Authenticatable
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(WorkforceEmployee::class, 'workforce_employee_id');
+    }
+
+    public function workforceRole(): BelongsTo
+    {
+        return $this->belongsTo(WorkforceRole::class);
     }
 
     public function outletAssignments(): HasMany

@@ -56,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('email-test', fn ($request) => Limit::perMinute(3)
             ->by('email-test:'.($request->user()?->id ?? $request->ip())));
 
+        RateLimiter::for('workforce-invitation', fn ($request) => Limit::perMinute(3)
+            ->by('workforce-invitation:'.($request->user()?->id ?? $request->ip())));
+
         RateLimiter::for('email-delivery-webhook', fn ($request) => Limit::perMinute(60)
             ->by('email-delivery-webhook:'.$request->ip()));
 
@@ -79,6 +82,15 @@ class AppServiceProvider extends ServiceProvider
         collect(config('permissions.capabilities', []))->each(function (array $roles, string $capability): void {
             Gate::define($capability, function (User $user) use ($roles, $capability): bool {
                 $role = $user->role instanceof UserRole ? $user->role->value : $user->role;
+
+                if ($user->workforce_role_id) {
+                    $workforceRole = $user->workforceRole;
+
+                    return $workforceRole
+                        && $workforceRole->company_id === $user->company_id
+                        && $workforceRole->is_active
+                        && $workforceRole->permissions()->where('permission_key', $capability)->exists();
+                }
 
                 if (str_starts_with($capability, 'saas.')) {
                     return $user->is_platform_admin && in_array($role, $roles, true);

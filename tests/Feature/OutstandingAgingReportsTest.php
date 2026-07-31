@@ -10,8 +10,8 @@ use Tests\TestCase;
 
 class OutstandingAgingReportsTest extends TestCase
 {
-    use RefreshDatabase;
     use BuildsReportingData;
+    use RefreshDatabase;
 
     public function test_outstanding_rows_use_source_balances_and_exclude_paid_and_cancelled_invoices(): void
     {
@@ -59,8 +59,9 @@ class OutstandingAgingReportsTest extends TestCase
         $unassigned = $this->reportBranch($company, 'Unassigned Outstanding Outlet');
         $administrator = $this->reportUser($company, $assigned);
         $manager = $this->reportUser($company, $assigned, UserRole::Manager);
-        $this->reportInvoice($company, $assigned, 'INV-CSV-OUTSTANDING', '44.44', '44.44', 'issued', today(), today()->addDay());
-        $this->reportInvoice($company, $unassigned, 'INV-HIDDEN-OUTSTANDING', '55.55', '55.55', 'issued', today(), today()->addDay());
+        $today = today($company->timezone);
+        $this->reportInvoice($company, $assigned, 'INV-CSV-OUTSTANDING', '44.44', '44.44', 'issued', $today, $today->copy()->addDay());
+        $this->reportInvoice($company, $unassigned, 'INV-HIDDEN-OUTSTANDING', '55.55', '55.55', 'issued', $today, $today->copy()->addDay());
 
         $managerReport = $this->reportFor($manager, 'outstanding');
         $this->assertSame(4444, $managerReport['detail']['outstanding']);

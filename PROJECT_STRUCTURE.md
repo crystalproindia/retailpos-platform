@@ -1,5 +1,13 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## Workforce, Roles, Permissions, and Performance (Phase I)
+
+- `WorkforceEmployee` is a tenant-scoped workplace profile that may exist without authentication access. `User` keeps Laravel authentication and may optionally link one-to-one through nullable `workforce_employee_id`; existing users are deliberately not backfilled into guessed employee records.
+- `WorkforceRole` and `WorkforceRolePermission` extend the existing `config/permissions.php` Gate architecture with tenant custom roles and explicit capabilities. System roles remain the protected route-role boundary.
+- `WorkforceService` owns employee/user creation, resource assignment, secure invitation creation/acceptance, last-administrator protection, custom-role creation, and audit records. `EnsureWorkforceAccountIsActive` invalidates access after a user is suspended or disabled.
+- Workforce routes live under `/workforce`; the shared Module Registry exposes Dashboard, Employees, User Accounts, and Roles without duplicating desktop/mobile navigation.
+- `workforce_employees`, role/permission, invitation, review, recognition, and employee assignment tables are additive. Historical users and transactions remain intact. See `docs/phase-i-workforce-access-performance.md` for migration, privacy, security, limitations, and production asset guidance.
+
 ## Navigation State And CRM Lead Master Data
 
 The shared Command Center navigation preserves per-user, per-company sidebar scroll, expanded groups, and desktop collapse state in browser-local storage without changing server authorization. CRM Settings provides tenant-scoped lead-status and lead-source management with ordering, defaults, lifecycle safeguards, audit logging, and active-only lead-form selection. See `docs/navigation-and-crm-master-data.md` for the operational contract and deployment note.

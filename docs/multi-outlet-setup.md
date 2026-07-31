@@ -6,6 +6,10 @@ RetailPOS already has a tenant-scoped `Branch` model. It is used by users, POS s
 
 Products, categories, customers, suppliers, tax rates, and invoice designs remain company scoped. `Warehouse`, `StockLevel`, and `StockMovement` remain the stock authority. A warehouse is created only when a newly created outlet has no warehouse relationship, avoiding duplicate warehouses or stock backfills.
 
+## Workforce assignment compatibility
+
+Phase I adds employee-level outlet, warehouse, and register assignment records without changing the existing outlet authority. When an employee receives a linked application account, `WorkforceService` synchronizes its active employee outlets to the existing `branch_user_assignments` table. `OutletAccessService` therefore continues to decide POS, report, CRM, inventory, and purchase access exactly as before. Workforce changes never rewrite historical branch ownership on transactions.
+
 ## Data and default outlet migration
 
 The additive outlet migration adds safe display/invoice metadata to `branches` and creates `branch_user_assignments`. For each existing company without a branch, it creates one active `MAIN` / `Main Outlet` using available company details. It makes exactly one existing branch primary, fills only missing user `branch_id` values, and never changes invoices, payments, products, suppliers, customers, stock levels, movement history, or timestamps on historical business records.

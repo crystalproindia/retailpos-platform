@@ -16,4 +16,4 @@ Lead forms show active records only and preselect tenant defaults. Existing lead
 
 ## Deployment note
 
-After the migration and cache commands, rebuild frontend assets and synchronize `public/build/` with the configured document-root build directory. Sidebar behavior lives in the compiled Vite JavaScript.
+After the migration and cache commands, rebuild frontend assets and synchronize `retailpos-platform/public/build/` to `/home/u237933956/domains/app.retailpos.biz/public_html/build/`. Sidebar behavior lives in the compiled Vite JavaScript. The migration is forward-only in production: use a forward remediation migration if a post-release correction is ever needed rather than rolling back and dropping populated default-state columns.

@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Outlets\OutletAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
 class RetailReportingService
@@ -92,9 +93,13 @@ class RetailReportingService
         }
 
         $available = $this->outlets->accessibleOutlets($user);
-        if ($available->isEmpty()) throw ValidationException::withMessages(['outlet_id' => 'No active outlet is assigned to this user.']);
+        if ($available->isEmpty()) {
+            throw ValidationException::withMessages(['outlet_id' => 'No active outlet is assigned to this user.']);
+        }
         $id = $requested ? (int) $requested : $this->outlets->current($user)->id;
-        if (! $available->contains('id', $id)) throw ValidationException::withMessages(['outlet_id' => 'That outlet is not available to this user.']);
+        if (! $available->contains('id', $id)) {
+            throw ValidationException::withMessages(['outlet_id' => 'That outlet is not available to this user.']);
+        }
 
         return ['ids' => [$id], 'label' => $available->firstWhere('id', $id)->name, 'warehouse_id' => $this->warehouse($user, [$id], $filters)];
     }
@@ -105,7 +110,9 @@ class RetailReportingService
         $timezone = $user->company?->timezone ?: config('app.timezone');
         $to = filled($filters['date_to'] ?? null) ? CarbonImmutable::parse($filters['date_to'], $timezone) : CarbonImmutable::now($timezone);
         $from = filled($filters['date_from'] ?? null) ? CarbonImmutable::parse($filters['date_from'], $timezone) : $to->startOfMonth();
-        if ($from->gt($to) || $from->diffInDays($to) > 366) throw ValidationException::withMessages(['date_to' => 'Select a date range of up to 366 days.']);
+        if ($from->gt($to) || $from->diffInDays($to) > 366) {
+            throw ValidationException::withMessages(['date_to' => 'Select a date range of up to 366 days.']);
+        }
 
         return ['from' => $from->startOfDay(), 'to' => $to->endOfDay(), 'timezone' => $timezone];
     }
@@ -148,7 +155,7 @@ class RetailReportingService
         ];
     }
 
-    /** @param class-string<\Illuminate\Database\Eloquent\Model> $model */
+    /** @param class-string<Model> $model */
     private function companyModelId(User $user, array $filters, string $key, string $model): ?int
     {
         if (! filled($filters[$key] ?? null)) {
@@ -189,7 +196,8 @@ class RetailReportingService
     private function sales(User $user, array $scope, array $range, array $context): array
     {
         $pos = $this->salesFilters($this->branchScope(PosSale::query()->where('company_id', $user->company_id), $scope['ids']), $context)
-            ->whereBetween('sold_at', [$range['from'], $range['to']]);
+            ->whereBetween('sold_at', $this->timestampRange($range));
+
         return ['gross_sales' => $this->minor((clone $pos)->sum('subtotal')), 'discounts' => $this->minor((clone $pos)->sum('discount_amount')), 'tax' => $this->minor((clone $pos)->sum('tax_amount')), 'net_sales' => $this->minor((clone $pos)->sum('total_amount')), 'count' => (clone $pos)->count(), 'source' => filled($context['status']) ? 'POS sales filtered by the selected status; CRM invoice reporting remains separate to prevent unlinked records being double counted.' : 'Completed POS sales only; CRM invoice reporting remains separate to prevent unlinked records being double counted.'];
     }
 
@@ -201,6 +209,7 @@ class RetailReportingService
             ->whereDate('supplier_invoice_date', '>=', $range['from']->toDateString())
             ->whereDate('supplier_invoice_date', '<=', $range['to']->toDateString());
         $grossTotal = $this->minor((clone $query)->sum('grand_total'));
+
         return ['gross_total' => $grossTotal, 'return_value' => $returnValue, 'total' => $grossTotal - $returnValue, 'tax' => $this->minor((clone $query)->sum('input_cgst')) + $this->minor((clone $query)->sum('input_sgst')) + $this->minor((clone $query)->sum('input_igst')) + $this->minor((clone $query)->sum('input_cess')), 'paid' => $this->minor((clone $query)->sum('paid_total')), 'outstanding' => $this->minor((clone $query)->sum('outstanding_total')), 'count' => (clone $query)->count()];
     }
 
@@ -209,6 +218,7 @@ class RetailReportingService
         $query = $this->paymentFilters($this->paymentScope(CrmInvoicePayment::query()->where('company_id', $user->company_id), $scope['ids']), $context)
             ->whereDate('payment_date', '>=', $range['from']->toDateString())
             ->whereDate('payment_date', '<=', $range['to']->toDateString());
+
         return ['received' => $this->minor((clone $query)->sum('amount')), 'count' => (clone $query)->count()];
     }
 
@@ -230,6 +240,7 @@ class RetailReportingService
     {
         $warehouseId = $scope['warehouse_id'];
         $query = $this->stockFilters($this->branchScope(StockLevel::query()->where('stock_levels.company_id', $user->company_id)->when($warehouseId, fn (Builder $query) => $query->where('stock_levels.warehouse_id', $warehouseId))->join('products', 'products.id', '=', 'stock_levels.product_id'), $scope['ids']), $context);
+
         return ['value' => $this->minor((clone $query)->selectRaw('COALESCE(ROUND(SUM(stock_levels.quantity_on_hand * products.cost_price), 2), 0) as total')->value('total')), 'low_stock_count' => (clone $query)->whereColumn('quantity_on_hand', '<=', 'minimum_stock')->count(), 'method' => 'Current on-hand quantity multiplied by the product current cost price. This is current valuation, not historical FIFO or weighted-average valuation.'];
     }
 
@@ -240,7 +251,7 @@ class RetailReportingService
             StockMovement::query()
                 ->where('company_id', $user->company_id)
                 ->when($warehouseId, fn (Builder $query) => $query->where('warehouse_id', $warehouseId))
-                ->whereBetween('occurred_at', [$range['from'], $range['to']]),
+                ->whereBetween('occurred_at', $this->timestampRange($range)),
             $scope['ids'],
         ), $context);
         $movements = (clone $query)->get(['direction', 'quantity']);
@@ -275,13 +286,14 @@ class RetailReportingService
         $query = $this->invoiceFilters($this->branchScope(CrmInvoice::query()->where('company_id', $user->company_id), $scope['ids']), $context)
             ->whereDate('issue_date', '>=', $range['from']->toDateString())
             ->whereDate('issue_date', '<=', $range['to']->toDateString());
+
         return ['taxable_sales' => $this->minor((clone $query)->sum('taxable_total')), 'cgst' => $this->minor((clone $query)->sum('cgst_total')), 'sgst' => $this->minor((clone $query)->sum('sgst_total')), 'igst' => $this->minor((clone $query)->sum('igst_total')), 'cess' => $this->minor((clone $query)->sum('cess_total')), 'incomplete_count' => (clone $query)->whereNull('place_of_supply_state_code')->count(), 'notice' => 'Preparation aid only. Review incomplete GSTIN, place-of-supply, and HSN/SAC data before filing.'];
     }
 
     private function salesRows(User $user, array $scope, array $range, array $context): array
     {
         return $this->salesFilters($this->branchScope(PosSale::query()->where('company_id', $user->company_id), $scope['ids']), $context)
-            ->whereBetween('sold_at', [$range['from'], $range['to']])
+            ->whereBetween('sold_at', $this->timestampRange($range))
             ->with('branch:id,name')->latest('sold_at')->limit(500)->get()
             ->map(fn (PosSale $sale) => ['date' => $sale->sold_at?->setTimezone($range['timezone'])->toDateString(), 'reference' => $sale->sale_number, 'outlet' => $sale->branch?->name, 'net_sales' => $this->minor($sale->total_amount), 'paid' => $this->minor($sale->paid_amount), 'status' => $sale->status])->all();
     }
@@ -289,6 +301,7 @@ class RetailReportingService
     private function purchaseRows(User $user, array $scope, array $range, array $context): array
     {
         $warehouseId = $scope['warehouse_id'];
+
         return $this->purchaseFilters($this->branchScope(PurchaseInvoice::query()->where('company_id', $user->company_id)->when($warehouseId, fn (Builder $query) => $query->where('warehouse_id', $warehouseId)), $scope['ids']), $context)
             ->whereDate('supplier_invoice_date', '>=', $range['from']->toDateString())
             ->whereDate('supplier_invoice_date', '<=', $range['to']->toDateString())
@@ -299,6 +312,7 @@ class RetailReportingService
     private function stockRows(User $user, array $scope, array $context): array
     {
         $warehouseId = $scope['warehouse_id'];
+
         return $this->stockFilters($this->branchScope(StockLevel::query()->where('company_id', $user->company_id)->when($warehouseId, fn (Builder $query) => $query->where('warehouse_id', $warehouseId)), $scope['ids']), $context)
             ->with(['product:id,name,sku,cost_price', 'branch:id,name'])->orderByDesc('quantity_on_hand')->limit(500)->get()
             ->map(fn (StockLevel $level) => ['product' => $level->product?->name, 'sku' => $level->product?->sku, 'outlet' => $level->branch?->name, 'quantity' => (string) $level->quantity_on_hand, 'unit_cost' => $this->minor($level->product?->cost_price), 'value' => $this->quantityValue($level->quantity_on_hand, $level->product?->cost_price)])->all();
@@ -345,14 +359,17 @@ class RetailReportingService
     private function returnRows(User $user, array $scope, array $range, array $context): array
     {
         $warehouseId = $scope['warehouse_id'];
-        return $this->returnItemFilters(PurchaseReturnItem::query(), $context)->with(['purchaseReturn.branch:id,name', 'purchaseReturn.supplier:id,name', 'product:id,name'])->whereHas('purchaseReturn', function (Builder $returns) use ($user, $scope, $range, $warehouseId, $context): void { $this->purchaseReturnFilters($this->branchScope($returns->where('company_id', $user->company_id), $scope['ids']), $context)->when($warehouseId, fn (Builder $query) => $query->where('warehouse_id', $warehouseId))->whereDate('return_date', '>=', $range['from']->toDateString())->whereDate('return_date', '<=', $range['to']->toDateString()); })->limit(500)->get()
+
+        return $this->returnItemFilters(PurchaseReturnItem::query(), $context)->with(['purchaseReturn.branch:id,name', 'purchaseReturn.supplier:id,name', 'product:id,name'])->whereHas('purchaseReturn', function (Builder $returns) use ($user, $scope, $range, $warehouseId, $context): void {
+            $this->purchaseReturnFilters($this->branchScope($returns->where('company_id', $user->company_id), $scope['ids']), $context)->when($warehouseId, fn (Builder $query) => $query->where('warehouse_id', $warehouseId))->whereDate('return_date', '>=', $range['from']->toDateString())->whereDate('return_date', '<=', $range['to']->toDateString());
+        })->limit(500)->get()
             ->map(fn (PurchaseReturnItem $item) => ['date' => $item->purchaseReturn?->return_date?->toDateString(), 'reference' => $item->purchaseReturn?->return_number, 'supplier' => $item->purchaseReturn?->supplier?->name, 'product' => $item->product?->name, 'outlet' => $item->purchaseReturn?->branch?->name, 'quantity' => (string) $item->quantity, 'value' => $this->quantityValue($item->quantity, $item->unit_cost)])->all();
     }
 
     private function outletPerformance(User $user, array $scope, array $range, array $context): array
     {
         $sales = $this->salesFilters($this->branchScope(PosSale::query()->where('pos_sales.company_id', $user->company_id), $scope['ids']), $context)
-            ->whereBetween('sold_at', [$range['from'], $range['to']])
+            ->whereBetween('sold_at', $this->timestampRange($range))
             ->join('branches', 'branches.id', '=', 'pos_sales.branch_id')
             ->selectRaw('branches.id, branches.name, COUNT(*) as sale_count, COALESCE(SUM(pos_sales.total_amount), 0) as net_sales, COALESCE(SUM(pos_sales.discount_amount), 0) as discounts')
             ->groupBy('branches.id', 'branches.name')->orderByDesc('net_sales')->get()
@@ -364,11 +381,11 @@ class RetailReportingService
     private function cashierPerformance(User $user, array $scope, array $range, array $context): array
     {
         $sales = $this->salesFilters($this->branchScope(PosSale::query()->where('pos_sales.company_id', $user->company_id), $scope['ids']), $context)
-            ->whereBetween('sold_at', [$range['from'], $range['to']])
+            ->whereBetween('sold_at', $this->timestampRange($range))
             ->leftJoin('users', 'users.id', '=', 'pos_sales.completed_by')
-            ->selectRaw("COALESCE(users.name, 'Unassigned') as cashier, COUNT(*) as sale_count, COALESCE(SUM(pos_sales.total_amount), 0) as net_sales, COALESCE(SUM(pos_sales.discount_amount), 0) as discounts")
+            ->selectRaw("users.id as cashier_id, COALESCE(users.name, 'Unassigned') as cashier, COUNT(*) as sale_count, COALESCE(SUM(pos_sales.total_amount), 0) as net_sales, COALESCE(SUM(pos_sales.discount_amount), 0) as discounts")
             ->groupBy('users.id', 'users.name')->orderByDesc('net_sales')->get()
-            ->map(fn ($row) => ['cashier' => $row->cashier, 'sales_count' => (int) $row->sale_count, 'net_sales' => $this->minor($row->net_sales), 'discounts' => $this->minor($row->discounts), 'average_order_value' => $row->sale_count ? intdiv($this->minor($row->net_sales), (int) $row->sale_count) : null])->all();
+            ->map(fn ($row) => ['cashier_id' => $row->cashier_id ? (int) $row->cashier_id : null, 'cashier' => $row->cashier, 'sales_count' => (int) $row->sale_count, 'net_sales' => $this->minor($row->net_sales), 'discounts' => $this->minor($row->discounts), 'average_order_value' => $row->sale_count ? intdiv($this->minor($row->net_sales), (int) $row->sale_count) : null])->all();
 
         return ['rows' => $sales, 'notice' => 'Operational sales metrics only; this report does not make quality judgments.'];
     }
@@ -442,7 +459,17 @@ class RetailReportingService
             ->when($context['movement_type'], fn (Builder $query, string $type) => $query->where('movement_type', $type));
     }
 
-    private function branchScope(Builder $query, ?array $ids): Builder { return $ids === null ? $query : $query->whereIn($query->getModel()->qualifyColumn('branch_id'), $ids); }
+    private function branchScope(Builder $query, ?array $ids): Builder
+    {
+        return $ids === null ? $query : $query->whereIn($query->getModel()->qualifyColumn('branch_id'), $ids);
+    }
+
+    /** @param array{from: CarbonImmutable, to: CarbonImmutable, timezone: string} $range @return array<int, CarbonImmutable> */
+    private function timestampRange(array $range): array
+    {
+        return [$range['from']->utc(), $range['to']->utc()];
+    }
+
     /** @param array<int, int>|null $ids */
     private function paymentScope(Builder $query, ?array $ids): Builder
     {
@@ -456,8 +483,44 @@ class RetailReportingService
             });
         });
     }
-    private function minor(mixed $value): int { $value = (string) ($value ?? '0'); $negative = str_starts_with($value, '-'); $value = ltrim($value, '+-'); [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, ''); $amount = ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0'); return $negative ? -$amount : $amount; }
-    private function quantityThousandths(mixed $value): int { $value = (string) ($value ?? '0'); $negative = str_starts_with($value, '-'); $value = ltrim($value, '+-'); [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, ''); $quantity = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0'); return $negative ? -$quantity : $quantity; }
-    private function quantityDisplay(int $thousandths): string { return number_format($thousandths / 1000, 3, '.', ''); }
-    private function quantityValue(mixed $quantity, mixed $unitCost): int { $value = (string) ($quantity ?? '0'); $negative = str_starts_with($value, '-'); $value = ltrim($value, '+-'); [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, ''); $thousandths = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0'); $thousandths = $negative ? -$thousandths : $thousandths; $numerator = $thousandths * $this->minor($unitCost); return $numerator < 0 ? -intdiv(abs($numerator) + 500, 1000) : intdiv($numerator + 500, 1000); }
+
+    private function minor(mixed $value): int
+    {
+        $value = (string) ($value ?? '0');
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $amount = ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0');
+
+        return $negative ? -$amount : $amount;
+    }
+
+    private function quantityThousandths(mixed $value): int
+    {
+        $value = (string) ($value ?? '0');
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $quantity = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0');
+
+        return $negative ? -$quantity : $quantity;
+    }
+
+    private function quantityDisplay(int $thousandths): string
+    {
+        return number_format($thousandths / 1000, 3, '.', '');
+    }
+
+    private function quantityValue(mixed $quantity, mixed $unitCost): int
+    {
+        $value = (string) ($quantity ?? '0');
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $thousandths = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0');
+        $thousandths = $negative ? -$thousandths : $thousandths;
+        $numerator = $thousandths * $this->minor($unitCost);
+
+        return $numerator < 0 ? -intdiv(abs($numerator) + 500, 1000) : intdiv($numerator + 500, 1000);
+    }
 }

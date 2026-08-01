@@ -58,6 +58,10 @@ use App\Http\Controllers\CommandCenter\Crm\ProformaShareController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\Tasks\TaskController;
 use App\Http\Controllers\CommandCenter\Tasks\TaskRuleSettingController;
+use App\Http\Controllers\CommandCenter\Attendance\AttendanceController;
+use App\Http\Controllers\CommandCenter\Attendance\LeaveController;
+use App\Http\Controllers\CommandCenter\Attendance\RosterController;
+use App\Http\Controllers\CommandCenter\Attendance\AttendanceCalendarController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerDashboardController;
@@ -228,6 +232,18 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('attendance')->name('attendance.')->middleware('can:attendance.view_own')->group(function (): void {
+        Route::get('me', [AttendanceController::class, 'self'])->name('self');
+        Route::post('check-in', [AttendanceController::class, 'checkIn'])->middleware('can:attendance.check_in')->name('check-in');
+        Route::post('records/{attendance}/check-out', [AttendanceController::class, 'checkOut'])->middleware('can:attendance.check_out')->name('check-out');
+        Route::post('records/{attendance}/breaks', [AttendanceController::class, 'startBreak'])->middleware('can:attendance.check_in')->name('breaks.start');
+        Route::post('breaks/{break}/end', [AttendanceController::class, 'endBreak'])->middleware('can:attendance.check_out')->name('breaks.end');
+        Route::get('history', [AttendanceController::class, 'history'])->name('history');
+        Route::post('records/{attendance}/corrections', [AttendanceController::class, 'requestCorrection'])->middleware('can:attendance.correct_own')->name('corrections.store');
+        Route::get('leave', [LeaveController::class, 'self'])->middleware('can:leave.view_own')->name('leave.self');
+        Route::post('leave', [LeaveController::class, 'store'])->middleware('can:leave.request')->name('leave.store');
+        Route::post('leave/{leave}/withdraw', [LeaveController::class, 'withdraw'])->middleware('can:leave.request')->name('leave.withdraw');
+    });
     Route::prefix('tasks')->name('tasks.')->middleware('can:tasks.view')->group(function (): void {
         Route::get('/', [TaskController::class, 'index'])->name('index');
         Route::get('today', [TaskController::class, 'index'])->defaults('view', 'today')->name('today');
@@ -1040,6 +1056,27 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::post('users/{user}/role', [WorkforceController::class, 'assignRole'])->middleware('can:workforce.manage')->name('users.role');
         Route::get('roles', [WorkforceController::class, 'roles'])->middleware('can:workforce.manage')->name('roles.index');
         Route::post('roles', [WorkforceController::class, 'storeRole'])->middleware('can:workforce.manage')->name('roles.store');
+    });
+    Route::middleware(['role:administrator,manager', 'can:attendance.view_team'])->prefix('attendance')->name('attendance.')->group(function (): void {
+        Route::get('dashboard', [AttendanceController::class, 'dashboard'])->name('dashboard');
+        Route::get('records', [AttendanceController::class, 'index'])->name('index');
+        Route::post('employees/{employee}/check-in', [AttendanceController::class, 'managerCheckIn'])->middleware('can:attendance.manage_team')->name('manager.check-in');
+        Route::post('records/{attendance}/manager-check-out', [AttendanceController::class, 'managerCheckOut'])->middleware('can:attendance.manage_team')->name('manager.check-out');
+        Route::post('corrections/{correction}/review', [AttendanceController::class, 'reviewCorrection'])->middleware('can:attendance.review_corrections')->name('corrections.review');
+        Route::post('overtime/{review}/review', [AttendanceController::class, 'reviewOvertime'])->middleware('can:overtime.review')->name('overtime.review');
+        Route::get('export', [AttendanceController::class, 'export'])->middleware('can:attendance.export')->name('export');
+        Route::get('summary', [AttendanceController::class, 'summary'])->name('summary');
+        Route::get('roster', [RosterController::class, 'index'])->middleware('can:shifts.view_team')->name('roster');
+        Route::post('shifts', [RosterController::class, 'storeShift'])->middleware('can:shifts.manage')->name('shifts.store');
+        Route::post('assignments', [RosterController::class, 'assign'])->middleware('can:rosters.manage')->name('assignments.store');
+        Route::post('roster/publish', [RosterController::class, 'publish'])->middleware('can:rosters.manage')->name('roster.publish');
+        Route::get('leave/approvals', [LeaveController::class, 'approvals'])->middleware('can:leave.view_team')->name('leave.approvals');
+        Route::post('leave/{leave}/review', [LeaveController::class, 'review'])->middleware('can:leave.approve')->name('leave.review');
+        Route::post('leave/types', [LeaveController::class, 'storeType'])->middleware('can:leave.manage_policies')->name('leave.types.store');
+        Route::post('leave/balances/{employee}', [LeaveController::class, 'adjustBalance'])->middleware('can:leave.adjust_balances')->name('leave.balances.adjust');
+        Route::get('calendar-settings', [AttendanceCalendarController::class, 'index'])->middleware('can:holidays.manage')->name('calendar-settings');
+        Route::post('holidays', [AttendanceCalendarController::class, 'storeHoliday'])->middleware('can:holidays.manage')->name('holidays.store');
+        Route::post('weekly-offs', [AttendanceCalendarController::class, 'storeWeeklyOff'])->middleware('can:holidays.manage')->name('weekly-offs.store');
     });
     Route::middleware('role:administrator,manager')->group(function (): void {
         Route::get('settings/outlets', [OutletController::class, 'index'])->middleware('can:outlets.manage')->name('settings.outlets.index');

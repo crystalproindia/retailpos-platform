@@ -19,6 +19,8 @@ $posManagementRoles = ['administrator', 'manager'];
 $managementRoles = ['administrator', 'manager'];
 $taskUserRoles = ['administrator', 'manager', 'sales', 'staff'];
 $taskManagementRoles = ['administrator', 'manager'];
+$attendanceUserRoles = ['administrator', 'manager', 'sales', 'staff'];
+$attendanceManagementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
@@ -41,6 +43,27 @@ return [
         'workforce.reviews.manage' => ['administrator', 'manager'],
         'workforce.recognition.manage' => ['administrator', 'manager'],
         'workforce.export' => ['administrator', 'manager'],
+        'attendance.view_own' => $attendanceUserRoles,
+        'attendance.check_in' => $attendanceUserRoles,
+        'attendance.check_out' => $attendanceUserRoles,
+        'attendance.view_team' => $attendanceManagementRoles,
+        'attendance.manage_team' => $attendanceManagementRoles,
+        'attendance.correct_own' => $attendanceUserRoles,
+        'attendance.review_corrections' => $attendanceManagementRoles,
+        'attendance.export' => $attendanceManagementRoles,
+        'attendance.summary_export' => $attendanceManagementRoles,
+        'shifts.view_own' => $attendanceUserRoles,
+        'shifts.view_team' => $attendanceManagementRoles,
+        'shifts.manage' => $attendanceManagementRoles,
+        'rosters.manage' => $attendanceManagementRoles,
+        'leave.view_own' => $attendanceUserRoles,
+        'leave.request' => $attendanceUserRoles,
+        'leave.view_team' => $attendanceManagementRoles,
+        'leave.approve' => $attendanceManagementRoles,
+        'leave.manage_policies' => $administratorRoles,
+        'leave.adjust_balances' => $attendanceManagementRoles,
+        'holidays.manage' => $attendanceManagementRoles,
+        'overtime.review' => $attendanceManagementRoles,
         'store.setup.manage' => $administratorRoles,
         'outlets.view' => $posUserRoles,
         'outlets.manage' => $managementRoles,

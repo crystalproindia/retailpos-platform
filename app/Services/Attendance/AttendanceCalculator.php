@@ -48,7 +48,9 @@ class AttendanceCalculator
             : 0;
 
         if (! $attendance->checked_out_at) {
-            $attendance->attendance_status = 'missing_check_out';
+            // An active session is present until the scheduled recovery job determines
+            // that a historical check-out is genuinely missing.
+            $attendance->attendance_status = 'present';
             $attendance->attendance_state = 'checked_in';
         } else {
             $minimum = $shift?->minimum_work_minutes ?? 0;

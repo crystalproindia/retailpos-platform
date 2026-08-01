@@ -27,6 +27,7 @@ class AttendanceFoundationTest extends TestCase
         $this->actingAs($user)->post(route('attendance.check-in'))->assertRedirect();
         $record = AttendanceRecord::query()->sole();
         $this->assertSame('checked_in', $record->attendance_state);
+        $this->assertSame('present', $record->attendance_status);
         $this->actingAs($user)->post(route('attendance.check-in'))->assertSessionHasErrors('attendance');
         $this->actingAs($user)->post(route('attendance.check-out', $record))->assertRedirect()->assertSessionHasNoErrors();
         $record->refresh();

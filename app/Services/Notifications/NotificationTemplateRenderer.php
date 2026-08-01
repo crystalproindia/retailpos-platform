@@ -155,6 +155,22 @@ class NotificationTemplateRenderer
             return 'Lead '.($event->payload()['lead_title'] ?? 'record').' was converted to customer '.($event->payload()['customer_code'] ?? $event->payload()['customer_name'] ?? 'account').'.';
         }
 
+        if ($event->eventKey() === 'leave.requested') {
+            return ($event->payload()['employee_name'] ?? 'An employee').' requested '.($event->payload()['leave_type'] ?? 'leave').' from '.($event->payload()['starts_on'] ?? 'the selected date').' to '.($event->payload()['ends_on'] ?? 'the selected date').'.';
+        }
+
+        if (in_array($event->eventKey(), ['leave.approved', 'leave.rejected'], true)) {
+            return 'Your '.($event->payload()['leave_type'] ?? 'leave').' request was '.($event->eventKey() === 'leave.approved' ? 'approved' : 'declined').'.';
+        }
+
+        if ($event->eventKey() === 'attendance.correction.requested') {
+            return ($event->payload()['employee_name'] ?? 'An employee').' requested an attendance correction for '.($event->payload()['attendance_date'] ?? 'a work day').'.';
+        }
+
+        if (in_array($event->eventKey(), ['attendance.correction.approved', 'attendance.correction.rejected'], true)) {
+            return 'Your attendance correction request was '.($event->eventKey() === 'attendance.correction.approved' ? 'approved' : 'declined').'.';
+        }
+
         if (str($event->eventKey())->startsWith('crm.support_ticket_')) {
             $number = $event->payload()['ticket_number'] ?? 'this support ticket';
             $subject = $event->payload()['ticket_subject'] ?? 'Support request';
@@ -302,6 +318,9 @@ class NotificationTemplateRenderer
             'crm.follow_up.due', 'crm.follow_up.overdue' => $event->payload()['lead_id'] ?? null
                 ? route('crm.leads.show', $event->payload()['lead_id'])
                 : route('crm.followups.index'),
+            'leave.requested' => route('attendance.leave.approvals'),
+            'leave.approved', 'leave.rejected', 'attendance.correction.approved', 'attendance.correction.rejected' => route('attendance.self'),
+            'attendance.correction.requested' => route('attendance.dashboard'),
             'cms.page.published', 'cms.page.unpublished' => $event->aggregateId() ? route('cms.pages.edit', $event->aggregateId()) : null,
             'cms.branding.updated' => route('cms.branding.index'),
             'cms.theme.updated' => route('cms.theme.index'),

@@ -35,6 +35,7 @@ class SidebarNavigationInventoryTest extends TestCase
             'expenses' => [],
             'tasks' => ['tasks-today', 'tasks-personal', 'tasks-work', 'tasks-team', 'tasks-rules'],
             'workforce' => ['workforce-dashboard', 'workforce-employees', 'users', 'roles'],
+            'attendance' => ['attendance-team', 'attendance-roster', 'attendance-leave', 'attendance-calendar-settings'],
             'hr' => [],
             'payroll' => [],
             'marketing' => [],
@@ -59,14 +60,14 @@ class SidebarNavigationInventoryTest extends TestCase
     public function test_manager_sales_and_staff_receive_their_authorised_navigation_inventory(): void
     {
         $this->assertSame([
-            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'gst-compliance', 'inventory', 'purchases', 'projects', 'support', 'finance', 'expenses', 'tasks', 'workforce', 'hr', 'marketing', 'whatsapp', 'cms', 'blog', 'website-cms', 'seo', 'reports', 'analytics', 'ai-assistant', 'company', 'branches', 'settings', 'operations', 'notifications',
+            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'gst-compliance', 'inventory', 'purchases', 'projects', 'support', 'finance', 'expenses', 'tasks', 'workforce', 'attendance', 'hr', 'marketing', 'whatsapp', 'cms', 'blog', 'website-cms', 'seo', 'reports', 'analytics', 'ai-assistant', 'company', 'branches', 'settings', 'operations', 'notifications',
         ], array_keys($this->inventoryFor($this->user(UserRole::Manager))));
 
         $this->assertSame([
-            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'inventory', 'support', 'tasks', 'notifications',
+            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'inventory', 'support', 'tasks', 'attendance', 'notifications',
         ], array_keys($this->inventoryFor($this->user(UserRole::Sales))));
 
-        $this->assertSame(['dashboard', 'orders', 'tasks'], array_keys($this->inventoryFor($this->user(UserRole::Staff))));
+        $this->assertSame(['dashboard', 'orders', 'tasks', 'attendance'], array_keys($this->inventoryFor($this->user(UserRole::Staff))));
     }
 
     public function test_restored_reports_ai_users_and_invoice_settings_follow_role_boundaries(): void

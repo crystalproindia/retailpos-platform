@@ -25,8 +25,12 @@ class LeaveRequestTest extends TestCase
         $type = LeaveType::create(['company_id' => $company->id, 'name' => 'Casual', 'code' => 'CL', 'annual_entitlement' => 5, 'is_active' => true, 'approval_required' => true]); $date = now('Asia/Kolkata')->addWeek()->nextWeekday()->toDateString();
         $this->actingAs($user)->post(route('attendance.leave.store'), ['leave_type_id' => $type->id, 'starts_on' => $date, 'ends_on' => $date, 'day_portion' => 'full_day'])->assertRedirect();
         $leave = LeaveRequest::query()->sole(); $this->assertSame('pending', $leave->status); $this->assertSame('1.00', (string) $employee->leaveBalances()->sole()->pending); $this->assertSame('4.00', (string) $employee->leaveBalances()->sole()->remaining);
+        $this->assertDatabaseHas('domain_event_logs', ['event_key' => 'leave.requested', 'aggregate_id' => $leave->id]);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $manager->id, 'data->event_key' => 'leave.requested']);
         $this->actingAs($user)->post(route('attendance.leave.review', $leave), ['decision' => 'approved'])->assertForbidden();
         $this->actingAs($manager)->post(route('attendance.leave.review', $leave), ['decision' => 'approved'])->assertRedirect();
         $this->assertSame('approved', $leave->refresh()->status); $this->assertSame('1.00', (string) $employee->leaveBalances()->sole()->used);
+        $this->assertDatabaseHas('domain_event_logs', ['event_key' => 'leave.approved', 'aggregate_id' => $leave->id]);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $user->id, 'data->event_key' => 'leave.approved']);
     }
 }

@@ -62,7 +62,10 @@ attendance/shift/leave capability. Direct tenant or outlet bypasses return 404;
 exports use the same authorized query path and neutralize spreadsheet formula
 prefixes. Audit events cover check-in/out, break lifecycle, manual entry,
 corrections, shifts, holidays, leave, balances, exports and overtime review.
-Leave reasons remain limited to the requester and authorized reviewers.
+The existing preference-aware in-app notification center receives leave-review
+and attendance-correction review events; Phase K does not add email, SMS, or
+external messaging. Leave reasons remain limited to the requester and
+authorized reviewers.
 
 ## Payroll-ready boundary
 
@@ -99,3 +102,12 @@ controls.
 No biometric import, payroll calculation, attachments, recurring rota copy,
 automatic shift reminders, salary impact, disciplinary labels, GPS/location,
 Google Calendar/Meet, or external messaging is included in V1.
+
+## Verification
+
+Focused attendance/leave/shift/field-duty coverage uses persisted SQLite
+records, including notification dispatch. Browser verification covers the
+attendance, dashboard, roster, leave, and calendar screens at 1440px, 768px,
+and 390px with no horizontal overflow or browser-console errors. Full-suite,
+historical-harness, Vite, cache, and route checks are recorded with the release
+verification for this branch.

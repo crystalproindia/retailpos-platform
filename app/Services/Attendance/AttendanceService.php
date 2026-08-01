@@ -2,6 +2,7 @@
 
 namespace App\Services\Attendance;
 
+use App\Events\Domain\Attendance\AttendanceDomainEvent;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceCorrection;
 use App\Models\AttendanceRecord;
@@ -10,6 +11,7 @@ use App\Models\ShiftAssignment;
 use App\Models\User;
 use App\Models\WorkforceEmployee;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +22,7 @@ class AttendanceService
         private readonly AttendanceAccessService $access,
         private readonly AttendanceCalculator $calculator,
         private readonly AuditLogger $audit,
+        private readonly DomainEventDispatcher $events,
     ) {}
 
     public function checkIn(User $actor, ?WorkforceEmployee $employee = null, array $data = []): AttendanceRecord
@@ -122,7 +125,7 @@ class AttendanceService
     public function requestCorrection(User $actor, AttendanceRecord $attendance, array $requested, string $reason): AttendanceCorrection
     {
         if ($attendance->employee_id !== $actor->workforce_employee_id) $this->access->assertManageEmployee($actor, $attendance->employee);
-        return DB::transaction(function () use ($actor, $attendance, $requested, $reason): AttendanceCorrection {
+        $correction = DB::transaction(function () use ($actor, $attendance, $requested, $reason): AttendanceCorrection {
             $attendance = AttendanceRecord::query()->lockForUpdate()->findOrFail($attendance->id);
             if ($attendance->correction_status === 'pending') throw ValidationException::withMessages(['attendance' => 'A correction is already awaiting review.']);
             $original = $attendance->only(['checked_in_at', 'checked_out_at', 'outlet_id', 'attendance_status', 'notes']);
@@ -131,12 +134,19 @@ class AttendanceService
             $this->audit->record('attendance.correction.requested', $correction, 'Attendance correction requested');
             return $correction;
         });
+
+        $this->events->dispatch(new AttendanceDomainEvent(
+            'attendance.correction.requested', $correction->company_id, $actor->id, $correction->getMorphClass(), $correction->id,
+            ['employee_name' => $correction->employee->display_name, 'attendance_date' => $correction->attendance->attendance_date->toDateString()],
+        ));
+
+        return $correction;
     }
 
     public function reviewCorrection(User $actor, AttendanceCorrection $correction, bool $approve, ?string $note = null): AttendanceCorrection
     {
         $this->access->assertManageEmployee($actor, $correction->employee);
-        return DB::transaction(function () use ($actor, $correction, $approve, $note): AttendanceCorrection {
+        $reviewed = DB::transaction(function () use ($actor, $correction, $approve, $note): AttendanceCorrection {
             $correction = AttendanceCorrection::query()->with('attendance.breaks', 'attendance.shiftAssignment.shift')->lockForUpdate()->findOrFail($correction->id);
             if ($correction->status !== 'pending') throw ValidationException::withMessages(['correction' => 'This correction has already been reviewed.']);
             if (! $approve && blank($note)) throw ValidationException::withMessages(['review_note' => 'A reason is required when rejecting a correction.']);
@@ -155,6 +165,13 @@ class AttendanceService
             $this->audit->record($approve ? 'attendance.correction.approved' : 'attendance.correction.rejected', $correction, $approve ? 'Attendance correction approved' : 'Attendance correction rejected');
             return $correction->refresh();
         });
+
+        $this->events->dispatch(new AttendanceDomainEvent(
+            $approve ? 'attendance.correction.approved' : 'attendance.correction.rejected', $reviewed->company_id, $actor->id, $reviewed->getMorphClass(), $reviewed->id,
+            ['employee_name' => $reviewed->employee->display_name, 'recipient_user_id' => $reviewed->requested_by],
+        ));
+
+        return $reviewed;
     }
 
     public function reviewOvertime(User $actor, OvertimeReview $review, string $status, int $minutes, ?string $reason): OvertimeReview

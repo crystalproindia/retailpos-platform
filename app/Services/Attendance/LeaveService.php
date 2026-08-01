@@ -2,6 +2,7 @@
 
 namespace App\Services\Attendance;
 
+use App\Events\Domain\Attendance\AttendanceDomainEvent;
 use App\Models\EmployeeLeaveBalance;
 use App\Models\AttendanceRecord;
 use App\Models\Holiday;
@@ -12,13 +13,18 @@ use App\Models\User;
 use App\Models\WeeklyOff;
 use App\Models\WorkforceEmployee;
 use App\Services\AuditLogger;
+use App\Services\Events\DomainEventDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class LeaveService
 {
-    public function __construct(private readonly AttendanceAccessService $access, private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AttendanceAccessService $access,
+        private readonly AuditLogger $audit,
+        private readonly DomainEventDispatcher $events,
+    ) {}
 
     public function createType(User $actor, array $data): LeaveType
     {
@@ -52,7 +58,7 @@ class LeaveService
     public function createRequest(User $actor, WorkforceEmployee $employee, array $data): LeaveRequest
     {
         if ($employee->id !== $actor->workforce_employee_id) $this->access->assertManageEmployee($actor, $employee);
-        return DB::transaction(function () use ($actor, $employee, $data): LeaveRequest {
+        $request = DB::transaction(function () use ($actor, $employee, $data): LeaveRequest {
             $type = LeaveType::query()->where('company_id', $actor->company_id)->whereKey($data['leave_type_id'])->where('is_active', true)->firstOrFail();
             $starts = CarbonImmutable::parse($data['starts_on'], $this->timezone($employee, $actor))->startOfDay();
             $ends = CarbonImmutable::parse($data['ends_on'], $this->timezone($employee, $actor))->startOfDay();
@@ -82,13 +88,20 @@ class LeaveService
             $this->audit->record('leave.requested', $request, 'Leave request submitted');
             return $request->refresh();
         });
+
+        $this->events->dispatch(new AttendanceDomainEvent(
+            'leave.requested', $request->company_id, $actor->id, $request->getMorphClass(), $request->id,
+            ['employee_name' => $employee->display_name, 'leave_type' => $request->leaveType->name, 'starts_on' => $request->starts_on->toDateString(), 'ends_on' => $request->ends_on->toDateString()],
+        ));
+
+        return $request;
     }
 
     public function review(User $actor, LeaveRequest $request, bool $approve, ?string $note = null): LeaveRequest
     {
         $this->access->assertManageEmployee($actor, $request->employee);
         if ($request->employee->user?->id === $actor->id) throw ValidationException::withMessages(['leave' => 'You cannot approve your own leave request.']);
-        return DB::transaction(function () use ($actor, $request, $approve, $note): LeaveRequest {
+        $reviewed = DB::transaction(function () use ($actor, $request, $approve, $note): LeaveRequest {
             $request = LeaveRequest::query()->with(['employee', 'leaveType'])->lockForUpdate()->findOrFail($request->id);
             if ($request->status !== 'pending') throw ValidationException::withMessages(['leave' => 'This leave request has already been reviewed.']);
             if (! $approve && blank($note)) throw ValidationException::withMessages(['review_note' => 'A rejection reason is required.']);
@@ -106,6 +119,13 @@ class LeaveService
             $this->audit->record($approve ? 'leave.approved' : 'leave.rejected', $request, $approve ? 'Leave request approved' : 'Leave request rejected');
             return $request->refresh();
         });
+
+        $this->events->dispatch(new AttendanceDomainEvent(
+            $approve ? 'leave.approved' : 'leave.rejected', $reviewed->company_id, $actor->id, $reviewed->getMorphClass(), $reviewed->id,
+            ['employee_name' => $reviewed->employee->display_name, 'leave_type' => $reviewed->leaveType->name, 'recipient_user_id' => $reviewed->requested_by],
+        ));
+
+        return $reviewed;
     }
 
     public function withdraw(User $actor, LeaveRequest $request): LeaveRequest

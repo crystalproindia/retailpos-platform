@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Concerns\Auditable;
 use App\Models\User;
+use App\Models\Tasks\Task;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,6 +86,11 @@ class CrmLead extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(CrmActivity::class, 'crm_lead_id')->latest('scheduled_at');
+    }
+
+    public function tasks(): MorphMany
+    {
+        return $this->morphMany(Task::class, 'related')->latest('due_at');
     }
 
     public function notes(): MorphMany

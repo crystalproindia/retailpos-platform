@@ -17,9 +17,24 @@ $customerUserRoles = ['administrator', 'manager', 'sales'];
 $posUserRoles = ['administrator', 'manager', 'sales'];
 $posManagementRoles = ['administrator', 'manager'];
 $managementRoles = ['administrator', 'manager'];
+$taskUserRoles = ['administrator', 'manager', 'sales', 'staff'];
+$taskManagementRoles = ['administrator', 'manager'];
 
 return [
     'capabilities' => [
+        'tasks.view' => $taskUserRoles,
+        'tasks.create' => $taskUserRoles,
+        'tasks.create_work' => $taskUserRoles,
+        'tasks.update_own' => $taskUserRoles,
+        'tasks.archive' => $taskUserRoles,
+        'tasks.view_team' => $taskManagementRoles,
+        'tasks.manage_team' => $taskManagementRoles,
+        'tasks.assign' => $taskManagementRoles,
+        'tasks.reassign' => $taskManagementRoles,
+        'tasks.reopen' => $taskManagementRoles,
+        'tasks.manage_recurring' => $taskUserRoles,
+        'tasks.export' => $taskManagementRoles,
+        'tasks.rules.manage' => $administratorRoles,
         'workforce.view' => ['administrator', 'manager'],
         'workforce.manage' => ['administrator'],
         'workforce.self.view' => ['administrator', 'manager', 'sales', 'staff'],

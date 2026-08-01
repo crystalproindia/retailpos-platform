@@ -9,6 +9,7 @@ use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
+use App\Models\Tasks\Task;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -124,6 +125,16 @@ class User extends Authenticatable
     public function createdCrmCustomers(): HasMany
     {
         return $this->hasMany(CrmCustomer::class, 'created_by');
+    }
+
+    public function ownedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'owner_user_id');
+    }
+
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_user_id');
     }
 
     public function notificationPreferences(): HasMany

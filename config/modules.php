@@ -1027,6 +1027,21 @@ return [
         'workforce-employees' => [
             'name' => 'Employees', 'description' => 'Employee profiles and operational assignments.', 'icon' => 'employees', 'route' => 'workforce.employees.index', 'route_params' => [], 'sort_order' => 402, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'workforce.view', 'badge' => null, 'license_key' => null, 'parent_id' => 'workforce',
         ],
+        'attendance' => [
+            'name' => 'Attendance', 'description' => 'Check in, shifts, leave, and workforce coverage.', 'icon' => 'clock', 'route' => 'attendance.self', 'route_params' => [], 'sort_order' => 405, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $taskRoles, 'permission' => 'attendance.view_own', 'badge' => null, 'license_key' => null, 'parent_id' => null,
+        ],
+        'attendance-team' => [
+            'name' => 'Attendance dashboard', 'description' => 'Outlet-scoped attendance and coverage.', 'icon' => 'dashboard', 'route' => 'attendance.dashboard', 'route_params' => [], 'sort_order' => 406, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'attendance.view_team', 'badge' => null, 'license_key' => null, 'parent_id' => 'attendance',
+        ],
+        'attendance-roster' => [
+            'name' => 'Weekly roster', 'description' => 'Employee shifts and outlet coverage.', 'icon' => 'calendar', 'route' => 'attendance.roster', 'route_params' => [], 'sort_order' => 407, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'shifts.view_team', 'badge' => null, 'license_key' => null, 'parent_id' => 'attendance',
+        ],
+        'attendance-leave' => [
+            'name' => 'Leave approvals', 'description' => 'Authorized leave requests and balances.', 'icon' => 'activity', 'route' => 'attendance.leave.approvals', 'route_params' => [], 'sort_order' => 408, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'leave.view_team', 'badge' => null, 'license_key' => null, 'parent_id' => 'attendance',
+        ],
+        'attendance-calendar-settings' => [
+            'name' => 'Holidays', 'description' => 'Holidays and weekly-off scheduling rules.', 'icon' => 'calendar', 'route' => 'attendance.calendar-settings', 'route_params' => [], 'sort_order' => 409, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'holidays.manage', 'badge' => null, 'license_key' => null, 'parent_id' => 'attendance',
+        ],
         'hr' => [
             'name' => 'HR',
             'description' => 'Human resources module foundation.',

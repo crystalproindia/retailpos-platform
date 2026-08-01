@@ -2,6 +2,7 @@
 
 $channels = ['database', 'email', 'webhook'];
 $futureChannels = ['whatsapp', 'sms', 'push'];
+$attendanceChannels = ['database'];
 
 return [
     'retention_days' => env('DOMAIN_EVENT_RETENTION_DAYS', 180),
@@ -176,6 +177,13 @@ return [
         'promotion.coupon.used' => ['name' => 'Promotion coupon used', 'description' => 'A promotion coupon was redeemed.', 'category' => 'Promotions', 'default_channels' => ['database'], 'allowed_channels' => array_merge($channels, $futureChannels), 'severity' => 'success', 'user_preference_enabled' => true, 'webhook_enabled' => true, 'future_ai_eligible' => true],
         'promotion.simulation.ran' => ['name' => 'Promotion simulation ran', 'description' => 'A promotion cart simulation completed.', 'category' => 'Promotions', 'default_channels' => ['database'], 'allowed_channels' => array_merge($channels, $futureChannels), 'severity' => 'info', 'user_preference_enabled' => true, 'webhook_enabled' => true, 'future_ai_eligible' => true],
         'promotion.approval.required' => ['name' => 'Promotion approval required', 'description' => 'A promotion requires or received approval.', 'category' => 'Promotions', 'default_channels' => ['database', 'email'], 'allowed_channels' => array_merge($channels, $futureChannels), 'severity' => 'warning', 'user_preference_enabled' => true, 'webhook_enabled' => true, 'future_ai_eligible' => true],
+
+        'leave.requested' => ['name' => 'Leave request submitted', 'description' => 'An employee leave request needs review.', 'category' => 'Workforce', 'default_channels' => ['database'], 'allowed_channels' => $attendanceChannels, 'severity' => 'info', 'user_preference_enabled' => true, 'webhook_enabled' => false, 'future_ai_eligible' => false],
+        'leave.approved' => ['name' => 'Leave request approved', 'description' => 'An employee leave request was approved.', 'category' => 'Workforce', 'default_channels' => ['database'], 'allowed_channels' => $attendanceChannels, 'severity' => 'success', 'user_preference_enabled' => true, 'webhook_enabled' => false, 'future_ai_eligible' => false],
+        'leave.rejected' => ['name' => 'Leave request declined', 'description' => 'An employee leave request was declined.', 'category' => 'Workforce', 'default_channels' => ['database'], 'allowed_channels' => $attendanceChannels, 'severity' => 'warning', 'user_preference_enabled' => true, 'webhook_enabled' => false, 'future_ai_eligible' => false],
+        'attendance.correction.requested' => ['name' => 'Attendance correction requested', 'description' => 'An attendance correction needs review.', 'category' => 'Workforce', 'default_channels' => ['database'], 'allowed_channels' => $attendanceChannels, 'severity' => 'info', 'user_preference_enabled' => true, 'webhook_enabled' => false, 'future_ai_eligible' => false],
+        'attendance.correction.approved' => ['name' => 'Attendance correction approved', 'description' => 'An attendance correction was approved.', 'category' => 'Workforce', 'default_channels' => ['database'], 'allowed_channels' => $attendanceChannels, 'severity' => 'success', 'user_preference_enabled' => true, 'webhook_enabled' => false, 'future_ai_eligible' => false],
+        'attendance.correction.rejected' => ['name' => 'Attendance correction declined', 'description' => 'An attendance correction was declined.', 'category' => 'Workforce', 'default_channels' => ['database'], 'allowed_channels' => $attendanceChannels, 'severity' => 'warning', 'user_preference_enabled' => true, 'webhook_enabled' => false, 'future_ai_eligible' => false],
 
         'system.user.created' => ['name' => 'User created', 'description' => 'A platform user was created.', 'category' => 'System', 'default_channels' => ['database'], 'allowed_channels' => $channels, 'severity' => 'info', 'user_preference_enabled' => true, 'webhook_enabled' => true, 'future_ai_eligible' => false],
         'system.user.deactivated' => ['name' => 'User deactivated', 'description' => 'A platform user was deactivated.', 'category' => 'System', 'default_channels' => ['database'], 'allowed_channels' => $channels, 'severity' => 'warning', 'user_preference_enabled' => true, 'webhook_enabled' => true, 'future_ai_eligible' => false],

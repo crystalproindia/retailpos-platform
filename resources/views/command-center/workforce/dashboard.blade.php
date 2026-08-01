@@ -43,6 +43,10 @@
             </section>
         @endif
 
+        @if($attendanceMetrics)
+            <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-3"><div><h2 class="font-semibold text-slate-950">Attendance and coverage</h2><p class="mt-1 text-sm text-slate-500">Today’s authorized outlet context. It is not a performance ranking.</p></div><a href="{{ route('attendance.dashboard') }}" class="text-sm font-semibold text-teal-700">Open attendance</a></div><div class="mt-4 grid gap-3 sm:grid-cols-3"><a href="{{ route('attendance.dashboard') }}" class="rounded-lg bg-emerald-50 p-4"><p class="text-xs text-emerald-700">Present</p><p class="mt-1 text-2xl font-semibold text-slate-950">{{ $attendanceMetrics['present'] }}</p></a><a href="{{ route('attendance.dashboard') }}" class="rounded-lg bg-amber-50 p-4"><p class="text-xs text-amber-700">Late</p><p class="mt-1 text-2xl font-semibold text-slate-950">{{ $attendanceMetrics['late'] }}</p></a><a href="{{ route('attendance.dashboard') }}" class="rounded-lg bg-rose-50 p-4"><p class="text-xs text-rose-700">Missing check-outs</p><p class="mt-1 text-2xl font-semibold text-slate-950">{{ $attendanceMetrics['missing'] }}</p></a></div></section>
+        @endif
+
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4"><h2 class="font-semibold text-slate-950">Recent starters</h2></div>

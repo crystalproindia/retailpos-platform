@@ -137,6 +137,11 @@ class User extends Authenticatable
         return $this->hasMany(Task::class, 'assigned_user_id');
     }
 
+    public function attendanceRecords(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class, 'user_id');
+    }
+
     public function notificationPreferences(): HasMany
     {
         return $this->hasMany(NotificationPreference::class);

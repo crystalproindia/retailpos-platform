@@ -64,4 +64,4 @@ Then clear and rebuild Laravel caches. Do not deploy a `public/build` directory 
 - Role duplication, role deactivation/replacement, and bulk workforce actions remain future controlled enhancements.
 - Reviews do not yet support acknowledgement, finalization/reopening, or employee comments.
 - Workforce metrics currently cover reliable completed POS sales only; payment collection, returns, discounts, and register variance will be added only after a shared authorized Phase H row provider is available for each source.
-- Attendance, leave, payroll, expenses, shift planning, promotion/discipline, and compensation are intentionally out of scope.
+- Phase K adds attendance, shifts, leave and scheduling as a separate authorized time-management foundation. It does not alter Phase I employee identities, account links, roles, assignments, reviews, recognition, or performance boundaries. Payroll, compensation and discipline remain out of scope.

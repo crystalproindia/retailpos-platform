@@ -147,6 +147,12 @@ idempotent, and disabled per tenant until an Administrator enables a rule. Test
 the intended tenant first with `php artisan tasks:generate --company=<id>
 --dry-run` and `php artisan tasks:send-reminders --company=<id> --dry-run`.
 
+Phase K uses the same scheduler for `attendance:mark-missing-checkouts --limit=250`
+hourly and `attendance:generate-daily-status --limit=500` daily. Both commands
+are bounded, idempotent, tenant-filterable and dry-run capable. They do not
+configure cron, calculate salary, send external messages, or enable location
+tracking.
+
 Replace the sample path and, if required by Hostinger, `php` with its configured PHP CLI path. Do not add jobs during this deployment phase. A future VPS may replace the cron-based queue fallback with a supervised worker.
 
 ## Cache and post-deploy commands

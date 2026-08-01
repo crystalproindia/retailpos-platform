@@ -15,6 +15,7 @@ use App\Models\WorkforceRecognition;
 use App\Models\WorkforceRole;
 use App\Repositories\Tasks\TaskRepository;
 use App\Services\AuditLogger;
+use App\Services\Attendance\AttendanceAccessService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Workforce\WorkforcePerformanceService;
 use App\Services\Workforce\WorkforceService;
@@ -29,7 +30,7 @@ class WorkforceController extends Controller
 {
     public function __construct(private readonly OutletAccessService $outlets) {}
 
-    public function dashboard(Request $request, TaskRepository $tasks): View
+    public function dashboard(Request $request, TaskRepository $tasks, AttendanceAccessService $attendance): View
     {
         $employees = $this->employeeQuery($request);
         $recent = (clone $employees)->latest()->limit(6)->get();
@@ -56,6 +57,11 @@ class WorkforceController extends Controller
             'recent' => $recent,
             'outletBreakdown' => $outletBreakdown,
             'taskMetrics' => $request->user()->can('tasks.view_team') ? $tasks->teamMetrics($request->user()) : null,
+            'attendanceMetrics' => $request->user()->can('attendance.view_team') ? [
+                'present' => $attendance->attendanceQuery($request->user())->whereDate('attendance_date', now()->toDateString())->whereIn('attendance_status', ['present', 'partial_day'])->count(),
+                'late' => $attendance->attendanceQuery($request->user())->whereDate('attendance_date', now()->toDateString())->where('late_minutes', '>', 0)->count(),
+                'missing' => $attendance->attendanceQuery($request->user())->whereDate('attendance_date', now()->toDateString())->where('attendance_status', 'missing_check_out')->count(),
+            ] : null,
         ]);
     }
 

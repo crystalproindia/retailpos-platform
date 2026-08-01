@@ -3168,3 +3168,7 @@ from integer minor units, preserving counts and quantities as their real values.
 Current-cost stock valuation, gross-profit/margin, sales returns/refunds, historical
 valuation, trends, and charts remain openly unavailable until reliable source
 ledgers and an approved KPI model exist. See `docs/phase-h-reporting-analytics.md`.
+
+# Phase K — Attendance, Shifts, Leave and Scheduling
+
+Phase K lives in `app/Services/Attendance`, `app/Http/Controllers/CommandCenter/Attendance`, and `resources/views/command-center/attendance`. The additive migration `2026_08_02_010000_create_attendance_shift_leave_foundation.php` creates shift templates/assignments, attendance records and normalized breaks/corrections, holidays/weekly offs, leave policies, balances and ledger transactions, leave requests, roster publications, and overtime reviews. The shared access service keeps every manager route outlet-scoped; the calculator is the single source of time totals. See `docs/phase-k-attendance-shifts-leave.md`.

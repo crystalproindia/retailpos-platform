@@ -152,3 +152,9 @@ retailpos-platform/public/build/
 Then clear and rebuild Laravel caches. Do not roll back the migration on a
 populated production database, do not deploy a Vite build from a different
 commit, and do not enable Google Calendar or Google Meet as part of this release.
+
+## Phase K compatibility
+
+Attendance and leave actions are separate from Tasks. Phase K may show work
+context in workforce dashboards, but it does not create attendance tasks,
+expose personal tasks, mutate task state, or use Tasks as an employee score.

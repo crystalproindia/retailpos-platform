@@ -24,7 +24,7 @@ class LeaveRequestTest extends TestCase
         foreach ([$user, $manager] as $account) BranchUserAssignment::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'user_id' => $account->id, 'is_active' => true, 'is_default' => true, 'assigned_by' => $manager->id]);
         $type = LeaveType::create(['company_id' => $company->id, 'name' => 'Casual', 'code' => 'CL', 'annual_entitlement' => 5, 'is_active' => true, 'approval_required' => true]); $date = now('Asia/Kolkata')->addWeek()->nextWeekday()->toDateString();
         $this->actingAs($user)->post(route('attendance.leave.store'), ['leave_type_id' => $type->id, 'starts_on' => $date, 'ends_on' => $date, 'day_portion' => 'full_day'])->assertRedirect();
-        $leave = LeaveRequest::query()->sole(); $this->assertSame('pending', $leave->status); $this->assertSame('1.00', (string) $employee->leaveBalances()->sole()->pending);
+        $leave = LeaveRequest::query()->sole(); $this->assertSame('pending', $leave->status); $this->assertSame('1.00', (string) $employee->leaveBalances()->sole()->pending); $this->assertSame('4.00', (string) $employee->leaveBalances()->sole()->remaining);
         $this->actingAs($user)->post(route('attendance.leave.review', $leave), ['decision' => 'approved'])->assertForbidden();
         $this->actingAs($manager)->post(route('attendance.leave.review', $leave), ['decision' => 'approved'])->assertRedirect();
         $this->assertSame('approved', $leave->refresh()->status); $this->assertSame('1.00', (string) $employee->leaveBalances()->sole()->used);

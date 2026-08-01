@@ -63,7 +63,7 @@ class LeaveService
             if ($days <= 0) throw ValidationException::withMessages(['starts_on' => 'The selected dates are non-working days.']);
             $period = $starts->format('Y');
             $balance = $this->balanceFor($employee, $type, $period, true);
-            $available = (float) $balance->remaining - (float) $balance->pending;
+            $available = (float) $balance->remaining;
             if (! $type->negative_balance_allowed && $available + 0.0001 < $days) throw ValidationException::withMessages(['leave_type_id' => 'The available leave balance is insufficient.']);
             $request = LeaveRequest::create([
                 'company_id' => $actor->company_id, 'employee_id' => $employee->id, 'leave_type_id' => $type->id, 'outlet_id' => $employee->primary_branch_id,
@@ -137,7 +137,7 @@ class LeaveService
 
     private function reconcile(EmployeeLeaveBalance $balance): void
     {
-        $balance->remaining = round((float) $balance->opening_balance + (float) $balance->accrued + (float) $balance->adjusted - (float) $balance->used, 2);
+        $balance->remaining = round((float) $balance->opening_balance + (float) $balance->accrued + (float) $balance->adjusted - (float) $balance->used - (float) $balance->pending, 2);
         $balance->save();
     }
 

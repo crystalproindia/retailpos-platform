@@ -14,6 +14,14 @@ Opportunities are separate tenant-scoped commercial records linked to a lead, op
 
 The existing `crm_activities` table remains the unified activity system. Follow-up records now carry status, timezone, reminder time, completion/cancellation actors, optional opportunity, and completion outcome. They are open, completed, cancelled, or query-derived overdue without relying on a scheduler. `/crm/follow-ups` and `/sales/follow-ups` expose the existing queue.
 
+Phase J adds a separate work-task layer at `/tasks`; it does not migrate,
+duplicate, or hide CRM activities. A lead task may be created from an authorized
+lead detail screen. Completing it may record the existing CRM activity/history
+entry and may explicitly create a next task, but it never changes lead status or
+creates an automatic stage transition. Task rules are disabled by default and
+only use approved, bounded lead first-contact/follow-up conditions. See
+`phase-j-smart-tasks-followups.md` for privacy, scope, and scheduler details.
+
 ## Quotations
 
 Quotations remain company-scoped and use the existing transactional numbering and server-side calculation flow. Browser totals are ignored. Items snapshot their description, unit, pricing, fixed or percentage discount, tax, and ordering. Accepted quotations remain non-editable; use a new draft for a commercial revision until the broader revision UI is introduced.

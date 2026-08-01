@@ -56,6 +56,8 @@ use App\Http\Controllers\CommandCenter\Crm\PipelineController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaShareController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
+use App\Http\Controllers\CommandCenter\Tasks\TaskController;
+use App\Http\Controllers\CommandCenter\Tasks\TaskRuleSettingController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerDashboardController;
@@ -226,6 +228,25 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('tasks')->name('tasks.')->middleware('can:tasks.view')->group(function (): void {
+        Route::get('/', [TaskController::class, 'index'])->name('index');
+        Route::get('today', [TaskController::class, 'index'])->defaults('view', 'today')->name('today');
+        Route::get('upcoming', [TaskController::class, 'index'])->defaults('view', 'upcoming')->name('upcoming');
+        Route::get('overdue', [TaskController::class, 'index'])->defaults('view', 'overdue')->name('overdue');
+        Route::get('completed', [TaskController::class, 'index'])->defaults('view', 'completed')->name('completed');
+        Route::get('personal', [TaskController::class, 'index'])->defaults('view', 'personal')->name('personal');
+        Route::get('work', [TaskController::class, 'index'])->defaults('view', 'work')->name('work');
+        Route::get('team', [TaskController::class, 'index'])->defaults('view', 'team')->middleware('can:tasks.view_team')->name('team');
+        Route::get('calendar', [TaskController::class, 'calendar'])->name('calendar');
+        Route::get('export', [TaskController::class, 'export'])->middleware('can:tasks.export')->name('export');
+        Route::post('/', [TaskController::class, 'store'])->middleware('can:tasks.create')->name('store');
+        Route::get('{task}', [TaskController::class, 'show'])->whereNumber('task')->name('show');
+        Route::put('{task}', [TaskController::class, 'update'])->whereNumber('task')->middleware('can:tasks.update_own')->name('update');
+        Route::post('{task}/transition', [TaskController::class, 'transition'])->whereNumber('task')->middleware('can:tasks.update_own')->name('transition');
+        Route::post('{task}/archive', [TaskController::class, 'archive'])->whereNumber('task')->middleware('can:tasks.archive')->name('archive');
+        Route::get('settings/rules', [TaskRuleSettingController::class, 'index'])->middleware('can:tasks.rules.manage')->name('rules.index');
+        Route::put('settings/rules/{rule}', [TaskRuleSettingController::class, 'update'])->middleware('can:tasks.rules.manage')->name('rules.update');
+    });
     Route::prefix('reports')->name('reports.')->middleware('can:crm.reports.view')->group(function (): void {
         Route::get('/', [ReportsController::class, 'index'])->name('index');
         Route::get('{report}', [ReportsController::class, 'show'])->whereIn('report', ['sales', 'purchases', 'inventory', 'movements', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->name('show');

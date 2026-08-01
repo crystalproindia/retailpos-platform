@@ -29,6 +29,8 @@ Schedule::command('notifications:dispatch-followup-overdue')->hourly()->withoutO
 Schedule::command('retailpos:lead-followup-reminders')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('retailpos:onboarding-reminders')->hourly()->withoutOverlapping();
 Schedule::command('retailpos:support-ticket-reminders')->hourly()->withoutOverlapping();
+Schedule::command('tasks:generate --limit=250')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('tasks:send-reminders --limit=250')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('retailpos:crm-refresh-lead-scores --stale')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('notifications:prune-domain-events')->dailyAt('02:30')->withoutOverlapping();
 Schedule::command('operations:health-check')->everyFiveMinutes()->withoutOverlapping();

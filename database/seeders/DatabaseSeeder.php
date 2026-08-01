@@ -103,6 +103,7 @@ use App\Models\Setting;
 use App\Models\SaasPlan;
 use App\Models\SaasSubscription;
 use App\Models\SystemHealthCheck;
+use App\Models\Tasks\Task;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
@@ -899,6 +900,57 @@ class DatabaseSeeder extends Seeder
                     'completed_at' => $index % 6 === 0 ? now()->subDay() : null,
                     'outcome' => $index % 6 === 0 ? 'Discovery completed' : null,
                     'priority' => $lead->priority->value,
+                ],
+            );
+        });
+
+        $demoLead = CrmLead::query()
+            ->where('company_id', $company->id)
+            ->where('title', 'Multi-store grocery inventory sync')
+            ->first();
+
+        collect([
+            [
+                'title' => 'Review today\'s retail priorities',
+                'task_type' => 'personal',
+                'owner_user_id' => $admin->id,
+                'assigned_user_id' => $admin->id,
+                'created_by_user_id' => $admin->id,
+                'due_at' => now()->setTime(9, 30),
+                'priority' => 'normal',
+                'description' => 'Demo-only personal task. This record is visible only to its owner.',
+            ],
+            [
+                'title' => 'Follow up on grocery rollout discovery',
+                'task_type' => 'work',
+                'owner_user_id' => $sales->id,
+                'assigned_user_id' => $sales->id,
+                'created_by_user_id' => $admin->id,
+                'outlet_id' => $branch->id,
+                'related_type' => $demoLead?->getMorphClass(),
+                'related_id' => $demoLead?->id,
+                'due_at' => now()->addHours(2),
+                'priority' => 'high',
+                'description' => 'Demo-only work task linked to an existing seeded lead.',
+            ],
+            [
+                'title' => 'Prepare next outlet opening checklist',
+                'task_type' => 'work',
+                'owner_user_id' => $manager->id,
+                'assigned_user_id' => null,
+                'created_by_user_id' => $manager->id,
+                'outlet_id' => $branch->id,
+                'due_at' => now()->addDay()->setTime(8, 0),
+                'priority' => 'normal',
+                'description' => 'Demo-only unassigned work task for the authorized manager queue.',
+            ],
+        ])->each(function (array $task) use ($company): void {
+            Task::updateOrCreate(
+                ['company_id' => $company->id, 'title' => $task['title']],
+                $task + [
+                    'company_id' => $company->id,
+                    'source_type' => 'manual',
+                    'status' => 'todo',
                 ],
             );
         });

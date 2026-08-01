@@ -11,6 +11,7 @@ $promotionRoles = ['administrator', 'manager', 'sales'];
 $promotionManagementRoles = ['administrator', 'manager'];
 $customerRoles = ['administrator', 'manager', 'sales'];
 $posRoles = ['administrator', 'manager', 'sales'];
+$taskRoles = ['administrator', 'manager', 'sales', 'staff'];
 
 return [
     'navigation_search' => [
@@ -1185,6 +1186,27 @@ return [
             'license_key' => null,
             'parent_id' => null,
         ],
+        'tasks' => [
+            'name' => 'Tasks',
+            'description' => 'Personal work planning, assigned tasks, and controlled CRM follow-up automation.',
+            'icon' => 'activity',
+            'route' => 'tasks.today',
+            'route_params' => [],
+            'sort_order' => 390,
+            'category' => 'People',
+            'enabled' => true,
+            'visible_in_sidebar' => true,
+            'roles' => $taskRoles,
+            'permission' => 'tasks.view',
+            'badge' => null,
+            'license_key' => null,
+            'parent_id' => null,
+        ],
+        'tasks-today' => ['name' => 'My Day', 'description' => 'Tasks due today across your private and work queues.', 'icon' => 'dashboard', 'route' => 'tasks.today', 'route_params' => [], 'sort_order' => 391, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $taskRoles, 'permission' => 'tasks.view', 'badge' => null, 'license_key' => null, 'parent_id' => 'tasks'],
+        'tasks-personal' => ['name' => 'Personal', 'description' => 'Only you can see these private personal tasks.', 'icon' => 'activity', 'route' => 'tasks.personal', 'route_params' => [], 'sort_order' => 392, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $taskRoles, 'permission' => 'tasks.view', 'badge' => null, 'license_key' => null, 'parent_id' => 'tasks'],
+        'tasks-work' => ['name' => 'Work', 'description' => 'Your authorized work tasks and CRM follow-up commitments.', 'icon' => 'activity', 'route' => 'tasks.work', 'route_params' => [], 'sort_order' => 393, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $taskRoles, 'permission' => 'tasks.view', 'badge' => null, 'license_key' => null, 'parent_id' => 'tasks'],
+        'tasks-team' => ['name' => 'Team Tasks', 'description' => 'Authorized outlet-scoped team workload and unassigned tasks.', 'icon' => 'employees', 'route' => 'tasks.team', 'route_params' => [], 'sort_order' => 394, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'tasks.view_team', 'badge' => null, 'license_key' => null, 'parent_id' => 'tasks'],
+        'tasks-rules' => ['name' => 'Task Rules', 'description' => 'Explicit, tenant-controlled task automation settings.', 'icon' => 'settings', 'route' => 'tasks.rules.index', 'route_params' => [], 'sort_order' => 395, 'category' => 'People', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $administratorRoles, 'permission' => 'tasks.rules.manage', 'badge' => null, 'license_key' => null, 'parent_id' => 'tasks'],
         'reports' => [
             'name' => 'Reports',
             'description' => 'Report center module foundation.',

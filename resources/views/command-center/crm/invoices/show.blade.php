@@ -19,6 +19,9 @@
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Due {{ $invoice->due_date?->format('d M Y') ?? 'not set' }} · {{ $invoice->currency }} {{ number_format((float) $invoice->balance_due, 2) }} outstanding</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    @can('tasks.create_work')
+                        <a href="{{ route('tasks.index', ['create_related_type' => 'invoice', 'create_related_id' => $invoice->id]) }}#quick-add" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200">Add task</a>
+                    @endcan
                     @if ($invoice->status?->isEditable())
                         @can('sales.invoices.update')
                             <a href="{{ route('sales.invoices.edit', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Edit draft</a>

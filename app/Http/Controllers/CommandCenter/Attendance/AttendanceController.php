@@ -94,6 +94,27 @@ class AttendanceController extends Controller
         return view('command-center.attendance.index', compact('records'));
     }
 
+    public function reviews(Request $request): View
+    {
+        $outletIds = $this->accessibleOutletIds($request->user());
+        $corrections = AttendanceCorrection::query()
+            ->with(['employee.primaryBranch', 'attendance'])
+            ->where('company_id', $request->user()->company_id)
+            ->where('status', 'pending')
+            ->whereHas('employee', fn ($query) => $query->whereIn('primary_branch_id', $outletIds))
+            ->latest()
+            ->paginate(20, ['*'], 'corrections_page');
+        $overtimeReviews = OvertimeReview::query()
+            ->with(['employee.primaryBranch', 'attendance'])
+            ->where('company_id', $request->user()->company_id)
+            ->where('status', 'pending_review')
+            ->whereHas('employee', fn ($query) => $query->whereIn('primary_branch_id', $outletIds))
+            ->latest()
+            ->paginate(20, ['*'], 'overtime_page');
+
+        return view('command-center.attendance.reviews', compact('corrections', 'overtimeReviews'));
+    }
+
     public function managerCheckIn(Request $request, WorkforceEmployee $employee): RedirectResponse
     {
         $data = $request->validate(['checked_in_at' => ['nullable', 'date'], 'notes' => ['required', 'string', 'max:1000']]);

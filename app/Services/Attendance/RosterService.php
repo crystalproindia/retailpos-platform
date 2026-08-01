@@ -3,6 +3,7 @@
 namespace App\Services\Attendance;
 
 use App\Models\Holiday;
+use App\Models\Branch;
 use App\Models\RosterPublication;
 use App\Models\ShiftAssignment;
 use App\Models\ShiftTemplate;
@@ -16,6 +17,37 @@ use Illuminate\Validation\ValidationException;
 class RosterService
 {
     public function __construct(private readonly AttendanceAccessService $access, private readonly AuditLogger $audit) {}
+
+    public function createTemplate(User $actor, array $data): ShiftTemplate
+    {
+        $outlet = Branch::query()
+            ->where('company_id', $actor->company_id)
+            ->findOrFail($data['outlet_id']);
+
+        $this->access->assertOutlet($actor, $outlet);
+
+        $template = ShiftTemplate::query()->create([
+            'company_id' => $actor->company_id,
+            'applicable_outlet_id' => $outlet->id,
+            'name' => $data['name'],
+            'code' => $data['code'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'crosses_midnight' => $data['crosses_midnight'],
+            'unpaid_break_minutes' => $data['unpaid_break_minutes'],
+            'grace_before_minutes' => $data['grace_before_minutes'],
+            'grace_after_minutes' => $data['grace_after_minutes'],
+            'minimum_work_minutes' => $data['minimum_work_minutes'],
+            'standard_work_minutes' => $data['standard_work_minutes'],
+            'overtime_after_minutes' => $data['overtime_after_minutes'],
+            'is_active' => true,
+            'created_by' => $actor->id,
+        ]);
+
+        $this->audit->record('attendance.shift_template.created', $template, 'Shift template created');
+
+        return $template;
+    }
 
     public function assign(User $actor, array $data): ShiftAssignment
     {

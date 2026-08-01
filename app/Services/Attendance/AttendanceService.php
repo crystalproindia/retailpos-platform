@@ -6,6 +6,7 @@ use App\Events\Domain\Attendance\AttendanceDomainEvent;
 use App\Models\AttendanceBreak;
 use App\Models\AttendanceCorrection;
 use App\Models\AttendanceRecord;
+use App\Models\Branch;
 use App\Models\OvertimeReview;
 use App\Models\ShiftAssignment;
 use App\Models\User;
@@ -36,7 +37,7 @@ class AttendanceService
             $timezone = $this->timezone($employee, $actor);
             $localNow = isset($data['checked_in_at']) ? CarbonImmutable::parse($data['checked_in_at'], $timezone) : CarbonImmutable::now($timezone);
             $now = $localNow->utc();
-            $active = AttendanceRecord::query()->where('company_id', $actor->company_id)->where('employee_id', $employee->id)->whereNotNull('checked_in_at')->whereNull('checked_out_at')->lockForUpdate()->first();
+            $active = AttendanceRecord::query()->where('company_id', $actor->company_id)->where('employee_id', $employee->id)->whereNotNull('checked_in_at')->whereNull('checked_out_at')->where('attendance_status', '!=', 'missing_check_out')->lockForUpdate()->first();
             if ($active) throw ValidationException::withMessages(['attendance' => 'This employee already has an active attendance session.']);
             $assignment = ShiftAssignment::query()->with(['shift', 'outlet'])->where('company_id', $actor->company_id)->where('employee_id', $employee->id)->whereDate('work_date', $localNow->toDateString())->first();
             $outlet = $assignment?->outlet_id ? $assignment->outlet : $employee->primaryBranch;
@@ -128,6 +129,7 @@ class AttendanceService
         $correction = DB::transaction(function () use ($actor, $attendance, $requested, $reason): AttendanceCorrection {
             $attendance = AttendanceRecord::query()->lockForUpdate()->findOrFail($attendance->id);
             if ($attendance->correction_status === 'pending') throw ValidationException::withMessages(['attendance' => 'A correction is already awaiting review.']);
+            $requested = $this->normaliseCorrectionValues($actor, $attendance, $requested);
             $original = $attendance->only(['checked_in_at', 'checked_out_at', 'outlet_id', 'attendance_status', 'notes']);
             $correction = AttendanceCorrection::create(['company_id' => $attendance->company_id, 'attendance_id' => $attendance->id, 'employee_id' => $attendance->employee_id, 'requested_by' => $actor->id, 'original_values' => $original, 'requested_values' => $requested, 'reason' => $reason]);
             $attendance->update(['correction_status' => 'pending', 'attendance_status' => 'pending_correction']);
@@ -153,7 +155,7 @@ class AttendanceService
             $correction->update(['status' => $approve ? 'approved' : 'rejected', 'reviewed_by' => $actor->id, 'review_note' => $note, 'reviewed_at' => now()]);
             $attendance = $correction->attendance;
             if ($approve) {
-                $values = array_intersect_key($correction->requested_values, array_flip(['checked_in_at', 'checked_out_at', 'outlet_id', 'attendance_status', 'notes']));
+                $values = $this->normaliseCorrectionValues($actor, $attendance, $correction->requested_values);
                 $attendance->fill($values);
                 $this->calculator->recalculate($attendance);
                 $attendance->correction_status = 'approved';
@@ -204,6 +206,47 @@ class AttendanceService
     private function timezone(WorkforceEmployee $employee, User $actor): string
     {
         return $employee->primaryBranch?->timezone ?: $actor->company?->timezone ?: config('app.timezone');
+    }
+
+    /**
+     * Normalise correction input before it becomes immutable review evidence and
+     * validate it again at approval time because records can outlive assignments.
+     *
+     * @param  array<string, mixed>  $requested
+     * @return array<string, mixed>
+     */
+    private function normaliseCorrectionValues(User $actor, AttendanceRecord $attendance, array $requested): array
+    {
+        $values = array_intersect_key($requested, array_flip(['checked_in_at', 'checked_out_at', 'outlet_id', 'attendance_status', 'notes']));
+
+        if ($values === []) {
+            throw ValidationException::withMessages(['attendance' => 'Select at least one attendance value to correct.']);
+        }
+
+        $timezone = $this->timezone($attendance->employee, $actor);
+        $checkedIn = array_key_exists('checked_in_at', $values)
+            ? CarbonImmutable::parse($values['checked_in_at'], $timezone)->utc()
+            : $attendance->checked_in_at?->toImmutable();
+        $checkedOut = array_key_exists('checked_out_at', $values)
+            ? CarbonImmutable::parse($values['checked_out_at'], $timezone)->utc()
+            : $attendance->checked_out_at?->toImmutable();
+
+        if ($checkedIn && $checkedOut && $checkedOut->lessThan($checkedIn)) {
+            throw ValidationException::withMessages(['checked_out_at' => 'Check-out cannot be before check-in.']);
+        }
+
+        if (array_key_exists('checked_in_at', $values)) {
+            $values['checked_in_at'] = $checkedIn;
+        }
+        if (array_key_exists('checked_out_at', $values)) {
+            $values['checked_out_at'] = $checkedOut;
+        }
+        if (array_key_exists('outlet_id', $values)) {
+            $outlet = Branch::query()->where('company_id', $actor->company_id)->findOrFail($values['outlet_id']);
+            $this->access->assertOutlet($actor, $outlet);
+        }
+
+        return $values;
     }
 
     private function ensureOvertimeReview(AttendanceRecord $attendance): void

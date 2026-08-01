@@ -251,8 +251,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('overtime_reviews');
-        Schema::dropIfExists('leave_requests');
         Schema::dropIfExists('leave_balance_transactions');
+        Schema::dropIfExists('leave_requests');
         Schema::dropIfExists('employee_leave_balances');
         Schema::dropIfExists('leave_types');
         Schema::dropIfExists('attendance_corrections');

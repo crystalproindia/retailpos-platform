@@ -106,8 +106,10 @@ Google Calendar/Meet, or external messaging is included in V1.
 ## Verification
 
 Focused attendance/leave/shift/field-duty coverage uses persisted SQLite
-records, including notification dispatch. Browser verification covers the
-attendance, dashboard, roster, leave, and calendar screens at 1440px, 768px,
-and 390px with no horizontal overflow or browser-console errors. Full-suite,
-historical-harness, Vite, cache, and route checks are recorded with the release
-verification for this branch.
+records, including notification dispatch. The final review passed 18 focused
+tests with 78 assertions and the full suite passed 489 tests with 3,533
+assertions. Browser verification covers the attendance, dashboard, roster,
+leave, calendar, and manager-review screens at 1440px, 768px, and 390px with
+no horizontal overflow or browser-console errors. Historical-harness, Vite,
+cache, and route checks are recorded with the release verification for this
+branch.

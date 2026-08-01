@@ -1060,6 +1060,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
     Route::middleware(['role:administrator,manager', 'can:attendance.view_team'])->prefix('attendance')->name('attendance.')->group(function (): void {
         Route::get('dashboard', [AttendanceController::class, 'dashboard'])->name('dashboard');
         Route::get('records', [AttendanceController::class, 'index'])->name('index');
+        Route::get('reviews', [AttendanceController::class, 'reviews'])->name('reviews');
         Route::post('employees/{employee}/check-in', [AttendanceController::class, 'managerCheckIn'])->middleware('can:attendance.manage_team')->name('manager.check-in');
         Route::post('records/{attendance}/manager-check-out', [AttendanceController::class, 'managerCheckOut'])->middleware('can:attendance.manage_team')->name('manager.check-out');
         Route::post('corrections/{correction}/review', [AttendanceController::class, 'reviewCorrection'])->middleware('can:attendance.review_corrections')->name('corrections.review');

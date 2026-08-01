@@ -161,6 +161,15 @@ class Module
             return $this->familyRouteIsActive('workforce');
         }
 
+        if (str_starts_with($this->route, 'tasks.')) {
+            if ($this->parentId === null) {
+                return request()->routeIs('tasks.*');
+            }
+
+            return request()->routeIs($this->route)
+                || ($this->id === 'tasks-work' && request()->routeIs('tasks.show'));
+        }
+
         return request()->routeIs($this->route)
             && collect($this->routeParameters)
                 ->every(fn (mixed $value, string $key): bool => request()->route($key) === $value);

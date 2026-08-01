@@ -121,6 +121,55 @@ class WorkforceFoundationTest extends TestCase
         $this->assertStringContainsString("'=Export Value", $csv->streamedContent());
     }
 
+    public function test_existing_users_without_employee_profiles_can_open_a_safe_self_service_state(): void
+    {
+        [$admin] = $this->administrator();
+
+        $this->actingAs($admin)->get(route('workforce.self'))
+            ->assertOk()
+            ->assertSee('Your employee profile is not linked yet');
+    }
+
+    public function test_administrator_can_render_user_accounts_without_assuming_role_object_shape(): void
+    {
+        [$admin] = $this->administrator();
+
+        $this->actingAs($admin)->get(route('workforce.users.index'))
+            ->assertOk()
+            ->assertSee($admin->email)
+            ->assertSee('Administrator');
+    }
+
+    public function test_administrator_can_render_the_custom_role_permission_matrix(): void
+    {
+        [$admin] = $this->administrator();
+
+        $this->actingAs($admin)->get(route('workforce.roles.index'))
+            ->assertOk()
+            ->assertSee('Permission matrix')
+            ->assertSee('Available in the Administrator, Manager system role policy.');
+    }
+
+    public function test_administrator_can_render_an_employee_detail_page_with_workforce_controls(): void
+    {
+        [$admin, $branch] = $this->administrator();
+        $employee = WorkforceEmployee::create([
+            'company_id' => $admin->company_id,
+            'primary_branch_id' => $branch->id,
+            'employee_number' => 'EMP-DETAIL-001',
+            'first_name' => 'Detail',
+            'display_name' => 'Detail Employee',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($admin)->get(route('workforce.employees.show', $employee))
+            ->assertOk()
+            ->assertSee('Detail Employee')
+            ->assertSee('Assignments')
+            ->assertSee('Manager reviews')
+            ->assertSee('Recognition');
+    }
+
     /** @return array{User, Branch} */
     private function administrator(): array
     {

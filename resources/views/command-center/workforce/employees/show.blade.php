@@ -61,8 +61,21 @@
             <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="font-semibold text-slate-950">Invitation history</h2>
                 <div class="mt-3 space-y-3 text-sm">
-                    @forelse($employee->invitations->sortByDesc('created_at')->take(3) as $invitation)
-                        <div class="flex items-start justify-between gap-3"><span><span class="block font-medium text-slate-700">{{ $invitation->email }}</span><span class="text-slate-500">{{ $invitation->accepted_at ? 'Accepted' : ($invitation->cancelled_at ? 'Cancelled' : ($invitation->expires_at->isPast() ? 'Expired' : 'Pending')) }}</span></span>@if(!$invitation->accepted_at && !$invitation->cancelled_at && $invitation->expires_at->isFuture())@can('workforce.manage')<form method="POST" action="{{ route('workforce.invitations.cancel', $invitation) }}">@csrf<button class="text-xs font-semibold text-rose-700">Cancel</button></form>@endcan@endif</div>
+                    @forelse ($employee->invitations->sortByDesc('created_at')->take(3) as $invitation)
+                        <div class="flex items-start justify-between gap-3">
+                            <span>
+                                <span class="block font-medium text-slate-700">{{ $invitation->email }}</span>
+                                <span class="text-slate-500">{{ $invitation->accepted_at ? 'Accepted' : ($invitation->cancelled_at ? 'Cancelled' : ($invitation->expires_at->isPast() ? 'Expired' : 'Pending')) }}</span>
+                            </span>
+                            @if (! $invitation->accepted_at && ! $invitation->cancelled_at && $invitation->expires_at->isFuture())
+                                @can('workforce.manage')
+                                    <form method="POST" action="{{ route('workforce.invitations.cancel', $invitation) }}">
+                                        @csrf
+                                        <button class="text-xs font-semibold text-rose-700">Cancel</button>
+                                    </form>
+                                @endcan
+                            @endif
+                        </div>
                     @empty
                         <p class="text-slate-500">No activation invitation has been sent.</p>
                     @endforelse
@@ -87,19 +100,33 @@
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="font-semibold text-slate-950">Manager reviews</h2>
-                <div class="mt-3 space-y-3">@forelse($employee->reviews->sortByDesc('period_ends_at') as $review)<article class="rounded-lg bg-slate-50 p-3 text-sm"><div class="flex justify-between gap-3"><strong>{{ str($review->cycle)->headline() }} review</strong><span class="text-slate-500">{{ str($review->status)->headline() }}</span></div><p class="mt-1 text-slate-600">{{ $review->period_starts_at->format('d M Y') }} - {{ $review->period_ends_at->format('d M Y') }}</p><p class="mt-2 text-slate-700">{{ $review->comments }}</p></article>@empty<p class="mt-3 text-sm text-slate-500">No manager review is recorded.</p>@endforelse</div>
+                <div class="mt-3 space-y-3">
+                    @forelse ($employee->reviews->sortByDesc('period_ends_at') as $review)
+                        <article class="rounded-lg bg-slate-50 p-3 text-sm"><div class="flex justify-between gap-3"><strong>{{ str($review->cycle)->headline() }} review</strong><span class="text-slate-500">{{ str($review->status)->headline() }}</span></div><p class="mt-1 text-slate-600">{{ $review->period_starts_at->format('d M Y') }} - {{ $review->period_ends_at->format('d M Y') }}</p><p class="mt-2 text-slate-700">{{ $review->comments }}</p></article>
+                    @empty
+                        <p class="mt-3 text-sm text-slate-500">No manager review is recorded.</p>
+                    @endforelse
+                </div>
                 @can('workforce.reviews.manage')
                     <form method="POST" action="{{ route('workforce.reviews.store', $employee) }}" class="mt-5 grid gap-3 sm:grid-cols-2">@csrf
                         <input type="date" name="period_starts_at" class="rounded-lg border-slate-300 text-sm" required><input type="date" name="period_ends_at" class="rounded-lg border-slate-300 text-sm" required>
                         <select name="cycle" class="rounded-lg border-slate-300 text-sm">@foreach(['monthly', 'quarterly', 'half_yearly', 'annual', 'custom'] as $cycle)<option value="{{ $cycle }}">{{ str($cycle)->headline() }}</option>@endforeach</select><select name="status" class="rounded-lg border-slate-300 text-sm"><option value="draft">Save draft</option><option value="submitted">Submit review</option></select>
-                        @foreach(['customer_service' => 'Customer service', 'product_knowledge' => 'Product knowledge', 'teamwork' => 'Teamwork', 'reliability' => 'Reliability', 'communication' => 'Communication', 'initiative' => 'Initiative'] as $field => $label)<label class="text-xs font-medium text-slate-600">{{ $label }}<select name="{{ $field }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm"><option value="">Not rated</option>@for($score = 1; $score <= 5; $score++)<option value="{{ $score }}">{{ $score }}</option>@endfor</select></label>@endforeach
+                        @foreach (['customer_service' => 'Customer service', 'product_knowledge' => 'Product knowledge', 'teamwork' => 'Teamwork', 'reliability' => 'Reliability', 'communication' => 'Communication', 'initiative' => 'Initiative'] as $field => $label)
+                            <label class="text-xs font-medium text-slate-600">{{ $label }}<select name="{{ $field }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm"><option value="">Not rated</option>@for($score = 1; $score <= 5; $score++)<option value="{{ $score }}">{{ $score }}</option>@endfor</select></label>
+                        @endforeach
                         <textarea name="comments" class="rounded-lg border-slate-300 text-sm sm:col-span-2" rows="3" placeholder="Required context for this review" required></textarea><button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white sm:col-span-2">Save review</button>
                     </form>
                 @endcan
             </section>
             <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="font-semibold text-slate-950">Recognition</h2>
-                <div class="mt-3 space-y-3">@forelse($employee->recognitions->sortByDesc('recognized_on') as $recognition)<article class="rounded-lg bg-teal-50 p-3 text-sm"><div class="flex justify-between gap-3"><strong class="text-teal-950">{{ $recognition->title }}</strong><span class="text-teal-700">{{ $recognition->recognized_on->format('d M Y') }}</span></div><p class="mt-1 text-teal-800">{{ $recognition->message }}</p></article>@empty<p class="mt-3 text-sm text-slate-500">No recognition has been recorded.</p>@endforelse</div>
+                <div class="mt-3 space-y-3">
+                    @forelse ($employee->recognitions->sortByDesc('recognized_on') as $recognition)
+                        <article class="rounded-lg bg-teal-50 p-3 text-sm"><div class="flex justify-between gap-3"><strong class="text-teal-950">{{ $recognition->title }}</strong><span class="text-teal-700">{{ $recognition->recognized_on->format('d M Y') }}</span></div><p class="mt-1 text-teal-800">{{ $recognition->message }}</p></article>
+                    @empty
+                        <p class="mt-3 text-sm text-slate-500">No recognition has been recorded.</p>
+                    @endforelse
+                </div>
                 @can('workforce.recognition.manage')
                     <form method="POST" action="{{ route('workforce.recognitions.store', $employee) }}" class="mt-5 grid gap-3 sm:grid-cols-2">@csrf
                         <select name="type" class="rounded-lg border-slate-300 text-sm">@foreach(['employee_of_month' => 'Employee of the Month', 'customer_service' => 'Excellent Customer Service', 'sales_achievement' => 'Sales Achievement', 'inventory_accuracy' => 'Inventory Accuracy', 'team_contribution' => 'Team Contribution', 'manager_appreciation' => 'Manager Appreciation', 'custom' => 'Custom recognition'] as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select><input type="date" name="recognized_on" value="{{ now()->toDateString() }}" class="rounded-lg border-slate-300 text-sm" required>

@@ -13,6 +13,7 @@ use App\Models\WorkforceInvitation;
 use App\Models\WorkforceManagerReview;
 use App\Models\WorkforceRecognition;
 use App\Models\WorkforceRole;
+use App\Repositories\Tasks\TaskRepository;
 use App\Services\AuditLogger;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Workforce\WorkforcePerformanceService;
@@ -28,7 +29,7 @@ class WorkforceController extends Controller
 {
     public function __construct(private readonly OutletAccessService $outlets) {}
 
-    public function dashboard(Request $request): View
+    public function dashboard(Request $request, TaskRepository $tasks): View
     {
         $employees = $this->employeeQuery($request);
         $recent = (clone $employees)->latest()->limit(6)->get();
@@ -54,6 +55,7 @@ class WorkforceController extends Controller
             ],
             'recent' => $recent,
             'outletBreakdown' => $outletBreakdown,
+            'taskMetrics' => $request->user()->can('tasks.view_team') ? $tasks->teamMetrics($request->user()) : null,
         ]);
     }
 
@@ -197,7 +199,11 @@ class WorkforceController extends Controller
     {
         return view('command-center.workforce.roles.index', [
             'roles' => WorkforceRole::query()->with(['permissions'])->withCount('users')->where('company_id', $request->user()->company_id)->orderBy('name')->get(),
-            'permissions' => config('permissions.capabilities', []),
+            'permissions' => collect(config('permissions.capabilities', []))
+                ->map(fn (array $roles): array => collect($roles)
+                    ->map(fn (string $role): string => (string) str($role)->headline())
+                    ->all())
+                ->all(),
             'baseRoles' => [UserRole::Manager, UserRole::Sales, UserRole::Staff],
         ]);
     }
@@ -281,12 +287,23 @@ class WorkforceController extends Controller
         }, 'employee-directory-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function self(Request $request, WorkforcePerformanceService $performance): View
+    public function self(Request $request, WorkforcePerformanceService $performance, TaskRepository $tasks): View
     {
-        abort_unless($request->user()->employee, 404);
+        if (! $request->user()->employee) {
+            return view('command-center.workforce.employees.self-unlinked', [
+                'personalTaskMetrics' => $tasks->personalMetrics($request->user()),
+                'workTaskMetrics' => $tasks->workMetrics($request->user()),
+            ]);
+        }
+
         $employee = $request->user()->employee->load(['primaryBranch', 'outletAssignments.branch', 'reviews', 'recognitions']);
 
-        return view('command-center.workforce.employees.self', ['employee' => $employee, 'metrics' => $performance->forEmployee($request->user(), $employee)]);
+        return view('command-center.workforce.employees.self', [
+            'employee' => $employee,
+            'metrics' => $performance->forEmployee($request->user(), $employee),
+            'personalTaskMetrics' => $tasks->personalMetrics($request->user()),
+            'workTaskMetrics' => $tasks->workMetrics($request->user()),
+        ]);
     }
 
     public function showInvitation(string $token): View

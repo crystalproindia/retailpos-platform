@@ -1,5 +1,12 @@
 # RetailPOS Platform - Command Center Project Structure
 
+## Smart Tasks, To-Do Lists, and CRM Follow-up Automation (Phase J)
+
+- `Task`, `TaskRuleSetting`, and `TaskReminderDelivery` provide additive, tenant-scoped personal/work task, controlled-rule, and reminder-delivery foundations. The migration is `2026_08_01_030000_create_smart_task_foundation_tables.php`; existing CRM activities and follow-ups are retained unchanged.
+- `app/Services/Tasks/TaskService`, `TaskRepository`, `TaskAccessService`, `TaskRelatedRecordRegistry`, `TaskRuleService`, and `TaskReminderService` centralize authorization, lifecycle, allow-listed related records, recurrence, controlled generation, and privacy-aware reminders. `app/Console/Commands/GenerateSmartTasks.php` and `SendSmartTaskReminders.php` run through the existing scheduler every fifteen minutes with overlap protection.
+- `/tasks` provides paginated task views, team/outlet-aware workload, a server-rendered calendar, safe CSV export, and Administrator-controlled rule settings. The Module Registry exposes the same permission-filtered Tasks navigation on desktop and mobile. Lead, customer, quotation, invoice, support, workforce, and Command Center screens link into the shared work-task flow without adding per-controller task implementations.
+- Personal tasks remain owner-only, cannot link company records or enter team/report/export data, and use generic audit/reminder copy. Work-task related links reuse the source module's tenant/outlet authorization path before they are created or rendered. See `docs/phase-j-smart-tasks-followups.md` for architecture, rules, scheduler, privacy, limits, and asset/deployment guidance.
+
 ## Workforce, Roles, Permissions, and Performance (Phase I)
 
 - `WorkforceEmployee` is a tenant-scoped workplace profile that may exist without authentication access. `User` keeps Laravel authentication and may optionally link one-to-one through nullable `workforce_employee_id`; existing users are deliberately not backfilled into guessed employee records.

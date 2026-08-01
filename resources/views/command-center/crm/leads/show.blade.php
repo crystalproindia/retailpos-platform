@@ -28,6 +28,9 @@
                     @can('crm.demos.create')
                         <a href="{{ route('crm.demos.create', $lead) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Schedule Demo</a>
                     @endcan
+                    @can('tasks.create_work')
+                        <a href="#lead-task" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200">Add task</a>
+                    @endcan
                     <a href="{{ route('crm.leads.edit', $lead) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Edit</a>
                     @if ($lead->crmCustomer)
                         <a href="{{ route('crm.customers.show', $lead->crmCustomer) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">View customer</a>
@@ -42,6 +45,16 @@
 
         @can('crm.ai.view')
             @include('command-center.crm.leads.partials.ai-assistant')
+        @endcan
+
+        @can('tasks.view')
+            <section id="lead-task" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Lead tasks</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The next actions linked to this lead. Completing a task records a CRM history note without changing lead status.</p></div><a href="{{ route('tasks.work') }}" class="text-sm font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">Open task workspace</a></div>
+                @can('tasks.create_work')
+                    <form method="POST" action="{{ route('tasks.store') }}" class="mt-4 grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-4 dark:bg-slate-950">@csrf<input type="hidden" name="task_type" value="work"><input type="hidden" name="related_type" value="lead"><input type="hidden" name="related_id" value="{{ $lead->id }}"><input type="hidden" name="outlet_id" value="{{ $lead->branch_id }}"><input type="hidden" name="assigned_user_id" value="{{ $lead->assigned_user_id ?? auth()->id() }}"><label class="sm:col-span-2"><span class="sr-only">Task title</span><input name="title" required class="min-h-11 w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="Next action for this lead"></label><input name="due_at" type="datetime-local" class="min-h-11 rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-900"><div class="flex gap-2"><select name="priority" class="min-h-11 min-w-0 flex-1 rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select><button class="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create</button></div></form>
+                @endcan
+                <div class="mt-4 space-y-2">@forelse($openTasks as $task)<a href="{{ route('tasks.show', $task) }}" class="flex flex-col justify-between gap-2 rounded-lg border border-slate-200 p-3 transition hover:bg-slate-50 sm:flex-row sm:items-center dark:border-slate-800 dark:hover:bg-slate-950"><span class="font-medium text-slate-950 dark:text-white">{{ $task->title }}</span><span class="text-sm {{ $task->isOverdue() ? 'font-semibold text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400' }}">{{ $task->due_at ? ($task->isOverdue() ? 'Overdue ' : 'Due ').$task->due_at->format('d M, g:i A') : 'No due date' }}</span></a>@empty<p class="rounded-lg border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No open work tasks are linked to this lead.</p>@endforelse</div>
+            </section>
         @endcan
 
         <section class="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">

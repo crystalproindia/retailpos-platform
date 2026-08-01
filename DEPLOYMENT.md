@@ -87,6 +87,17 @@ npm ci
 npm run build
 ```
 
+For the current Hostinger layout, synchronize the complete matching build folder:
+
+```text
+retailpos-platform/public/build/
+-> /home/u237933956/domains/app.retailpos.biz/public_html/build/
+```
+
+Do not retain an older manifest or asset folder at the destination. Laravel's
+`public/build/manifest.json` and the deployed JavaScript/CSS assets must come
+from the same application commit.
+
 If Composer is unavailable, prefer enabling SSH/Composer or using Hostinger's supported deployment tooling. A last-resort manual fallback may upload a locally generated `vendor` directory built with the same PHP platform requirements, but it must be refreshed whenever `composer.lock` changes and is less reliable than server-side Composer.
 
 ## Manual upload fallback
@@ -130,6 +141,11 @@ For the scheduler, create a separate every-minute hPanel Cron Job:
 ```cron
 * * * * * cd /home/<hostinger-user>/retailpos-platform && php artisan schedule:run >> /dev/null 2>&1
 ```
+
+The Smart Tasks rules and reminders use this same scheduler. They are bounded,
+idempotent, and disabled per tenant until an Administrator enables a rule. Test
+the intended tenant first with `php artisan tasks:generate --company=<id>
+--dry-run` and `php artisan tasks:send-reminders --company=<id> --dry-run`.
 
 Replace the sample path and, if required by Hostinger, `php` with its configured PHP CLI path. Do not add jobs during this deployment phase. A future VPS may replace the cron-based queue fallback with a supervised worker.
 

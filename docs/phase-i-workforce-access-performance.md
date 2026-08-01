@@ -36,6 +36,16 @@ The employee profile reuses the Phase H cashier report for completed POS sales i
 
 Manager reviews preserve a period, cycle, ratings, comments, and draft/submitted state. Recognition is separate from reviews. Both are audited. Missing operational records appear as unavailable rather than zero.
 
+## Task compatibility
+
+Phase J adds task cards to workforce dashboards through the shared authorized
+task repository. Only work tasks in the user's permitted outlet scope contribute
+to manager workload. Personal tasks remain private to their owner and never
+appear in workforce metrics, employee profiles, reviews, recognition, exports,
+or management screens. Workforce profiles can create an ordinary task through
+the shared `/tasks` experience; this does not create an employee-performance
+score or a hidden personnel record.
+
 ## Migration and production operations
 
 `2026_07_31_020000_create_workforce_foundation.php` is additive and forward-only for production. It creates new workforce tables and nullable user links; it does not mutate historical sales, invoices, payments, stock, or existing user roles. If a release remediation is required, add a new forward migration. Do not roll back populated workforce tables in production.

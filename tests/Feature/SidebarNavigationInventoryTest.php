@@ -33,6 +33,7 @@ class SidebarNavigationInventoryTest extends TestCase
             'support' => [],
             'finance' => [],
             'expenses' => [],
+            'tasks' => ['tasks-today', 'tasks-personal', 'tasks-work', 'tasks-team', 'tasks-rules'],
             'workforce' => ['workforce-dashboard', 'workforce-employees', 'users', 'roles'],
             'hr' => [],
             'payroll' => [],
@@ -58,14 +59,14 @@ class SidebarNavigationInventoryTest extends TestCase
     public function test_manager_sales_and_staff_receive_their_authorised_navigation_inventory(): void
     {
         $this->assertSame([
-            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'gst-compliance', 'inventory', 'purchases', 'projects', 'support', 'finance', 'expenses', 'workforce', 'hr', 'marketing', 'whatsapp', 'cms', 'blog', 'website-cms', 'seo', 'reports', 'analytics', 'ai-assistant', 'company', 'branches', 'settings', 'operations', 'notifications',
+            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'gst-compliance', 'inventory', 'purchases', 'projects', 'support', 'finance', 'expenses', 'tasks', 'workforce', 'hr', 'marketing', 'whatsapp', 'cms', 'blog', 'website-cms', 'seo', 'reports', 'analytics', 'ai-assistant', 'company', 'branches', 'settings', 'operations', 'notifications',
         ], array_keys($this->inventoryFor($this->user(UserRole::Manager))));
 
         $this->assertSame([
-            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'inventory', 'support', 'notifications',
+            'dashboard', 'crm', 'sales', 'pos', 'customers', 'orders', 'promotions', 'inventory', 'support', 'tasks', 'notifications',
         ], array_keys($this->inventoryFor($this->user(UserRole::Sales))));
 
-        $this->assertSame(['dashboard', 'orders'], array_keys($this->inventoryFor($this->user(UserRole::Staff))));
+        $this->assertSame(['dashboard', 'orders', 'tasks'], array_keys($this->inventoryFor($this->user(UserRole::Staff))));
     }
 
     public function test_restored_reports_ai_users_and_invoice_settings_follow_role_boundaries(): void
@@ -75,14 +76,16 @@ class SidebarNavigationInventoryTest extends TestCase
         $sales = $this->inventoryFor($this->user(UserRole::Sales));
         $staff = $this->inventoryFor($this->user(UserRole::Staff));
 
-        foreach (['reports', 'ai-assistant', 'workforce'] as $module) {
+        foreach (['reports', 'ai-assistant', 'tasks', 'workforce'] as $module) {
             $this->assertArrayHasKey($module, $administrator);
         }
+        $this->assertSame(['tasks-today', 'tasks-personal', 'tasks-work', 'tasks-team', 'tasks-rules'], $administrator['tasks']);
         $this->assertSame(['workforce-dashboard', 'workforce-employees', 'users', 'roles'], $administrator['workforce']);
         $this->assertSame(['invoice-designs', 'invoice-reminders'], $administrator['settings']);
         $this->assertArrayHasKey('reports', $manager);
         $this->assertArrayHasKey('ai-assistant', $manager);
         $this->assertSame(['workforce-dashboard', 'workforce-employees'], $manager['workforce']);
+        $this->assertSame(['tasks-today', 'tasks-personal', 'tasks-work', 'tasks-team'], $manager['tasks']);
         foreach (['reports', 'ai-assistant', 'workforce', 'settings'] as $module) {
             $this->assertArrayNotHasKey($module, $sales);
             $this->assertArrayNotHasKey($module, $staff);
@@ -160,6 +163,7 @@ class SidebarNavigationInventoryTest extends TestCase
             ->assertSee('Reports')
             ->assertSee('AI Assistant')
             ->assertSee('Users')
+            ->assertSee('Tasks')
             ->assertSee('Workforce')
             ->assertSee('Invoice Designs')
             ->assertSee('Invoice Reminders')

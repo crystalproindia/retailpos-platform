@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Repositories\Crm\ContactRepository;
 use App\Repositories\Crm\CrmCompanyRepository;
 use App\Repositories\Crm\LeadRepository;
+use App\Repositories\Tasks\TaskRepository;
 use App\Services\Crm\LeadConversionService;
 use App\Services\Crm\CrmLeadScoringService;
 use App\Services\Crm\LeadService;
@@ -74,7 +75,7 @@ class LeadController extends Controller
         return redirect()->route('crm.leads.show', $lead)->with('status', 'CRM lead created.');
     }
 
-    public function show(Request $request, LeadRepository $leadRepository, CrmLeadScoringService $scoring, int $lead): View
+    public function show(Request $request, LeadRepository $leadRepository, CrmLeadScoringService $scoring, TaskRepository $tasks, int $lead): View
     {
         $lead = $leadRepository->findForUser($request->user(), $lead);
 
@@ -83,6 +84,16 @@ class LeadController extends Controller
             'priorities' => LeadPriority::cases(),
             'aiScore' => $scoring->latestFor($lead),
             'aiFollowUp' => session('aiFollowUp'),
+            'openTasks' => $request->user()->can('tasks.view')
+                ? $tasks->queryForUser($request->user())
+                    ->where('task_type', \App\Enums\Tasks\TaskType::Work->value)
+                    ->where('related_type', $lead->getMorphClass())
+                    ->where('related_id', $lead->id)
+                    ->whereIn('status', $tasks->openStatuses())
+                    ->orderBy('due_at')
+                    ->limit(8)
+                    ->get()
+                : collect(),
         ]);
     }
 

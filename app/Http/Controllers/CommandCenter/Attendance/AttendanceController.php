@@ -145,8 +145,13 @@ class AttendanceController extends Controller
 
     public function summary(Request $request): View
     {
+        $filters = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
         $query = $this->access->attendanceQuery($request->user());
-        $from = $request->date('from', now()->startOfMonth())->toDateString(); $to = $request->date('to', now())->toDateString();
+        $from = CarbonImmutable::parse($filters['from'] ?? now()->startOfMonth())->toDateString();
+        $to = CarbonImmutable::parse($filters['to'] ?? now())->toDateString();
         $rows = $query->with('employee')->whereBetween('attendance_date', [$from, $to])->get()->groupBy('employee_id')->map(fn ($records) => ['employee' => $records->first()->employee, 'scheduled_days' => $records->count(), 'present_days' => $records->whereIn('attendance_status', ['present', 'partial_day'])->count(), 'worked_minutes' => $records->sum('worked_minutes'), 'overtime_minutes' => $records->sum('overtime_minutes'), 'late_minutes' => $records->sum('late_minutes'), 'missing' => $records->where('attendance_status', 'missing_check_out')->count()]);
         return view('command-center.attendance.summary', compact('rows', 'from', 'to'));
     }

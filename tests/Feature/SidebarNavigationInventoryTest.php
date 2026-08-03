@@ -162,7 +162,7 @@ class SidebarNavigationInventoryTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Reports')
-            ->assertSee('AI Assistant')
+            ->assertSee('AI & Forecasting')
             ->assertSee('Users')
             ->assertSee('Tasks')
             ->assertSee('Workforce')

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\CommandCenter;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Ai\RefreshAiForecastsJob;
 use App\Models\Ai\AiInsight;
 use App\Models\Setting;
 use App\Services\Ai\AiForecastService;
@@ -17,18 +18,18 @@ class AiForecastController extends Controller
     public function index(Request $request, AiForecastService $forecasts): View
     {
         abort_unless($request->user()->can('ai.dashboard.view'), 403);
-        return view('command-center.ai.index', ['data' => $forecasts->dashboard($request->user()->company_id), 'settings' => $this->forecastSettings($request->user()->company_id)]);
+        return view('command-center.ai.index', ['data' => $forecasts->dashboard($request->user()), 'settings' => $this->forecastSettings($request->user()->company_id)]);
     }
 
-    public function run(Request $request, AiForecastService $forecasts): RedirectResponse
+    public function run(Request $request): RedirectResponse
     {
         abort_unless($request->user()->can('ai.forecasts.run'), 403);
         $key = 'ai-forecast-run:'.$request->user()->id;
         if (RateLimiter::tooManyAttempts($key, 3)) return back()->withErrors(['forecast' => 'Please wait before requesting another recalculation.']);
         RateLimiter::hit($key, 300);
         $type = $request->validate(['type' => ['nullable', 'in:all,sales,inventory,customers,crm']])['type'] ?? 'all';
-        $forecasts->run($request->user()->company_id, $type, $request->user());
-        return back()->with('status', 'Explainable forecast refresh completed. Results remain advisory until reviewed.');
+        RefreshAiForecastsJob::dispatch($request->user()->company_id, $type, $request->user()->id);
+        return back()->with('status', 'Forecast refresh queued. Existing results remain advisory until the refresh completes.');
     }
 
     public function review(Request $request, AiInsight $insight, AiForecastService $forecasts): RedirectResponse

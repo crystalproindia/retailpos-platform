@@ -14,6 +14,6 @@ Customer segments are transparent RFM-style labels: insufficient data, active, l
 
 ## Operations, privacy, and review
 
-Scheduled refreshes are non-overlapping: sales nightly, inventory nightly, customers weekly, CRM hourly. Each run records algorithm version, source period, data points, status, and safe failure text. Insight evidence contains metrics and record IDs only, not email addresses, phone numbers, secrets, or customer message content. Administrators can run forecasts and manage settings; managers can review tenant insights; no forecast is public.
+Scheduled refreshes are non-overlapping and queued: sales nightly, inventory nightly, customers weekly, CRM hourly. Manual refreshes also enqueue work and never calculate in the page request. A run is unique per tenant, type, algorithm version, and local training period; retries reuse the same run rather than duplicating it. Each run records algorithm version, source period, data points, status, and safe failure text. Insight evidence contains metrics and record IDs only, not email addresses, phone numbers, secrets, or customer message content. Administrators can run forecasts and manage settings; managers can review only results and insights for their assigned outlets; no forecast is public.
 
 Review every advisory result against the supporting transactions before acting. V1 has no forecast-versus-actual evaluation, supplier-pending-order adjustment, category seasonality, or automated action. Those are intentional future extensions.

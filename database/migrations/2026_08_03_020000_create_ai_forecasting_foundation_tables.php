@@ -28,6 +28,7 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['company_id', 'forecast_type', 'status'], 'ai_run_company_type_status_idx');
             $table->index(['company_id', 'completed_at'], 'ai_run_company_completed_idx');
+            $table->unique(['company_id', 'forecast_type', 'algorithm_version', 'training_start', 'training_end'], 'ai_run_company_type_period_unique');
         });
 
         Schema::create('ai_forecast_results', function (Blueprint $table): void {
@@ -56,6 +57,7 @@ return new class extends Migration
         Schema::create('ai_insights', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('outlet_id')->nullable()->constrained('branches')->nullOnDelete();
             $table->string('insight_type', 60);
             $table->string('severity', 16)->default('info');
             $table->string('entity_type', 100)->nullable();
@@ -71,7 +73,7 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['company_id', 'status', 'severity'], 'ai_insight_company_status_severity_idx');
             $table->index(['company_id', 'insight_type', 'expires_at'], 'ai_insight_company_type_expiry_idx');
-            $table->index(['company_id', 'entity_type', 'entity_id'], 'ai_insight_company_entity_idx');
+            $table->index(['company_id', 'outlet_id', 'entity_type', 'entity_id'], 'ai_insight_company_outlet_entity_idx');
         });
     }
 

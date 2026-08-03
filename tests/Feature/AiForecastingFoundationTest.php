@@ -7,7 +7,9 @@ use App\Enums\Crm\LeadStageType;
 use App\Enums\UserRole;
 use App\Models\Ai\AiForecastResult;
 use App\Models\Ai\AiForecastRun;
+use App\Models\Ai\AiInsight;
 use App\Models\Branch;
+use App\Models\BranchUserAssignment;
 use App\Models\Company;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmLeadStatus;
@@ -20,7 +22,9 @@ use App\Models\Pos\PosSale;
 use App\Models\Pos\PosSaleItem;
 use App\Models\User;
 use App\Services\Ai\AiForecastService;
+use App\Jobs\Ai\RefreshAiForecastsJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AiForecastingFoundationTest extends TestCase
@@ -94,6 +98,60 @@ class AiForecastingFoundationTest extends TestCase
             ->actingAs($manager)->post('/ai/run', ['type' => 'sales'])->assertForbidden();
         app(AiForecastService::class)->run($company->id, 'sales', $admin);
         $this->assertSame(0, AiForecastRun::query()->where('company_id', $otherCompany->id)->count());
+    }
+
+    public function test_manual_refresh_is_queued_instead_of_running_during_the_request(): void
+    {
+        [$company, , $admin] = $this->account();
+        Queue::fake();
+
+        $this->actingAs($admin)->post('/ai/run', ['type' => 'sales'])->assertRedirect();
+
+        Queue::assertPushed(RefreshAiForecastsJob::class, fn (RefreshAiForecastsJob $job) => $job->companyId === $company->id && $job->type === 'sales' && $job->actorId === $admin->id);
+        $this->assertDatabaseCount('ai_forecast_runs', 0);
+    }
+
+    public function test_same_company_type_and_period_reuses_the_existing_forecast_run(): void
+    {
+        [$company, $branch, $admin] = $this->account();
+        foreach (range(1, 14) as $day) $this->sale($company, $branch, now()->subDays($day), 1000 + $day);
+
+        $first = app(AiForecastService::class)->run($company->id, 'sales', $admin)->get('sales');
+        $second = app(AiForecastService::class)->run($company->id, 'sales', $admin)->get('sales');
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertDatabaseCount('ai_forecast_runs', 1);
+        $this->assertDatabaseCount('ai_forecast_results', 3);
+    }
+
+    public function test_manager_dashboard_is_limited_to_their_assigned_outlet_results(): void
+    {
+        [$company, $branch, $admin] = $this->account();
+        $otherBranch = Branch::factory()->create(['company_id' => $company->id]);
+        $manager = User::factory()->create(['company_id' => $company->id, 'branch_id' => $branch->id, 'role' => UserRole::Manager]);
+        BranchUserAssignment::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'user_id' => $manager->id, 'assigned_by' => $admin->id, 'is_default' => true, 'is_active' => true]);
+        foreach (range(1, 14) as $day) {
+            $this->sale($company, $branch, now()->subDays($day), 1000 + $day);
+            $this->sale($company, $otherBranch, now()->subDays($day), 2000 + $day);
+        }
+
+        app(AiForecastService::class)->run($company->id, 'sales', $admin);
+        $data = app(AiForecastService::class)->dashboard($manager);
+
+        $this->assertCount(3, $data['sales']);
+        $this->assertTrue($data['sales']->every(fn (AiForecastResult $result) => $result->outlet_id === $branch->id));
+    }
+
+    public function test_manager_cannot_review_another_outlets_insight_by_direct_url(): void
+    {
+        [$company, $branch, $admin] = $this->account();
+        $otherBranch = Branch::factory()->create(['company_id' => $company->id]);
+        $manager = User::factory()->create(['company_id' => $company->id, 'branch_id' => $branch->id, 'role' => UserRole::Manager]);
+        BranchUserAssignment::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'user_id' => $manager->id, 'assigned_by' => $admin->id, 'is_default' => true, 'is_active' => true]);
+        $insight = AiInsight::create(['company_id' => $company->id, 'outlet_id' => $otherBranch->id, 'insight_type' => 'stockout_risk', 'severity' => 'warning', 'entity_type' => 'product', 'entity_id' => 1, 'title' => 'Other outlet risk', 'explanation' => 'Review', 'recommended_action' => 'Review', 'evidence' => [], 'status' => 'new']);
+
+        $this->actingAs($manager)->post("/ai/insights/{$insight->id}/review", ['status' => 'reviewed'])->assertNotFound();
+        $this->assertSame('new', $insight->fresh()->status);
     }
 
     private function account(): array

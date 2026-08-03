@@ -55,11 +55,17 @@ class ActivityRepository
     public function followUpsForUser(User $user, bool $overdueOnly = false): Collection
     {
         return $this->queryForUser($user)
+            ->leftJoin('crm_leads', 'crm_leads.id', '=', 'crm_activities.crm_lead_id')
+            ->select('crm_activities.*')
             ->whereIn('type', ['follow_up', 'call', 'meeting', 'task'])
             ->whereNull('completed_at')
             ->whereNull('cancelled_at')
             ->when($overdueOnly, fn (Builder $query) => $query->where('scheduled_at', '<', now()))
-            ->oldest('scheduled_at')
+            ->orderByRaw('CASE WHEN crm_activities.scheduled_at < ? THEN 0 ELSE 1 END', [now()])
+            ->orderByDesc('crm_leads.follow_up_urgency_rating')
+            ->orderByDesc('crm_leads.buying_interest_rating')
+            ->orderBy('crm_leads.last_contacted_at')
+            ->oldest('crm_activities.scheduled_at')
             ->limit(50)
             ->get();
     }
@@ -68,9 +74,9 @@ class ActivityRepository
     {
         return CrmActivity::query()
             ->with(['lead.status', 'crmCompany', 'contact', 'assignedUser'])
-            ->where('company_id', $user->company_id)
+            ->where('crm_activities.company_id', $user->company_id)
             ->when($withTrashed, fn (Builder $query) => $query->withTrashed())
-            ->when($this->isSales($user), fn (Builder $query) => $query->where('assigned_user_id', $user->id));
+            ->when($this->isSales($user), fn (Builder $query) => $query->where('crm_activities.assigned_user_id', $user->id));
     }
 
     private function isSales(User $user): bool

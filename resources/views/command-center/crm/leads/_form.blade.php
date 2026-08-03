@@ -7,6 +7,9 @@
 @if (($method ?? 'POST') !== 'POST')
     @method($method)
 @endif
+@if (! $lead->exists)
+    <input type="hidden" name="lead_creation_token" value="{{ old('lead_creation_token', (string) \Illuminate\Support\Str::uuid()) }}">
+@endif
 
 <div class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
     <section class="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -142,6 +145,8 @@
         </section>
     </aside>
 </div>
+
+@include('command-center.crm.leads.partials.conversation-assessment-form')
 
 <div class="mt-6 flex justify-end">
     <button type="submit" class="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">Save lead</button>

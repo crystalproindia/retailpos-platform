@@ -37,6 +37,8 @@ class LeadRepository
             ->when($filters['demo_requests'] ?? null, fn (Builder $query) => $query->whereHas('source', fn (Builder $source) => $source->where('slug', 'book-demo')))
             ->when($filters['priority'] ?? null, fn (Builder $query, string $priority) => $query->where('priority', $priority))
             ->when($filters['assigned_user_id'] ?? null, fn (Builder $query, int|string $userId) => $query->where('assigned_user_id', $userId))
+            ->when($filters['qualification'] ?? null, fn (Builder $query, string $qualification) => $this->applyQualificationFilter($query, $qualification))
+            ->when(($filters['high_urgency'] ?? null) === '1', fn (Builder $query) => $query->where('follow_up_urgency_rating', '>=', 4))
             ->when($filters['scheduled_date'] ?? null, fn (Builder $query, string $date) => $query->whereHas('latestDemoSchedule', fn (Builder $schedule) => $schedule->whereDate('scheduled_date', $date)))
             ->when(
                 ($filters['sort'] ?? null) === 'scheduled_date',
@@ -139,7 +141,7 @@ class LeadRepository
     {
         return CrmLeadSource::query()
             ->where('company_id', $companyId)
-            ->where(fn (Builder $query) => $query->where('is_active', true)->when($includeSourceId, fn (Builder $query) => $query->orWhereKey($includeSourceId)))
+            ->where(fn (Builder $query) => $query->where('is_active', true)->when($includeSourceId, fn (Builder $query) => $query->orWhere('id', $includeSourceId)))
             ->orderByDesc('is_default')
             ->orderBy('sort_order')
             ->get();
@@ -152,7 +154,7 @@ class LeadRepository
     {
         return CrmLeadStatus::query()
             ->where('company_id', $companyId)
-            ->where(fn (Builder $query) => $query->where('is_active', true)->when($includeStatusId, fn (Builder $query) => $query->orWhereKey($includeStatusId)))
+            ->where(fn (Builder $query) => $query->where('is_active', true)->when($includeStatusId, fn (Builder $query) => $query->orWhere('id', $includeStatusId)))
             ->orderByDesc('is_default')
             ->orderBy('sort_order')
             ->get();
@@ -194,5 +196,19 @@ class LeadRepository
         $role = $user->role instanceof UserRole ? $user->role : UserRole::tryFrom((string) $user->role);
 
         return $role === UserRole::Sales;
+    }
+
+    private function applyQualificationFilter(Builder $query, string $qualification): void
+    {
+        $sum = '(COALESCE(crm_leads.client_receptiveness_rating, 0) + COALESCE(crm_leads.buying_interest_rating, 0) + COALESCE(crm_leads.follow_up_urgency_rating, 0))';
+        $count = '((CASE WHEN crm_leads.client_receptiveness_rating IS NULL THEN 0 ELSE 1 END) + (CASE WHEN crm_leads.buying_interest_rating IS NULL THEN 0 ELSE 1 END) + (CASE WHEN crm_leads.follow_up_urgency_rating IS NULL THEN 0 ELSE 1 END))';
+
+        match ($qualification) {
+            'hot' => $query->whereRaw("{$count} > 0 AND ({$sum} * 1.0 / {$count}) >= 4"),
+            'warm' => $query->whereRaw("{$count} > 0 AND ({$sum} * 1.0 / {$count}) >= 2.5 AND ({$sum} * 1.0 / {$count}) < 4"),
+            'cold' => $query->whereRaw("{$count} > 0 AND ({$sum} * 1.0 / {$count}) < 2.5"),
+            'not_rated' => $query->whereRaw("{$count} = 0"),
+            default => null,
+        };
     }
 }

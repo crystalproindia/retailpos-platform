@@ -8,6 +8,10 @@
 @endsection
 
 @section('content')
+    @php
+        $conversationAssessment = $lead->conversationAssessment();
+        $assessmentAudit = $lead->auditLogs->firstWhere('event', 'crm.lead.conversation_assessment_updated');
+    @endphp
     <div class="space-y-6">
         @include('command-center.crm.partials.nav')
 
@@ -31,7 +35,10 @@
                     @can('tasks.create_work')
                         <a href="#lead-task" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200">Add task</a>
                     @endcan
-                    <a href="{{ route('crm.leads.edit', $lead) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Edit</a>
+                    @can('crm.leads.update')
+                        <a href="{{ route('crm.leads.edit', $lead) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Edit lead</a>
+                        <a href="{{ route('crm.leads.edit', $lead) }}#conversation-assessment" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Edit assessment</a>
+                    @endcan
                     @if ($lead->crmCustomer)
                         <a href="{{ route('crm.customers.show', $lead->crmCustomer) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">View customer</a>
                     @else
@@ -85,6 +92,21 @@
                         </div>
                     @endforeach
                 </dl>
+                <div id="conversation-assessment" class="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Conversation Assessment</p>
+                            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Staff-entered conversation assessment, not an AI prediction.</p>
+                        </div>
+                        @include('command-center.crm.leads.partials.conversation-assessment-badge', ['assessment' => $conversationAssessment])
+                    </div>
+                    <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                        <div><dt class="text-slate-500 dark:text-slate-400">Client receptiveness</dt><dd class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $lead->client_receptiveness_rating ? $lead->client_receptiveness_rating.' / 5' : 'Not rated' }}</dd></div>
+                        <div><dt class="text-slate-500 dark:text-slate-400">Buying interest</dt><dd class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $lead->buying_interest_rating ? $lead->buying_interest_rating.' / 5' : 'Not rated' }}</dd></div>
+                        <div><dt class="text-slate-500 dark:text-slate-400">Follow-up urgency</dt><dd class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $lead->follow_up_urgency_rating ? $lead->follow_up_urgency_rating.' / 5' : 'Not rated' }}</dd></div>
+                    </dl>
+                    <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">Conversation score: <span class="font-semibold text-slate-900 dark:text-white">{{ $conversationAssessment->average !== null ? number_format($conversationAssessment->average, 1).' / 5' : 'Not Rated' }}</span>@if ($assessmentAudit) <span class="text-slate-500 dark:text-slate-400">· Updated {{ $assessmentAudit->created_at?->format('d M Y, h:i A') }} by {{ $assessmentAudit->user?->name ?? 'System' }}</span>@endif</p>
+                </div>
                 <div class="mt-5 border-t border-slate-100 pt-5 dark:border-slate-800">
                     <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Requirement</p>
                     <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $lead->description ?: 'No requirement recorded yet.' }}</p>

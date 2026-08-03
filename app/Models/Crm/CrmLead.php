@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Concerns\Auditable;
 use App\Models\User;
 use App\Models\Tasks\Task;
+use App\Support\Crm\LeadConversationAssessment;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'crm_company_id', 'crm_contact_id', 'customer_id', 'source_id', 'status_id', 'assigned_user_id', 'created_by', 'title', 'business_name', 'contact_name', 'email', 'phone', 'alternate_phone', 'industry', 'city', 'country', 'business_type', 'interested_modules', 'expected_value', 'expected_timeline', 'currency', 'priority', 'lead_score', 'next_follow_up_at', 'last_contacted_at', 'lost_reason', 'description', 'metadata', 'converted_at', 'won_at', 'lost_at'])]
+#[Fillable(['company_id', 'branch_id', 'crm_company_id', 'crm_contact_id', 'customer_id', 'source_id', 'status_id', 'assigned_user_id', 'created_by', 'title', 'business_name', 'contact_name', 'email', 'phone', 'alternate_phone', 'industry', 'city', 'country', 'business_type', 'interested_modules', 'expected_value', 'expected_timeline', 'currency', 'priority', 'lead_score', 'creation_token', 'client_receptiveness_rating', 'buying_interest_rating', 'follow_up_urgency_rating', 'next_follow_up_at', 'last_contacted_at', 'lost_reason', 'description', 'metadata', 'converted_at', 'won_at', 'lost_at'])]
 class CrmLead extends Model
 {
     use Auditable, SoftDeletes;
@@ -29,6 +30,9 @@ class CrmLead extends Model
             'interested_modules' => 'array',
             'metadata' => 'array',
             'expected_value' => 'decimal:2',
+            'client_receptiveness_rating' => 'integer',
+            'buying_interest_rating' => 'integer',
+            'follow_up_urgency_rating' => 'integer',
             'priority' => LeadPriority::class,
             'next_follow_up_at' => 'datetime',
             'last_contacted_at' => 'datetime',
@@ -171,5 +175,14 @@ class CrmLead extends Model
     public function isConverted(): bool
     {
         return $this->converted_at !== null;
+    }
+
+    public function conversationAssessment(): LeadConversationAssessment
+    {
+        return LeadConversationAssessment::fromRatings(
+            $this->client_receptiveness_rating,
+            $this->buying_interest_rating,
+            $this->follow_up_urgency_rating,
+        );
     }
 }

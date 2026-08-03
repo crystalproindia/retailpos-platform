@@ -16,6 +16,7 @@ use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class LeadService
 {
@@ -31,27 +32,43 @@ class LeadService
     public function create(User $user, array $data): CrmLead
     {
         $payload = $this->payload($data);
+        $creationToken = $data['lead_creation_token'] ?? null;
+        $payload['branch_id'] = ($data['branch_id'] ?? null) ?: $user->branch_id;
+        $payload['assigned_user_id'] = ($data['assigned_user_id'] ?? null) ?: $user->id;
 
-        $lead = CrmLead::create($payload + $this->lifecycleTimestamps((int) $data['status_id']) + [
-            'company_id' => $user->company_id,
-            'branch_id' => $data['branch_id'] ?? $user->branch_id,
-            'created_by' => $user->id,
-            'assigned_user_id' => $data['assigned_user_id'] ?? $user->id,
-        ]);
+        return DB::transaction(function () use ($user, $data, $payload, $creationToken): CrmLead {
+            if ($creationToken) {
+                $existing = CrmLead::query()
+                    ->where('company_id', $user->company_id)
+                    ->where('creation_token', $creationToken)
+                    ->first();
 
-        $this->syncTags($lead, $data['tag_ids'] ?? []);
-        $this->recordCreatedActivity($lead, $user);
-        $this->auditLogger->record('crm.lead.created', $lead, 'CRM lead created');
-        $this->domainEvents->dispatch(new LeadCreated(
-            companyId: $lead->company_id,
-            actorId: $user->id,
-            aggregateType: CrmLead::class,
-            aggregateId: $lead->id,
-            payload: $this->eventPayload($lead),
-        ));
-        $this->leadScoring->refresh($lead, $user);
+                if ($existing) {
+                    return $existing->load(['source', 'status', 'assignedUser', 'tags', 'leadScore']);
+                }
+            }
 
-        return $lead->load(['source', 'status', 'assignedUser', 'tags', 'leadScore']);
+            $lead = CrmLead::create($payload + $this->lifecycleTimestamps((int) $data['status_id']) + [
+                'company_id' => $user->company_id,
+                'created_by' => $user->id,
+                'creation_token' => $creationToken,
+            ]);
+
+            $this->syncTags($lead, $data['tag_ids'] ?? []);
+            $this->recordCreatedActivity($lead, $user);
+            $this->auditLogger->record('crm.lead.created', $lead, 'CRM lead created');
+            $this->recordConversationAssessmentChange($lead, $user, $this->emptyConversationRatings());
+            $this->domainEvents->dispatch(new LeadCreated(
+                companyId: $lead->company_id,
+                actorId: $user->id,
+                aggregateType: CrmLead::class,
+                aggregateId: $lead->id,
+                payload: $this->eventPayload($lead),
+            ));
+            $this->leadScoring->refresh($lead, $user);
+
+            return $lead->load(['source', 'status', 'assignedUser', 'tags', 'leadScore']);
+        });
     }
 
     /**
@@ -63,6 +80,7 @@ class LeadService
         $originalAssigneeId = $lead->assigned_user_id;
         $originalPriority = $lead->priority?->value ?? $lead->priority;
         $originalFollowUpAt = $lead->next_follow_up_at?->toDateTimeString();
+        $originalConversationRatings = $this->conversationRatings($lead);
         $payload = $this->payload($data);
 
         if (array_key_exists('status_id', $payload) && (int) $payload['status_id'] !== (int) $originalStatusId) {
@@ -74,6 +92,7 @@ class LeadService
         $this->auditLogger->record('crm.lead.updated', $lead, 'CRM lead updated', [
             'updated_by' => $user->id,
         ]);
+        $this->recordConversationAssessmentChange($lead, $user, $originalConversationRatings);
 
         if (isset($payload['status_id']) && (int) $payload['status_id'] !== (int) $originalStatusId) {
             $this->auditLogger->record('crm.lead.status_changed', $lead, 'CRM lead status changed', [
@@ -264,6 +283,9 @@ class LeadService
             'currency',
             'priority',
             'lead_score',
+            'client_receptiveness_rating',
+            'buying_interest_rating',
+            'follow_up_urgency_rating',
             'next_follow_up_at',
             'last_contacted_at',
             'lost_reason',
@@ -368,5 +390,51 @@ class LeadService
     private function dateTimeString(mixed $value): ?string
     {
         return $value ? Carbon::parse($value)->toDateTimeString() : null;
+    }
+
+    /**
+     * @return array{client_receptiveness_rating: int|null, buying_interest_rating: int|null, follow_up_urgency_rating: int|null}
+     */
+    private function conversationRatings(CrmLead $lead): array
+    {
+        return [
+            'client_receptiveness_rating' => $lead->client_receptiveness_rating,
+            'buying_interest_rating' => $lead->buying_interest_rating,
+            'follow_up_urgency_rating' => $lead->follow_up_urgency_rating,
+        ];
+    }
+
+    /**
+     * @return array{client_receptiveness_rating: null, buying_interest_rating: null, follow_up_urgency_rating: null}
+     */
+    private function emptyConversationRatings(): array
+    {
+        return [
+            'client_receptiveness_rating' => null,
+            'buying_interest_rating' => null,
+            'follow_up_urgency_rating' => null,
+        ];
+    }
+
+    /**
+     * @param  array{client_receptiveness_rating: int|null, buying_interest_rating: int|null, follow_up_urgency_rating: int|null}  $originalRatings
+     */
+    private function recordConversationAssessmentChange(CrmLead $lead, User $user, array $originalRatings): void
+    {
+        $ratings = $this->conversationRatings($lead);
+
+        if ($ratings === $originalRatings) {
+            return;
+        }
+
+        $assessment = $lead->conversationAssessment();
+
+        $this->auditLogger->record('crm.lead.conversation_assessment_updated', $lead, 'CRM lead conversation assessment updated', [
+            'from' => $originalRatings,
+            'to' => $ratings,
+            'qualification' => $assessment->qualification,
+            'average' => $assessment->average,
+            'updated_by' => $user->id,
+        ]);
     }
 }

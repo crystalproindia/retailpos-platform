@@ -265,6 +265,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.querySelectorAll('[data-conversation-rating]').forEach((group) => {
+        const value = group.querySelector('[data-conversation-rating-value]');
+
+        const updateRatingValue = () => {
+            const selected = group.querySelector('input[type="radio"]:checked');
+            if (!value) return;
+
+            value.textContent = selected?.value ? `${selected.value} / 5` : 'Not rated';
+            const selectedRating = Number(selected?.value || 0);
+            group.querySelectorAll('[data-conversation-rating-star]').forEach((star) => {
+                const active = Number(star.dataset.conversationRatingStar) <= selectedRating;
+
+                star.classList.toggle('border-amber-500', active);
+                star.classList.toggle('bg-amber-100', active);
+                star.classList.toggle('text-amber-800', active);
+                star.classList.toggle('dark:bg-amber-900/40', active);
+                star.classList.toggle('dark:text-amber-200', active);
+            });
+            const clear = group.querySelector('[data-conversation-rating-clear]');
+            clear?.classList.toggle('border-slate-500', selectedRating === 0);
+            clear?.classList.toggle('bg-slate-100', selectedRating === 0);
+            clear?.classList.toggle('dark:bg-slate-800', selectedRating === 0);
+        };
+
+        group.addEventListener('change', updateRatingValue);
+        group.addEventListener('focusin', (event) => {
+            if (event.target.matches('input[type="radio"]')) {
+                event.target.nextElementSibling?.classList.add('ring-2', 'ring-teal-500');
+            }
+        });
+        group.addEventListener('focusout', (event) => {
+            if (event.target.matches('input[type="radio"]')) {
+                event.target.nextElementSibling?.classList.remove('ring-2', 'ring-teal-500');
+            }
+        });
+        updateRatingValue();
+    });
+
     const confirmDialog = document.querySelector('[data-confirm-dialog]');
 
     if (confirmDialog instanceof HTMLDialogElement) {

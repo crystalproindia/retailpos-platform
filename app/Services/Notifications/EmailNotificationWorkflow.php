@@ -7,8 +7,10 @@ use App\Enums\UserRole;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\DemoSchedule;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class EmailNotificationWorkflow
 {
@@ -23,13 +25,21 @@ class EmailNotificationWorkflow
             return;
         }
 
-        match ($event->eventKey()) {
-            'crm.lead.created' => $this->leadReceived($event),
-            'crm.demo.scheduled' => $this->demo($event, 'demo_confirmation', 'Demo scheduled', 'Your RetailPOS demo is confirmed.'),
-            'crm.demo.rescheduled' => $this->demo($event, 'demo_rescheduled', 'Demo rescheduled', 'Your RetailPOS demo has been rescheduled.'),
-            'crm.demo.cancelled' => $this->demo($event, 'demo_cancelled', 'Demo cancelled', 'Your RetailPOS demo has been cancelled.'),
-            default => null,
-        };
+        try {
+            match ($event->eventKey()) {
+                'crm.lead.created' => $this->leadReceived($event),
+                'crm.demo.scheduled' => $this->demo($event, 'demo_confirmation', 'Demo scheduled', 'Your RetailPOS demo is confirmed.'),
+                'crm.demo.rescheduled' => $this->demo($event, 'demo_rescheduled', 'Demo rescheduled', 'Your RetailPOS demo has been rescheduled.'),
+                'crm.demo.cancelled' => $this->demo($event, 'demo_cancelled', 'Demo cancelled', 'Your RetailPOS demo has been cancelled.'),
+                default => null,
+            };
+        } catch (QueryException $exception) {
+            Log::error('Email delivery record could not be created after a domain event.', [
+                'event_key' => $event->eventKey(),
+                'company_id' => $event->companyId(),
+                'exception' => $exception::class,
+            ]);
+        }
     }
 
     private function leadReceived(DomainEvent $event): void

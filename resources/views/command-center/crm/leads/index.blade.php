@@ -49,6 +49,17 @@
                         <option value="{{ $user->id }}" @selected((int) request('assigned_user_id') === $user->id)>{{ $user->name }}</option>
                     @endforeach
                 </select>
+                <select name="qualification" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    <option value="">Conversation score</option>
+                    <option value="hot" @selected(request('qualification') === 'hot')>Hot Lead</option>
+                    <option value="warm" @selected(request('qualification') === 'warm')>Warm Lead</option>
+                    <option value="cold" @selected(request('qualification') === 'cold')>Cold Lead</option>
+                    <option value="not_rated" @selected(request('qualification') === 'not_rated')>Not Rated</option>
+                </select>
+                <label class="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                    <input type="checkbox" name="high_urgency" value="1" @checked(request('high_urgency') === '1') class="rounded border-slate-300 text-teal-700 focus:ring-teal-600">
+                    Urgency 4–5
+                </label>
                 @if (request()->boolean('demo_requests'))
                     <input type="date" name="scheduled_date" value="{{ request('scheduled_date') }}" aria-label="Scheduled demo date" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     <select name="sort" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
@@ -94,9 +105,11 @@
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2">
+                            @php($assessment = $lead->conversationAssessment())
                             <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $lead->status?->name }}</span>
                             <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-100">{{ $lead->priority?->label() }}</span>
                             @if ($lead->source)<span class="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-900 dark:text-sky-100">{{ $lead->source->name }}</span>@endif
+                            @include('command-center.crm.leads.partials.conversation-assessment-badge', ['assessment' => $assessment])
                         </div>
                         <div class="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
                             <span>{{ $lead->assignedUser?->name ?? 'Unassigned' }}</span>
@@ -121,6 +134,7 @@
                             <th class="px-5 py-3">Lead</th>
                             <th class="px-5 py-3">Status</th>
                             <th class="px-5 py-3">Priority</th>
+                            <th class="px-5 py-3">Assessment</th>
                             <th class="px-5 py-3">Source</th>
                             <th class="px-5 py-3">Owner</th>
                             @if (request()->boolean('demo_requests'))<th class="px-5 py-3">Scheduled Demo</th>@endif
@@ -138,6 +152,7 @@
                                 </td>
                                 <td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $lead->status?->name }}</span></td>
                                 <td class="px-5 py-4"><span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-100">{{ $lead->priority?->label() }}</span></td>
+                                <td class="px-5 py-4">@include('command-center.crm.leads.partials.conversation-assessment-badge', ['assessment' => $lead->conversationAssessment()])</td>
                                 <td class="px-5 py-4"><span class="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-900 dark:text-sky-100">{{ $lead->source?->name ?? 'Unclassified' }}</span></td>
                                 <td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ $lead->assignedUser?->name ?? 'Unassigned' }}</td>
                                 @if (request()->boolean('demo_requests'))
@@ -162,7 +177,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ request()->boolean('demo_requests') ? 9 : 8 }}" class="px-5 py-10 text-center text-slate-500 dark:text-slate-400">No CRM leads found.</td>
+                                <td colspan="{{ request()->boolean('demo_requests') ? 10 : 9 }}" class="px-5 py-10 text-center text-slate-500 dark:text-slate-400">No CRM leads found.</td>
                             </tr>
                         @endforelse
                     </tbody>

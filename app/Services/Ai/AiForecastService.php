@@ -10,6 +10,7 @@ use App\Models\Customers\Customer;
 use App\Models\Inventory\StockLevel;
 use App\Models\Pos\PosSale;
 use App\Models\Pos\PosSaleItem;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Support\Collection;
@@ -46,18 +47,19 @@ class AiForecastService
 
     private function runType(int $companyId, string $type, ?User $actor): AiForecastRun
     {
-        $historyDays = (int) config('ai_forecasting.minimum_sales_history_days');
+        $settings = $this->settings($companyId);
+        $historyDays = (int) $settings['minimum_sales_history_days'];
         $run = AiForecastRun::create([
             'company_id' => $companyId, 'forecast_type' => $type, 'algorithm_version' => config('ai_forecasting.algorithm_version'),
-            'parameters' => ['history_days' => $historyDays, 'advisory_only' => true], 'training_start' => today()->subDays($historyDays), 'training_end' => today()->subDay(),
+            'parameters' => ['history_days' => $historyDays, 'advisory_only' => true, 'settings' => $settings], 'training_start' => today()->subDays($historyDays), 'training_end' => today()->subDay(),
             'forecast_start' => today(), 'forecast_end' => today()->addDays(90), 'status' => 'running', 'started_at' => now(), 'created_by' => $actor?->id,
         ]);
 
         try {
             $count = match ($type) {
-                'sales' => $this->sales($run),
-                'inventory' => $this->inventory($run),
-                'customers' => $this->customers($run),
+                'sales' => $this->sales($run, $settings),
+                'inventory' => $this->inventory($run, $settings),
+                'customers' => $this->customers($run, $settings),
                 'crm' => $this->crm($run),
                 default => throw new \InvalidArgumentException('Unsupported forecast type.'),
             };
@@ -72,10 +74,10 @@ class AiForecastService
         return $run->refresh();
     }
 
-    private function sales(AiForecastRun $run): int
+    private function sales(AiForecastRun $run, array $settings): int
     {
         $daily = PosSale::query()->where('company_id', $run->company_id)->where('status', 'completed')->whereBetween('sold_at', [$run->training_start->startOfDay(), $run->training_end->endOfDay()])->selectRaw('date(sold_at) as day, sum(total_amount) as total')->groupBy('day')->orderBy('day')->pluck('total');
-        if ($daily->count() < (int) config('ai_forecasting.minimum_sales_history_days')) return 0;
+        if ($daily->count() < (int) $settings['minimum_sales_history_days']) return 0;
         $mean = (float) $daily->avg();
         $recent = (float) $daily->take(-7)->avg();
         $prediction = round(($mean * .4) + ($recent * .6), 2);
@@ -89,15 +91,15 @@ class AiForecastService
         return $count;
     }
 
-    private function inventory(AiForecastRun $run): int
+    private function inventory(AiForecastRun $run, array $settings): int
     {
-        $count = 0; $horizon = 30; $safety = (int) config('ai_forecasting.safety_stock_days');
+        $count = 0; $horizon = 30; $safety = (int) $settings['safety_stock_days'];
         StockLevel::query()->with('product')->where('company_id', $run->company_id)->whereHas('product', fn ($query) => $query->where('is_active', true))->orderBy('id')->chunkById(100, function ($levels) use ($run, $horizon, $safety, &$count): void {
             foreach ($levels as $level) {
                 $sold = (float) PosSaleItem::query()->where('company_id', $run->company_id)->where('product_id', $level->product_id)->whereHas('sale', fn ($query) => $query->where('status', 'completed')->where('sold_at', '>=', now()->subDays(28)))->sum('quantity');
                 $velocity = $sold / 28; if ($velocity <= 0) $velocity = (float) ($level->average_daily_sales ?? 0);
                 $available = max(0, (float) $level->quantity_available); $days = $velocity > 0 ? $available / $velocity : null;
-                $classification = $velocity <= 0 ? 'dead_stock' : ($days <= 7 ? 'stockout_risk' : ($days > $horizon * 3 ? 'overstock_risk' : ($days > (int) config('ai_forecasting.slow_moving_days') ? 'slow_moving' : 'stable')));
+                $classification = $velocity <= 0 ? 'dead_stock' : ($days <= 7 ? 'stockout_risk' : ($days > $horizon * 3 ? 'overstock_risk' : ($days > (int) $settings['slow_moving_days'] ? 'slow_moving' : 'stable')));
                 $suggested = max(0, ceil(($velocity * ($horizon + $safety)) - $available));
                 AiForecastResult::create(['forecast_run_id' => $run->id, 'company_id' => $run->company_id, 'outlet_id' => $level->branch_id, 'product_id' => $level->product_id, 'period_start' => today(), 'period_end' => today()->addDays($horizon), 'predicted_value' => $velocity, 'score' => $days === null ? null : round(max(0, 100 - min(100, $days * 4)), 2), 'classification' => $classification, 'explanation' => ['plain_language' => $this->inventoryExplanation($classification, $days), 'advisory_only' => true], 'supporting_metrics' => ['available_stock' => $available, 'daily_sales_velocity' => round($velocity, 3), 'days_remaining' => $days === null ? null : round($days, 1), 'suggested_reorder_quantity' => $suggested, 'safety_stock_days' => $safety]]);
                 if (in_array($classification, ['stockout_risk', 'overstock_risk', 'slow_moving', 'dead_stock'], true)) $this->insight($run->company_id, $classification, $level->product_id, $classification === 'stockout_risk' ? 'warning' : 'info', $level->product?->name ?? 'Product', ['available_stock' => $available, 'daily_sales_velocity' => round($velocity, 3), 'suggested_reorder_quantity' => $suggested]);
@@ -106,9 +108,9 @@ class AiForecastService
         }); return $count;
     }
 
-    private function customers(AiForecastRun $run): int
+    private function customers(AiForecastRun $run, array $settings): int
     {
-        $count = 0; Customer::query()->where('company_id', $run->company_id)->orderBy('id')->chunkById(100, function ($customers) use ($run, &$count): void { foreach ($customers as $customer) { $days = $customer->last_purchase_at?->diffInDays(now()); $orders = (int) $customer->total_orders_count; $amount = (float) $customer->total_purchase_amount; $segment = $orders === 0 || $days === null ? 'insufficient_data' : ($days >= config('ai_forecasting.customer_lapsed_days') ? 'lapsed' : ($days >= config('ai_forecasting.customer_at_risk_days') ? 'at_risk' : ($orders >= 8 ? 'loyal' : ($days <= config('ai_forecasting.customer_active_days') ? 'active' : 'new')))); if ($amount >= 100000 && $segment !== 'insufficient_data') $segment = 'high_value'; AiForecastResult::create(['forecast_run_id' => $run->id, 'company_id' => $run->company_id, 'customer_id' => $customer->id, 'classification' => $segment, 'score' => $orders === 0 ? null : min(100, round(($orders * 5) + max(0, 30 - min(30, $days ?? 30)) + min(30, $amount / 10000), 2)), 'explanation' => ['plain_language' => 'Segment is based on recency, completed-order count, and purchase value. It does not send a campaign.'], 'supporting_metrics' => ['days_since_purchase' => $days, 'completed_orders' => $orders, 'purchase_value' => round($amount, 2)]]); $count++; } }); return $count;
+        $count = 0; Customer::query()->where('company_id', $run->company_id)->orderBy('id')->chunkById(100, function ($customers) use ($run, $settings, &$count): void { foreach ($customers as $customer) { $days = $customer->last_purchase_at?->diffInDays(now()); $orders = (int) $customer->total_orders_count; $amount = (float) $customer->total_purchase_amount; $segment = $orders === 0 || $days === null ? 'insufficient_data' : ($days >= $settings['customer_lapsed_days'] ? 'lapsed' : ($days >= $settings['customer_at_risk_days'] ? 'at_risk' : ($orders >= 8 ? 'loyal' : ($days <= $settings['customer_active_days'] ? 'active' : 'new')))); if ($amount >= 100000 && $segment !== 'insufficient_data') $segment = 'high_value'; AiForecastResult::create(['forecast_run_id' => $run->id, 'company_id' => $run->company_id, 'customer_id' => $customer->id, 'classification' => $segment, 'score' => $orders === 0 ? null : min(100, round(($orders * 5) + max(0, 30 - min(30, $days ?? 30)) + min(30, $amount / 10000), 2)), 'explanation' => ['plain_language' => 'Segment is based on recency, completed-order count, and purchase value. It does not send a campaign.'], 'supporting_metrics' => ['days_since_purchase' => $days, 'completed_orders' => $orders, 'purchase_value' => round($amount, 2)]]); $count++; } }); return $count;
     }
 
     private function crm(AiForecastRun $run): int
@@ -122,6 +124,7 @@ class AiForecastService
         $insight->fill(['severity' => $severity, 'title' => str($type)->replace('_', ' ')->headline().' · '.$productName, 'explanation' => 'This advisory signal is based on current available stock and completed sales history. Review the supporting transactions before taking action.', 'recommended_action' => 'Review stock, expected demand, and open purchases. No purchase order is created automatically.', 'evidence' => $evidence, 'expires_at' => now()->addDays((int) config('ai_forecasting.insight_retention_days'))]);
         if (! $insight->exists) $insight->status = 'new'; $insight->save();
     }
+    private function settings(int $companyId): array { return (Setting::query()->where('company_id', $companyId)->where('group', 'ai_forecasting')->where('key', 'settings')->value('value') ?? []) + config('ai_forecasting'); }
     private function inventoryExplanation(string $classification, ?float $days): string { return match ($classification) { 'stockout_risk' => 'Available stock may run out in '.($days === null ? 'an unknown number of' : round($days, 1)).' days at the recent sales rate.', 'overstock_risk' => 'Available stock covers more than the configured planning horizon at the recent sales rate.', 'slow_moving' => 'Recent demand suggests this product is moving slowly.', 'dead_stock' => 'No recent completed sales were available for this product.', default => 'Available stock appears aligned with recent sales velocity.' }; }
     private function crmExplanation(CrmLead $lead, bool $overdue): string { $reasons = []; if ($overdue) $reasons[] = 'follow-up is overdue'; if ($lead->buying_interest_rating) $reasons[] = 'buying interest is '.$lead->buying_interest_rating.'/5'; if ($lead->follow_up_urgency_rating) $reasons[] = 'urgency is '.$lead->follow_up_urgency_rating.'/5'; return $reasons ? 'Priority is higher because '.implode(', ', $reasons).'.' : 'Priority is limited because no overdue follow-up or staff-entered conversation rating is available.'; }
 }

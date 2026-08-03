@@ -90,7 +90,8 @@ class AiForecastingFoundationTest extends TestCase
         $manager = User::factory()->create(['company_id' => $company->id, 'branch_id' => $branch->id, 'role' => UserRole::Manager]);
         $this->sale($company, $branch, now()->subDay(), 1000);
         $this->actingAs($admin)->get('/ai')->assertOk();
-        $this->actingAs($manager)->post('/ai/run', ['type' => 'sales'])->assertForbidden();
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->actingAs($manager)->post('/ai/run', ['type' => 'sales'])->assertForbidden();
         app(AiForecastService::class)->run($company->id, 'sales', $admin);
         $this->assertSame(0, AiForecastRun::query()->where('company_id', $otherCompany->id)->count());
     }

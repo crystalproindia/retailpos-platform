@@ -28,6 +28,19 @@ class PosCatalogRepository
 
     public function findSaleable(int $companyId, int $productId): Product
     {
-        return Product::query()->with('category')->where('company_id', $companyId)->where('is_active', true)->where('status', Product::STATUS_ACTIVE)->findOrFail($productId);
+        return Product::query()->with(['category', 'taxRate', 'unit'])->where('company_id', $companyId)->where('is_active', true)->where('status', Product::STATUS_ACTIVE)->findOrFail($productId);
+    }
+
+    public function findByBarcodeOrSku(int $companyId, ?int $branchId, string $code): ?Product
+    {
+        return Product::query()
+            ->with(['category', 'brand'])
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where('status', Product::STATUS_ACTIVE)
+            ->where(fn ($query) => $query->where('barcode', $code)->orWhere('sku', $code))
+            ->when($branchId, fn ($query) => $query->with(['stockLevels' => fn ($stock) => $stock->where('branch_id', $branchId)]), fn ($query) => $query->with('stockLevels'))
+            ->orderByRaw('case when barcode = ? then 0 else 1 end', [$code])
+            ->first();
     }
 }

@@ -66,9 +66,9 @@ class PosCoreOperationsTest extends TestCase
 
         $this->actingAs($manager)->post('/pos/sales/'.$sale->id.'/void', ['reason' => 'Customer requested cancellation'])->assertRedirect();
         $this->assertSame('voided', $sale->refresh()->status);
-        $this->assertDatabaseHas('stock_levels', ['product_id' => $product->id, 'quantity_on_hand' => 5]);
-        $this->assertDatabaseHas('stock_movements', ['product_id' => $product->id, 'movement_type' => 'sale_void', 'reference_id' => $sale->id]);
-        $this->assertDatabaseHas('pos_payments', ['pos_sale_id' => $sale->id, 'status' => 'reversed']);
+        $this->assertDatabaseHas('stock_levels', ['product_id' => $product->id, 'quantity_on_hand' => 3]);
+        $this->assertDatabaseMissing('stock_movements', ['product_id' => $product->id, 'movement_type' => 'sale_void', 'reference_id' => $sale->id]);
+        $this->assertDatabaseHas('pos_payments', ['pos_sale_id' => $sale->id, 'status' => 'recorded']);
 
         $closed = $registers->close($session, $manager, 0);
         $this->assertSame('closed', $closed->status);

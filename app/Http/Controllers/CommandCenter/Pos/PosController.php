@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\PosCheckoutRequest;
 use App\Http\Requests\Pos\PosQuickCustomerRequest;
 use App\Models\Customers\Customer;
+use App\Models\Compliance\GstSetting;
 use App\Models\Pos\PosRegister;
 use App\Models\Pos\PosSale;
 use App\Repositories\Pos\PosCatalogRepository;
@@ -15,6 +16,7 @@ use App\Services\Pos\PosCheckoutService;
 use App\Services\Pos\PosCustomerLookupService;
 use App\Services\Pos\PosDashboardService;
 use App\Services\Pos\PosReceiptPdfService;
+use App\Services\AuditLogger;
 use App\Services\Outlets\OutletAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -86,7 +88,13 @@ class PosController extends Controller
 
     public function catalog(Request $request, PosCatalogRepository $catalog, OutletAccessService $outlets): JsonResponse
     {
-        return response()->json(['products' => $catalog->search($request->user()->company_id, $outlets->current($request->user())->id, $request->string('q')->toString())->map(fn ($product) => $this->productPayload($product))->values()]);
+        $outlet = $outlets->current($request->user());
+        $scan = trim($request->string('scan')->toString());
+        $products = $scan !== ''
+            ? collect([$catalog->findByBarcodeOrSku($request->user()->company_id, $outlet->id, $scan)])->filter()
+            : $catalog->search($request->user()->company_id, $outlet->id, $request->string('q')->toString());
+
+        return response()->json(['products' => $products->map(fn ($product) => $this->productPayload($product))->values()]);
     }
 
     public function customer(Request $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions, OutletAccessService $outlets): JsonResponse
@@ -132,7 +140,9 @@ class PosController extends Controller
         $sale = $sales->findForUser($request->user(), $sale);
         abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
 
-        return view('command-center.pos.receipt', compact('sale'));
+        $gst = GstSetting::query()->where('company_id', $request->user()->company_id)->first();
+
+        return view('command-center.pos.receipt', compact('sale', 'gst'));
     }
 
     public function receiptPdf(Request $request, PosSaleRepository $sales, PosReceiptPdfService $pdf, int $sale): Response
@@ -140,7 +150,11 @@ class PosController extends Controller
         $sale = $sales->findForUser($request->user(), $sale);
         abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
 
-        return $pdf->document($sale)->download($pdf->filename($sale));
+        app(AuditLogger::class)->record('pos.receipt.printed', $sale, 'POS receipt PDF downloaded', ['company_id' => $request->user()->company_id]);
+
+        $gst = GstSetting::query()->where('company_id', $request->user()->company_id)->first();
+
+        return $pdf->document($sale, $gst)->download($pdf->filename($sale));
     }
 
     public function void(Request $request, PosSaleRepository $sales, PosCheckoutService $checkout, int $sale): RedirectResponse
@@ -148,7 +162,14 @@ class PosController extends Controller
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
         $sale = $checkout->void($sales->findForUser($request->user(), $sale), $request->user(), $data['reason']);
 
-        return redirect()->route('pos.receipts.show', $sale)->with('status', 'Sale voided and stock restored.');
+        return redirect()->route('pos.receipts.show', $sale)->with('status', 'Sale voided. Use the returns/refund workflow for stock and payment reversals.');
+    }
+
+    public function destroyHeld(Request $request, PosSaleRepository $sales, PosCheckoutService $checkout, int $sale): RedirectResponse
+    {
+        $checkout->cancelHeld($sales->findForUser($request->user(), $sale), $request->user());
+
+        return redirect()->route('pos.held.index')->with('status', 'Held bill discarded.');
     }
 
     /** @return array<string, mixed> */

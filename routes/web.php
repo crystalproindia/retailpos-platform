@@ -602,10 +602,11 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('customers/lookup', [PosController::class, 'customer'])->name('customers.lookup');
         Route::post('customers/quick-create', [PosController::class, 'quickCustomer'])->middleware('can:pos.customers.create')->name('customers.quick-create');
         Route::post('hold', [PosController::class, 'hold'])->middleware('can:pos.hold')->name('hold');
-        Route::post('checkout', [PosController::class, 'complete'])->middleware('can:pos.checkout')->name('checkout');
-        Route::get('held/{sale}', [PosController::class, 'resume'])->whereNumber('sale')->middleware('can:pos.hold')->name('held.resume');
+        Route::post('checkout', [PosController::class, 'complete'])->middleware(['can:pos.checkout', 'can:pos.payments.record'])->name('checkout');
+        Route::get('held/{sale}', [PosController::class, 'resume'])->whereNumber('sale')->middleware('can:pos.sales.resume')->name('held.resume');
+        Route::delete('held/{sale}', [PosController::class, 'destroyHeld'])->whereNumber('sale')->middleware('can:pos.hold')->name('held.destroy');
         Route::get('receipts/{sale}', [PosController::class, 'receipt'])->whereNumber('sale')->name('receipts.show');
-        Route::get('receipts/{sale}/pdf', [PosController::class, 'receiptPdf'])->whereNumber('sale')->middleware('can:pos.receipts.view')->name('receipts.pdf');
+        Route::get('receipts/{sale}/pdf', [PosController::class, 'receiptPdf'])->whereNumber('sale')->middleware(['can:pos.receipts.view', 'can:pos.receipts.print'])->name('receipts.pdf');
         Route::post('sales/{sale}/void', [PosController::class, 'void'])->whereNumber('sale')->middleware('can:pos.sales.void')->name('sales.void');
     });
 

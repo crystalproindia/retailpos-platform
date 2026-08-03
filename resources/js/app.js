@@ -761,6 +761,8 @@ document.addEventListener('DOMContentLoaded', () => {
         isSubmitting: false,
         online: navigator.onLine,
         offlineSettings: {},
+        completionKey: crypto.randomUUID(),
+        lastScan: { value: '', at: 0 },
     };
     const money = (value) => Number(value || 0).toFixed(2);
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]));
@@ -1040,10 +1042,11 @@ document.addEventListener('DOMContentLoaded', () => {
         append('register_id', [...document.querySelectorAll('[data-pos-register]')].map((input) => input.value).find(Boolean) || '');
         append('device_type', posApp.dataset.posMode === 'mobile' || window.matchMedia('(max-width: 1023px)').matches ? 'mobile' : 'desktop');
         append('manual_discount_amount', manualDiscount());
+        append('held_sale_id', posApp.dataset.resumedSaleId || '');
         append('coupon_code', document.querySelector('[data-pos-coupon]')?.value || '');
         append('notes', [...document.querySelectorAll('[data-pos-notes]')].map((input) => input.value.trim()).find(Boolean) || '');
         state.cart.forEach((item, index) => { append(`items[${index}][product_id]`, item.id); append(`items[${index}][quantity]`, item.quantity); append(`items[${index}][unit_price]`, item.price); });
-        if (action === 'checkout') { state.isSubmitting = true; render(); paymentEntries().forEach((payment, index) => { append(`payments[${index}][method]`, payment.method); append(`payments[${index}][amount]`, payment.amount); append(`payments[${index}][reference]`, payment.reference); }); }
+        if (action === 'checkout') { state.isSubmitting = true; append('completion_key', state.completionKey); render(); paymentEntries().forEach((payment, index) => { append(`payments[${index}][method]`, payment.method); append(`payments[${index}][amount]`, payment.amount); append(`payments[${index}][reference]`, payment.reference); }); }
         form.submit();
     };
 
@@ -1060,9 +1063,26 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const closePayment = () => { paymentModal?.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
 
+    const scanProduct = async (input) => {
+        const code = input.value.trim();
+        if (!code) return;
+        const now = Date.now();
+        if (state.lastScan.value === code && now - state.lastScan.at < 250) return;
+        state.lastScan = { value: code, at: now };
+        const match = [...document.querySelectorAll('[data-pos-product]')].map((node) => parse(node.dataset.posProduct, null)).find((product) => product?.barcode === code || product?.sku === code);
+        if (match) { addProduct(match); input.value = ''; return; }
+        if (!state.online) { showFeedback('No matching barcode or SKU is available offline.', 'error'); return; }
+        const url = new URL(posApp.dataset.catalogUrl, window.location.origin);
+        url.searchParams.set('scan', code);
+        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+        const payload = response.ok ? await response.json() : { products: [] };
+        if (payload.products?.[0]) { addProduct(payload.products[0]); input.value = ''; return; }
+        showFeedback('No active product matches this barcode or SKU.', 'error');
+    };
+
     document.querySelectorAll('[data-pos-scanner]').forEach((input) => {
         input.addEventListener('input', () => searchProducts(input.value));
-        input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); const match = [...document.querySelectorAll('[data-pos-product]')].map((node) => parse(node.dataset.posProduct, null)).find((product) => product?.barcode === input.value || product?.sku === input.value); if (match) { addProduct(match); input.value = ''; } else { searchProducts(input.value); showFeedback('No matching barcode or SKU found.', 'error'); } } });
+        input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); scanProduct(input); } });
     });
     document.querySelectorAll('[data-pos-search]').forEach((button) => button.addEventListener('click', focusScanner));
     document.querySelectorAll('[data-pos-customer-search]').forEach((button) => button.addEventListener('click', lookupCustomer));

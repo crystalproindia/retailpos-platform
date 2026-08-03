@@ -23,16 +23,16 @@
 
         <article class="pos-receipt rounded-xl bg-white p-6 shadow-[0_8px_28px_rgb(15_23_42_/_0.08)] sm:p-8">
             <header class="border-b border-dashed border-slate-300 pb-5 text-center">
-                <p class="text-xl font-bold text-slate-950">{{ auth()->user()->company?->name ?? config('app.name') }}</p>
+                <p class="text-xl font-bold text-slate-950">{{ $gst?->legal_name ?: auth()->user()->company?->name ?? config('app.name') }}</p>
                 <p class="mt-1 text-sm text-slate-500">{{ $sale->branch?->name }}</p>
-                <p class="mt-1 text-xs text-slate-400">Tax registration details available when configured in company settings.</p>
+                @if($gst?->gstin)<p class="mt-1 text-xs text-slate-400">GSTIN {{ $gst->gstin }}</p>@endif
             </header>
 
             <section class="grid grid-cols-2 gap-x-5 gap-y-2 border-b border-dashed border-slate-300 py-4 text-sm">
                 <div><span class="text-slate-400">Bill</span><p class="font-semibold">{{ $sale->receipt_number ?: $sale->sale_number }}</p></div>
                 <div class="text-right"><span class="text-slate-400">Date</span><p class="font-semibold">{{ $sale->completed_at?->format('d M Y, h:i A') }}</p></div>
                 <div><span class="text-slate-400">Cashier</span><p class="font-semibold">{{ $sale->completer?->name ?? 'Not recorded' }}</p></div>
-                <div class="text-right"><span class="text-slate-400">Customer</span><p class="font-semibold">{{ $sale->customer_name_snapshot ?: $sale->customer?->display_name ?: 'Walk-in customer' }}</p><p class="text-xs text-slate-500">{{ $sale->customer_phone_snapshot ?: $sale->customer?->phone }}</p></div>
+                <div class="text-right"><span class="text-slate-400">Customer</span><p class="font-semibold">{{ $sale->customer_name_snapshot ?: $sale->customer?->display_name ?: 'Walk-in customer' }}</p><p class="text-xs text-slate-500">{{ $sale->customer_mobile_snapshot ?: $sale->customer?->phone }}</p>@if($sale->customer?->gstin)<p class="text-xs text-slate-500">GSTIN {{ $sale->customer->gstin }}</p>@endif</div>
             </section>
 
             <section class="divide-y divide-slate-100">
@@ -51,7 +51,11 @@
             <section class="mt-3 space-y-2 border-t border-slate-200 pt-4 text-sm">
                 <div class="flex justify-between text-slate-500"><span>Subtotal</span><span>{{ number_format($sale->subtotal, 2) }}</span></div>
                 <div class="flex justify-between text-slate-500"><span>Item / promotion discount</span><span>{{ number_format($sale->discount_amount, 2) }}</span></div>
-                <div class="flex justify-between text-slate-500"><span>Tax</span><span>{{ number_format($sale->tax_amount, 2) }}</span></div>
+                <div class="flex justify-between text-slate-500"><span>Taxable amount</span><span>{{ number_format($sale->taxable_amount, 2) }}</span></div>
+                <div class="flex justify-between text-slate-500"><span>CGST</span><span>{{ number_format($sale->cgst_total, 2) }}</span></div>
+                <div class="flex justify-between text-slate-500"><span>SGST</span><span>{{ number_format($sale->sgst_total, 2) }}</span></div>
+                <div class="flex justify-between text-slate-500"><span>IGST</span><span>{{ number_format($sale->igst_total, 2) }}</span></div>
+                <div class="flex justify-between text-slate-500"><span>Cess</span><span>{{ number_format($sale->cess_total, 2) }}</span></div>
                 <div class="flex justify-between text-slate-500"><span>Paid</span><span>{{ number_format($sale->paid_amount, 2) }}</span></div>
                 <div class="flex justify-between text-slate-500"><span>Change</span><span>{{ number_format($sale->change_amount, 2) }}</span></div>
                 <div class="flex justify-between border-t border-slate-200 pt-3 text-xl font-bold text-slate-950"><span>Total</span><span>{{ number_format($sale->total_amount, 2) }}</span></div>
@@ -78,9 +82,10 @@
             <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
                 <p class="font-semibold">This sale was voided.</p>
                 <p class="mt-1">{{ $sale->void_reason }}</p>
+                <p class="mt-2">Use the returns/refund workflow for any stock or payment reversal.</p>
             </div>
         @elseif(auth()->user()->can('pos.sales.void'))
-            <form method="POST" action="{{ route('pos.sales.void', $sale) }}" class="pos-print-controls mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onsubmit="return confirm('Void this completed sale and restore its stock? This cannot be undone.');">
+            <form method="POST" action="{{ route('pos.sales.void', $sale) }}" class="pos-print-controls mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onsubmit="return confirm('Void this completed sale? Stock and payments are handled only through the returns/refund workflow.');">
                 @csrf
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <label class="min-w-0 flex-1 text-sm font-semibold text-slate-700">

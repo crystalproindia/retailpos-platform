@@ -56,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('email-test', fn ($request) => Limit::perMinute(3)
             ->by('email-test:'.($request->user()?->id ?? $request->ip())));
 
+        RateLimiter::for('ai-forecast-run', fn ($request) => Limit::perMinute(3)
+            ->by('ai-forecast-run:'.($request->user()?->id ?? $request->ip())));
+
         RateLimiter::for('workforce-invitation', fn ($request) => Limit::perMinute(3)
             ->by('workforce-invitation:'.($request->user()?->id ?? $request->ip())));
 

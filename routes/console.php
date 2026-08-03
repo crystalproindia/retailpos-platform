@@ -34,6 +34,10 @@ Schedule::command('tasks:send-reminders --limit=250')->everyFifteenMinutes()->wi
 Schedule::command('attendance:mark-missing-checkouts --limit=250')->hourly()->withoutOverlapping();
 Schedule::command('attendance:generate-daily-status --limit=500')->dailyAt('00:15')->withoutOverlapping();
 Schedule::command('retailpos:crm-refresh-lead-scores --stale')->dailyAt('02:15')->withoutOverlapping();
+Schedule::command('retailpos:refresh-ai-forecasts --type=sales')->dailyAt('02:45')->withoutOverlapping();
+Schedule::command('retailpos:refresh-ai-forecasts --type=inventory')->dailyAt('03:15')->withoutOverlapping();
+Schedule::command('retailpos:refresh-ai-forecasts --type=customers')->weeklyOn(1, '03:45')->withoutOverlapping();
+Schedule::command('retailpos:refresh-ai-forecasts --type=crm')->hourly()->withoutOverlapping();
 Schedule::command('notifications:prune-domain-events')->dailyAt('02:30')->withoutOverlapping();
 Schedule::command('operations:health-check')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('operations:capture-queue-snapshot')->everyFifteenMinutes()->withoutOverlapping();

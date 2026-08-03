@@ -71,6 +71,7 @@ use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\DashboardController;
+use App\Http\Controllers\CommandCenter\AiForecastController;
 use App\Http\Controllers\CommandCenter\Free365OnboardingController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailDeliveryLogController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailIntegrationController;
@@ -352,6 +353,14 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('email-deliveries', [EmailDeliveryLogController::class, 'index'])->middleware('can:email.deliveries.view')->name('email-deliveries.index');
         Route::post('email-deliveries/{emailDelivery}/retry', [EmailDeliveryLogController::class, 'retry'])->middleware('can:email.deliveries.retry')->name('email-deliveries.retry');
         Route::post('email-deliveries/{emailDelivery}/cancel', [EmailDeliveryLogController::class, 'cancel'])->middleware('can:email.deliveries.retry')->name('email-deliveries.cancel');
+    });
+
+    Route::prefix('ai')->name('ai.')->group(function (): void {
+        Route::get('/', [AiForecastController::class, 'index'])->middleware('can:ai.dashboard.view')->name('dashboard');
+        Route::post('run', [AiForecastController::class, 'run'])->middleware(['can:ai.forecasts.run', 'throttle:ai-forecast-run'])->name('run');
+        Route::post('insights/{insight}/review', [AiForecastController::class, 'review'])->middleware('can:ai.insights.review')->name('insights.review');
+        Route::get('settings', [AiForecastController::class, 'settings'])->middleware('can:ai.settings.manage')->name('settings');
+        Route::put('settings', [AiForecastController::class, 'updateSettings'])->middleware('can:ai.settings.manage')->name('settings.update');
     });
 
     Route::middleware(['role:administrator,manager,sales', 'can:crm.view'])->prefix('crm')->name('crm.')->group(function (): void {

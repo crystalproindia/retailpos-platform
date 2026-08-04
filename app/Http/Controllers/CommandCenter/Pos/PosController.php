@@ -16,6 +16,7 @@ use App\Services\Pos\PosCheckoutService;
 use App\Services\Pos\PosCustomerLookupService;
 use App\Services\Pos\PosDashboardService;
 use App\Services\Pos\PosReceiptPdfService;
+use App\Services\Crm\InvoiceTemplateService;
 use App\Services\AuditLogger;
 use App\Services\Outlets\OutletAccessService;
 use Illuminate\Http\JsonResponse;
@@ -135,14 +136,14 @@ class PosController extends Controller
         return $this->workspace($request, $catalog, $sales, $dashboard, 'terminal', $resumedSale);
     }
 
-    public function receipt(Request $request, PosSaleRepository $sales, int $sale): View
+    public function receipt(Request $request, PosSaleRepository $sales, InvoiceTemplateService $templates, int $sale): View
     {
         $sale = $sales->findForUser($request->user(), $sale);
         abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
 
         $gst = GstSetting::query()->where('company_id', $request->user()->company_id)->first();
 
-        return view('command-center.pos.receipt', compact('sale', 'gst'));
+        return view('command-center.pos.receipt', ['sale' => $sale, 'gst' => $gst, 'branding' => $templates->brandingFor($request->user()->company)]);
     }
 
     public function receiptPdf(Request $request, PosSaleRepository $sales, PosReceiptPdfService $pdf, int $sale): Response

@@ -62,6 +62,23 @@ The existing responsive receipt supports 80 mm/58 mm print layouts, browser prin
 
 Existing Phase H reports continue to query only completed POS sales and stock movements. Held and voided sales do not inflate completed-sales reporting.
 
+## Company branding and document logos
+
+Company Branding lives in **Settings → Company Profile → Company branding**. It is deliberately separate from CMS website media: CMS files remain public website assets, while document logos are private tenant files stored on the local private disk under `companies/{company_id}/branding/`.
+
+Two nullable company paths are supported:
+
+- `company_logo_path`: the primary business logo.
+- `invoice_logo_path`: an optional invoice and receipt override.
+
+The renderer resolves document branding in this order: invoice/receipt override, company primary logo, then no image. Branch logos are not part of the current branch profile architecture, so the company default applies to every outlet. No invoice-template record stores a separate uploaded logo.
+
+Only PNG, JPEG, and WEBP images up to 2 MB and 5000 × 5000 pixels are accepted. The server derives an opaque UUID filename from the verified MIME type, never trusts the original path, does not accept SVG or remote URLs, and does not expose document-logo paths through the public storage disk. Documents receive an in-memory data URI only while rendering, allowing browser, Dompdf A4, and thermal receipt output to work without a browser-only asset URL.
+
+Invoice design settings retain presentation controls in their existing `options` JSON: `show_logo`, `logo_position` (`left`, `center`, `right`), `logo_size` (`small`, `medium`, `large`), and `show_company_name`. Safe defaults are on, left, medium, and on. Every supported A4 design, the public invoice page, CRM payment receipt, POS browser receipt, and POS A4 receipt use the same central resolver. When the file is missing or logo display is off, the company name remains visible as the document fallback.
+
+Logo uploads, replacements, removals, and invoice presentation setting changes are audited without binary content. Company Profile permission (`company.profile.update`) is required for branding changes; cashier users can print the configured documents but cannot alter branding.
+
 ## Known V1 limitations
 
 - No returns, exchanges, refunds, or automatic void reversals.
@@ -69,6 +86,8 @@ Existing Phase H reports continue to query only completed POS sales and stock mo
 - No Bluetooth/native scanner or printer SDK.
 - No payment-gateway integration, accounting journals, GST filing, e-invoice submission, or payment QR generation.
 - No loyalty redemption or store-credit settlement changes.
+- No branch-specific logo override in V1; the company logo is the outlet default.
+- No SVG input, image optimization pipeline, printer SDK, or external image hosting.
 - Google Calendar/Meet and AI forecast integrations are not involved in billing and remain inactive.
 
 ## Production deployment

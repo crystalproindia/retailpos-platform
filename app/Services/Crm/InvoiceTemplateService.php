@@ -7,6 +7,7 @@ use App\Models\Crm\CrmInvoice;
 use App\Models\InvoiceTemplateSetting;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Branding\CompanyBrandingService;
 
 class InvoiceTemplateService
 {
@@ -27,12 +28,30 @@ class InvoiceTemplateService
     public function __construct(
         private readonly InvoiceBalancePresentationService $balances,
         private readonly InvoicePaymentQrService $paymentQr,
+        private readonly CompanyBrandingService $branding,
         private readonly AuditLogger $audit,
     ) {}
 
     public function setting(Company $company): InvoiceTemplateSetting
     {
         return InvoiceTemplateSetting::firstOrCreate(['company_id' => $company->id], ['options' => $this->defaultOptions()])->refresh();
+    }
+
+    /** @return array{data_uri: ?string, source: ?string, show_logo: bool, logo_position: string, logo_size: string, show_company_name: bool} */
+    public function brandingFor(Company $company): array
+    {
+        $setting = $this->setting($company);
+        $options = array_replace($this->defaultOptions(), $setting->options ?? []);
+        $logo = $this->branding->forInvoice($company);
+
+        return [
+            'data_uri' => $logo['data_uri'],
+            'source' => $logo['source'],
+            'show_logo' => (bool) $options['show_logo'],
+            'logo_position' => in_array($options['logo_position'], ['left', 'center', 'right'], true) ? $options['logo_position'] : 'left',
+            'logo_size' => in_array($options['logo_size'], ['small', 'medium', 'large'], true) ? $options['logo_size'] : 'medium',
+            'show_company_name' => (bool) $options['show_company_name'],
+        ];
     }
 
     /** @param array<string,mixed> $data */
@@ -72,12 +91,21 @@ class InvoiceTemplateService
         $balance = $this->balances->forInvoice($invoice);
         $paymentQr = $this->paymentQr->forInvoice($invoice, $setting);
 
-        return ['setting' => $setting, 'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'], 'item_chunks' => $items->chunk(50), 'tax_rows' => array_values($rows), 'balance' => $balance, 'payment_qr_uri' => $paymentQr['payload'] ?? null, 'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null];
+        return [
+            'setting' => $setting,
+            'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'],
+            'item_chunks' => $items->chunk(50),
+            'tax_rows' => array_values($rows),
+            'balance' => $balance,
+            'payment_qr_uri' => $paymentQr['payload'] ?? null,
+            'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null,
+            'branding' => $this->brandingFor($invoice->company),
+        ];
     }
 
     /** @return array<string,bool> */
     public function defaultOptions(): array
     {
-        return ['show_logo' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
+        return ['show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
     }
 }

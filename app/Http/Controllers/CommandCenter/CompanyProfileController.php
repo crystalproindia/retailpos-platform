@@ -3,39 +3,42 @@
 namespace App\Http\Controllers\CommandCenter;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateCompanyProfileRequest;
+use App\Services\Branding\CompanyBrandingService;
 use App\Services\AuditLogger;
 use App\Services\Saas\IndustryRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CompanyProfileController extends Controller
 {
-    public function edit(Request $request, IndustryRegistry $industries): View
+    public function edit(Request $request, IndustryRegistry $industries, CompanyBrandingService $branding): View
     {
         return view('command-center.settings.company-profile', [
             'company' => $request->user()->company,
             'industries' => $industries->enabled(),
+            'branding' => $branding->forCompany($request->user()->company),
         ]);
     }
 
-    public function update(Request $request, AuditLogger $audit, IndustryRegistry $industries): RedirectResponse
+    public function update(UpdateCompanyProfileRequest $request, AuditLogger $audit, IndustryRegistry $industries, CompanyBrandingService $branding): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'industry' => ['required', 'string', 'max:80'],
-            'legal_name' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:5000'],
-            'tax_id' => ['nullable', 'string', 'max:32'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-        ]);
+        $data = $request->safe()->only(['name', 'industry', 'legal_name', 'address', 'tax_id', 'phone', 'email']);
         $industries->selectable($data['industry']);
         $company = $request->user()->company;
         $company->update($data);
         $audit->record('company.profile.updated', $company, 'Company profile updated.', ['company_id' => $company->id, 'placeholder_company_name' => $company->hasPlaceholderName()]);
 
-        return back()->with('status', 'Company profile saved.');
+        foreach (['company', 'invoice'] as $kind) {
+            $fileKey = $kind.'_logo';
+            if ($request->hasFile($fileKey)) {
+                $company = $branding->replace($company, $request->user(), $request->file($fileKey), $kind);
+            } elseif ($request->boolean('remove_'.$fileKey)) {
+                $company = $branding->remove($company, $request->user(), $kind);
+            }
+        }
+
+        return back()->with('status', 'Company profile and branding saved.');
     }
 }

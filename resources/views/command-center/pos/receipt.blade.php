@@ -22,8 +22,15 @@
         </div>
 
         <article class="pos-receipt rounded-xl bg-white p-6 shadow-[0_8px_28px_rgb(15_23_42_/_0.08)] sm:p-8">
-            <header class="border-b border-dashed border-slate-300 pb-5 text-center">
-                <p class="text-xl font-bold text-slate-950">{{ $gst?->legal_name ?: auth()->user()->company?->name ?? config('app.name') }}</p>
+            @php
+                $receiptLogo = ($branding['show_logo'] ?? false) ? ($branding['data_uri'] ?? null) : null;
+                $receiptAlignment = in_array($branding['logo_position'] ?? null, ['left', 'center', 'right'], true) ? $branding['logo_position'] : 'center';
+                $receiptDimensions = ['small' => 'max-h-7 max-w-20', 'medium' => 'max-h-10 max-w-28', 'large' => 'max-h-12 max-w-36'][$branding['logo_size'] ?? 'medium'] ?? 'max-h-10 max-w-28';
+                $showReceiptName = ($branding['show_company_name'] ?? true) || ! $receiptLogo;
+            @endphp
+            <header class="border-b border-dashed border-slate-300 pb-5" style="text-align: {{ $receiptAlignment }};">
+                @if($receiptLogo)<img src="{{ $receiptLogo }}" alt="{{ $sale->company->name }} logo" class="{{ $receiptDimensions }} mx-auto mb-2 w-auto object-contain @if($receiptAlignment === 'left') mr-auto ml-0 @elseif($receiptAlignment === 'right') ml-auto mr-0 @endif">@endif
+                @if($showReceiptName)<p class="text-xl font-bold text-slate-950">{{ $gst?->legal_name ?: $sale->company->name ?? config('app.name') }}</p>@endif
                 <p class="mt-1 text-sm text-slate-500">{{ $sale->branch?->name }}</p>
                 @if($gst?->gstin)<p class="mt-1 text-xs text-slate-400">GSTIN {{ $gst->gstin }}</p>@endif
             </header>

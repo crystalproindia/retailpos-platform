@@ -46,7 +46,13 @@ class InvoicePdfService
 
     public function receipt(CrmInvoice $invoice, CrmInvoicePayment $payment): DompdfDocument
     {
-        return Pdf::loadView('pdf.crm-payment-receipt', compact('invoice', 'payment'))->setPaper('a4');
+        $invoice->loadMissing('company');
+
+        return Pdf::loadView('pdf.crm-payment-receipt', [
+            'invoice' => $invoice,
+            'payment' => $payment,
+            'branding' => $this->templates->brandingFor($invoice->company),
+        ])->setPaper('a4');
     }
 
     public function filename(CrmInvoice $invoice): string

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\CommandCenter\Crm;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\Crm\InvoiceRepository;
+use App\Services\Branding\CompanyBrandingService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoicePaymentQrService;
 use App\Services\Crm\InvoiceTemplateService;
@@ -13,9 +14,15 @@ use Illuminate\View\View;
 
 class InvoiceTemplateController extends Controller
 {
-    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices): View
+    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices, CompanyBrandingService $branding): View
     {
-        return view('command-center.crm.invoices.templates', ['setting' => $templates->setting($request->user()->company), 'templates' => $templates->definitions(), 'defaults' => $templates->defaultOptions(), 'previewInvoice' => $invoices->paginate($request->user())->first()]);
+        return view('command-center.crm.invoices.templates', [
+            'setting' => $templates->setting($request->user()->company),
+            'templates' => $templates->definitions(),
+            'defaults' => $templates->defaultOptions(),
+            'previewInvoice' => $invoices->paginate($request->user())->first(),
+            'branding' => $branding->forCompany($request->user()->company),
+        ]);
     }
 
     public function preview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, int $invoice): \Illuminate\Http\Response
@@ -44,6 +51,7 @@ class InvoiceTemplateController extends Controller
             ],
             'options' => ['array'],
             'options.show_logo' => ['nullable', 'boolean'], 'options.show_bill_to' => ['nullable', 'boolean'], 'options.show_ship_to' => ['nullable', 'boolean'],
+            'options.logo_position' => ['nullable', 'in:left,center,right'], 'options.logo_size' => ['nullable', 'in:small,medium,large'], 'options.show_company_name' => ['nullable', 'boolean'],
             'options.show_bank_details' => ['nullable', 'boolean'], 'options.show_terms' => ['nullable', 'boolean'], 'options.show_signature' => ['nullable', 'boolean'],
             'options.show_seal' => ['nullable', 'boolean'], 'options.show_amount_words' => ['nullable', 'boolean'], 'options.show_received_amount' => ['nullable', 'boolean'],
             'options.show_previous_balance' => ['nullable', 'boolean'], 'options.show_current_balance' => ['nullable', 'boolean'], 'options.show_hsn_sac' => ['nullable', 'boolean'],

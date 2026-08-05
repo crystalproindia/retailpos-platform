@@ -15,6 +15,7 @@ return [
     'public_signup' => [
         'enabled' => filter_var(env('SAAS_PUBLIC_SIGNUP_ENABLED', false), FILTER_VALIDATE_BOOL),
         'email_otp_enabled' => filter_var(env('SAAS_PUBLIC_SIGNUP_EMAIL_OTP_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'email_delivery_company_id' => env('SAAS_PUBLIC_SIGNUP_EMAIL_DELIVERY_COMPANY_ID'),
         'mobile_otp_enabled' => filter_var(env('SAAS_PUBLIC_SIGNUP_MOBILE_OTP_ENABLED', false), FILTER_VALIDATE_BOOL),
         'mobile_otp_provider' => env('SAAS_MOBILE_OTP_PROVIDER'),
         'session_ttl_minutes' => 30,

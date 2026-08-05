@@ -24,6 +24,7 @@ class PublicSaasSignupController extends Controller
             'industries' => $industries->enabled(),
             'methods' => $signup->methods(),
             'signup' => $record,
+            'deliveryStatus' => $record ? $signup->deliveryStatus($record) : null,
             'termsUrl' => config('saas.public_signup.terms_url'),
             'privacyUrl' => config('saas.public_signup.privacy_url'),
         ]);
@@ -45,7 +46,7 @@ class PublicSaasSignupController extends Controller
         $request->session()->regenerate();
         $request->session()->put('saas_public_signup_token', $result['token']);
 
-        return redirect()->route('saas.public-signup.show')->with('status', 'Enter the code we sent to continue.');
+        return redirect()->route('saas.public-signup.show')->with('status', $signup->deliveryMessage($result['session']));
     }
 
     public function verify(Request $request, PublicFree365SignupService $signup): RedirectResponse
@@ -57,8 +58,8 @@ class PublicSaasSignupController extends Controller
 
     public function resend(Request $request, PublicFree365SignupService $signup): RedirectResponse
     {
-        $signup->resend($this->token($request));
-        return redirect()->route('saas.public-signup.show')->with('status', 'A new code has been sent.');
+        $record = $signup->resend($this->token($request));
+        return redirect()->route('saas.public-signup.show')->with('status', $signup->deliveryMessage($record));
     }
 
     public function complete(Request $request, PublicFree365SignupService $signup): RedirectResponse

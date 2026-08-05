@@ -13,6 +13,7 @@ class SaasPublicSignupSession extends Model
     {
         return [
             'verification_expires_at' => 'datetime',
+            'verification_sequence' => 'integer',
             'resend_available_at' => 'datetime',
             'verified_at' => 'datetime',
             'expires_at' => 'datetime',
@@ -25,6 +26,11 @@ class SaasPublicSignupSession extends Model
     public function onboarding(): BelongsTo
     {
         return $this->belongsTo(SaasTenantOnboarding::class, 'saas_tenant_onboarding_id');
+    }
+
+    public function verificationDelivery(): BelongsTo
+    {
+        return $this->belongsTo(NotificationDelivery::class, 'verification_delivery_id');
     }
 
     public function isExpired(): bool

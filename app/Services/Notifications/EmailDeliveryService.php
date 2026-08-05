@@ -67,6 +67,7 @@ class EmailDeliveryService
         ?string $recipientName = null,
         ?string $reminderStage = null,
         ?string $reminderSource = null,
+        ?array $sensitivePayload = null,
     ): NotificationDelivery {
         $recipient = $this->cleanAddress($recipient);
         $reminderStage = $this->cleanReminderValue($reminderStage, 32);
@@ -92,6 +93,7 @@ class EmailDeliveryService
                     'status' => $configuration['configured'] ? 'queued' : 'skipped_not_configured',
                     'queued_at' => $configuration['configured'] ? now() : null,
                     'payload' => $this->safePayload($payload),
+                    'sensitive_payload' => $configuration['configured'] && $sensitivePayload ? $this->safeSensitivePayload($sensitivePayload) : null,
                     'failure_reason' => $configuration['configured'] ? null : $configuration['reason'],
                 ],
             );
@@ -124,7 +126,8 @@ class EmailDeliveryService
 
         $delivery = $this->lifecycle->transition($delivery, \App\Enums\Notifications\EmailDeliveryStatus::Processing, 'delivery.processing');
 
-        $payload = $delivery->payload ?? [];
+        // Sensitive values, such as short-lived OTPs, remain encrypted at rest until the queued worker sends them.
+        $payload = array_replace($delivery->payload ?? [], $delivery->sensitive_payload ?? []);
         try {
             $invoiceAttachment = $this->invoiceAttachments->forDelivery($delivery);
             $attachments = $invoiceAttachment ? [$invoiceAttachment] : [];
@@ -159,6 +162,9 @@ class EmailDeliveryService
         }
 
         $delivery = $this->lifecycle->transition($delivery, \App\Enums\Notifications\EmailDeliveryStatus::Sent, 'delivery.sent');
+        if ($delivery->sensitive_payload !== null) {
+            $delivery->update(['sensitive_payload' => null]);
+        }
         $this->auditLogger->record('email.sent', $delivery, 'Email delivery sent', ['company_id' => $delivery->company_id, 'template_key' => $delivery->template_key]);
     }
 
@@ -274,6 +280,16 @@ class EmailDeliveryService
             'action_label' => isset($payload['action_label']) ? str((string) $payload['action_label'])->limit(80)->toString() : null,
             'attachment_type' => ($payload['attachment_type'] ?? null) === InvoiceEmailAttachmentService::TYPE ? InvoiceEmailAttachmentService::TYPE : null,
         ];
+    }
+
+    /** @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function safeSensitivePayload(array $payload): array
+    {
+        $allowed = array_intersect_key($payload, array_flip(['heading', 'greeting', 'message', 'details', 'action_url', 'action_label']));
+
+        return array_intersect_key($this->safePayload($allowed), $allowed);
     }
 
     private function cleanAddress(string $address): string

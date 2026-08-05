@@ -4,18 +4,28 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Contracts\Saas\MobileOtpSender;
-use App\Mail\PublicSignupVerificationCode;
 use App\Models\Branch;
+use App\Models\AuditLog;
 use App\Models\Company;
+use App\Models\CompanyEmailSetting;
+use App\Models\NotificationDelivery;
 use App\Models\SaasIndustry;
 use App\Models\SaasPlan;
 use App\Models\SaasPublicSignupSession;
 use App\Models\User;
+use App\Jobs\Notifications\SendNotificationDeliveryJob;
+use App\Mail\CommandCenterEmail;
+use App\Services\Notifications\EmailDeliveryLifecycleService;
+use App\Services\Notifications\EmailDeliveryService;
 use App\Services\Saas\PublicFree365SignupService;
 use App\Services\Saas\Free365OnboardingService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Tests\TestCase;
 
 class PublicSignupTest extends TestCase
@@ -46,24 +56,151 @@ class PublicSignupTest extends TestCase
 
     public function test_email_otp_starts_a_short_lived_hashed_pending_signup(): void
     {
-        Mail::fake();
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: true);
         $response = $this->post(route('saas.public-signup.begin'), ['industry' => 'general_retail', 'verification_method' => 'email', 'email' => 'owner@example.test']);
         $response->assertRedirect(route('saas.public-signup.show'));
         $record = SaasPublicSignupSession::firstOrFail();
+        $delivery = NotificationDelivery::query()->sole();
+        $code = $this->otpCode($delivery);
+
         $this->assertSame('owner@example.test', $record->email);
         $this->assertNotNull($record->verification_code_hash);
         $this->assertNull($record->verified_at);
         $this->assertGreaterThan(now(), $record->expires_at);
-        Mail::assertSent(PublicSignupVerificationCode::class);
+        $this->assertTrue(Hash::check($code, $record->verification_code_hash));
+        $this->assertNotSame($code, $record->verification_code_hash);
+        $this->assertSame($delivery->id, $record->verification_delivery_id);
+        $this->assertSame('queued', $delivery->status);
+        $this->assertSame('saas_public_signup_otp', $delivery->template_key);
+        $this->assertFalse(str_contains((string) $delivery->getRawOriginal('sensitive_payload'), $code));
+        $this->assertStringNotContainsString($code, json_encode($delivery->payload, JSON_THROW_ON_ERROR));
+        $audit = AuditLog::query()->where('event', 'saas.public_signup.otp_delivery_queued')->firstOrFail();
+        $this->assertStringNotContainsString($code, json_encode($audit->properties, JSON_THROW_ON_ERROR));
+        $response->assertSessionHas('status', 'Your OTP has been sent. Enter the code to continue.');
+        Queue::assertPushed(SendNotificationDeliveryJob::class, fn (SendNotificationDeliveryJob $job): bool => $job->deliveryId === $delivery->id);
+        $this->get(route('saas.public-signup.show'))->assertOk()->assertDontSee($code);
+
+        Mail::fake();
+        app(EmailDeliveryService::class)->send($delivery);
+        Mail::assertSent(CommandCenterEmail::class, function (CommandCenterEmail $mail) use ($code): bool {
+            $this->assertSame('Verify your RetailPOS account', $mail->heading);
+            $this->assertStringContainsString($code, $mail->messageText);
+            $this->assertStringContainsString('expires in 10 minutes', $mail->messageText);
+
+            return $mail->hasTo('owner@example.test');
+        });
+        $this->assertNull($delivery->fresh()->sensitive_payload);
+    }
+
+    public function test_missing_smtp_records_a_safe_status_without_losing_the_pending_signup(): void
+    {
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: false);
+
+        $this->post(route('saas.public-signup.begin'), ['industry' => 'general_retail', 'verification_method' => 'email', 'email' => 'owner@example.test'])
+            ->assertRedirect(route('saas.public-signup.show'))
+            ->assertSessionHas('status', 'Email delivery is unavailable right now. Your signup is saved and retry is available.');
+
+        $session = SaasPublicSignupSession::firstOrFail();
+        $delivery = NotificationDelivery::query()->sole();
+        $this->assertSame('skipped_not_configured', $delivery->status);
+        $this->assertSame($delivery->id, $session->verification_delivery_id);
+        $this->assertNotNull($session->verification_code_hash);
+        $this->assertNull($delivery->sensitive_payload);
+        Queue::assertNothingPushed();
+        $this->get(route('saas.public-signup.show'))->assertOk()->assertSee('Email delivery is unavailable.')->assertDontSee('SMTP is not configured.');
+    }
+
+    public function test_queue_failure_is_recorded_without_losing_the_signup_session_or_exposing_transport_errors(): void
+    {
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: true);
+        $started = app(PublicFree365SignupService::class)->begin('general_retail', 'email', 'owner@example.test', '127.0.0.1', 'test');
+        $session = $started['session'];
+        $delivery = NotificationDelivery::query()->sole();
+
+        Mail::shouldReceive('purge')->once()->with('company_smtp');
+        Mail::shouldReceive('mailer')->once()->with('company_smtp')->andThrow(new RuntimeException('SMTP credentials rejected'));
+
+        try {
+            app(EmailDeliveryService::class)->send($delivery);
+            $this->fail('Expected the email transport to fail.');
+        } catch (RuntimeException) {
+            // The existing queue lifecycle keeps the encrypted OTP available for a retry.
+        }
+
+        $this->assertSame('temporarily_failed', $delivery->fresh()->status);
+        $this->assertNotNull($session->fresh()->verification_code_hash);
+        (new SendNotificationDeliveryJob($delivery->id))->failed(new RuntimeException('SMTP credentials rejected'));
+        $this->assertSame('permanently_failed', $delivery->fresh()->status);
+
+        $this->withSession(['saas_public_signup_token' => $started['token']])
+            ->get(route('saas.public-signup.show'))
+            ->assertOk()
+            ->assertSee('OTP delivery failed.')
+            ->assertDontSee('SMTP credentials rejected');
+    }
+
+    public function test_resend_is_rate_limited_and_prevents_an_older_otp_email_from_sending(): void
+    {
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: true);
+        $started = app(PublicFree365SignupService::class)->begin('general_retail', 'email', 'owner@example.test', '127.0.0.1', 'test');
+        $first = NotificationDelivery::query()->sole();
+
+        try {
+            app(PublicFree365SignupService::class)->resend($started['token']);
+            $this->fail('Expected a resend cooldown validation error.');
+        } catch (ValidationException) {
+            // The configured cooldown protects repeated sends.
+        }
+
+        Carbon::setTestNow(now()->addSeconds((int) config('saas.verification.resend_cooldown_seconds', 60) + 1));
+        $session = app(PublicFree365SignupService::class)->resend($started['token']);
+        Carbon::setTestNow();
+        $second = NotificationDelivery::query()->whereKeyNot($first->id)->sole();
+
+        $this->assertSame(2, $session->verification_sequence);
+        $this->assertSame($second->id, $session->verification_delivery_id);
+        $this->assertNotSame($this->otpCode($first), $this->otpCode($second));
+        (new SendNotificationDeliveryJob($first->id))->handle(app(EmailDeliveryService::class), app(EmailDeliveryLifecycleService::class));
+        $this->assertSame('cancelled', $first->fresh()->status);
+        $this->assertNull($first->fresh()->sensitive_payload);
+        Queue::assertPushed(SendNotificationDeliveryJob::class, 2);
+    }
+
+    public function test_expired_otp_is_rejected(): void
+    {
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: true);
+        $service = app(PublicFree365SignupService::class);
+        $expired = $service->begin('general_retail', 'email', 'expired@example.test', '127.0.0.1', 'test');
+        $expired['session']->update(['verification_code_hash' => Hash::make('123456'), 'verification_expires_at' => now()->subSecond()]);
+        $this->expectException(ValidationException::class);
+        $service->verify($expired['token'], '123456');
     }
 
     public function test_verified_signup_provisions_one_free365_tenant_and_is_idempotent(): void
     {
-        Mail::fake();
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: true);
         $started = app(PublicFree365SignupService::class)->begin('general_retail', 'email', 'owner@example.test', '127.0.0.1', 'test');
         $record = $started['session'];
-        $record->update(['verification_code_hash' => Hash::make('123456')]);
-        app(PublicFree365SignupService::class)->verify($started['token'], '123456');
+        $code = $this->otpCode($record->verificationDelivery);
+        try {
+            app(PublicFree365SignupService::class)->verify($started['token'], '000000');
+            $this->fail('Expected an invalid OTP validation error.');
+        } catch (ValidationException) {
+            // A failed attempt does not invalidate the correct current OTP.
+        }
+        app(PublicFree365SignupService::class)->verify($started['token'], $code);
+        try {
+            app(PublicFree365SignupService::class)->verify($started['token'], $code);
+            $this->fail('Expected a used OTP validation error.');
+        } catch (ValidationException) {
+            // OTPs are single-use even before account completion.
+        }
         $payload = ['name' => 'Asha Owner', 'password' => 'password-with-enough-length', 'company_name' => null, 'terms' => true];
         app(PublicFree365SignupService::class)->complete($started['token'], $payload);
         app(PublicFree365SignupService::class)->complete($started['token'], $payload);
@@ -81,7 +218,8 @@ class PublicSignupTest extends TestCase
 
     public function test_unverified_or_duplicate_contact_cannot_provision_a_public_free_account(): void
     {
-        Mail::fake();
+        Queue::fake();
+        $this->platformDeliveryCompany(configured: true);
         $started = app(PublicFree365SignupService::class)->begin('general_retail', 'email', 'owner@example.test', '127.0.0.1', null);
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         app(PublicFree365SignupService::class)->complete($started['token'], ['name' => 'Asha', 'password' => 'password-with-enough-length', 'terms' => true]);
@@ -128,6 +266,37 @@ class PublicSignupTest extends TestCase
         foreach (['dashboard.basic', 'pos.billing', 'sales.invoices', 'inventory.basic', 'customers.basic'] as $feature) $plan->features()->updateOrCreate(['feature_key' => $feature], ['is_enabled' => true]);
         foreach (['users' => 1, 'branches' => 1, 'monthly_invoices' => 25] as $key => $value) $plan->limits()->updateOrCreate(['limit_key' => $key], ['limit_value' => $value]);
         return $plan;
+    }
+
+    private function platformDeliveryCompany(bool $configured): Company
+    {
+        $company = Company::factory()->create();
+        $administrator = User::factory()->for($company)->create(['role' => UserRole::Administrator, 'is_platform_admin' => true]);
+        config()->set('saas.public_signup.email_delivery_company_id', $company->id);
+
+        if ($configured) {
+            CompanyEmailSetting::create([
+                'company_id' => $company->id,
+                'is_enabled' => true,
+                'host' => 'smtp.example.test',
+                'port' => 587,
+                'encryption' => 'tls',
+                'username' => 'mailer@example.test',
+                'from_name' => 'RetailPOS',
+                'from_address' => 'hello@example.test',
+                'updated_by' => $administrator->id,
+            ]);
+        }
+
+        return $company;
+    }
+
+    private function otpCode(NotificationDelivery $delivery): string
+    {
+        preg_match('/\b(\d{6})\b/', (string) ($delivery->sensitive_payload['message'] ?? ''), $matches);
+        $this->assertArrayHasKey(1, $matches);
+
+        return $matches[1];
     }
 
     /** @return array{Company, User} */

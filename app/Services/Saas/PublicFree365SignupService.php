@@ -3,14 +3,12 @@
 namespace App\Services\Saas;
 
 use App\Contracts\Saas\MobileOtpSender;
-use App\Mail\PublicSignupVerificationCode;
 use App\Models\SaasPlan;
 use App\Models\SaasPublicSignupSession;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +19,7 @@ class PublicFree365SignupService
         private readonly IndustryRegistry $industries,
         private readonly TenantProvisioningService $provisioning,
         private readonly AuditLogger $audit,
+        private readonly PublicSignupOtpDeliveryService $otpDelivery,
     ) {}
 
     /** @return array{session: SaasPublicSignupSession, token: string} */
@@ -35,29 +34,35 @@ class PublicFree365SignupService
 
         $token = Str::random(64);
         $code = (string) random_int(100000, 999999);
-        $session = SaasPublicSignupSession::create([
-            'public_token_hash' => hash('sha256', $token),
-            'idempotency_key' => (string) Str::uuid(),
-            'industry_key' => $industry,
-            'verification_method' => $method,
-            'email' => $method === 'email' ? $contact : null,
-            'mobile' => $method === 'mobile' ? $contact : null,
-            'verification_code_hash' => Hash::make($code),
-            'verification_expires_at' => now()->addMinutes((int) config('saas.verification.code_ttl_minutes', 10)),
-            'resend_available_at' => now()->addSeconds((int) config('saas.verification.resend_cooldown_seconds', 60)),
-            'verification_max_attempts' => (int) config('saas.verification.max_attempts', 5),
-            'expires_at' => now()->addMinutes((int) config('saas.public_signup.session_ttl_minutes', 30)),
-            'started_ip_hash' => hash('sha256', $ip),
-            'user_agent_hash' => $userAgent ? hash('sha256', $userAgent) : null,
-            'started_at' => now(),
-        ]);
+        $session = DB::transaction(function () use ($token, $industry, $method, $contact, $ip, $userAgent, $code): SaasPublicSignupSession {
+            $session = SaasPublicSignupSession::create([
+                'public_token_hash' => hash('sha256', $token),
+                'idempotency_key' => (string) Str::uuid(),
+                'industry_key' => $industry,
+                'verification_method' => $method,
+                'email' => $method === 'email' ? $contact : null,
+                'mobile' => $method === 'mobile' ? $contact : null,
+                'verification_code_hash' => Hash::make($code),
+                'verification_sequence' => 1,
+                'verification_delivery_status' => 'pending',
+                'verification_expires_at' => now()->addMinutes((int) config('saas.verification.code_ttl_minutes', 10)),
+                'resend_available_at' => now()->addSeconds((int) config('saas.verification.resend_cooldown_seconds', 60)),
+                'verification_max_attempts' => (int) config('saas.verification.max_attempts', 5),
+                'expires_at' => now()->addMinutes((int) config('saas.public_signup.session_ttl_minutes', 30)),
+                'started_ip_hash' => hash('sha256', $ip),
+                'user_agent_hash' => $userAgent ? hash('sha256', $userAgent) : null,
+                'started_at' => now(),
+            ]);
+            $this->audit->record('saas.public_signup.started', $session, 'Public Free 365 signup started.', [
+                'verification_method' => $method,
+                'industry' => $industry,
+                'signup_token_fingerprint' => $this->fingerprint($token),
+            ]);
+
+            return $session;
+        });
 
         $this->deliver($session, $code);
-        $this->audit->record('saas.public_signup.started', $session, 'Public Free 365 signup started.', [
-            'verification_method' => $method,
-            'industry' => $industry,
-            'signup_token_fingerprint' => $this->fingerprint($token),
-        ]);
 
         return compact('session', 'token');
     }
@@ -74,7 +79,7 @@ class PublicFree365SignupService
 
     public function resend(string $token): SaasPublicSignupSession
     {
-        return DB::transaction(function () use ($token): SaasPublicSignupSession {
+        [$session, $code] = DB::transaction(function () use ($token): array {
             $session = $this->locked($token);
             if ($session->resend_available_at?->isFuture()) {
                 throw ValidationException::withMessages(['verification' => 'Please wait before requesting another code.']);
@@ -84,21 +89,29 @@ class PublicFree365SignupService
             $session->update([
                 'verification_code_hash' => Hash::make($code),
                 'verification_attempts' => 0,
+                'verification_sequence' => $session->verification_sequence + 1,
+                'verification_delivery_id' => null,
+                'verification_delivery_status' => 'pending',
                 'verification_expires_at' => now()->addMinutes((int) config('saas.verification.code_ttl_minutes', 10)),
                 'resend_available_at' => now()->addSeconds((int) config('saas.verification.resend_cooldown_seconds', 60)),
             ]);
-            $this->deliver($session, $code);
             $this->audit->record('saas.public_signup.otp_resent', $session, 'Public signup verification code resent.', ['verification_method' => $session->verification_method]);
 
-            return $session->refresh();
+            return [$session->refresh(), $code];
         });
+
+        $this->deliver($session, $code);
+
+        return $session->refresh();
     }
 
     public function verify(string $token, string $code): SaasPublicSignupSession
     {
         return DB::transaction(function () use ($token, $code): SaasPublicSignupSession {
             $session = $this->locked($token);
-            if ($session->verified_at) return $session;
+            if ($session->verified_at) {
+                throw ValidationException::withMessages(['code' => 'This verification code is no longer valid.']);
+            }
             if (! $session->verification_code_hash || ! $session->verification_expires_at || $session->verification_expires_at->isPast() || $session->verification_attempts >= $session->verification_max_attempts) {
                 throw ValidationException::withMessages(['code' => 'This verification code is no longer valid.']);
             }
@@ -170,6 +183,20 @@ class PublicFree365SignupService
         return ['email' => $this->isMethodAvailable('email'), 'mobile' => $this->isMethodAvailable('mobile')];
     }
 
+    public function deliveryStatus(SaasPublicSignupSession $session): ?string
+    {
+        return $this->otpDelivery->status($session);
+    }
+
+    public function deliveryMessage(SaasPublicSignupSession $session): string
+    {
+        return match ($this->deliveryStatus($session)) {
+            'queued', 'processing', 'sent', 'delivered' => 'Your OTP has been sent. Enter the code to continue.',
+            'skipped_not_configured' => 'Email delivery is unavailable right now. Your signup is saved and retry is available.',
+            default => 'OTP delivery failed. Please retry.',
+        };
+    }
+
     public function normalizeMobile(string $mobile): string
     {
         $digits = preg_replace('/\D+/', '', $mobile) ?? '';
@@ -232,7 +259,7 @@ class PublicFree365SignupService
     private function deliver(SaasPublicSignupSession $session, string $code): void
     {
         if ($session->verification_method === 'email') {
-            Mail::to($session->email)->send(new PublicSignupVerificationCode($code));
+            $this->otpDelivery->queue($session, $code);
             return;
         }
 

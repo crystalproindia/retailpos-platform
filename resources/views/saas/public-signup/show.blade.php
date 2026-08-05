@@ -57,7 +57,13 @@
                 <button class="flex w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300">Continue to verification</button>
             </form>
         @elseif(! $signup->verified_at)
-            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">We sent a code to <strong class="font-semibold text-slate-950">{{ $signup->email ?: $signup->mobile }}</strong>. It expires shortly and can only be used once.</div>
+            @if($signup->verification_method === 'email' && $deliveryStatus === 'skipped_not_configured')
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="status"><strong>Email delivery is unavailable.</strong> Your signup is saved. Please retry once email delivery is restored.</div>
+            @elseif($signup->verification_method === 'email' && in_array($deliveryStatus, ['temporarily_failed', 'permanently_failed', 'failed', 'cancelled'], true))
+                <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert"><strong>OTP delivery failed.</strong> Please retry. No account has been created yet.</div>
+            @else
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">We sent a code to <strong class="font-semibold text-slate-950">{{ $signup->email ?: $signup->mobile }}</strong>. It expires shortly and can only be used once.</div>
+            @endif
             <form method="POST" action="{{ route('saas.public-signup.verify') }}" class="space-y-5">@csrf
                 <label class="block text-sm font-medium text-slate-700">Six-digit verification code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" required autofocus class="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-3 text-center text-lg font-semibold tracking-[0.35em] shadow-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"></label>
                 <button class="flex w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white">Verify and continue</button>

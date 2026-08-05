@@ -7,6 +7,7 @@ use App\Enums\Notifications\EmailDeliveryStatus;
 use App\Services\Notifications\EmailDeliveryService;
 use App\Services\Notifications\EmailDeliveryLifecycleService;
 use App\Services\Crm\InvoiceReminderService;
+use App\Services\Saas\PublicSignupOtpDeliveryService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -29,16 +30,24 @@ class SendNotificationDeliveryJob implements ShouldQueue
 
     public function __construct(public readonly int $deliveryId) {}
 
-    public function handle(EmailDeliveryService $emailDelivery, EmailDeliveryLifecycleService $lifecycle, ?InvoiceReminderService $reminders = null): void
+    public function handle(EmailDeliveryService $emailDelivery, EmailDeliveryLifecycleService $lifecycle, ?InvoiceReminderService $reminders = null, ?PublicSignupOtpDeliveryService $signupOtps = null): void
     {
         $delivery = NotificationDelivery::query()->findOrFail($this->deliveryId);
 
         if (! in_array($delivery->status, ['queued', 'temporarily_failed'], true)) return;
 
         $reminders ??= app(InvoiceReminderService::class);
+        $signupOtps ??= app(PublicSignupOtpDeliveryService::class);
         if (! $reminders->canSendQueuedAutomatic($delivery)) {
             $cancelled = $lifecycle->transition($delivery, EmailDeliveryStatus::Cancelled, 'delivery.reminder_cancelled');
             $cancelled->update(['failure_reason' => 'Automatic reminder cancelled because the invoice is no longer eligible.', 'next_retry_at' => null]);
+
+            return;
+        }
+
+        if (! $signupOtps->canSendQueued($delivery)) {
+            $cancelled = $lifecycle->transition($delivery, EmailDeliveryStatus::Cancelled, 'delivery.signup_otp_cancelled');
+            $cancelled->update(['failure_reason' => 'Signup verification email is no longer active.', 'next_retry_at' => null, 'sensitive_payload' => null]);
 
             return;
         }

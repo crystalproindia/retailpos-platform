@@ -3165,10 +3165,21 @@ validated within the acting company before querying; data filters do not bypass
 outlet authorisation. `ReportValueFormatter` converts only named monetary fields
 from integer minor units, preserving counts and quantities as their real values.
 
-Current-cost stock valuation, gross-profit/margin, sales returns/refunds, historical
-valuation, trends, and charts remain openly unavailable until reliable source
-ledgers and an approved KPI model exist. See `docs/phase-h-reporting-analytics.md`.
+Current-cost stock valuation and gross-profit/margin remain expressly limited;
+historical valuation, trends, and charts remain future reporting work. Completed
+POS returns/refunds are now separately reported and deducted only from net-sales
+views through the Phase Q return ledger. See `docs/phase-h-reporting-analytics.md`.
 
 # Phase K — Attendance, Shifts, Leave and Scheduling
 
 Phase K lives in `app/Services/Attendance`, `app/Http/Controllers/CommandCenter/Attendance`, and `resources/views/command-center/attendance`. The additive migration `2026_08_02_010000_create_attendance_shift_leave_foundation.php` creates shift templates/assignments, attendance records and normalized breaks/corrections, holidays/weekly offs, leave policies, balances and ledger transactions, leave requests, roster publications, and overtime reviews. The shared access service keeps every manager route outlet-scoped; the calculator is the single source of time totals. See `docs/phase-k-attendance-shifts-leave.md`.
+
+# Phase Q — POS Returns, Refunds and Exchanges
+
+Phase Q adds a post-sale workflow without rewriting the existing POS, payment, stock, customer, GST, receipt, or reporting systems. `pos_return_settings`, `pos_return_sequences`, `pos_returns`, `pos_return_items`, and `pos_refunds` are additive tables created by `2026_08_06_010000_create_pos_return_foundation_tables.php`. `pos_sales.returned_amount` and `pos_sales.return_status` are derived lifecycle fields only; original invoice snapshots and totals remain unchanged.
+
+`PosReturnService` is the company/outlet-scoped transactional boundary. It reuses `PosSaleRepository`, `OutletAccessService`, immutable `PosSaleItem` snapshots, `StockMovement`/`StockLevel`, `WalletService`, the Audit Logger, generic POS domain events, Invoice Template branding, and the existing reporting service. It uses integer paise and quantity-thousandth arithmetic so partial return allocations reconcile deterministically to the original line snapshots. A completed return creates a linked credit-note-style document and can issue existing customer wallet credit, while card/UPI/bank records remain explicitly manual and no provider refund is invoked.
+
+Routes under `/pos/returns` provide scoped lookup, return creation, approval/rejection/cancellation, completion, settings, and completed credit-note PDF download. Cancellation is limited to unposted requests and has no inventory, wallet, or refund effect. `pos.returns.view` and `pos.returns.initiate` follow the POS user boundary; approval, completion, window override, reprint, and settings are management capabilities. The POS sidebar child is registered through `config/modules.php`, so desktop and mobile navigation are permission-safe. The `sales_returns` authorised report is separate from existing purchase-return reporting, while net sales are reported after completed sales returns without altering gross-sale snapshots.
+
+See `docs/pos-returns-refunds-exchanges.md` for the calculation method, lifecycle, stock dispositions, GST boundary, reporting contract, and intentional V1 limitations.

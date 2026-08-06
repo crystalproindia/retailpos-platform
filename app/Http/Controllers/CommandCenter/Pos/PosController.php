@@ -140,6 +140,7 @@ class PosController extends Controller
     {
         $sale = $sales->findForUser($request->user(), $sale);
         abort_unless(in_array($sale->status, ['completed', 'voided'], true), 404);
+        $sale->load(['returns' => fn ($returns) => $returns->with(['items', 'exchangeSale'])->latest()]);
 
         $gst = GstSetting::query()->where('company_id', $request->user()->company_id)->first();
 

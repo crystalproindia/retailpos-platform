@@ -79,6 +79,15 @@
                 </div>
             </section>
 
+            @if($sale->returns->isNotEmpty())
+                <section class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                    <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="font-semibold">Return history</p><p class="mt-1">Returned {{ number_format($sale->returned_amount,2) }} · {{ str($sale->return_status)->headline() }} return</p></div><a href="{{ route('pos.returns.index', ['q' => $sale->receipt_number ?: $sale->sale_number]) }}" class="font-semibold text-teal-700">Open returns</a></div>
+                    <div class="mt-3 space-y-2">@foreach($sale->returns as $return)<a href="{{ route('pos.returns.show',$return) }}" class="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2"><span class="font-semibold">{{ $return->return_number }}</span><span>{{ number_format($return->refund_total,2) }} · {{ str($return->status)->replace('_',' ')->title() }}</span></a>@endforeach</div>
+                </section>
+            @elseif($sale->status === 'completed' && auth()->user()->can('pos.returns.create'))
+                <section class="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900"><p class="font-semibold">Need to reverse some or all of this sale?</p><p class="mt-1">Use the controlled return workflow so stock, refunds, and GST adjustments remain auditable.</p><a href="{{ route('pos.returns.create',['sale'=>$sale->id]) }}" class="mt-3 inline-block font-semibold text-teal-700">Start a return</a></section>
+            @endif
+
             <footer class="mt-6 border-t border-dashed border-slate-300 pt-5 text-center text-sm text-slate-500">
                 <p>Thank you for shopping with us.</p>
                 <p class="mt-1 text-xs">Loyalty and wallet settlement are displayed once enabled for this POS workflow.</p>

@@ -28,7 +28,7 @@ class PosSaleRepository
             ->get();
     }
 
-    private function queryForUser(User $user)
+    public function queryForUser(User $user)
     {
         $outletIds = $this->outlets->accessibleOutlets($user)->pluck('id');
 

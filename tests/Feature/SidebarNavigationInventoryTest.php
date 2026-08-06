@@ -22,7 +22,7 @@ class SidebarNavigationInventoryTest extends TestCase
             'dashboard' => [],
             'crm' => ['crm-dashboard', 'contacts', 'leads', 'demo-requests', 'crm-quotations', 'crm-customers', 'crm-proformas', 'crm-onboarding', 'crm-companies', 'crm-pipeline', 'crm-activities', 'crm-follow-ups', 'crm-settings'],
             'sales' => ['sales-invoices', 'sales-opportunities'],
-            'pos' => ['pos-dashboard', 'pos-billing', 'pos-held', 'pos-offline', 'pos-sales', 'pos-registers'],
+            'pos' => ['pos-dashboard', 'pos-billing', 'pos-held', 'pos-offline', 'pos-sales', 'pos-returns', 'pos-registers'],
             'customers' => ['customer-dashboard', 'customer-records', 'customer-groups', 'customer-loyalty', 'customer-birthdays', 'customer-insights', 'customer-inactive', 'customer-lost', 'customer-returns', 'customer-wallet', 'customer-settings'],
             'orders' => [],
             'promotions' => ['promotion-dashboard', 'promotion-campaigns', 'promotion-rules', 'promotion-buy-x-get-y', 'promotion-coupons', 'promotion-combos', 'promotion-product-offers', 'promotion-category-offers', 'promotion-brand-offers', 'promotion-channel-offers', 'promotion-branch-offers', 'promotion-simulator', 'promotion-usage', 'promotion-settings'],

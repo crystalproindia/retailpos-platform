@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Pos\PosRegister;
 use App\Models\Pos\PosRegisterSession;
 use App\Models\Pos\PosSale;
+use App\Models\Pos\PosRefund;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Outlets\OutletAccessService;
@@ -80,7 +81,8 @@ class PosRegisterService
                 throw ValidationException::withMessages(['session' => 'This register session is already closed.']);
             }
             $cashSales = PosSale::query()->where('company_id', $user->company_id)->where('register_session_id', $session->id)->where('status', 'completed')->whereHas('payments', fn ($payments) => $payments->where('payment_method', 'cash')->whereIn('status', ['recorded', 'confirmed']))->with('payments')->get()->sum(fn (PosSale $sale) => $sale->payments->where('payment_method', 'cash')->whereIn('status', ['recorded', 'confirmed'])->sum('amount'));
-            $expected = round((float) $session->opening_cash + (float) $cashSales, 2);
+            $cashRefunds = PosRefund::query()->where('company_id', $user->company_id)->where('method', 'cash')->where('status', 'recorded')->whereHas('posReturn.originalSale', fn ($sales) => $sales->where('register_session_id', $session->id))->sum('amount');
+            $expected = round((float) $session->opening_cash + (float) $cashSales - (float) $cashRefunds, 2);
             $variance = round((float) $closingCash - $expected, 2);
             $session->update(['closed_by' => $user->id, 'closed_at' => now(), 'closing_cash' => $closingCash, 'expected_cash' => $expected, 'variance' => $variance, 'status' => 'closed', 'notes' => $notes ?? $session->notes]);
             $session->register()->update(['current_session_id' => null]);

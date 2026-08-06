@@ -155,6 +155,10 @@ class ReportsController extends Controller
                 $select('category_id', 'Category', $records($options['categories'], 'name')),
                 $select('status', 'Return status', $status(['draft', 'pending_approval', 'approved', 'rejected'])),
             ],
+            'sales_returns' => [
+                $select('customer_id', 'Customer', $records($options['customers'], 'display_name')),
+                $select('status', 'Return status', $status(['completed'])),
+            ],
             default => [],
         };
     }

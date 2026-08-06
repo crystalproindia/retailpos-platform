@@ -11,6 +11,7 @@ use App\Models\Inventory\StockLevel;
 use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosSale;
+use App\Models\Pos\PosReturn;
 use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseReturnItem;
 use App\Models\Purchases\Supplier;
@@ -34,37 +35,41 @@ class RetailReportingService
         $invoices = $this->invoices($user, $scope, $range, $context);
         $sales = $this->sales($user, $scope, $range, $context);
         $returns = $this->returns($user, $scope, $range, $context);
+        $salesReturns = $this->salesReturns($user, $scope, $range, $context);
         $purchases = $this->purchases($user, $scope, $range, $returns['value'], $context);
         $payments = $this->payments($user, $scope, $range, $context);
         $stock = $this->stock($user, $scope, $context);
         $outlets = $this->outletPerformance($user, $scope, $range, $context);
         $cashiers = $this->cashierPerformance($user, $scope, $range, $context);
+        $netSalesAfterReturns = max(0, $sales['net_sales'] - $salesReturns['refund_total']);
 
         return [
             'scope' => $scope,
             'range' => $range,
             'metrics' => [
                 'gross_sales' => $sales['gross_sales'],
-                'net_sales' => $sales['net_sales'],
+                'net_sales' => $netSalesAfterReturns,
                 'invoice_count' => $sales['count'],
-                'average_order_value' => $sales['count'] ? intdiv($sales['net_sales'], $sales['count']) : null,
+                'average_order_value' => $sales['count'] ? intdiv($netSalesAfterReturns, $sales['count']) : null,
                 'purchase_total' => $purchases['total'],
                 'payments_received' => $payments['received'],
                 'outstanding_receivables' => $invoices['outstanding'],
                 'return_value' => $returns['value'],
+                'sales_return_value' => $salesReturns['refund_total'],
                 'stock_value' => $stock['value'],
                 'low_stock_count' => $stock['low_stock_count'],
             ],
             'reports' => [
-                'sales' => $sales + $invoices + ['rows' => $this->salesRows($user, $scope, $range, $context)],
+                'sales' => $sales + $invoices + ['returns_total' => $salesReturns['refund_total'], 'net_sales_after_returns' => $netSalesAfterReturns, 'rows' => $this->salesRows($user, $scope, $range, $context)],
                 'purchases' => $purchases + ['rows' => $this->purchaseRows($user, $scope, $range, $context)],
                 'inventory' => $stock + ['rows' => $this->stockRows($user, $scope, $context)],
                 'movements' => $this->stockMovements($user, $scope, $range, $context),
-                'profitability' => ['net_sales' => $sales['net_sales'], 'cost_of_goods_sold' => null, 'gross_profit' => null, 'notice' => 'Gross profit is unavailable until a reliable invoice-level cost snapshot exists.'],
+                'profitability' => ['net_sales' => $netSalesAfterReturns, 'cost_of_goods_sold' => null, 'gross_profit' => null, 'notice' => 'Gross profit is unavailable until a reliable invoice-level cost snapshot exists.'],
                 'gst' => $this->gst($user, $scope, $range, $context) + ['rows' => $this->gstRows($user, $scope, $range, $context)],
                 'payments' => $payments + ['rows' => $this->paymentRows($user, $scope, $range, $context)],
                 'outstanding' => $invoices + ['rows' => $this->outstandingRows($user, $scope, $range, $context)],
                 'returns' => $returns + ['rows' => $this->returnRows($user, $scope, $range, $context)],
+                'sales_returns' => $salesReturns + ['rows' => $this->salesReturnRows($user, $scope, $range, $context)],
                 'outlets' => $outlets,
                 'cashiers' => $cashiers,
             ],
@@ -236,6 +241,15 @@ class RetailReportingService
         return ['value' => $items->sum(fn (PurchaseReturnItem $item) => $this->quantityValue($item->quantity, $item->unit_cost)), 'count' => $items->count(), 'notice' => 'Purchase returns are supported. Sales-return and refund totals are unavailable until a sales-return ledger is introduced.'];
     }
 
+    private function salesReturns(User $user, array $scope, array $range, array $context): array
+    {
+        $query = $this->branchScope(PosReturn::query()->where('company_id', $user->company_id)->where('status', PosReturn::STATUS_COMPLETED), $scope['ids'])
+            ->whereBetween('completed_at', $this->timestampRange($range))
+            ->when($context['customer_id'] ?? null, fn (Builder $returns, $customerId) => $returns->where('customer_id', $customerId));
+
+        return ['refund_total' => $this->minor((clone $query)->sum('refund_total')), 'store_credit_total' => $this->minor((clone $query)->sum('store_credit_total')), 'tax_adjustment_total' => $this->minor((clone $query)->sum('tax_adjustment_total')), 'exchange_payable_total' => $this->minor((clone $query)->sum('exchange_payable_total')), 'exchange_refund_total' => $this->minor((clone $query)->sum('exchange_refund_total')), 'count' => (clone $query)->count(), 'notice' => 'Completed POS returns only. Manual refund records are operational records; no payment-gateway action is implied.'];
+    }
+
     private function stock(User $user, array $scope, array $context): array
     {
         $warehouseId = $scope['warehouse_id'];
@@ -364,6 +378,16 @@ class RetailReportingService
             $this->purchaseReturnFilters($this->branchScope($returns->where('company_id', $user->company_id), $scope['ids']), $context)->when($warehouseId, fn (Builder $query) => $query->where('warehouse_id', $warehouseId))->whereDate('return_date', '>=', $range['from']->toDateString())->whereDate('return_date', '<=', $range['to']->toDateString());
         })->limit(500)->get()
             ->map(fn (PurchaseReturnItem $item) => ['date' => $item->purchaseReturn?->return_date?->toDateString(), 'reference' => $item->purchaseReturn?->return_number, 'supplier' => $item->purchaseReturn?->supplier?->name, 'product' => $item->product?->name, 'outlet' => $item->purchaseReturn?->branch?->name, 'quantity' => (string) $item->quantity, 'value' => $this->quantityValue($item->quantity, $item->unit_cost)])->all();
+    }
+
+    private function salesReturnRows(User $user, array $scope, array $range, array $context): array
+    {
+        return $this->branchScope(PosReturn::query()->where('company_id', $user->company_id)->where('status', PosReturn::STATUS_COMPLETED), $scope['ids'])
+            ->whereBetween('completed_at', $this->timestampRange($range))
+            ->when($context['customer_id'] ?? null, fn (Builder $returns, $customerId) => $returns->where('customer_id', $customerId))
+            ->with(['branch:id,name', 'customer:id,display_name', 'originalSale:id,sale_number,receipt_number'])
+            ->latest('completed_at')->limit(500)->get()
+            ->map(fn (PosReturn $return) => ['date' => $return->completed_at?->setTimezone($range['timezone'])->toDateString(), 'return_number' => $return->return_number, 'credit_note' => $return->credit_note_number, 'original_sale' => $return->originalSale?->receipt_number ?: $return->originalSale?->sale_number, 'customer' => $return->customer?->display_name ?: 'Walk-in', 'outlet' => $return->branch?->name, 'refund_total' => $this->minor($return->refund_total), 'store_credit_total' => $this->minor($return->store_credit_total), 'tax_adjustment_total' => $this->minor($return->tax_adjustment_total), 'status' => $return->status])->all();
     }
 
     private function outletPerformance(User $user, array $scope, array $range, array $context): array

@@ -13,5 +13,6 @@
 </head>
 <body class="pos-shell min-h-screen bg-slate-100 text-slate-950 antialiased">
     @yield('content')
+    @stack('scripts')
 </body>
 </html>

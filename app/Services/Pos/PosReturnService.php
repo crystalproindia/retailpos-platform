@@ -93,6 +93,18 @@ class PosReturnService
         return DB::transaction(function () use ($user, $sale, $data): PosReturn {
             $sale = $this->saleForReturn($user, $sale->id, (bool) ($data['window_override'] ?? false));
             $sale = PosSale::query()->with(['items', 'payments', 'returns.items'])->lockForUpdate()->findOrFail($sale->id);
+            $idempotencyKey = (string) ($data['idempotency_key'] ?? str()->uuid());
+            $existing = PosReturn::query()
+                ->where('company_id', $user->company_id)
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
+            if ($existing) {
+                if ((int) $existing->original_sale_id !== (int) $sale->id) {
+                    throw ValidationException::withMessages(['idempotency_key' => 'This request key has already been used for another sale.']);
+                }
+
+                return $existing->load(['items', 'refunds', 'originalSale.payments', 'customer']);
+            }
             $calculation = $this->calculate($sale, $data['items'] ?? []);
             if ($calculation['refund_total_minor'] <= 0) {
                 throw ValidationException::withMessages(['items' => 'Choose at least one remaining item quantity to return.']);
@@ -121,9 +133,6 @@ class PosReturnService
             }
             $this->validateSettlement($sale, $data, $calculation['refund_total_minor'], $settings);
             $exchange = $this->exchangeSale($user, $sale, $data['exchange_sale_id'] ?? null);
-            $idempotencyKey = (string) ($data['idempotency_key'] ?? str()->uuid());
-            $existing = PosReturn::query()->where('company_id', $user->company_id)->where('idempotency_key', $idempotencyKey)->first();
-            if ($existing) return $existing->load(['items', 'refunds', 'originalSale.payments', 'customer']);
             $numbers = $this->nextNumbers($user->company_id, $sale->branch_id, now());
 
             $requiresApproval = $settings->manager_approval_required || ($settings->approval_threshold !== null && $calculation['refund_total_minor'] > $this->minor((string) $settings->approval_threshold));
@@ -165,6 +174,7 @@ class PosReturnService
             if ($return->status === PosReturn::STATUS_APPROVED) return $return;
             if ($return->status !== PosReturn::STATUS_PENDING_APPROVAL) throw ValidationException::withMessages(['return' => 'Only pending returns can be approved.']);
             if ($return->requested_by === $user->id && ! $user->isAdministrator()) throw ValidationException::withMessages(['approval' => 'A different manager must approve a return you requested.']);
+            PosSale::query()->whereKey($return->original_sale_id)->lockForUpdate()->firstOrFail();
             $this->assertStillReturnable($return);
             $return->update(['status' => PosReturn::STATUS_APPROVED, 'approved_by' => $user->id, 'approved_at' => now()]);
             $this->audit->record('pos.return.approved', $return, "POS return {$return->return_number} approved", ['company_id' => $user->company_id]);
@@ -297,7 +307,7 @@ class PosReturnService
         foreach ($data['refunds'] ?? [] as $refund) {
             if (! in_array($refund['method'] ?? '', ['cash', 'card', 'upi', 'bank_transfer', 'store_credit', 'other'], true)) throw ValidationException::withMessages(['refunds' => 'Choose a supported refund method.']);
             if (($refund['method'] ?? null) === 'store_credit' && (! $settings->store_credit_allowed || ! $sale->customer_id)) throw ValidationException::withMessages(['refunds' => 'Store credit is unavailable for this return.']);
-            if (filled($refund['external_reference'] ?? null) && PosRefund::query()->where('company_id', $sale->company_id)->where('external_reference', $refund['external_reference'])->whereNotIn('status', ['failed', 'cancelled'])->exists()) throw ValidationException::withMessages(['refunds' => 'This external refund reference is already in use.']);
+            if (filled($refund['external_reference'] ?? null) && PosRefund::query()->where('company_id', $sale->company_id)->where('external_reference', $refund['external_reference'])->exists()) throw ValidationException::withMessages(['refunds' => 'This external refund reference is already in use.']);
             if ($settings->refund_original_method_only && ($refund['method'] ?? null) !== 'store_credit' && ! $sale->payments->contains(fn ($payment) => $payment->id === (int) ($refund['original_payment_id'] ?? 0) && $payment->payment_method === $refund['method'])) throw ValidationException::withMessages(['refunds' => 'Refunds must use a recorded original payment method.']);
         }
     }
@@ -305,7 +315,7 @@ class PosReturnService
     private function restoreStock(User $user, PosReturn $return, PosReturnItem $item): void
     {
         if (! $item->product_id) return;
-        $existing = StockMovement::query()->where('reference_type', PosReturn::class)->where('reference_id', $return->id)->where('product_id', $item->product_id)->where('movement_type', 'sale_return')->exists();
+        $existing = StockMovement::query()->where('pos_return_item_id', $item->id)->exists();
         if ($existing) return;
         $saleMovement = StockMovement::query()->where('reference_type', PosSale::class)->where('reference_id', $return->original_sale_id)->where('product_id', $item->product_id)->where('movement_type', 'sale')->latest('id')->first();
         if (! $saleMovement) return;
@@ -318,7 +328,7 @@ class PosReturnService
         $quantity = (float) $item->return_quantity;
         $after = $restock ? $before + $quantity : $before;
         if ($restock) $level->update(['quantity_on_hand' => $after, 'quantity_available' => (float) $level->quantity_available + $quantity, 'last_stock_movement_at' => now()]);
-        StockMovement::create(['company_id' => $user->company_id, 'branch_id' => $return->branch_id, 'warehouse_id' => $level->warehouse_id, 'stock_location_id' => $level->stock_location_id, 'product_id' => $item->product_id, 'movement_type' => 'sale_return', 'direction' => $restock ? 'in' : 'neutral', 'quantity' => $item->return_quantity, 'quantity_before' => $before, 'quantity_after' => $after, 'unit_cost' => $saleMovement->unit_cost, 'reference_type' => PosReturn::class, 'reference_id' => $return->id, 'reason' => $disposition, 'notes' => $item->condition_note, 'created_by' => $user->id, 'occurred_at' => now()]);
+        StockMovement::create(['company_id' => $user->company_id, 'branch_id' => $return->branch_id, 'warehouse_id' => $level->warehouse_id, 'stock_location_id' => $level->stock_location_id, 'product_id' => $item->product_id, 'pos_return_item_id' => $item->id, 'movement_type' => 'sale_return', 'direction' => $restock ? 'in' : 'neutral', 'quantity' => $item->return_quantity, 'quantity_before' => $before, 'quantity_after' => $after, 'unit_cost' => $saleMovement->unit_cost, 'reference_type' => PosReturn::class, 'reference_id' => $return->id, 'reason' => $disposition, 'notes' => $item->condition_note, 'created_by' => $user->id, 'occurred_at' => now()]);
     }
 
     private function recordCustomerReturn(?Customer $customer, PosReturn $return, User $user): void

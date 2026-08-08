@@ -8,7 +8,9 @@ Phase Q adds post-sale returns to the existing POS billing ledger. It never edit
 
 Migration `2026_08_06_010000_create_pos_return_foundation_tables.php` adds `pos_return_settings`, `pos_return_sequences`, `pos_returns`, `pos_return_items`, and `pos_refunds`, plus read-only derived return metadata on `pos_sales`. Existing `customer_wallet_transactions` provides customer store credit; no competing wallet is introduced.
 
-`PosReturnService` is the transaction boundary. It uses `PosSaleRepository` and `OutletAccessService` for company/outlet scope, original POS sale-item snapshots for all money and GST calculations, the existing stock ledger for restoration, `WalletService` for store credit, and the Audit/Domain Event services for traceability. Completion locks the return and sale, posts each stock movement at most once, records manual refunds, issues any store credit, allocates the credit-note number, and then updates only the sale's derived return status and total.
+Follow-up migration `2026_08_06_010100_add_return_line_guards_to_pos_movements_and_refunds.php` gives each posted stock-restoration movement a nullable return-line reference and enforces one movement per return line. It also enforces unique non-null external refund references within a company, preventing an operator from recording the same payment-provider reference twice.
+
+`PosReturnService` is the transaction boundary. It uses `PosSaleRepository` and `OutletAccessService` for company/outlet scope, original POS sale-item snapshots for all money and GST calculations, the existing stock ledger for restoration, `WalletService` for store credit, and the Audit/Domain Event services for traceability. Completion locks the return and sale, posts each stock movement at most once per return line, records manual refunds, issues any store credit, allocates the credit-note number, and then updates only the sale's derived return status and total.
 
 ## Calculation and Controls
 

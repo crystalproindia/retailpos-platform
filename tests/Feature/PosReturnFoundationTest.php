@@ -11,6 +11,7 @@ use App\Models\Inventory\InventoryUnit;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\StockLevel;
 use App\Models\Inventory\StockLocation;
+use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosReturn;
 use App\Models\Pos\PosReturnSetting;
@@ -66,12 +67,65 @@ class PosReturnFoundationTest extends TestCase
         $service->create($manager, $sale, $this->payload($sale, $item->id, '3.001', 'cash', '100.00', 'over-return'));
     }
 
+    public function test_each_return_line_restores_stock_once_when_a_sale_contains_the_same_product_twice(): void
+    {
+        [$manager, $product, , $sale] = $this->completedSale('1.000', '120.00', true);
+        PosReturnSetting::firstOrCreate(['company_id' => $manager->company_id])->update(['manager_approval_required' => false]);
+        $return = app(PosReturnService::class)->create($manager, $sale, [
+            'return_type' => 'full_return',
+            'reason_code' => 'changed_mind',
+            'receipt_confirmed' => true,
+            'items' => $sale->items->map(fn ($item) => ['original_sale_item_id' => $item->id, 'return_quantity' => '1.000', 'stock_disposition' => 'restock'])->all(),
+            'refunds' => [['original_payment_id' => $sale->payments->first()->id, 'method' => 'cash', 'amount' => '240.00']],
+            'idempotency_key' => '66666666-6666-4666-8666-666666666666',
+        ]);
+
+        app(PosReturnService::class)->complete($manager, $return);
+
+        $this->assertDatabaseHas('stock_levels', ['product_id' => $product->id, 'quantity_on_hand' => 6, 'quantity_available' => 6]);
+        $this->assertDatabaseCount('stock_movements', 4);
+        $this->assertSame(2, StockMovement::query()->whereNotNull('pos_return_item_id')->count());
+    }
+
+    public function test_external_refund_references_are_unique_within_a_company(): void
+    {
+        [$manager, , , $sale] = $this->completedSale('2.000', '60.00');
+        PosReturnSetting::firstOrCreate(['company_id' => $manager->company_id])->update(['manager_approval_required' => false]);
+        $service = app(PosReturnService::class);
+        $item = $sale->items->first();
+
+        $first = $service->create($manager, $sale, $this->payload($sale, $item->id, '1.000', 'cash', '60.00', 'reference-one', 'CASH-REF-001'));
+        $service->complete($manager, $first);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $service->create($manager, $sale->refresh()->load(['items', 'returns.items', 'payments']), $this->payload($sale, $item->id, '1.000', 'cash', '60.00', 'reference-two', 'CASH-REF-001'));
+    }
+
+    public function test_return_creation_retry_reuses_completed_return_before_recalculation(): void
+    {
+        [$manager, , , $sale] = $this->completedSale();
+        PosReturnSetting::firstOrCreate(['company_id' => $manager->company_id])->update(['manager_approval_required' => false]);
+        $service = app(PosReturnService::class);
+        $payload = $this->payload($sale, $sale->items->first()->id, '1.000', 'cash', '120.00', 'retry', 'CASH-RETRY-001');
+        $return = $service->create($manager, $sale, $payload);
+        $service->complete($manager, $return);
+
+        $retry = $service->create($manager, $sale->refresh()->load(['items', 'returns.items', 'payments']), $payload);
+
+        $this->assertSame($return->id, $retry->id);
+        $this->assertDatabaseCount('pos_returns', 1);
+        $this->assertDatabaseCount('pos_refunds', 1);
+        $this->assertDatabaseCount('stock_movements', 2);
+    }
+
     public function test_return_routes_enforce_tenant_scope_and_valid_screen_loads(): void
     {
         [$manager, , , $sale] = $this->completedSale();
+        $return = app(PosReturnService::class)->create($manager, $sale, $this->payload($sale, $sale->items->first()->id, '1.000', 'cash', '120.00'));
         $outsider = User::factory()->create(['role' => UserRole::Manager]);
         $this->actingAs($manager)->get('/pos/returns')->assertOk()->assertSee('Returns and refunds');
         $this->actingAs($manager)->get('/pos/returns/create?sale='.$sale->id)->assertOk()->assertSee('Create return');
+        $this->actingAs($manager)->get('/pos/returns/'.$return->id)->assertOk()->assertSee($return->return_number);
         $this->actingAs($outsider)->get('/pos/returns/create?sale='.$sale->id)->assertNotFound();
         $staff = User::factory()->for($manager->company)->create(['branch_id' => $manager->branch_id, 'role' => UserRole::Staff]);
         $this->actingAs($staff)->get('/pos/returns')->assertForbidden();
@@ -130,7 +184,7 @@ class PosReturnFoundationTest extends TestCase
     }
 
     /** @return array{User,Product,Customer,PosSale} */
-    private function completedSale(string $quantity = '1.000', string $total = '120.00'): array
+    private function completedSale(string $quantity = '1.000', string $total = '120.00', bool $duplicateLine = false): array
     {
         $company = Company::factory()->create();
         $branch = Branch::factory()->for($company)->create(['is_active' => true]);
@@ -141,15 +195,19 @@ class PosReturnFoundationTest extends TestCase
         $product = Product::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'category_id' => $category->id, 'unit_id' => $unit->id, 'name' => 'Return item', 'slug' => 'return-item', 'sku' => 'RET-ITEM', 'barcode' => '8900000000101', 'selling_price' => $total, 'cost_price' => '60.00', 'track_inventory' => true, 'status' => 'active', 'is_active' => true]);
         $warehouse = Warehouse::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'name' => 'Return store', 'code' => 'RET-WH', 'type' => 'store', 'country' => 'India', 'is_active' => true]);
         $location = StockLocation::create(['company_id' => $company->id, 'warehouse_id' => $warehouse->id, 'name' => 'Return bin', 'code' => 'RET-BIN', 'type' => 'bin', 'is_active' => true]);
-        StockLevel::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'warehouse_id' => $warehouse->id, 'stock_location_id' => $location->id, 'product_id' => $product->id, 'quantity_on_hand' => 5, 'quantity_available' => 5]);
-        $payment = number_format((float) $quantity * (float) $total, 2, '.', '');
-        $this->actingAs($manager)->post('/pos/checkout', ['customer_id' => $customer->id, 'items' => [['product_id' => $product->id, 'quantity' => $quantity, 'unit_price' => $total]], 'payments' => [['method' => 'cash', 'amount' => $payment]]])->assertRedirect();
+        StockLevel::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'warehouse_id' => $warehouse->id, 'stock_location_id' => $location->id, 'product_id' => $product->id, 'quantity_on_hand' => $duplicateLine ? 6 : 5, 'quantity_available' => $duplicateLine ? 6 : 5]);
+        $items = [['product_id' => $product->id, 'quantity' => $quantity, 'unit_price' => $total]];
+        if ($duplicateLine) {
+            $items[] = ['product_id' => $product->id, 'quantity' => $quantity, 'unit_price' => $total];
+        }
+        $payment = number_format((float) $quantity * (float) $total * count($items), 2, '.', '');
+        $this->actingAs($manager)->post('/pos/checkout', ['customer_id' => $customer->id, 'items' => $items, 'payments' => [['method' => 'cash', 'amount' => $payment]]])->assertRedirect();
 
         return [$manager, $product, $customer, PosSale::query()->with(['items', 'payments'])->firstOrFail()];
     }
 
-    private function payload(PosSale $sale, int $saleItemId, string $quantity, string $method, string $amount, string $key = 'request'): array
+    private function payload(PosSale $sale, int $saleItemId, string $quantity, string $method, string $amount, string $key = 'request', ?string $externalReference = null): array
     {
-        return ['return_type' => 'partial_return', 'reason_code' => 'changed_mind', 'receipt_confirmed' => true, 'items' => [['original_sale_item_id' => $saleItemId, 'return_quantity' => $quantity, 'stock_disposition' => 'restock']], 'refunds' => [['original_payment_id' => $sale->payments->first()->id, 'method' => $method, 'amount' => $amount]], 'idempotency_key' => match ($key) { 'one-third' => '77777777-7777-4777-8777-777777777777', 'remaining' => '88888888-8888-4888-8888-888888888888', default => '99999999-9999-4999-8999-999999999999' }];
+        return ['return_type' => 'partial_return', 'reason_code' => 'changed_mind', 'receipt_confirmed' => true, 'items' => [['original_sale_item_id' => $saleItemId, 'return_quantity' => $quantity, 'stock_disposition' => 'restock']], 'refunds' => [['original_payment_id' => $sale->payments->first()->id, 'method' => $method, 'amount' => $amount, 'external_reference' => $externalReference]], 'idempotency_key' => match ($key) { 'one-third' => '77777777-7777-4777-8777-777777777777', 'remaining' => '88888888-8888-4888-8888-888888888888', 'reference-one' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'reference-two' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'retry' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', default => '99999999-9999-4999-8999-999999999999' }];
     }
 }

@@ -110,8 +110,8 @@ return new class extends Migration
         $this->addColumnIfMissing('stock_transfer_items', 'notes', fn (Blueprint $table) => $table->text('notes')->nullable()->after('unit_snapshot'));
 
         $this->addForeignIdIfMissing('reorder_rules', 'stock_location_id', 'warehouse_id', 'stock_locations', 'cascade');
-        $this->dropIndexIfPresent('reorder_rules', ['company_id', 'warehouse_id', 'product_id'], true);
         $this->addIndexIfMissing('reorder_rules', 'reorder_rule_location_product_uq', ['company_id', 'warehouse_id', 'stock_location_id', 'product_id'], true);
+        $this->dropIndexIfPresent('reorder_rules', ['company_id', 'warehouse_id', 'product_id'], true);
 
         if (! Schema::hasTable('inventory_transfer_receipts')) {
             Schema::create('inventory_transfer_receipts', function (Blueprint $table): void {
@@ -308,7 +308,7 @@ return new class extends Migration
     /** @param array<int, string> $columns */
     private function addIndexIfMissing(string $tableName, string $indexName, array $columns, bool $unique = false): void
     {
-        if (Schema::hasIndex($tableName, $indexName)
+        if (Schema::hasIndex($tableName, $indexName, $unique ? 'unique' : null)
             || Schema::hasIndex($tableName, $columns, $unique ? 'unique' : null)) {
             return;
         }

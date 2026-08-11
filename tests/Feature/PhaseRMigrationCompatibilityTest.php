@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Inventory\InventoryUnit;
 use App\Models\Inventory\Warehouse;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +90,22 @@ class PhaseRMigrationCompatibilityTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $reorderRuleId = DB::table('reorder_rules')->insertGetId([
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $productId,
+            'minimum_stock' => 4,
+            'reorder_point' => 6,
+            'reorder_quantity' => 12,
+            'requires_approval' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->assertTrue(Schema::hasIndex('reorder_rules', ['company_id', 'warehouse_id', 'product_id'], 'unique'));
+        $this->assertTrue(Schema::hasForeignKey('reorder_rules', ['company_id']));
 
         Schema::table('products', function (Blueprint $table): void {
             $table->boolean('track_batches')->default(false)->after('track_inventory');
@@ -106,6 +123,13 @@ class PhaseRMigrationCompatibilityTest extends TestCase
         $this->assertEquals(1.25, DB::table('stock_levels')->where('id', $stockLevelId)->value('quantity_damaged'));
         $this->assertSame($warehouse->id, DB::table('pos_registers')->where('id', $registerId)->value('warehouse_id'));
         $this->assertSame(1, DB::table('warehouses')->where('company_id', $company->id)->where('branch_id', $branch->id)->count());
+        $this->assertDatabaseHas('reorder_rules', [
+            'id' => $reorderRuleId,
+            'company_id' => $company->id,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $productId,
+            'reorder_quantity' => 12,
+        ]);
 
         foreach (['pack_size', 'track_batches', 'track_serials', 'track_expiry'] as $column) {
             $this->assertTrue(Schema::hasColumn('products', $column), $column.' was not preserved or created.');
@@ -136,11 +160,77 @@ class PhaseRMigrationCompatibilityTest extends TestCase
             'pos_registers' => ['warehouse_id', 'stock_location_id'],
             'stock_transfers' => ['source_stock_location_id', 'destination_stock_location_id', 'approved_by', 'packed_by', 'rejected_by'],
             'stock_transfer_items' => ['source_stock_location_id', 'destination_stock_location_id'],
-            'reorder_rules' => ['stock_location_id'],
+            'reorder_rules' => ['company_id', 'warehouse_id', 'product_id', 'stock_location_id'],
         ] as $table => $columns) {
             foreach ($columns as $column) {
                 $this->assertTrue(Schema::hasForeignKey($table, [$column]), $table.'.'.$column.' foreign key is missing.');
             }
         }
+
+        $locationA = DB::table('stock_locations')->insertGetId([
+            'company_id' => $company->id,
+            'warehouse_id' => $warehouse->id,
+            'name' => 'Compatibility Location A',
+            'code' => 'COMPAT-A',
+            'type' => 'storage',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $locationB = DB::table('stock_locations')->insertGetId([
+            'company_id' => $company->id,
+            'warehouse_id' => $warehouse->id,
+            'name' => 'Compatibility Location B',
+            'code' => 'COMPAT-B',
+            'type' => 'storage',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('reorder_rules')->where('id', $reorderRuleId)->update(['stock_location_id' => $locationA]);
+        DB::table('reorder_rules')->insert([
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'stock_location_id' => $locationB,
+            'product_id' => $productId,
+            'minimum_stock' => 4,
+            'reorder_point' => 6,
+            'reorder_quantity' => 12,
+            'requires_approval' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->assertSame(2, DB::table('reorder_rules')->where('product_id', $productId)->count());
+
+        try {
+            DB::table('reorder_rules')->insert([
+                'company_id' => $company->id,
+                'branch_id' => $branch->id,
+                'warehouse_id' => $warehouse->id,
+                'stock_location_id' => $locationA,
+                'product_id' => $productId,
+                'minimum_stock' => 4,
+                'reorder_point' => 6,
+                'reorder_quantity' => 12,
+                'requires_approval' => true,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->fail('The location-level reorder uniqueness constraint was not enforced.');
+        } catch (QueryException) {
+            $this->assertSame(2, DB::table('reorder_rules')->where('product_id', $productId)->count());
+        }
+
+        $migrationSource = file_get_contents(database_path('migrations/2026_08_07_010000_add_advanced_inventory_warehouse_foundation.php'));
+        $this->assertTrue(
+            strpos($migrationSource, "addIndexIfMissing('reorder_rules', 'reorder_rule_location_product_uq'")
+            < strpos($migrationSource, "dropIndexIfPresent('reorder_rules'"),
+            'The replacement index must be created before the foreign-key-supporting legacy index is dropped.',
+        );
     }
 }

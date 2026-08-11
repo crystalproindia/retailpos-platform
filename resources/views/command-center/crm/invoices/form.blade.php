@@ -18,6 +18,19 @@
         @else
             @php
                 $formItems = old('items', $invoice?->items?->map(fn ($item) => ['name' => $item->name, 'description' => $item->description, 'quantity' => $item->quantity, 'unit' => $item->unit, 'unit_price' => $item->unit_price, 'discount_type' => $item->discount_type, 'discount_value' => $item->discount_value, 'tax_rate' => $item->tax_rate])->all() ?? [['name' => '', 'description' => '', 'quantity' => '1', 'unit' => 'service', 'unit_price' => '0', 'discount_type' => 'fixed', 'discount_value' => '0', 'tax_rate' => '0']]);
+                $selectedCustomer ??= $invoice?->customer;
+                $selectedCustomerPayload = $selectedCustomer ? [
+                    'id' => $selectedCustomer->id,
+                    'name' => $selectedCustomer->display_name,
+                    'company_name' => $selectedCustomer->company_name,
+                    'phone' => $selectedCustomer->phone,
+                    'email' => $selectedCustomer->email,
+                    'tax_number' => $selectedCustomer->tax_number,
+                    'billing_address' => $selectedCustomer->billing_address,
+                    'country' => $selectedCustomer->country,
+                    'business_type' => $selectedCustomer->business_type,
+                    'outstanding' => null,
+                ] : null;
             @endphp
             <form method="POST" action="{{ $invoice ? route('sales.invoices.update', $invoice) : route('sales.invoices.store') }}" class="space-y-6">
                 @csrf
@@ -26,17 +39,34 @@
                     <h1 class="text-xl font-semibold text-slate-950 dark:text-white">{{ $invoice ? 'Edit draft invoice' : 'New sales invoice' }}</h1>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $invoice ? 'Update this draft before issuing it. Issued invoices are protected from silent commercial changes.' : 'Add the billing details and line items. RetailPOS calculates totals on the server when you save.' }}</p>
                     @if ($errors->any())<div class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Please review the highlighted information and try again.</div>@endif
+                    <div class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950" data-customer-selector data-search-url="{{ route('sales.invoices.customers.search') }}" data-create-url="{{ route('sales.invoices.customers.store') }}" data-selected='@json($selectedCustomerPayload)'>
+                        <input type="hidden" name="customer_id" value="{{ old('customer_id', $selectedCustomer?->id) }}" data-customer-id>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div><h2 class="text-sm font-semibold text-slate-950 dark:text-white">Customer</h2><p class="mt-1 text-xs leading-5 text-slate-500">Search an existing CRM customer, create one here, or continue as a walk-in invoice.</p></div>
+                            @can('crm.customers.create')<button type="button" data-new-customer class="inline-flex min-h-11 items-center justify-center rounded-lg border border-teal-300 bg-white px-4 text-sm font-semibold text-teal-800 transition hover:bg-teal-50 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-200">+ New Customer</button>@endcan
+                        </div>
+                        <div class="mt-4" data-customer-search-wrap>
+                            <label class="text-sm font-medium" for="invoice-customer-search">Find customer</label>
+                            <div class="mt-1 flex gap-2"><input id="invoice-customer-search" data-customer-search autocomplete="off" placeholder="Name, phone, email or GSTIN" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"><button type="button" data-clear-customer class="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">Walk-in</button></div>
+                            <div data-customer-results class="mt-2 hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"></div>
+                        </div>
+                        <div data-selected-customer class="mt-4 hidden rounded-lg border border-teal-200 bg-white p-4 dark:border-teal-900 dark:bg-slate-900">
+                            <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p data-customer-name class="truncate font-semibold text-slate-950 dark:text-white"></p><p data-customer-company class="mt-1 truncate text-sm text-slate-500"></p></div><span class="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800 dark:bg-teal-950 dark:text-teal-200">Selected</span></div>
+                            <div class="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 dark:text-slate-300"><p data-customer-phone></p><p data-customer-tax></p><p data-customer-address class="sm:col-span-2"></p><p data-customer-outstanding class="font-semibold text-amber-700 dark:text-amber-300"></p></div>
+                        </div>
+                        <p data-customer-feedback class="mt-2 hidden text-sm" role="status" aria-live="polite"></p>
+                    </div>
                     <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                        <label class="text-sm font-medium">Billing name<input name="billing_name" value="{{ old('billing_name', $invoice?->billing_name) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
-                        <label class="text-sm font-medium">Company<input name="billing_company" value="{{ old('billing_company', $invoice?->billing_company) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
-                        <label class="text-sm font-medium">Email<input name="billing_email" type="email" value="{{ old('billing_email', $invoice?->billing_email) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
-                        <label class="text-sm font-medium">Phone<input name="billing_phone" value="{{ old('billing_phone', $invoice?->billing_phone) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="text-sm font-medium">Billing name<input name="billing_name" value="{{ old('billing_name', $invoice?->billing_name ?? $selectedCustomer?->display_name) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="text-sm font-medium">Company<input name="billing_company" value="{{ old('billing_company', $invoice?->billing_company ?? $selectedCustomer?->company_name) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="text-sm font-medium">Email<input name="billing_email" type="email" value="{{ old('billing_email', $invoice?->billing_email ?? $selectedCustomer?->email) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="text-sm font-medium">Phone<input name="billing_phone" value="{{ old('billing_phone', $invoice?->billing_phone ?? $selectedCustomer?->phone) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Currency<input name="currency" required maxlength="3" value="{{ old('currency', $invoice?->currency ?? 'INR') }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Due date<input name="due_date" type="date" value="{{ old('due_date', $invoice?->due_date?->toDateString()) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
-                        <label class="text-sm font-medium">Customer tax number<input name="customer_tax_number" value="{{ old('customer_tax_number', $invoice?->customer_tax_number) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="text-sm font-medium">Customer tax number<input name="customer_tax_number" value="{{ old('customer_tax_number', $invoice?->customer_tax_number ?? $selectedCustomer?->tax_number) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Place of supply<input name="place_of_supply" value="{{ old('place_of_supply', $invoice?->place_of_supply) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                     </div>
-                    <label class="mt-4 block text-sm font-medium">Billing address<textarea name="billing_address" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('billing_address', $invoice?->billing_address) }}</textarea></label>
+                    <label class="mt-4 block text-sm font-medium">Billing address<textarea name="billing_address" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('billing_address', $invoice?->billing_address ?? $selectedCustomer?->billing_address) }}</textarea></label>
                 </section>
 
                 <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -72,6 +102,7 @@
     </div>
 
     @if (! $quotation)
+        <div data-customer-modal class="fixed inset-0 z-[70] hidden" role="dialog" aria-modal="true" aria-labelledby="new-customer-title"><button type="button" data-close-customer-modal class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" aria-label="Close new customer panel"></button><section class="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col overflow-y-auto bg-white p-5 shadow-2xl dark:bg-slate-900"><div class="flex items-start justify-between gap-4"><div><h2 id="new-customer-title" class="text-lg font-semibold text-slate-950 dark:text-white">New customer</h2><p class="mt-1 text-sm text-slate-500">Add the essentials now. You can complete the profile later.</p></div><button type="button" data-close-customer-modal class="flex size-11 items-center justify-center rounded-lg border border-slate-200" aria-label="Close"><x-icon name="x" class="size-5" /></button></div><div class="mt-6 space-y-4" data-quick-customer-fields><label class="block text-sm font-medium">Customer name <span class="text-rose-600">*</span><input data-quick-field="name" class="mt-1 w-full rounded-lg border-slate-300 text-sm" required></label><label class="block text-sm font-medium">Business name<input data-quick-field="company_name" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></label><div class="grid gap-4 sm:grid-cols-2"><label class="block text-sm font-medium">Phone<input data-quick-field="phone" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></label><label class="block text-sm font-medium">Email<input data-quick-field="email" type="email" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></label></div><label class="block text-sm font-medium">GSTIN<input data-quick-field="tax_number" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></label><label class="block text-sm font-medium">Billing address<textarea data-quick-field="billing_address" rows="3" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></textarea></label><details class="rounded-lg border border-slate-200 p-4"><summary class="cursor-pointer text-sm font-semibold">More details</summary><div class="mt-4 space-y-4"><label class="block text-sm font-medium">Customer type<input data-quick-field="business_type" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></label><label class="block text-sm font-medium">Internal notes<textarea data-quick-field="notes" rows="3" class="mt-1 w-full rounded-lg border-slate-300 text-sm"></textarea></label></div></details><p data-quick-customer-error class="hidden rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></p><button type="button" data-save-customer class="w-full rounded-lg bg-teal-600 px-4 py-3 text-sm font-semibold text-white hover:bg-teal-700">Create and select customer</button></div></section></div>
         <template id="invoice-item-template"><div data-invoice-item class="rounded-lg border border-slate-200 p-4 dark:border-slate-800"><div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label class="text-xs font-semibold uppercase text-slate-500">Item<input data-field="name" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></label><label class="text-xs font-semibold uppercase text-slate-500">Quantity<input data-field="quantity" required type="number" min="0.001" step="0.001" value="1" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></label><label class="text-xs font-semibold uppercase text-slate-500">Unit price<input data-field="unit_price" required type="number" min="0" step="0.01" value="0" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></label><label class="text-xs font-semibold uppercase text-slate-500">Tax %<input data-field="tax_rate" type="number" min="0" max="100" step="0.001" value="0" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></label><label class="text-xs font-semibold uppercase text-slate-500">Unit<input data-field="unit" value="service" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></label><label class="text-xs font-semibold uppercase text-slate-500">Discount type<select data-field="discount_type" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"><option value="fixed">Fixed</option><option value="percentage">Percentage</option></select></label><label class="text-xs font-semibold uppercase text-slate-500">Discount value<input data-field="discount_value" type="number" min="0" step="0.001" value="0" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></label><div class="flex items-end"><button type="button" data-remove-invoice-item class="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700">Remove</button></div></div><label class="mt-3 block text-xs font-semibold uppercase text-slate-500">Description<textarea data-field="description" rows="2" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 normal-case text-sm"></textarea></label></div></template>
         <script>
             document.addEventListener('click', function (event) {
@@ -86,6 +117,60 @@
                 const remove = event.target.closest('[data-remove-invoice-item]');
                 if (remove && items.querySelectorAll('[data-invoice-item]').length > 1) remove.closest('[data-invoice-item]').remove();
             });
+
+            (function () {
+                const root = document.querySelector('[data-customer-selector]');
+                if (!root) return;
+                const input = root.querySelector('[data-customer-search]');
+                const results = root.querySelector('[data-customer-results]');
+                const selected = root.querySelector('[data-selected-customer]');
+                const customerId = root.querySelector('[data-customer-id]');
+                const modal = document.querySelector('[data-customer-modal]');
+                let timer;
+
+                const escape = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
+                const fill = (customer, updateBilling = true) => {
+                    customerId.value = customer?.id || '';
+                    selected.classList.toggle('hidden', !customer);
+                    if (!customer) return;
+                    selected.querySelector('[data-customer-name]').textContent = customer.name || customer.company_name;
+                    selected.querySelector('[data-customer-company]').textContent = customer.company_name || '';
+                    selected.querySelector('[data-customer-phone]').textContent = customer.phone || customer.email || 'No phone or email recorded';
+                    selected.querySelector('[data-customer-tax]').textContent = customer.tax_number ? 'GSTIN ' + customer.tax_number : 'GSTIN not recorded';
+                    selected.querySelector('[data-customer-address]').textContent = customer.billing_address || 'Billing address not recorded';
+                    selected.querySelector('[data-customer-outstanding]').textContent = customer.outstanding !== null && customer.outstanding !== undefined ? 'Outstanding: INR ' + Number(customer.outstanding).toFixed(2) : '';
+                    if (updateBilling) {
+                        const values = {billing_name: customer.name, billing_company: customer.company_name, billing_email: customer.email, billing_phone: customer.phone, billing_address: customer.billing_address, billing_country: customer.country, customer_tax_number: customer.tax_number};
+                        Object.entries(values).forEach(([name, value]) => { const field = document.querySelector('[name="' + name + '"]'); if (field) field.value = value || ''; });
+                    }
+                };
+                fill(root.dataset.selected ? JSON.parse(root.dataset.selected) : null, false);
+
+                input.addEventListener('input', () => {
+                    clearTimeout(timer);
+                    if (input.value.trim().length < 2) { results.classList.add('hidden'); return; }
+                    timer = setTimeout(async () => {
+                        const response = await fetch(root.dataset.searchUrl + '?q=' + encodeURIComponent(input.value.trim()), {headers: {'Accept':'application/json'}});
+                        const data = response.ok ? await response.json() : {customers: []};
+                        results.innerHTML = data.customers.length ? data.customers.map((customer) => '<button type="button" data-customer-option=\'' + escape(JSON.stringify(customer)) + '\' class="block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-teal-50"><span class="block font-semibold text-slate-900">' + escape(customer.company_name || customer.name) + '</span><span class="mt-1 block text-xs text-slate-500">' + escape([customer.phone, customer.email, customer.tax_number].filter(Boolean).join(' · ') || 'No contact details') + '</span></button>').join('') : '<p class="px-4 py-5 text-sm text-slate-500">No matching customers.</p>';
+                        results.classList.remove('hidden');
+                    }, 250);
+                });
+                results.addEventListener('click', (event) => { const option = event.target.closest('[data-customer-option]'); if (option) { fill(JSON.parse(option.dataset.customerOption)); results.classList.add('hidden'); input.value = ''; } });
+                root.querySelector('[data-clear-customer]').addEventListener('click', () => fill(null));
+                document.querySelector('[data-new-customer]')?.addEventListener('click', () => { modal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); modal.querySelector('[data-quick-field="name"]').focus(); });
+                modal?.querySelectorAll('[data-close-customer-modal]').forEach((button) => button.addEventListener('click', () => { modal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }));
+                document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) { modal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); } });
+                modal?.querySelector('[data-save-customer]')?.addEventListener('click', async (event) => {
+                    const button = event.currentTarget; const error = modal.querySelector('[data-quick-customer-error]'); const payload = {};
+                    modal.querySelectorAll('[data-quick-field]').forEach((field) => payload[field.dataset.quickField] = field.value);
+                    button.disabled = true; error.classList.add('hidden');
+                    const response = await fetch(root.dataset.createUrl, {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content}, body:JSON.stringify(payload)});
+                    const data = await response.json(); button.disabled = false;
+                    if (!response.ok) { error.textContent = data.message || Object.values(data.errors || {}).flat()[0] || 'Customer could not be created.'; error.classList.remove('hidden'); return; }
+                    fill(data.customer); modal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); modal.querySelectorAll('[data-quick-field]').forEach((field) => field.value = '');
+                });
+            })();
         </script>
     @endif
 @endsection

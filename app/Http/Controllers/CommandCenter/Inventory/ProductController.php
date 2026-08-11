@@ -9,10 +9,12 @@ use App\Repositories\Inventory\InventoryLookupRepository;
 use App\Repositories\Inventory\ProductRepository;
 use App\Services\Inventory\InventoryLocationAccessService;
 use App\Services\Inventory\InventoryStockViewService;
+use App\Services\Inventory\ProductImageService;
 use App\Services\Inventory\ProductService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
 {
@@ -83,5 +85,10 @@ class ProductController extends Controller
         $productService->restore($productRepository->findForCompany($request->user()->company_id, $product, true));
 
         return back()->with('status', 'Product restored.');
+    }
+
+    public function image(Request $request, ProductRepository $products, ProductImageService $images, int $product): StreamedResponse
+    {
+        return $images->response($products->findForCompany($request->user()->company_id, $product, true));
     }
 }

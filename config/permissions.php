@@ -340,6 +340,7 @@ return [
         'inventory.products.view' => $inventoryUserRoles,
         'inventory.products.create' => $inventoryManagementRoles,
         'inventory.products.update' => $inventoryManagementRoles,
+        'inventory.products.image.manage' => $inventoryManagementRoles,
         'inventory.products.delete' => $inventoryManagementRoles,
         'inventory.products.restore' => $inventoryManagementRoles,
         'inventory.categories.manage' => $inventoryManagementRoles,

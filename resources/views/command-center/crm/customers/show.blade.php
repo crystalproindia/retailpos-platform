@@ -29,6 +29,12 @@
             </div>
         </section>
         <div class="flex flex-wrap justify-end gap-3">
+            @can('sales.invoices.create')
+                <a href="{{ route('sales.invoices.create', ['customer' => $customer->id]) }}" class="inline-flex min-h-11 items-center rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">Create Invoice</a>
+            @endcan
+            @can('sales.invoices.view')
+                <a href="{{ route('sales.invoices.index', ['customer_id' => $customer->id]) }}" class="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">View Invoices</a>
+            @endcan
             @can('tasks.create_work')
                 <a href="{{ route('tasks.index', ['create_related_type' => 'customer', 'create_related_id' => $customer->id]) }}#quick-add" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200">Add task</a>
             @endcan
@@ -93,11 +99,17 @@
             </section>
         @endcan
 
-        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            @foreach ([['title' => 'Stores', 'copy' => 'Multi-store management will appear here.'], ['title' => 'Subscriptions', 'copy' => 'Customer subscriptions will appear here.'], ['title' => 'Invoices', 'copy' => 'CRM invoice history will appear here.']] as $area)
-                <article class="rounded-lg border border-dashed border-slate-300 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 class="text-base font-semibold text-slate-950 dark:text-white">{{ $area['title'] }}</h2><p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">{{ $area['copy'] }}</p><p class="mt-4 text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">Coming soon</p></article>
-            @endforeach
-        </section>
+        @if ($commercialHistory)
+            <section id="commercial-history" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Commercial history</h2><p class="mt-1 text-sm text-slate-500">Invoices and payments already recorded for this customer.</p></div><a href="{{ route('sales.invoices.index', ['customer_id' => $customer->id]) }}" class="text-sm font-semibold text-teal-700 dark:text-teal-300">View all invoices</a></div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-semibold uppercase text-slate-500">Outstanding</p><p class="mt-2 text-xl font-semibold text-slate-950 dark:text-white">INR {{ number_format((float) $commercialHistory['outstanding'], 2) }}</p></div>
+                    <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-semibold uppercase text-slate-500">Last invoice</p><p class="mt-2 font-semibold text-slate-950 dark:text-white">{{ $commercialHistory['last_invoice']?->invoice_number ?? 'None yet' }}</p><p class="mt-1 text-xs text-slate-500">{{ $commercialHistory['last_invoice']?->created_at?->format('d M Y') }}</p></div>
+                    <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-semibold uppercase text-slate-500">Last payment</p><p class="mt-2 font-semibold text-slate-950 dark:text-white">{{ $commercialHistory['last_payment'] ? 'INR '.number_format((float) $commercialHistory['last_payment']->amount, 2) : 'None yet' }}</p><p class="mt-1 text-xs text-slate-500">{{ $commercialHistory['last_payment']?->payment_date?->format('d M Y') }}</p></div>
+                </div>
+                <div class="mt-5 overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="border-b border-slate-200 text-xs uppercase text-slate-500"><tr><th class="py-3 pr-4">Invoice</th><th class="px-4 py-3">Date</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Total</th><th class="py-3 pl-4 text-right">Balance</th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-800">@forelse($commercialHistory['invoices'] as $historyInvoice)<tr><td class="py-3 pr-4"><a href="{{ route('sales.invoices.show', $historyInvoice) }}" class="font-semibold text-teal-700 dark:text-teal-300">{{ $historyInvoice->invoice_number }}</a></td><td class="px-4 py-3 text-slate-500">{{ $historyInvoice->issue_date?->format('d M Y') ?? $historyInvoice->created_at->format('d M Y') }}</td><td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $historyInvoice->status?->label() }}</span></td><td class="px-4 py-3 text-right">{{ $historyInvoice->currency }} {{ number_format((float) $historyInvoice->grand_total, 2) }}</td><td class="py-3 pl-4 text-right">{{ number_format((float) $historyInvoice->balance_due, 2) }}</td></tr>@empty<tr><td colspan="5" class="py-8 text-center text-slate-500">No invoices have been created for this customer.</td></tr>@endforelse</tbody></table></div>
+            </section>
+        @endif
 
         @if ($supportSummary)
             <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
 use App\Services\Saas\UsageService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,6 +21,7 @@ class ProductService
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly UsageService $usage,
+        private readonly ProductImageService $images,
     ) {}
 
     /**
@@ -33,6 +35,10 @@ class ProductService
                 'company_id' => $user->company_id,
                 'branch_id' => $data['branch_id'] ?? $user->branch_id,
             ]);
+
+            if (($data['product_image'] ?? null) instanceof UploadedFile) {
+                $product = $this->images->replace($product, $user, $data['product_image']);
+            }
 
             $this->syncVariantAttributes($product, $data['attribute_value_ids'] ?? []);
             $this->auditLogger->record('inventory.product.created', $product, 'Inventory product created');
@@ -55,6 +61,11 @@ class ProductService
     {
         return DB::transaction(function () use ($product, $user, $data): Product {
             $product->update($this->payload($user, $data, $product));
+            if (($data['product_image'] ?? null) instanceof UploadedFile) {
+                $product = $this->images->replace($product, $user, $data['product_image']);
+            } elseif ($data['remove_image'] ?? false) {
+                $product = $this->images->remove($product, $user);
+            }
             $this->syncVariantAttributes($product, $data['attribute_value_ids'] ?? []);
 
             $this->auditLogger->record('inventory.product.updated', $product, 'Inventory product updated');
@@ -111,7 +122,6 @@ class ProductService
             'purchase_price',
             'pack_size',
             'variant_name',
-            'image',
             'status',
         ]);
 

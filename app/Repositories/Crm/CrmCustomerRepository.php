@@ -46,6 +46,25 @@ class CrmCustomerRepository
         return $this->queryForUser($user)->where('lead_id', $leadId)->first();
     }
 
+    /** @return Collection<int, CrmCustomer> */
+    public function searchForInvoice(User $user, string $search, int $limit = 10): Collection
+    {
+        $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($search)).'%';
+
+        return $this->queryForUser($user)
+            ->with('primaryContact')
+            ->where(function (Builder $query) use ($term): void {
+                $query->where('company_name', 'like', $term)
+                    ->orWhere('display_name', 'like', $term)
+                    ->orWhere('phone', 'like', $term)
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('tax_number', 'like', $term);
+            })
+            ->orderByDesc('updated_at')
+            ->limit(min($limit, 20))
+            ->get();
+    }
+
     /** @return array{total: int, new_this_month: int, onboarding: int, active: int, latest: Collection<int, CrmCustomer>} */
     public function dashboardMetrics(User $user): array
     {
@@ -70,7 +89,9 @@ class CrmCustomerRepository
     {
         return CrmCustomer::query()
             ->where('company_id', $user->company_id)
-            ->when($this->isSales($user), fn (Builder $query) => $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)));
+            ->when($this->isSales($user), fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
+                ->where('created_by', $user->id)
+                ->orWhereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id))));
     }
 
     private function isSales(User $user): bool

@@ -11,6 +11,7 @@ use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Crm\CrmQuotation;
 use App\Models\User;
+use App\Repositories\Crm\CrmCustomerRepository;
 use App\Services\AuditLogger;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Saas\UsageService;
@@ -24,6 +25,7 @@ class InvoiceService
         private readonly AuditLogger $audit,
         private readonly UsageService $usage,
         private readonly OutletAccessService $outlets,
+        private readonly CrmCustomerRepository $customers,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -31,6 +33,7 @@ class InvoiceService
     {
         return DB::transaction(function () use ($user, $data): CrmInvoice {
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
+            $data = $this->customerData($user, $data);
             $outlet = $this->outlets->current($user);
             $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
             $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + [
@@ -46,6 +49,12 @@ class InvoiceService
             $invoice->items()->createMany($calculation['items']);
             $this->recordActivity($invoice, $user, 'Invoice '.$invoice->invoice_number.' created.');
             $this->audit->record('crm.invoice.created', $invoice, 'Sales invoice created', ['company_id' => $invoice->company_id]);
+            if ($invoice->customer_id) {
+                $this->audit->record('crm.invoice.created_from_customer', $invoice, 'Invoice created for CRM customer', [
+                    'company_id' => $invoice->company_id,
+                    'customer_id' => $invoice->customer_id,
+                ]);
+            }
 
             return $invoice->load(['items', 'quotation', 'lead']);
         });
@@ -101,9 +110,11 @@ class InvoiceService
         return DB::transaction(function () use ($invoice, $user, $data): CrmInvoice {
             $invoice = $this->findInvoiceForUpdate($invoice->id, $user);
             $this->ensureDraft($invoice);
+            $previousCustomerId = $invoice->customer_id;
+            $data = $this->customerData($user, $data);
             $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
             $invoice->update(Arr::only($data, [
-                'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
+                'customer_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
                 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date',
                 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before',
             ]) + $calculation + [
@@ -114,9 +125,38 @@ class InvoiceService
             $invoice->items()->createMany($calculation['items']);
             $this->recordActivity($invoice, $user, 'Draft invoice '.$invoice->invoice_number.' updated.');
             $this->audit->record('crm.invoice.updated', $invoice, 'Draft invoice updated', ['company_id' => $invoice->company_id]);
+            if ((int) $previousCustomerId !== (int) $invoice->customer_id) {
+                $this->audit->record('crm.invoice.customer_changed', $invoice, 'Invoice customer changed before issue', [
+                    'company_id' => $invoice->company_id,
+                    'previous_customer_id' => $previousCustomerId,
+                    'customer_id' => $invoice->customer_id,
+                ]);
+            }
 
             return $invoice->refresh()->load('items');
         });
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function customerData(User $user, array $data): array
+    {
+        if (empty($data['customer_id'])) {
+            $data['customer_id'] = null;
+
+            return $data;
+        }
+
+        $customer = $this->customers->findForUser($user, (int) $data['customer_id']);
+        $data['customer_id'] = $customer->id;
+        $data['billing_name'] = ($data['billing_name'] ?? null) ?: $customer->display_name;
+        $data['billing_company'] = ($data['billing_company'] ?? null) ?: $customer->company_name;
+        $data['billing_email'] = ($data['billing_email'] ?? null) ?: $customer->email;
+        $data['billing_phone'] = ($data['billing_phone'] ?? null) ?: $customer->phone;
+        $data['billing_address'] = ($data['billing_address'] ?? null) ?: $customer->billing_address;
+        $data['billing_country'] = ($data['billing_country'] ?? null) ?: $customer->country;
+        $data['customer_tax_number'] = ($data['customer_tax_number'] ?? null) ?: $customer->tax_number;
+
+        return $data;
     }
 
     /** @param array<string,mixed> $data */
@@ -193,7 +233,9 @@ class InvoiceService
     public function cancel(CrmInvoice $invoice, User $user): CrmInvoice
     {
         $this->assertMutationAccess($invoice, $user);
-        if ($invoice->amount_paid > 0) { throw ValidationException::withMessages(['invoice' => 'An invoice with payments cannot be cancelled without reversing its payments.']); }
+        if ($invoice->amount_paid > 0) {
+            throw ValidationException::withMessages(['invoice' => 'An invoice with payments cannot be cancelled without reversing its payments.']);
+        }
         $invoice->update(['status' => InvoiceStatus::Cancelled, 'cancelled_at' => now(), 'updated_by' => $user->id]);
         $this->audit->record('crm.invoice.cancelled', $invoice, 'Invoice cancelled', ['company_id' => $invoice->company_id]);
 
@@ -202,7 +244,9 @@ class InvoiceService
 
     public function refreshStatus(CrmInvoice $invoice, ?User $user = null): CrmInvoice
     {
-        if (in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) { return $invoice; }
+        if (in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
+            return $invoice;
+        }
         $status = $invoice->balance_due <= 0 ? InvoiceStatus::Paid : ($invoice->amount_paid > 0 ? InvoiceStatus::PartiallyPaid : ($invoice->due_date?->isPast() ? InvoiceStatus::Overdue : $invoice->status));
         $invoice->update(['status' => $status, 'paid_at' => $status === InvoiceStatus::Paid ? ($invoice->paid_at ?? now()) : null, 'updated_by' => $user?->id ?? $invoice->updated_by]);
 
@@ -217,22 +261,31 @@ class InvoiceService
         foreach (array_values($items) as $index => $item) {
             $quantityMilli = $this->milli((string) $item['quantity']);
             $priceCents = $this->cents((string) $item['unit_price']);
-            if ($quantityMilli <= 0 || $priceCents < 0) { throw ValidationException::withMessages(['items' => 'Invoice quantities must be positive and prices cannot be negative.']); }
+            if ($quantityMilli <= 0 || $priceCents < 0) {
+                throw ValidationException::withMessages(['items' => 'Invoice quantities must be positive and prices cannot be negative.']);
+            }
             $gross = intdiv($quantityMilli * $priceCents + 500, 1000);
             $discountType = $item['discount_type'] ?? 'fixed';
             $discountValue = $item['discount_value'] ?? ($item['discount_amount'] ?? 0);
             $discount = $discountType === 'percentage' ? intdiv($gross * $this->milli((string) $discountValue) + 50000, 100000) : $this->cents((string) $discountValue);
             $discount = min(max(0, $discount), $gross);
             $taxRateMilli = $this->milli((string) ($item['tax_rate'] ?? 0));
-            if ($taxRateMilli < 0 || $taxRateMilli > 100000) { throw ValidationException::withMessages(['items' => 'Tax rate must be between zero and 100 percent.']); }
+            if ($taxRateMilli < 0 || $taxRateMilli > 100000) {
+                throw ValidationException::withMessages(['items' => 'Tax rate must be between zero and 100 percent.']);
+            }
             $lineSubtotal = $gross - $discount;
             $tax = intdiv($lineSubtotal * $taxRateMilli + 50000, 100000);
-            $subtotal += $gross; $discountTotal += $discount; $taxTotal += $tax;
+            $subtotal += $gross;
+            $discountTotal += $discount;
+            $taxTotal += $tax;
             $normalized[] = ['name' => $item['name'], 'description' => $item['description'] ?? null, 'quantity' => $this->decimal($quantityMilli, 3), 'unit' => $item['unit'] ?? 'unit', 'unit_price' => $this->decimal($priceCents), 'discount_type' => $discountType, 'discount_value' => $discountType === 'percentage' ? $this->decimal($this->milli((string) $discountValue), 3) : $this->decimal($this->cents((string) $discountValue)), 'discount_amount' => $this->decimal($discount), 'tax_rate' => $this->decimal($taxRateMilli, 3), 'tax_amount' => $this->decimal($tax), 'line_subtotal' => $this->decimal($lineSubtotal), 'line_total' => $this->decimal($lineSubtotal + $tax), 'sort_order' => $index + 1];
         }
         $adjustmentCents = $this->cents((string) $adjustment);
         $grandTotal = $subtotal - $discountTotal + $taxTotal + $adjustmentCents;
-        if ($grandTotal < 0) { throw ValidationException::withMessages(['adjustment_total' => 'Adjustment cannot reduce an invoice below zero.']); }
+        if ($grandTotal < 0) {
+            throw ValidationException::withMessages(['adjustment_total' => 'Adjustment cannot reduce an invoice below zero.']);
+        }
+
         return ['subtotal' => $this->decimal($subtotal), 'discount_total' => $this->decimal($discountTotal), 'taxable_total' => $this->decimal($subtotal - $discountTotal), 'tax_total' => $this->decimal($taxTotal), 'adjustment_total' => $this->decimal($adjustmentCents), 'grand_total' => $this->decimal($grandTotal), 'items' => $normalized];
     }
 
@@ -284,13 +337,46 @@ class InvoiceService
         }
     }
 
-    private function ensureDraft(CrmInvoice $invoice): void { if (! $invoice->status?->isEditable()) { throw ValidationException::withMessages(['invoice' => 'Only draft invoices can be issued.']); } }
-    private function nextNumber(int $companyId): string { $year = now()->format('Y'); $last = CrmInvoice::query()->where('company_id', $companyId)->where('invoice_number', 'like', "RPOS-INV-{$year}-%")->lockForUpdate()->latest('id')->value('invoice_number'); return "RPOS-INV-{$year}-".str_pad((string) ((int) substr((string) $last, -5) + 1), 5, '0', STR_PAD_LEFT); }
-    private function nextPaymentReference(int $companyId): string { return 'RPOS-PAY-'.now()->format('Y').'-'.str_pad((string) (CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1), 5, '0', STR_PAD_LEFT); }
-    private function nextReceiptNumber(int $companyId): string { return 'RPOS-RCPT-'.now()->format('Y').'-'.str_pad((string) (CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1), 5, '0', STR_PAD_LEFT); }
-    private function recordActivity(CrmInvoice $invoice, User $user, string $subject): void { CrmActivity::create(['company_id' => $invoice->company_id, 'crm_lead_id' => $invoice->lead_id, 'opportunity_id' => $invoice->opportunity_id, 'assigned_user_id' => $invoice->lead?->assigned_user_id, 'created_by' => $user->id, 'type' => ActivityType::Note, 'subject' => $subject, 'scheduled_at' => now(), 'completed_at' => now(), 'completed_by' => $user->id, 'follow_up_status' => 'completed', 'priority' => $invoice->lead?->priority ?? LeadPriority::Medium]); }
-    private function cents(string $value): int { return $this->minor($value, 2); }
-    private function milli(string $value): int { return $this->minor($value, 3); }
+    private function ensureDraft(CrmInvoice $invoice): void
+    {
+        if (! $invoice->status?->isEditable()) {
+            throw ValidationException::withMessages(['invoice' => 'Only draft invoices can be issued.']);
+        }
+    }
+
+    private function nextNumber(int $companyId): string
+    {
+        $year = now()->format('Y');
+        $last = CrmInvoice::query()->where('company_id', $companyId)->where('invoice_number', 'like', "RPOS-INV-{$year}-%")->lockForUpdate()->latest('id')->value('invoice_number');
+
+        return "RPOS-INV-{$year}-".str_pad((string) ((int) substr((string) $last, -5) + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    private function nextPaymentReference(int $companyId): string
+    {
+        return 'RPOS-PAY-'.now()->format('Y').'-'.str_pad((string) (CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    private function nextReceiptNumber(int $companyId): string
+    {
+        return 'RPOS-RCPT-'.now()->format('Y').'-'.str_pad((string) (CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    private function recordActivity(CrmInvoice $invoice, User $user, string $subject): void
+    {
+        CrmActivity::create(['company_id' => $invoice->company_id, 'crm_lead_id' => $invoice->lead_id, 'opportunity_id' => $invoice->opportunity_id, 'assigned_user_id' => $invoice->lead?->assigned_user_id, 'created_by' => $user->id, 'type' => ActivityType::Note, 'subject' => $subject, 'scheduled_at' => now(), 'completed_at' => now(), 'completed_by' => $user->id, 'follow_up_status' => 'completed', 'priority' => $invoice->lead?->priority ?? LeadPriority::Medium]);
+    }
+
+    private function cents(string $value): int
+    {
+        return $this->minor($value, 2);
+    }
+
+    private function milli(string $value): int
+    {
+        return $this->minor($value, 3);
+    }
+
     private function minor(string $value, int $scale): int
     {
         $value = trim($value);
@@ -304,6 +390,7 @@ class InvoiceService
 
         return $matches[1] === '-' ? -$minor : $minor;
     }
+
     private function decimal(int $minor, int $scale = 2): string
     {
         $sign = $minor < 0 ? '-' : '';

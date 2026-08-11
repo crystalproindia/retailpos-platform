@@ -53,6 +53,11 @@ class CrmCustomer extends Model
         return $this->hasMany(CrmProformaInvoice::class, 'customer_id')->latest('created_at');
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(CrmInvoice::class, 'customer_id')->latest('created_at');
+    }
+
     public function onboardings(): HasMany
     {
         return $this->hasMany(CrmCustomerOnboarding::class, 'customer_id')->latest('created_at');

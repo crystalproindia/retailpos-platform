@@ -11,6 +11,7 @@ use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmQuotation;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Repositories\Crm\CrmSupportTicketRepository;
+use App\Repositories\Crm\InvoiceRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
 use App\Services\Crm\CrmCustomerConversionService;
@@ -30,7 +31,7 @@ class CrmCustomerController extends Controller
         ]);
     }
 
-    public function show(Request $request, CrmCustomerRepository $customers, CrmSupportTicketRepository $supportTickets, int $customer): View
+    public function show(Request $request, CrmCustomerRepository $customers, CrmSupportTicketRepository $supportTickets, InvoiceRepository $invoices, int $customer): View
     {
         $record = $customers->findForUser($request->user(), $customer);
 
@@ -38,6 +39,9 @@ class CrmCustomerController extends Controller
             'customer' => $record,
             'supportSummary' => $request->user()->can('crm.support.view')
                 ? $supportTickets->customerSummary($record->company_id, $record->id)
+                : null,
+            'commercialHistory' => $request->user()->can('sales.invoices.view')
+                ? $invoices->customerHistory($request->user(), $record->id)
                 : null,
         ]);
     }

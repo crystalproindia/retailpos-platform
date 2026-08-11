@@ -10,7 +10,13 @@ class ProductRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $permission = $this->isMethod('PUT') ? 'inventory.products.update' : 'inventory.products.create';
+        if (! $this->user()?->can($permission)) {
+            return false;
+        }
+
+        return ! ($this->hasFile('product_image') || $this->boolean('remove_image'))
+            || $this->user()->can('inventory.products.image.manage');
     }
 
     /**
@@ -43,7 +49,8 @@ class ProductRequest extends FormRequest
             'online_price' => ['nullable', 'numeric', 'min:0'],
             'purchase_price' => ['nullable', 'numeric', 'min:0'],
             'pack_size' => ['nullable', 'numeric', 'gt:0'],
-            'image' => ['nullable', 'string', 'max:255'],
+            'product_image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'mimetypes:image/jpeg,image/png,image/webp', 'max:2048', 'dimensions:min_width=32,min_height=32,max_width=8000,max_height=8000'],
+            'remove_image' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in([Product::STATUS_ACTIVE, Product::STATUS_INACTIVE])],
             'track_inventory' => ['nullable', 'boolean'],
             'track_batches' => ['nullable', 'boolean'],

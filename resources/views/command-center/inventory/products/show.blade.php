@@ -13,6 +13,7 @@
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
+                    <div class="mb-4 flex h-48 w-full max-w-sm items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-5xl font-semibold text-slate-300 dark:bg-slate-800">@if($product->imageUrl())<img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" class="size-full object-contain">@else{{ str($product->name)->substr(0, 1) }}@endif</div>
                     <p class="font-mono text-xs text-slate-500">{{ $product->sku }}</p>
                     <h1 class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{{ $product->name }}</h1>
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $product->description ?: 'No description yet.' }}</p>

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['company_id', 'branch_id', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'parent_product_id', 'type', 'name', 'slug', 'sku', 'barcode', 'hsn_code', 'description', 'short_description', 'cost_price', 'selling_price', 'mrp', 'wholesale_price', 'online_price', 'purchase_price', 'pack_size', 'track_inventory', 'track_batches', 'track_serials', 'track_expiry', 'allow_negative_stock', 'has_variants', 'is_variant', 'variant_name', 'image', 'status', 'is_active'])]
 class Product extends Model
@@ -129,5 +130,14 @@ class Product extends Model
     public function availableStock(): string
     {
         return (string) $this->stockLevels->sum('quantity_available');
+    }
+
+    public function imageUrl(): ?string
+    {
+        $prefix = "companies/{$this->company_id}/products/{$this->id}/";
+
+        return $this->image && str_starts_with($this->image, $prefix) && Storage::disk('local')->exists($this->image)
+            ? route('inventory.products.image', $this)
+            : null;
     }
 }

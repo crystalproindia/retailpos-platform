@@ -16,6 +16,11 @@ class StoreInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'customer_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('crm_customers', 'id')->where('company_id', $this->user()?->company_id),
+            ],
             'billing_name' => ['nullable', 'string', 'max:255'],
             'billing_company' => ['nullable', 'string', 'max:255'],
             'billing_email' => ['nullable', 'email'],

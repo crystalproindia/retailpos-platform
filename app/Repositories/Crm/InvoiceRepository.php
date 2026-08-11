@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
 class InvoiceRepository
 {
     public function __construct(private readonly OutletAccessService $outlets) {}
+
     /** @param array<string,mixed> $filters */
     public function paginate(User $user, array $filters = []): LengthAwarePaginator
     {
@@ -32,7 +33,21 @@ class InvoiceRepository
 
     public function find(User $user, int $invoice): CrmInvoice
     {
-        return $this->queryForUser($user)->with(['items', 'payments.recorder', 'quotation', 'opportunity', 'lead.assignedUser'])->findOrFail($invoice);
+        return $this->queryForUser($user)->with(['items', 'payments.recorder', 'quotation', 'opportunity', 'lead.assignedUser', 'customer.primaryContact'])->findOrFail($invoice);
+    }
+
+    /** @return array{invoices: Collection<int, CrmInvoice>, outstanding: string, last_invoice: ?CrmInvoice, last_payment: mixed} */
+    public function customerHistory(User $user, int $customerId): array
+    {
+        $query = $this->queryForUser($user)->where('customer_id', $customerId);
+        $invoices = (clone $query)->with('payments')->latest('created_at')->limit(10)->get();
+
+        return [
+            'invoices' => $invoices,
+            'outstanding' => (string) (clone $query)->whereNotIn('status', ['cancelled', 'void'])->sum('balance_due'),
+            'last_invoice' => $invoices->first(),
+            'last_payment' => $invoices->flatMap->payments->sortByDesc('payment_date')->first(),
+        ];
     }
 
     /** @return Collection<int, array{currency:string,total_invoiced:string,total_collected:string,outstanding:string,overdue:string}> */
@@ -60,7 +75,9 @@ class InvoiceRepository
         return CrmInvoice::query()->where('company_id', $user->company_id)
             // Legacy invoices predate outlet ownership and remain readable under their existing role policy.
             ->where(fn (Builder $query) => $query->whereNull('branch_id')->orWhereIn('branch_id', $outletIds))
-            ->when($role === UserRole::Sales, fn (Builder $query) => $query->whereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id)));
+            ->when($role === UserRole::Sales, fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
+                ->where('created_by', $user->id)
+                ->orWhereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id))));
     }
 
     /** @param array<string,mixed> $filters */
@@ -75,6 +92,7 @@ class InvoiceRepository
                 ->orWhere('billing_phone', 'like', "%{$search}%")
                 ->orWhereHas('quotation', fn (Builder $quote) => $quote->where('quotation_number', 'like', "%{$search}%"))
                 ->orWhereHas('payments', fn (Builder $payment) => $payment->where('transaction_reference', 'like', "%{$search}%"))))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status));
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['customer_id'] ?? null, fn (Builder $query, int|string $customerId) => $query->where('customer_id', (int) $customerId));
     }
 }

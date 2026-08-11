@@ -529,6 +529,8 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'index'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings');
         Route::put('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'update'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.update');
         Route::post('invoices/reminders/settings/restore-defaults', [InvoiceReminderSettingsController::class, 'restore'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.restore');
+        Route::get('invoices/customers/search', [InvoiceController::class, 'customers'])->middleware('can:sales.invoices.create')->name('invoices.customers.search');
+        Route::post('invoices/customers', [InvoiceController::class, 'quickCustomer'])->middleware(['can:sales.invoices.create', 'can:crm.customers.create', 'throttle:20,1'])->name('invoices.customers.store');
         Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');
         Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('can:sales.finance.export')->name('invoices.export');
@@ -892,6 +894,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('products', [ProductController::class, 'index'])->middleware('can:inventory.products.view')->name('products.index');
         Route::get('products/create', [ProductController::class, 'create'])->middleware('can:inventory.products.create')->name('products.create');
         Route::post('products', [ProductController::class, 'store'])->middleware('can:inventory.products.create')->name('products.store');
+        Route::get('products/{product}/image', [ProductController::class, 'image'])->whereNumber('product')->middleware('can:inventory.products.view')->name('products.image');
         Route::get('products/{product}', [ProductController::class, 'show'])->middleware('can:inventory.products.view')->name('products.show');
         Route::get('products/{product}/edit', [ProductController::class, 'edit'])->middleware('can:inventory.products.update')->name('products.edit');
         Route::put('products/{product}', [ProductController::class, 'update'])->middleware('can:inventory.products.update')->name('products.update');

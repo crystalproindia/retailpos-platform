@@ -81,6 +81,30 @@
     </section>
 
     <aside class="space-y-4">
+        @can('inventory.products.image.manage')
+            <section class="product-form-card" data-product-image-uploader>
+                <h2 class="product-form-heading">Product image</h2>
+                <p class="product-form-help">Use a clear PNG, JPG, or WEBP image up to 2 MB. It will help staff identify this product across POS and inventory.</p>
+                <div class="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800" style="aspect-ratio: 4 / 3">
+                    @if ($product->imageUrl())
+                        <img src="{{ $product->imageUrl() }}" alt="Current image for {{ $product->name }}" data-product-image-preview class="size-full object-contain" loading="lazy">
+                        <div data-product-image-placeholder class="hidden size-full items-center justify-center text-4xl font-semibold text-slate-300">{{ str($product->name ?: 'P')->substr(0, 1) }}</div>
+                    @else
+                        <img alt="" data-product-image-preview class="hidden size-full object-contain">
+                        <div data-product-image-placeholder class="flex size-full items-center justify-center text-4xl font-semibold text-slate-300">{{ str($product->name ?: 'P')->substr(0, 1) }}</div>
+                    @endif
+                </div>
+                <label class="mt-4 flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-teal-300 bg-white px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-200">
+                    <span>{{ $product->imageUrl() ? 'Replace Image' : 'Upload Image' }}</span>
+                    <input type="file" name="product_image" accept="image/png,image/jpeg,image/webp" class="sr-only" data-product-image-input>
+                </label>
+                @if ($product->image)
+                    <label class="mt-3 flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"><input type="checkbox" name="remove_image" value="1" class="rounded border-slate-300 text-rose-600"><span>Remove current image</span></label>
+                @endif
+                @error('product_image')<p class="mt-2 text-sm text-rose-600">{{ $message }}</p>@enderror
+            </section>
+        @endcan
+
         <section class="product-form-card">
             <h2 class="product-form-heading">Pricing</h2><p class="product-form-help">Set the prices used across purchasing, selling, and online channels.</p>
             <div class="mt-4 grid gap-4">
@@ -98,7 +122,7 @@
             <div class="mt-4 space-y-3">
                 <label class="block space-y-1"><span class="text-sm font-medium">Pack size <span class="font-normal text-slate-400">optional</span></span><input name="pack_size" type="number" step="0.001" min="0.001" value="{{ old('pack_size', $product->pack_size) }}" class="w-full rounded-lg border-slate-300 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-950"><span class="block text-xs text-slate-500">Units contained in a standard purchasing or selling pack.</span></label>
                 @foreach (['track_inventory' => 'Track inventory', 'track_batches' => 'Track batches', 'track_serials' => 'Track serial numbers', 'track_expiry' => 'Track expiry dates', 'allow_negative_stock' => 'Allow negative stock', 'has_variants' => 'Has variants', 'is_variant' => 'This is a variant'] as $field => $label)
-                    <label class="flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                    <label class="flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                         <input type="checkbox" name="{{ $field }}" value="1" @checked(old($field, $product->{$field})) class="rounded border-slate-300 text-teal-600">
                         <span>{{ $label }}</span>
                     </label>
@@ -125,7 +149,7 @@
             </section>
         @endif
 
-        <div class="sticky bottom-3 z-10 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-[0_-8px_28px_rgb(15_23_42_/_0.09)] backdrop-blur"><button class="w-full rounded-lg bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">Save product</button></div>
+        <div class="z-10 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-[0_-8px_28px_rgb(15_23_42_/_0.09)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 xl:sticky xl:bottom-3"><button class="w-full rounded-lg bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">Save product</button></div>
     </aside>
 </div>
 
@@ -134,3 +158,16 @@
         {{ $errors->first() }}
     </div>
 @endif
+
+<script>
+    document.querySelector('[data-product-image-input]')?.addEventListener('change', function () {
+        const file = this.files?.[0];
+        if (!file) return;
+        const preview = document.querySelector('[data-product-image-preview]');
+        const placeholder = document.querySelector('[data-product-image-placeholder]');
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        placeholder?.classList.add('hidden');
+        placeholder?.classList.remove('flex');
+    });
+</script>

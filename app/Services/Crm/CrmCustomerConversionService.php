@@ -25,6 +25,7 @@ class CrmCustomerConversionService
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly CrmLeadScoringService $leadScoring,
+        private readonly CrmCustomerService $customers,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -39,7 +40,7 @@ class CrmCustomerConversionService
                 'company_id' => $lead->company_id,
                 'lead_id' => $lead->id,
                 'quotation_id' => $quotation?->id,
-                'customer_code' => $this->nextCustomerCode($lead->company_id),
+                'customer_code' => $this->customers->nextCustomerCode($lead->company_id),
                 'source' => $lead->source?->name,
                 'converted_at' => now(),
                 'created_by' => $user->id,
@@ -140,20 +141,5 @@ class CrmCustomerConversionService
             'won_at' => now(),
             'status_id' => $wonStatus->id,
         ]);
-    }
-
-    private function nextCustomerCode(int $companyId): string
-    {
-        $year = now()->format('Y');
-        $prefix = "RPC-{$year}-";
-        $lastCode = CrmCustomer::query()
-            ->where('company_id', $companyId)
-            ->where('customer_code', 'like', $prefix.'%')
-            ->lockForUpdate()
-            ->latest('id')
-            ->value('customer_code');
-        $lastSequence = $lastCode ? (int) substr($lastCode, -6) : 0;
-
-        return $prefix.str_pad((string) ($lastSequence + 1), 6, '0', STR_PAD_LEFT);
     }
 }

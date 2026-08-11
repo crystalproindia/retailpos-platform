@@ -5,25 +5,25 @@ namespace App\Http\Controllers\CommandCenter\Pos;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\PosCheckoutRequest;
 use App\Http\Requests\Pos\PosQuickCustomerRequest;
-use App\Models\Customers\Customer;
 use App\Models\Compliance\GstSetting;
+use App\Models\Customers\Customer;
 use App\Models\Pos\PosRegister;
 use App\Models\Pos\PosSale;
 use App\Repositories\Pos\PosCatalogRepository;
 use App\Repositories\Pos\PosSaleRepository;
+use App\Services\AuditLogger;
+use App\Services\Crm\InvoiceTemplateService;
+use App\Services\Outlets\OutletAccessService;
 use App\Services\Pos\CustomerProductSuggestionService;
 use App\Services\Pos\PosCheckoutService;
 use App\Services\Pos\PosCustomerLookupService;
 use App\Services\Pos\PosDashboardService;
 use App\Services\Pos\PosReceiptPdfService;
-use App\Services\Crm\InvoiceTemplateService;
-use App\Services\AuditLogger;
-use App\Services\Outlets\OutletAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Http\Response;
+use Illuminate\View\View;
 
 class PosController extends Controller
 {
@@ -90,10 +90,13 @@ class PosController extends Controller
     public function catalog(Request $request, PosCatalogRepository $catalog, OutletAccessService $outlets): JsonResponse
     {
         $outlet = $outlets->current($request->user());
+        $register = $request->filled('register_id')
+            ? PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $outlet->id)->where('is_active', true)->findOrFail($request->integer('register_id'))
+            : null;
         $scan = trim($request->string('scan')->toString());
         $products = $scan !== ''
-            ? collect([$catalog->findByBarcodeOrSku($request->user()->company_id, $outlet->id, $scan)])->filter()
-            : $catalog->search($request->user()->company_id, $outlet->id, $request->string('q')->toString());
+            ? collect([$catalog->findByBarcodeOrSku($request->user()->company_id, $outlet->id, $scan, $register?->warehouse_id, $register?->stock_location_id)])->filter()
+            : $catalog->search($request->user()->company_id, $outlet->id, $request->string('q')->toString(), $register?->warehouse_id, $register?->stock_location_id);
 
         return response()->json(['products' => $products->map(fn ($product) => $this->productPayload($product))->values()]);
     }
@@ -102,7 +105,9 @@ class PosController extends Controller
     {
         $request->validate(['mobile' => ['required', 'string', 'min:6', 'max:50']]);
         $customer = $lookup->findByMobile($request->user()->company_id, (string) $request->mobile);
-        if (! $customer) return response()->json(['customer' => null, 'suggestions' => []]);
+        if (! $customer) {
+            return response()->json(['customer' => null, 'suggestions' => []]);
+        }
 
         return response()->json(['customer' => $this->customerPayload($customer), 'suggestions' => collect($suggestions->suggestions($customer, $outlets->current($request->user())->id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())]);
     }
@@ -184,7 +189,9 @@ class PosController extends Controller
     private function workspace(Request $request, PosCatalogRepository $catalog, PosSaleRepository $sales, PosDashboardService $dashboard, string $mode = 'desktop', mixed $resumedSale = null): View
     {
         $outlet = app(OutletAccessService::class)->current($request->user());
-        $products = $catalog->search($request->user()->company_id, $outlet->id, $request->string('search')->toString());
+        $openRegisters = PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $outlet->id)->where('is_active', true)->whereNotNull('current_session_id')->orderBy('name')->get();
+        $register = $openRegisters->first();
+        $products = $catalog->search($request->user()->company_id, $outlet->id, $request->string('search')->toString(), $register?->warehouse_id, $register?->stock_location_id);
 
         return view('command-center.pos.index', [
             'products' => $products,
@@ -193,7 +200,7 @@ class PosController extends Controller
             'resumedSale' => $resumedSale,
             'posMode' => $mode,
             'popularProductIds' => $dashboard->popularProductIds($request->user()->company_id, $outlet->id),
-            'openRegisters' => PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $outlet->id)->where('is_active', true)->whereNotNull('current_session_id')->orderBy('name')->get(),
+            'openRegisters' => $openRegisters,
         ]);
     }
 

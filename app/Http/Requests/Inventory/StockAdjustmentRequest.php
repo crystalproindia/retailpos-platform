@@ -18,7 +18,11 @@ class StockAdjustmentRequest extends FormRequest
             ->values()
             ->all();
 
-        $this->merge(['items' => $items]);
+        $this->merge([
+            'items' => $items,
+            'adjustment_type' => $this->input('adjustment_type', 'other'),
+            'approval_required' => $this->boolean('approval_required', true),
+        ]);
     }
 
     /**
@@ -28,6 +32,8 @@ class StockAdjustmentRequest extends FormRequest
     {
         return [
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'adjustment_type' => ['required', 'in:opening_correction,damage,wastage,expiry,theft_loss,found_stock,system_correction,other'],
+            'approval_required' => ['nullable', 'boolean'],
             'reason' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],

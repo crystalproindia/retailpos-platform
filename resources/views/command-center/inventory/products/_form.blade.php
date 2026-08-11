@@ -96,7 +96,8 @@
         <section class="product-form-card">
             <h2 class="product-form-heading">Inventory behavior</h2><p class="product-form-help">Choose how stock and variants should behave for this product.</p>
             <div class="mt-4 space-y-3">
-                @foreach (['track_inventory' => 'Track inventory', 'allow_negative_stock' => 'Allow negative stock', 'has_variants' => 'Has variants', 'is_variant' => 'This is a variant'] as $field => $label)
+                <label class="block space-y-1"><span class="text-sm font-medium">Pack size <span class="font-normal text-slate-400">optional</span></span><input name="pack_size" type="number" step="0.001" min="0.001" value="{{ old('pack_size', $product->pack_size) }}" class="w-full rounded-lg border-slate-300 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-950"><span class="block text-xs text-slate-500">Units contained in a standard purchasing or selling pack.</span></label>
+                @foreach (['track_inventory' => 'Track inventory', 'track_batches' => 'Track batches', 'track_serials' => 'Track serial numbers', 'track_expiry' => 'Track expiry dates', 'allow_negative_stock' => 'Allow negative stock', 'has_variants' => 'Has variants', 'is_variant' => 'This is a variant'] as $field => $label)
                     <label class="flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700">
                         <input type="checkbox" name="{{ $field }}" value="1" @checked(old($field, $product->{$field})) class="rounded border-slate-300 text-teal-600">
                         <span>{{ $label }}</span>

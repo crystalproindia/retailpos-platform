@@ -8,6 +8,7 @@ use App\Models\Inventory\ReorderSuggestion;
 use App\Repositories\Inventory\InventoryLookupRepository;
 use App\Repositories\Inventory\ProductRepository;
 use App\Repositories\Inventory\ReorderRepository;
+use App\Services\Inventory\InventoryLocationAccessService;
 use App\Services\Inventory\ReorderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,15 +16,17 @@ use Illuminate\View\View;
 
 class ReorderSuggestionController extends Controller
 {
-    public function index(Request $request, ReorderRepository $reorders, ProductRepository $products, InventoryLookupRepository $lookups): View
+    public function index(Request $request, ReorderRepository $reorders, ProductRepository $products, InventoryLookupRepository $lookups, InventoryLocationAccessService $access): View
     {
         $options = $lookups->formOptions($request->user()->company_id);
+        $warehouseIds = $access->accessibleWarehouses($request->user())->pluck('id');
 
         return view('command-center.inventory.reorder.index', [
             'suggestions' => $reorders->suggestions($request->user()->company_id, $request->only(['status', 'risk'])),
-            'rules' => ReorderRule::query()->with(['product', 'warehouse'])->where('company_id', $request->user()->company_id)->latest()->get(),
+            'rules' => ReorderRule::query()->with(['product', 'warehouse', 'location'])->where('company_id', $request->user()->company_id)->whereIn('warehouse_id', $warehouseIds)->latest()->get(),
             'products' => $products->activeForCompany($request->user()->company_id),
-            'warehouses' => $options['warehouses'],
+            'warehouses' => $options['warehouses']->whereIn('id', $warehouseIds)->values(),
+            'locations' => $options['locations']->whereIn('warehouse_id', $warehouseIds)->values(),
         ]);
     }
 
@@ -31,7 +34,8 @@ class ReorderSuggestionController extends Controller
     {
         $validated = $request->validate([
             'product_id' => ['required', 'integer', 'exists:products,id'],
-            'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'stock_location_id' => ['nullable', 'integer', 'exists:stock_locations,id'],
             'minimum_stock' => ['required', 'numeric', 'min:0'],
             'maximum_stock' => ['nullable', 'numeric', 'min:0'],
             'reorder_point' => ['required', 'numeric', 'min:0'],

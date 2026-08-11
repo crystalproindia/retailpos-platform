@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'product_id', 'minimum_stock', 'maximum_stock', 'reorder_point', 'reorder_quantity', 'safety_stock', 'supplier_lead_time_days', 'preferred_supplier_id', 'average_daily_sales', 'seasonal_factor', 'auto_generate_purchase_request', 'requires_approval', 'is_active'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'stock_location_id', 'product_id', 'minimum_stock', 'maximum_stock', 'reorder_point', 'reorder_quantity', 'safety_stock', 'supplier_lead_time_days', 'preferred_supplier_id', 'average_daily_sales', 'seasonal_factor', 'auto_generate_purchase_request', 'requires_approval', 'is_active'])]
 class ReorderRule extends Model
 {
     use Auditable, SoftDeletes;
@@ -44,6 +44,11 @@ class ReorderRule extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(StockLocation::class, 'stock_location_id');
     }
 
     public function product(): BelongsTo

@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\Inventory\BarcodeLabelTemplate;
 use App\Models\Inventory\BarcodePrintBatch;
+use App\Models\Inventory\InventoryBatch;
 use App\Models\Inventory\Product;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -57,9 +58,13 @@ class BarcodeService
     public function createPrintBatch(User $user, array $data): BarcodePrintBatch
     {
         return DB::transaction(function () use ($user, $data): BarcodePrintBatch {
+            $template = BarcodeLabelTemplate::query()
+                ->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $user->company_id))
+                ->where('is_active', true)
+                ->findOrFail((int) $data['template_id']);
             $batch = BarcodePrintBatch::create([
                 'company_id' => $user->company_id,
-                'template_id' => $data['template_id'],
+                'template_id' => $template->id,
                 'batch_number' => 'BC-'.now()->format('Ymd').'-'.Str::upper(Str::random(5)),
                 'title' => $data['title'] ?? null,
                 'created_by' => $user->id,
@@ -69,8 +74,12 @@ class BarcodeService
 
             foreach ($data['items'] as $item) {
                 $product = Product::query()->where('company_id', $user->company_id)->findOrFail($item['product_id']);
+                $inventoryBatch = ! empty($item['inventory_batch_id'])
+                    ? InventoryBatch::query()->where('company_id', $user->company_id)->where('product_id', $product->id)->findOrFail((int) $item['inventory_batch_id'])
+                    : null;
                 $batch->items()->create([
                     'product_id' => $product->id,
+                    'inventory_batch_id' => $inventoryBatch?->id,
                     'quantity' => $item['quantity'],
                     'price_override' => $item['price_override'] ?? null,
                     'label_data' => [
@@ -78,6 +87,8 @@ class BarcodeService
                         'sku' => $product->sku,
                         'barcode' => $product->barcode,
                         'price' => $item['price_override'] ?? $product->selling_price,
+                        'batch' => $inventoryBatch?->batch_number,
+                        'expiry' => $inventoryBatch?->expires_at?->toDateString(),
                     ],
                 ]);
             }

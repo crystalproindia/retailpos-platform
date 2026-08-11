@@ -21,6 +21,8 @@
                         @endforeach
                     </select>
                 </label>
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-200">Sell stock from<select name="warehouse_id" id="register-warehouse" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Choose warehouse</option>@foreach($warehouses as $warehouse)<option data-branch="{{$warehouse->branch_id}}" value="{{$warehouse->id}}">{{$warehouse->name}}</option>@endforeach</select></label>
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-200">Bin <span class="font-normal text-slate-400">optional</span><select name="stock_location_id" id="register-location" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Main stock area</option>@foreach($locations as $location)<option data-warehouse="{{$location->warehouse_id}}" value="{{$location->id}}">{{$location->code}} · {{$location->name}}</option>@endforeach</select></label>
                 <label class="text-sm font-medium text-slate-700 dark:text-slate-200">Register code<input name="code" required maxlength="48" placeholder="COUNTER-1" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
                 <label class="text-sm font-medium text-slate-700 dark:text-slate-200">Register name<input name="name" required maxlength="255" placeholder="Front Counter" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
                 <label class="text-sm font-medium text-slate-700 dark:text-slate-200">Receipt prefix<input name="receipt_prefix" maxlength="24" value="POS" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
@@ -38,7 +40,7 @@
                         @forelse($registers as $register)
                             <tr>
                                 <td class="p-4"><p class="font-semibold text-slate-950 dark:text-white">{{ $register->name }}</p><p class="mt-1 text-xs text-slate-500">{{ $register->code }} · {{ $register->receipt_prefix }}</p></td>
-                                <td class="p-4">{{ $register->branch?->name }}</td>
+                                <td class="p-4">{{ $register->branch?->name }}<p class="mt-1 text-xs text-slate-500">{{ $register->warehouse?->name ?? 'Stock location not assigned' }}@if($register->stockLocation) / {{$register->stockLocation->code}}@endif</p></td>
                                 <td class="p-4">
                                     @if($register->currentSession)
                                         <span class="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800 dark:bg-teal-950 dark:text-teal-200">Open since {{ $register->currentSession->opened_at?->format('d M, h:i A') }}</span>
@@ -79,4 +81,5 @@
             </div>
         </section>
     </div>
+    <script>document.addEventListener('DOMContentLoaded',()=>{const branch=document.querySelector('[name=branch_id]');const warehouse=document.getElementById('register-warehouse');const location=document.getElementById('register-location');const filterWarehouses=()=>{[...warehouse.options].forEach((option,index)=>{if(index)option.hidden=option.dataset.branch!==branch.value;});if(warehouse.selectedOptions[0]?.hidden)warehouse.value='';filterLocations();};const filterLocations=()=>{[...location.options].forEach((option,index)=>{if(index)option.hidden=option.dataset.warehouse!==warehouse.value;});location.value='';};branch?.addEventListener('change',filterWarehouses);warehouse?.addEventListener('change',filterLocations);filterWarehouses();});</script>
 @endsection

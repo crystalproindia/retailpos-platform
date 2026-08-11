@@ -14,8 +14,9 @@
             <label class="space-y-1"><span class="text-sm font-medium">Template</span><select name="template_id" required class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">@foreach($templates as $template)<option value="{{ $template->id }}">{{ $template->name }}</option>@endforeach</select></label>
             <label class="space-y-1"><span class="text-sm font-medium">Title</span><input name="title" class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"></label>
         </div>
-        <div class="mt-5 grid gap-3 md:grid-cols-[1fr_140px_160px]">
+        <div class="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_120px_150px]">
             <select name="items[0][product_id]" required class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">@foreach($products as $product)<option value="{{ $product->id }}">{{ $product->name }} ({{ $product->sku }})</option>@endforeach</select>
+            <select name="items[0][inventory_batch_id]" class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">No batch / expiry</option>@foreach($inventoryBatches as $inventoryBatch)<option value="{{$inventoryBatch->id}}">{{$inventoryBatch->product?->name}} · {{$inventoryBatch->batch_number}}{{$inventoryBatch->expires_at?' · '.$inventoryBatch->expires_at->format('d M Y'):''}}</option>@endforeach</select>
             <input name="items[0][quantity]" type="number" value="1" min="1" required class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">
             <input name="items[0][price_override]" type="number" step="0.01" min="0" placeholder="Price override" class="rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">
         </div>

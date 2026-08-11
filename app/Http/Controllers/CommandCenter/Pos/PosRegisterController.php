@@ -4,6 +4,8 @@ namespace App\Http\Controllers\CommandCenter\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\Inventory\StockLocation;
+use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosRegister;
 use App\Models\Pos\PosRegisterSession;
 use App\Services\Pos\PosRegisterService;
@@ -17,12 +19,14 @@ class PosRegisterController extends Controller
     {
         return view('command-center.pos.registers.index', [
             'registers' => PosRegister::query()
-                ->with(['branch', 'currentSession.opener'])
+                ->with(['branch', 'warehouse', 'stockLocation', 'currentSession.opener'])
                 ->where('company_id', $request->user()->company_id)
                 ->orderBy('branch_id')
                 ->orderBy('name')
                 ->get(),
             'branches' => Branch::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(),
+            'warehouses' => Warehouse::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(),
+            'locations' => StockLocation::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('code')->get(),
         ]);
     }
 
@@ -30,6 +34,8 @@ class PosRegisterController extends Controller
     {
         $data = $request->validate([
             'branch_id' => ['required', 'integer'],
+            'warehouse_id' => ['nullable', 'integer'],
+            'stock_location_id' => ['nullable', 'integer'],
             'code' => ['required', 'string', 'max:48'],
             'name' => ['required', 'string', 'max:255'],
             'receipt_prefix' => ['nullable', 'string', 'max:24'],

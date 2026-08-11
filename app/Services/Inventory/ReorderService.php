@@ -15,6 +15,7 @@ class ReorderService
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly InventoryLocationAccessService $locations,
     ) {}
 
     /**
@@ -22,13 +23,19 @@ class ReorderService
      */
     public function saveRule(User $user, array $data, ?ReorderRule $rule = null): ReorderRule
     {
+        $warehouse = $this->locations->authorize($user, (int) $data['warehouse_id']);
         $payload = $data + [
             'company_id' => $user->company_id,
-            'branch_id' => $user->branch_id,
+            'branch_id' => $warehouse->branch_id,
             'is_active' => true,
         ];
 
-        $model = $rule ? tap($rule)->update($payload) : ReorderRule::create($payload);
+        $model = $rule ? tap($rule)->update($payload) : ReorderRule::query()->updateOrCreate([
+            'company_id' => $user->company_id,
+            'warehouse_id' => $warehouse->id,
+            'stock_location_id' => $data['stock_location_id'] ?? null,
+            'product_id' => $data['product_id'],
+        ], $payload);
         $this->auditLogger->record($rule ? 'inventory.reorder_rule.updated' : 'inventory.reorder_rule.created', $model, 'Inventory reorder rule saved');
 
         return $model->refresh();
@@ -40,6 +47,7 @@ class ReorderService
             ->where('company_id', $rule->company_id)
             ->where('product_id', $rule->product_id)
             ->when($rule->warehouse_id, fn ($query) => $query->where('warehouse_id', $rule->warehouse_id))
+            ->when($rule->stock_location_id, fn ($query) => $query->where('stock_location_id', $rule->stock_location_id))
             ->sum('quantity_available');
 
         if ((float) $stock > (float) $rule->reorder_point) {

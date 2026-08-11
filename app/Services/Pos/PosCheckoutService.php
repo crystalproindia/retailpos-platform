@@ -178,7 +178,9 @@ class PosCheckoutService
     /** @param array<string, mixed> $data */
     private function heldSale(User $user, array $data, Branch $branch): ?PosSale
     {
-        if (empty($data['held_sale_id'])) return null;
+        if (empty($data['held_sale_id'])) {
+            return null;
+        }
         $sale = PosSale::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail((int) $data['held_sale_id']);
         $this->assertSaleAccess($sale, $user);
         if ($sale->status !== 'held' || $sale->held_by !== $user->id || $sale->branch_id !== $branch->id) {
@@ -210,8 +212,12 @@ class PosCheckoutService
     private function validatePayments(array $payments, string $total): array
     {
         $totalMinor = $this->minor($total);
-        if ($totalMinor === 0 && $payments === []) return ['records' => [], 'paid' => '0.00', 'change' => '0.00'];
-        if ($payments === []) throw ValidationException::withMessages(['payments' => 'Record at least one payment before completing this sale.']);
+        if ($totalMinor === 0 && $payments === []) {
+            return ['records' => [], 'paid' => '0.00', 'change' => '0.00'];
+        }
+        if ($payments === []) {
+            throw ValidationException::withMessages(['payments' => 'Record at least one payment before completing this sale.']);
+        }
 
         $paid = 0;
         $nonCash = 0;
@@ -224,11 +230,17 @@ class PosCheckoutService
                 throw ValidationException::withMessages(['payments' => 'Card, UPI, and bank-transfer payments require a reference.']);
             }
             $paid += $amount;
-            if ($method !== 'cash') $nonCash += $amount;
+            if ($method !== 'cash') {
+                $nonCash += $amount;
+            }
             $records[] = ['method' => $method, 'amount' => $this->decimal($amount), 'reference' => $reference ?: null];
         }
-        if ($paid < $totalMinor) throw ValidationException::withMessages(['payments' => 'Payment total must cover the bill total.']);
-        if ($nonCash > $totalMinor) throw ValidationException::withMessages(['payments' => 'Only cash may exceed the bill total to return change.']);
+        if ($paid < $totalMinor) {
+            throw ValidationException::withMessages(['payments' => 'Payment total must cover the bill total.']);
+        }
+        if ($nonCash > $totalMinor) {
+            throw ValidationException::withMessages(['payments' => 'Only cash may exceed the bill total to return change.']);
+        }
 
         return ['records' => $records, 'paid' => $this->decimal($paid), 'change' => $this->decimal(max(0, $paid - $totalMinor))];
     }
@@ -335,9 +347,47 @@ class PosCheckoutService
     private function postStock(User $user, PosSale $sale, array $line): void
     {
         $product = $line['product'];
-        if (! $product->track_inventory) return;
-        $level = StockLevel::query()->where('company_id', $user->company_id)->where('product_id', $product->id)->where('branch_id', $sale->branch_id)->lockForUpdate()->first();
-        if (! $level) throw ValidationException::withMessages(['items' => "No saleable stock location is configured for {$product->name}."]);
+        if (! $product->track_inventory) {
+            return;
+        }
+        $register = PosRegister::query()->where('company_id', $user->company_id)->where('branch_id', $sale->branch_id)->find($sale->register_id);
+        if ($register && ! $register->warehouse_id) {
+            throw ValidationException::withMessages(['register_id' => 'Configure a stock warehouse for this register before completing a sale.']);
+        }
+        if (! $register) {
+            $legacyLevels = StockLevel::query()
+                ->where('company_id', $user->company_id)
+                ->where('product_id', $product->id)
+                ->where('branch_id', $sale->branch_id)
+                ->limit(2)
+                ->lockForUpdate()
+                ->get();
+            if ($legacyLevels->count() > 1) {
+                throw ValidationException::withMessages(['register_id' => "Select a register before selling {$product->name}; stock exists in multiple locations."]);
+            }
+            $level = $legacyLevels->first();
+        } else {
+            $levelQuery = StockLevel::query()
+                ->where('company_id', $user->company_id)
+                ->where('product_id', $product->id)
+                ->where('branch_id', $sale->branch_id)
+                ->where('warehouse_id', $register->warehouse_id)
+                ->lockForUpdate();
+            $level = $register->stock_location_id
+                ? (clone $levelQuery)->where('stock_location_id', $register->stock_location_id)->first()
+                : (clone $levelQuery)->whereNull('stock_location_id')->first();
+
+            if (! $level && ! $register->stock_location_id) {
+                $binLevels = (clone $levelQuery)->whereNotNull('stock_location_id')->limit(2)->get();
+                if ($binLevels->count() > 1) {
+                    throw ValidationException::withMessages(['register_id' => "Select a register bin before selling {$product->name}; stock exists in multiple bins."]);
+                }
+                $level = $binLevels->first();
+            }
+        }
+        if (! $level) {
+            throw ValidationException::withMessages(['items' => "No saleable stock location is configured for {$product->name}."]);
+        }
         $quantity = (float) $line['quantity'];
         $available = (float) $level->quantity_available;
         if (! $product->allow_negative_stock && $available < $quantity) {
@@ -358,11 +408,15 @@ class PosCheckoutService
             $summary->fill(['category_id' => $line['product']->category_id, 'purchase_count' => (int) $summary->purchase_count + 1, 'quantity_purchased' => (float) $summary->quantity_purchased + (float) $line['quantity'], 'total_spent' => (float) $summary->total_spent + $line['line_total_minor'] / 100, 'first_purchased_at' => $summary->first_purchased_at ?? $sale->completed_at, 'last_purchased_at' => $sale->completed_at]);
             $summary->save();
         }
-        foreach ($lines as $source) foreach ($lines as $related) if ($source['product']->id !== $related['product']->id) {
-            $pair = PosProductPairSummary::firstOrNew(['company_id' => $customer->company_id, 'product_id' => $source['product']->id, 'related_product_id' => $related['product']->id]);
-            $pair->co_purchase_count = (int) $pair->co_purchase_count + 1;
-            $pair->last_purchased_together_at = $sale->completed_at;
-            $pair->save();
+        foreach ($lines as $source) {
+            foreach ($lines as $related) {
+                if ($source['product']->id !== $related['product']->id) {
+                    $pair = PosProductPairSummary::firstOrNew(['company_id' => $customer->company_id, 'product_id' => $source['product']->id, 'related_product_id' => $related['product']->id]);
+                    $pair->co_purchase_count = (int) $pair->co_purchase_count + 1;
+                    $pair->last_purchased_together_at = $sale->completed_at;
+                    $pair->save();
+                }
+            }
         }
         CustomerActivityLog::create(['company_id' => $customer->company_id, 'customer_id' => $customer->id, 'activity_type' => 'purchase', 'title' => 'POS sale completed', 'description' => $sale->sale_number, 'reference_type' => PosSale::class, 'reference_id' => $sale->id, 'user_id' => $user->id, 'occurred_at' => $sale->completed_at]);
         $this->insights->calculate($customer->refresh());
@@ -375,18 +429,28 @@ class PosCheckoutService
 
     private function assertSaleAccess(PosSale $sale, User $user): void
     {
-        if ($sale->company_id !== $user->company_id) throw ValidationException::withMessages(['outlet' => 'This sale is not available to your company.']);
+        if ($sale->company_id !== $user->company_id) {
+            throw ValidationException::withMessages(['outlet' => 'This sale is not available to your company.']);
+        }
         if ($sale->branch_id === null) {
-            if (! $this->outlets->hasCompanyWideAccess($user)) throw ValidationException::withMessages(['outlet' => 'Only a company administrator can change a historical sale without an outlet.']);
+            if (! $this->outlets->hasCompanyWideAccess($user)) {
+                throw ValidationException::withMessages(['outlet' => 'Only a company administrator can change a historical sale without an outlet.']);
+            }
+
             return;
         }
         $branch = Branch::query()->where('company_id', $user->company_id)->find($sale->branch_id);
-        if (! $branch || ! $this->outlets->canAccess($user, $branch)) throw ValidationException::withMessages(['outlet' => 'You are not assigned to this sale outlet.']);
+        if (! $branch || ! $this->outlets->canAccess($user, $branch)) {
+            throw ValidationException::withMessages(['outlet' => 'You are not assigned to this sale outlet.']);
+        }
     }
 
     private function minor(string $value): int
     {
-        if (! preg_match('/^(\d+)(?:\.(\d{1,2}))?$/', $value, $matches)) throw ValidationException::withMessages(['payments' => 'A valid payment amount is required.']);
+        if (! preg_match('/^(\d+)(?:\.(\d{1,2}))?$/', $value, $matches)) {
+            throw ValidationException::withMessages(['payments' => 'A valid payment amount is required.']);
+        }
+
         return ((int) $matches[1] * 100) + (int) str_pad($matches[2] ?? '', 2, '0');
     }
 

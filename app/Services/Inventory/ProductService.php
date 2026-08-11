@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Events\Domain\Inventory\ProductCreated;
 use App\Events\Domain\Inventory\ProductUpdated;
 use App\Models\Inventory\Product;
+use App\Models\Inventory\ProductAttributeValue;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
@@ -108,6 +109,7 @@ class ProductService
             'wholesale_price',
             'online_price',
             'purchase_price',
+            'pack_size',
             'variant_name',
             'image',
             'status',
@@ -115,6 +117,9 @@ class ProductService
 
         $payload['slug'] = Str::slug($data['slug'] ?? $data['name'] ?? $product?->name ?? Str::uuid()->toString());
         $payload['track_inventory'] = (bool) ($data['track_inventory'] ?? false);
+        $payload['track_batches'] = (bool) ($data['track_batches'] ?? false);
+        $payload['track_serials'] = (bool) ($data['track_serials'] ?? false);
+        $payload['track_expiry'] = (bool) ($data['track_expiry'] ?? false);
         $payload['allow_negative_stock'] = (bool) ($data['allow_negative_stock'] ?? false);
         $payload['has_variants'] = (bool) ($data['has_variants'] ?? false);
         $payload['is_variant'] = (bool) ($data['is_variant'] ?? false);
@@ -140,7 +145,7 @@ class ProductService
     {
         $sync = collect($attributeValueIds)
             ->filter()
-            ->mapWithKeys(fn ($valueId) => [(int) $valueId => ['attribute_id' => \App\Models\Inventory\ProductAttributeValue::query()->whereKey($valueId)->value('attribute_id')]])
+            ->mapWithKeys(fn ($valueId) => [(int) $valueId => ['attribute_id' => ProductAttributeValue::query()->whereKey($valueId)->value('attribute_id')]])
             ->filter(fn (array $pivot) => $pivot['attribute_id'] !== null)
             ->all();
 

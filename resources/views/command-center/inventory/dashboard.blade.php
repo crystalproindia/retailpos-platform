@@ -9,6 +9,8 @@
 @section('content')
     @include('command-center.inventory.partials.nav')
 
+    <form method="GET" class="mb-5 flex justify-end"><label class="text-sm font-semibold text-slate-600 dark:text-slate-300">Location<select name="warehouse_id" onchange="this.form.submit()" class="ml-2 min-h-11 rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">All authorized locations</option>@foreach($warehouses as $warehouse)<option value="{{$warehouse->id}}" @selected((string)request('warehouse_id')===(string)$warehouse->id)>{{$warehouse->name}}</option>@endforeach</select></label></form>
+
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @foreach ($dashboard['cards'] as $card)
             @php
@@ -27,7 +29,7 @@
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-[1fr_1.4fr]">
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <p class="text-sm font-semibold text-slate-500 dark:text-slate-400">Inventory value</p>
             <p class="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">₹{{ number_format($dashboard['inventory_value'], 2) }}</p>
             <div class="mt-5 grid grid-cols-2 gap-3 text-sm">
@@ -42,7 +44,7 @@
             </div>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Recent stock positions</h2>
             </div>

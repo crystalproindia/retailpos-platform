@@ -984,6 +984,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const url = new URL(posApp.dataset.catalogUrl, window.location.origin);
         if (value) url.searchParams.set('q', value);
+        const registerId = [...document.querySelectorAll('[data-pos-register]')].map((input) => input.value).find(Boolean);
+        if (registerId) url.searchParams.set('register_id', registerId);
         const response = await fetch(url, { headers: { Accept: 'application/json' } });
         if (!response.ok) return;
         const payload = await response.json();
@@ -1074,6 +1076,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.online) { showFeedback('No matching barcode or SKU is available offline.', 'error'); return; }
         const url = new URL(posApp.dataset.catalogUrl, window.location.origin);
         url.searchParams.set('scan', code);
+        const registerId = [...document.querySelectorAll('[data-pos-register]')].map((field) => field.value).find(Boolean);
+        if (registerId) url.searchParams.set('register_id', registerId);
         const response = await fetch(url, { headers: { Accept: 'application/json' } });
         const payload = response.ok ? await response.json() : { products: [] };
         if (payload.products?.[0]) { addProduct(payload.products[0]); input.value = ''; return; }
@@ -1085,6 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); scanProduct(input); } });
     });
     document.querySelectorAll('[data-pos-search]').forEach((button) => button.addEventListener('click', focusScanner));
+    document.querySelectorAll('[data-pos-register]').forEach((select) => select.addEventListener('change', () => searchProducts('')));
     document.querySelectorAll('[data-pos-customer-search]').forEach((button) => button.addEventListener('click', lookupCustomer));
     document.querySelectorAll('[data-pos-clear]').forEach((button) => button.addEventListener('click', () => { state.cart = []; render(); }));
     document.querySelectorAll('[data-pos-discount]').forEach((input) => input.addEventListener('input', () => { state.manualDiscount = input.value; document.querySelectorAll('[data-pos-discount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));

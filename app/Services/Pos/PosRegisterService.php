@@ -3,10 +3,12 @@
 namespace App\Services\Pos;
 
 use App\Models\Branch;
+use App\Models\Inventory\StockLocation;
+use App\Models\Inventory\Warehouse;
+use App\Models\Pos\PosRefund;
 use App\Models\Pos\PosRegister;
 use App\Models\Pos\PosRegisterSession;
 use App\Models\Pos\PosSale;
-use App\Models\Pos\PosRefund;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Outlets\OutletAccessService;
@@ -25,10 +27,30 @@ class PosRegisterService
         if (! $this->outlets->canAccess($user, $branch)) {
             throw ValidationException::withMessages(['branch_id' => 'You are not assigned to this outlet.']);
         }
+        $warehouseQuery = Warehouse::query()->where('company_id', $user->company_id)->where('branch_id', $branch->id)->where('is_active', true);
+        $warehouse = ! empty($data['warehouse_id'])
+            ? (clone $warehouseQuery)->findOrFail((int) $data['warehouse_id'])
+            : $warehouseQuery->orderByDesc('is_primary')->orderBy('id')->first();
+        $warehouse ??= Warehouse::create([
+            'company_id' => $user->company_id,
+            'branch_id' => $branch->id,
+            'name' => $branch->name.' Stock',
+            'code' => 'POS-'.$branch->id,
+            'type' => 'store',
+            'country' => $branch->country,
+            'is_primary' => true,
+            'is_active' => true,
+        ]);
+        $locationId = $data['stock_location_id'] ?? null;
+        if ($locationId && ! StockLocation::query()->where('company_id', $user->company_id)->where('warehouse_id', $warehouse->id)->where('is_active', true)->whereKey((int) $locationId)->exists()) {
+            throw ValidationException::withMessages(['stock_location_id' => 'Choose a bin in the selected register warehouse.']);
+        }
 
         $register = PosRegister::create([
             'company_id' => $user->company_id,
             'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'stock_location_id' => $locationId,
             'code' => strtoupper((string) $data['code']),
             'name' => $data['name'],
             'receipt_prefix' => strtoupper((string) ($data['receipt_prefix'] ?? 'POS')),

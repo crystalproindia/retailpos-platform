@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'stock_location_id', 'product_id', 'quantity_on_hand', 'quantity_reserved', 'quantity_available', 'reorder_point', 'reorder_quantity', 'minimum_stock', 'maximum_stock', 'safety_stock', 'preferred_supplier_id', 'supplier_lead_time_days', 'average_daily_sales', 'last_stock_movement_at'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'stock_location_id', 'product_id', 'quantity_on_hand', 'quantity_reserved', 'quantity_damaged', 'quantity_available', 'reorder_point', 'reorder_quantity', 'minimum_stock', 'maximum_stock', 'safety_stock', 'preferred_supplier_id', 'supplier_lead_time_days', 'average_daily_sales', 'last_stock_movement_at'])]
 class StockLevel extends Model
 {
     protected function casts(): array
@@ -16,6 +16,7 @@ class StockLevel extends Model
         return [
             'quantity_on_hand' => 'decimal:3',
             'quantity_reserved' => 'decimal:3',
+            'quantity_damaged' => 'decimal:3',
             'quantity_available' => 'decimal:3',
             'reorder_point' => 'decimal:3',
             'reorder_quantity' => 'decimal:3',

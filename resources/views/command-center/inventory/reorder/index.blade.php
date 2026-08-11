@@ -15,7 +15,8 @@
             <h2 class="text-base font-semibold">New reorder rule</h2>
             <div class="mt-4 grid gap-4">
                 <label class="space-y-1"><span class="text-sm font-medium">Product</span><select name="product_id" required class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">@foreach($products as $product)<option value="{{ $product->id }}">{{ $product->name }}</option>@endforeach</select></label>
-                <label class="space-y-1"><span class="text-sm font-medium">Warehouse</span><select name="warehouse_id" class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">All warehouses</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>@endforeach</select></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Location</span><select name="warehouse_id" id="reorder-warehouse" required class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">Choose store or warehouse</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>@endforeach</select></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Bin <span class="font-normal text-slate-400">optional</span></span><select name="stock_location_id" id="reorder-location" class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">Main stock area</option>@foreach($locations as $location)<option data-warehouse="{{$location->warehouse_id}}" value="{{$location->id}}">{{$location->code}} · {{$location->name}}</option>@endforeach</select></label>
                 <div class="grid gap-3 sm:grid-cols-2">
                     @foreach (['minimum_stock' => 'Minimum stock', 'maximum_stock' => 'Maximum stock', 'reorder_point' => 'Reorder point', 'reorder_quantity' => 'Reorder quantity', 'safety_stock' => 'Safety stock', 'average_daily_sales' => 'Avg daily sales'] as $field => $label)
                         <label class="space-y-1"><span class="text-sm font-medium">{{ $label }}</span><input name="{{ $field }}" type="number" step="0.001" @required(in_array($field, ['minimum_stock', 'reorder_point', 'reorder_quantity'], true)) class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"></label>
@@ -43,4 +44,5 @@
             <div class="border-t border-slate-200 px-5 py-4 dark:border-slate-800">{{ $suggestions->links() }}</div>
         </section>
     </div>
+    <script>document.addEventListener('DOMContentLoaded',()=>document.getElementById('reorder-warehouse')?.addEventListener('change',event=>{const select=document.getElementById('reorder-location');[...select.options].forEach((option,index)=>{if(index)option.hidden=option.dataset.warehouse!==event.target.value;});select.value='';}));</script>
 @endsection

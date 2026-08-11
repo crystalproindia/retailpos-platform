@@ -7,6 +7,8 @@ use App\Http\Requests\Inventory\ProductRequest;
 use App\Models\Inventory\Product;
 use App\Repositories\Inventory\InventoryLookupRepository;
 use App\Repositories\Inventory\ProductRepository;
+use App\Services\Inventory\InventoryLocationAccessService;
+use App\Services\Inventory\InventoryStockViewService;
 use App\Services\Inventory\ProductService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,10 +16,14 @@ use Illuminate\View\View;
 
 class ProductController extends Controller
 {
-    public function index(Request $request, ProductRepository $products, InventoryLookupRepository $lookups): View
+    public function index(Request $request, ProductRepository $products, InventoryLookupRepository $lookups, InventoryLocationAccessService $locations): View
     {
+        $page = $products->paginateForCompany($request->user()->company_id, $request->only(['search', 'category_id', 'brand_id', 'status', 'trashed']));
+        $warehouseIds = $locations->accessibleWarehouses($request->user(), false)->pluck('id');
+        $page->getCollection()->each(fn (Product $product) => $product->setRelation('stockLevels', $product->stockLevels->whereIn('warehouse_id', $warehouseIds)->values()));
+
         return view('command-center.inventory.products.index', [
-            'products' => $products->paginateForCompany($request->user()->company_id, $request->only(['search', 'category_id', 'brand_id', 'status', 'trashed'])),
+            'products' => $page,
             'categories' => $lookups->categories($request->user()->company_id),
             'brands' => $lookups->brands($request->user()->company_id),
         ]);
@@ -38,10 +44,15 @@ class ProductController extends Controller
         return redirect()->route('inventory.products.show', $product)->with('status', 'Product created.');
     }
 
-    public function show(Request $request, ProductRepository $products, int $product): View
+    public function show(Request $request, ProductRepository $products, InventoryStockViewService $stock, int $product): View
     {
+        $model = $products->findForCompany($request->user()->company_id, $product, true);
+        $inventory = $stock->product($request->user(), $model);
+        $model->setRelation('stockLevels', $inventory['levels']);
+
         return view('command-center.inventory.products.show', [
-            'product' => $products->findForCompany($request->user()->company_id, $product, true),
+            'product' => $model,
+            'inventory' => $inventory,
         ]);
     }
 

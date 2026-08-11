@@ -10,9 +10,10 @@
     @include('command-center.inventory.partials.nav')
     <form method="POST" action="{{ route('inventory.adjustments.store') }}" class="max-w-5xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         @csrf
-        <div class="grid gap-4 md:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-4">
             <label class="space-y-1"><span class="text-sm font-medium">Warehouse</span><select name="warehouse_id" required class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">@foreach($warehouses as $warehouse)<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>@endforeach</select></label>
-            <label class="space-y-1 md:col-span-2"><span class="text-sm font-medium">Reason</span><input name="reason" required class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"></label>
+            <label class="space-y-1"><span class="text-sm font-medium">Adjustment type</span><select name="adjustment_type" required class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950">@foreach(['opening_correction'=>'Opening correction','damage'=>'Damage','wastage'=>'Wastage','expiry'=>'Expiry','theft_loss'=>'Theft or loss','found_stock'=>'Found stock','system_correction'=>'System correction','other'=>'Other'] as $value=>$label)<option value="{{$value}}">{{$label}}</option>@endforeach</select></label>
+            <label class="space-y-1 md:col-span-2"><span class="text-sm font-medium">Reason</span><input name="reason" required placeholder="Explain why the balance must change" class="w-full rounded-lg border-slate-300 text-sm dark:border-slate-700 dark:bg-slate-950"></label>
         </div>
         <div class="mt-5 rounded-lg border border-slate-200 dark:border-slate-800">
             <div class="grid gap-3 border-b border-slate-200 p-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid-cols-[1fr_1fr_140px_1fr] dark:border-slate-800"><span>Product</span><span>Location</span><span>Adjusted qty</span><span>Reason</span></div>

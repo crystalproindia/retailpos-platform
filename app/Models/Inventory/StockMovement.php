@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'stock_location_id', 'product_id', 'pos_return_item_id', 'movement_type', 'direction', 'quantity', 'quantity_before', 'quantity_after', 'unit_cost', 'reference_type', 'reference_id', 'reason', 'notes', 'created_by', 'occurred_at'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'stock_location_id', 'product_id', 'inventory_batch_id', 'inventory_serial_number_id', 'pos_return_item_id', 'movement_type', 'direction', 'from_stock_state', 'to_stock_state', 'quantity', 'quantity_before', 'quantity_after', 'unit_cost', 'reference_type', 'reference_id', 'reason', 'notes', 'created_by', 'occurred_at'])]
 class StockMovement extends Model
 {
     protected function casts(): array
@@ -46,6 +46,16 @@ class StockMovement extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(InventoryBatch::class, 'inventory_batch_id');
+    }
+
+    public function serialNumber(): BelongsTo
+    {
+        return $this->belongsTo(InventorySerialNumber::class, 'inventory_serial_number_id');
     }
 
     public function creator(): BelongsTo

@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'adjustment_number', 'status', 'reason', 'notes', 'created_by', 'approved_by', 'approved_at'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'adjustment_number', 'status', 'adjustment_type', 'approval_required', 'reason', 'notes', 'created_by', 'approved_by', 'approved_at'])]
 class StockAdjustment extends Model
 {
     use Auditable, SoftDeletes;
@@ -24,6 +24,7 @@ class StockAdjustment extends Model
     protected function casts(): array
     {
         return [
+            'approval_required' => 'boolean',
             'approved_at' => 'datetime',
         ];
     }

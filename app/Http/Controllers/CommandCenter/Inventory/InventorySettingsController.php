@@ -29,8 +29,15 @@ class InventorySettingsController extends Controller
             'default_cost_method' => ['required', 'string', 'max:80'],
             'low_stock_notifications' => ['nullable', 'boolean'],
             'allow_negative_stock_default' => ['nullable', 'boolean'],
+            'require_transfer_approval' => ['nullable', 'boolean'],
+            'enable_transfer_packing' => ['nullable', 'boolean'],
+            'large_adjustment_threshold' => ['nullable', 'numeric', 'min:0'],
             'barcode_price_source' => ['required', 'string', 'max:80'],
         ]);
+
+        foreach (['low_stock_notifications', 'allow_negative_stock_default', 'require_transfer_approval', 'enable_transfer_packing'] as $key) {
+            $validated[$key] = $request->boolean($key);
+        }
 
         foreach ($validated as $key => $value) {
             Setting::updateOrCreate(

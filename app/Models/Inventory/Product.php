@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'parent_product_id', 'type', 'name', 'slug', 'sku', 'barcode', 'hsn_code', 'description', 'short_description', 'cost_price', 'selling_price', 'mrp', 'wholesale_price', 'online_price', 'purchase_price', 'track_inventory', 'allow_negative_stock', 'has_variants', 'is_variant', 'variant_name', 'image', 'status', 'is_active'])]
+#[Fillable(['company_id', 'branch_id', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'parent_product_id', 'type', 'name', 'slug', 'sku', 'barcode', 'hsn_code', 'description', 'short_description', 'cost_price', 'selling_price', 'mrp', 'wholesale_price', 'online_price', 'purchase_price', 'pack_size', 'track_inventory', 'track_batches', 'track_serials', 'track_expiry', 'allow_negative_stock', 'has_variants', 'is_variant', 'variant_name', 'image', 'status', 'is_active'])]
 class Product extends Model
 {
     use Auditable, SoftDeletes;
@@ -32,7 +32,11 @@ class Product extends Model
             'wholesale_price' => 'decimal:2',
             'online_price' => 'decimal:2',
             'purchase_price' => 'decimal:2',
+            'pack_size' => 'decimal:3',
             'track_inventory' => 'boolean',
+            'track_batches' => 'boolean',
+            'track_serials' => 'boolean',
+            'track_expiry' => 'boolean',
             'allow_negative_stock' => 'boolean',
             'has_variants' => 'boolean',
             'is_variant' => 'boolean',
@@ -88,6 +92,16 @@ class Product extends Model
     public function stockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class)->latest('occurred_at');
+    }
+
+    public function inventoryBatches(): HasMany
+    {
+        return $this->hasMany(InventoryBatch::class);
+    }
+
+    public function inventorySerialNumbers(): HasMany
+    {
+        return $this->hasMany(InventorySerialNumber::class);
     }
 
     public function attributeValues(): BelongsToMany

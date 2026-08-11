@@ -11,12 +11,10 @@ use App\Models\Inventory\StockAdjustment;
 use App\Models\Inventory\StockLevel;
 use App\Models\Inventory\StockLocation;
 use App\Models\Inventory\StockMovement;
-use App\Models\Inventory\Warehouse;
 use App\Models\User;
 use App\Repositories\Inventory\StockRepository;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
-use App\Services\Outlets\OutletAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +25,7 @@ class StockService
         private readonly StockRepository $stocks,
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
-        private readonly OutletAccessService $outlets,
+        private readonly InventoryLocationAccessService $locationAccess,
     ) {}
 
     /**
@@ -37,12 +35,13 @@ class StockService
     {
         return DB::transaction(function () use ($user, $data): StockMovement {
             $product = Product::query()->where('company_id', $user->company_id)->findOrFail((int) $data['product_id']);
+            $warehouse = $this->locationAccess->authorize($user, (int) $data['warehouse_id']);
             $locationId = $data['stock_location_id'] ?? null;
-            $this->assertLocationBelongsToWarehouse($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null);
+            $this->assertLocationBelongsToWarehouse($user->company_id, $warehouse->id, $locationId ? (int) $locationId : null);
 
             $duplicate = StockMovement::query()
                 ->where('company_id', $user->company_id)
-                ->where('warehouse_id', $data['warehouse_id'])
+                ->where('warehouse_id', $warehouse->id)
                 ->where('product_id', $product->id)
                 ->where('movement_type', 'opening')
                 ->when($locationId, fn ($query) => $query->where('stock_location_id', $locationId), fn ($query) => $query->whereNull('stock_location_id'))
@@ -54,7 +53,7 @@ class StockService
                 ]);
             }
 
-            $level = $this->stocks->level($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null, $product->id);
+            $level = $this->stocks->level($user->company_id, $warehouse->id, $locationId ? (int) $locationId : null, $product->id);
             $quantityBefore = (float) $level->quantity_on_hand;
             $quantityAfter = (float) $data['quantity'];
 
@@ -62,12 +61,12 @@ class StockService
                 throw ValidationException::withMessages(['quantity' => 'This product does not allow negative stock.']);
             }
 
-            $this->setLevelQuantity($level, $quantityAfter, $user->branch_id);
+            $this->setLevelQuantity($level, $quantityAfter, $warehouse->branch_id);
 
             $movement = StockMovement::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $user->branch_id,
-                'warehouse_id' => $data['warehouse_id'],
+                'branch_id' => $warehouse->branch_id,
+                'warehouse_id' => $warehouse->id,
                 'stock_location_id' => $locationId,
                 'product_id' => $product->id,
                 'movement_type' => 'opening',
@@ -102,21 +101,15 @@ class StockService
     public function createAdjustment(User $user, array $data): StockAdjustment
     {
         return DB::transaction(function () use ($user, $data): StockAdjustment {
-            $outlet = $this->outlets->current($user);
-            $warehouse = Warehouse::query()
-                ->where('company_id', $user->company_id)
-                ->where('branch_id', $outlet->id)
-                ->where('is_active', true)
-                ->find((int) $data['warehouse_id']);
-            if (! $warehouse) {
-                throw ValidationException::withMessages(['warehouse_id' => 'Choose an active warehouse in your current outlet.']);
-            }
+            $warehouse = $this->locationAccess->authorize($user, (int) $data['warehouse_id']);
             $adjustment = StockAdjustment::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $outlet->id,
+                'branch_id' => $warehouse->branch_id,
                 'warehouse_id' => $warehouse->id,
                 'adjustment_number' => 'ADJ-'.now()->format('Ymd').'-'.Str::upper(Str::random(5)),
                 'status' => StockAdjustment::STATUS_DRAFT,
+                'adjustment_type' => $data['adjustment_type'] ?? 'other',
+                'approval_required' => (bool) ($data['approval_required'] ?? true),
                 'reason' => $data['reason'],
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $user->id,
@@ -152,10 +145,10 @@ class StockService
         }
 
         return DB::transaction(function () use ($adjustment, $user): StockAdjustment {
-            $outlet = $this->outlets->current($user);
-            if ($adjustment->company_id !== $user->company_id || $adjustment->branch_id !== $outlet->id || ! $this->outlets->canAccess($user, $outlet)) {
-                throw ValidationException::withMessages(['outlet' => 'You are not assigned to this adjustment outlet.']);
+            if ($adjustment->company_id !== $user->company_id) {
+                throw ValidationException::withMessages(['warehouse_id' => 'That adjustment is not available to you.']);
             }
+            $this->locationAccess->authorize($user, $adjustment->warehouse_id);
             $adjustment->load('items.product');
 
             foreach ($adjustment->items as $item) {
@@ -242,9 +235,10 @@ class StockService
     {
         return DB::transaction(function () use ($user, $data, $movementType, $direction): StockMovement {
             $product = Product::query()->where('company_id', $user->company_id)->findOrFail((int) $data['product_id']);
+            $warehouse = $this->locationAccess->authorize($user, (int) $data['warehouse_id']);
             $locationId = $data['stock_location_id'] ?? null;
-            $this->assertLocationBelongsToWarehouse($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null);
-            $level = $this->stocks->level($user->company_id, (int) $data['warehouse_id'], $locationId ? (int) $locationId : null, $product->id);
+            $this->assertLocationBelongsToWarehouse($user->company_id, $warehouse->id, $locationId ? (int) $locationId : null);
+            $level = $this->stocks->level($user->company_id, $warehouse->id, $locationId ? (int) $locationId : null, $product->id);
             $before = (float) $level->quantity_on_hand;
             $quantity = (float) $data['quantity'];
             $after = $direction === 'in' ? $before + $quantity : $before - $quantity;
@@ -255,12 +249,12 @@ class StockService
                 ]);
             }
 
-            $this->setLevelQuantity($level, $after, $data['branch_id'] ?? $user->branch_id);
+            $this->setLevelQuantity($level, $after, $warehouse->branch_id);
 
             $movement = StockMovement::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $data['branch_id'] ?? $user->branch_id,
-                'warehouse_id' => $data['warehouse_id'],
+                'branch_id' => $warehouse->branch_id,
+                'warehouse_id' => $warehouse->id,
                 'stock_location_id' => $locationId,
                 'product_id' => $product->id,
                 'movement_type' => $movementType,
@@ -286,11 +280,12 @@ class StockService
     private function setLevelQuantity(StockLevel $level, float $quantity, ?int $branchId): void
     {
         $reserved = (float) $level->quantity_reserved;
+        $damaged = (float) $level->quantity_damaged;
 
         $level->update([
             'branch_id' => $branchId,
             'quantity_on_hand' => $quantity,
-            'quantity_available' => $quantity - $reserved,
+            'quantity_available' => $quantity - $reserved - $damaged,
             'last_stock_movement_at' => now(),
         ]);
     }

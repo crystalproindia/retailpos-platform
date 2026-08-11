@@ -34,7 +34,7 @@ companies/{company_id}/products/{product_id}/{generated-uuid}.{extension}
 
 Images are delivered through the authenticated `inventory.products.image` route. The product repository enforces company ownership before the service verifies the path prefix and file existence. Responses use private caching and `X-Content-Type-Options: nosniff`. Remote URLs, caller-selected paths, SVG, and base64 database payloads are not accepted.
 
-Replacing an image removes the previous owned file after the new file is stored. Removing an image clears the model path and deletes only a file inside the product's expected tenant directory. Missing or legacy paths return a clean placeholder in the UI.
+Replacing an image removes the previous owned original and thumbnail only after the new original and thumbnail are stored. Removing an image clears the model path and deletes only files inside the product's expected tenant directory. Missing or legacy paths return a clean placeholder in the UI.
 
 ## Image Validation
 
@@ -43,10 +43,11 @@ Replacing an image removes the previous owned file after the new file is stored.
 - Dimensions: 32 to 8,000 pixels on each side
 - Validation: file, decoded image, extension, and server-detected MIME type
 - Filename: generated UUID with a server-selected extension
+- Runtime: PHP GD extension is required for thumbnail generation
 
 ## Image Reuse
 
-The secured thumbnail URL is reused on product lists and profiles, POS product cards, global stock lookup, product stock details, transfer product search, transfer selection, and stock-count lines. Thumbnails preserve aspect ratio, use fixed dimensions, and lazy-load where repeated. A text initial is shown when no valid image is available.
+Uploads generate a proportional thumbnail whose longest edge is at most 320 pixels. The secured thumbnail URL is reused on product lists, desktop and mobile POS product cards, global stock lookup, product stock details, transfer product search, transfer selection and receiving details, and stock-count lines. The original is reserved for product forms and profiles. Repeated thumbnails lazy-load, and a text initial is shown when no valid image is available.
 
 ## Permissions
 
@@ -77,6 +78,6 @@ Customer actions wrap into accessible touch targets. The invoice selector remain
 
 - Recent-customer suggestions are not shown before a search; this keeps the endpoint bounded and avoids exposing unnecessary customer data.
 - CRM commercial history covers CRM invoices and their payments. POS customer purchases and Phase Q returns use a separate operational customer model and are not merged into this CRM view.
-- One primary product image is supported. Galleries and image optimization derivatives remain future work.
+- One primary product image and one operational thumbnail are supported. Galleries, additional responsive sizes, and CDN delivery remain future work.
 - Images are served through authorized Laravel responses rather than a public CDN; this prioritizes tenant privacy over public catalogue delivery.
 - Barcode label previews remain text and barcode focused because a thumbnail would reduce label readability at common print sizes.

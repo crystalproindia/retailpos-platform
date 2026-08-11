@@ -12,8 +12,10 @@ use App\Models\Inventory\InventoryUnit;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\User;
+use App\Services\Inventory\ProductImageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -51,6 +53,36 @@ class CustomerInvoiceProductImageUxTest extends TestCase
                 ->assertJsonPath('customers.0.id', $customer->id)
                 ->assertJsonPath('customers.0.company_name', 'Northstar Retail');
         }
+    }
+
+    public function test_invoice_customer_search_aggregates_outstanding_without_per_customer_queries(): void
+    {
+        $manager = $this->user();
+        foreach (range(1, 3) as $sequence) {
+            $customer = CrmCustomer::create([
+                'company_id' => $manager->company_id,
+                'customer_code' => 'RPC-2026-'.str_pad((string) $sequence, 6, '0', STR_PAD_LEFT),
+                'company_name' => 'Aggregate Retail '.$sequence,
+                'display_name' => 'Aggregate Customer '.$sequence,
+                'status' => CrmCustomerStatus::Active,
+                'created_by' => $manager->id,
+            ]);
+            $this->actingAs($manager)->post(route('sales.invoices.store'), $this->invoicePayload(['customer_id' => $customer->id]));
+        }
+
+        $invoiceQueries = 0;
+        DB::listen(function ($query) use (&$invoiceQueries): void {
+            if (str_contains($query->sql, 'crm_invoices')) {
+                $invoiceQueries++;
+            }
+        });
+
+        $this->actingAs($manager)
+            ->getJson(route('sales.invoices.customers.search', ['q' => 'Aggregate Retail']))
+            ->assertOk()
+            ->assertJsonCount(3, 'customers')
+            ->assertJsonPath('customers.0.outstanding', '1180');
+        $this->assertSame(1, $invoiceQueries);
     }
 
     public function test_customer_can_be_quick_created_selected_and_duplicate_is_rejected(): void
@@ -178,7 +210,7 @@ class CustomerInvoiceProductImageUxTest extends TestCase
         $unit = $this->unit($manager);
 
         foreach (['png', 'jpg', 'webp'] as $index => $extension) {
-            $file = UploadedFile::fake()->image('product.'.$extension, 120, 90);
+            $file = UploadedFile::fake()->image('product.'.$extension, 1200, 900);
             $this->actingAs($manager)
                 ->post(route('inventory.products.store'), $this->productPayload($unit, $index + 1, ['product_image' => $file]))
                 ->assertRedirect();
@@ -189,7 +221,14 @@ class CustomerInvoiceProductImageUxTest extends TestCase
         foreach ($products as $product) {
             $this->assertStringStartsWith("companies/{$manager->company_id}/products/{$product->id}/", $product->image);
             Storage::disk('local')->assertExists($product->image);
+            $thumbnailPath = dirname($product->image).'/thumbnail-'.basename($product->image);
+            Storage::disk('local')->assertExists($thumbnailPath);
+            [$width, $height] = getimagesize(Storage::disk('local')->path($thumbnailPath));
+            $this->assertLessThanOrEqual(320, max($width, $height));
             $this->actingAs($manager)->get(route('inventory.products.image', $product))->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+            $thumbnailResponse = $this->actingAs($manager)->get(route('inventory.products.image', [$product, 'variant' => 'thumbnail']))->assertOk();
+            $this->assertStringContainsString('private', (string) $thumbnailResponse->headers->get('Cache-Control'));
+            $this->assertStringContainsString('max-age=86400', (string) $thumbnailResponse->headers->get('Cache-Control'));
         }
     }
 
@@ -204,6 +243,14 @@ class CustomerInvoiceProductImageUxTest extends TestCase
             ->assertRedirect();
         $product = Product::query()->firstOrFail();
         $firstPath = $product->image;
+        $firstThumbnailPath = dirname($firstPath).'/thumbnail-'.basename($firstPath);
+
+        DB::beginTransaction();
+        app(ProductImageService::class)->replace($product, $manager, UploadedFile::fake()->image('rolled-back.jpg', 100, 100));
+        DB::rollBack();
+        $this->assertSame($firstPath, $product->refresh()->image);
+        Storage::disk('local')->assertExists($firstPath);
+        Storage::disk('local')->assertExists($firstThumbnailPath);
 
         $this->actingAs($manager)
             ->put(route('inventory.products.update', $product), $this->productPayload($unit, 1, ['product_image' => UploadedFile::fake()->image('second.jpg', 100, 100)]))
@@ -211,7 +258,10 @@ class CustomerInvoiceProductImageUxTest extends TestCase
         $secondPath = $product->refresh()->image;
         $this->assertNotSame($firstPath, $secondPath);
         Storage::disk('local')->assertMissing($firstPath);
+        Storage::disk('local')->assertMissing($firstThumbnailPath);
         Storage::disk('local')->assertExists($secondPath);
+        $secondThumbnailPath = dirname($secondPath).'/thumbnail-'.basename($secondPath);
+        Storage::disk('local')->assertExists($secondThumbnailPath);
         $this->assertDatabaseHas('audit_logs', ['event' => 'inventory.product.image_replaced', 'auditable_id' => $product->id]);
 
         $outside = $this->user();
@@ -226,6 +276,7 @@ class CustomerInvoiceProductImageUxTest extends TestCase
             ->assertRedirect();
         $this->assertNull($product->refresh()->image);
         Storage::disk('local')->assertMissing($secondPath);
+        Storage::disk('local')->assertMissing($secondThumbnailPath);
         $this->assertDatabaseHas('audit_logs', ['event' => 'inventory.product.image_removed', 'auditable_id' => $product->id]);
 
         $this->actingAs($manager)
@@ -245,12 +296,13 @@ class CustomerInvoiceProductImageUxTest extends TestCase
             ->post(route('inventory.products.store'), $this->productPayload($unit, 1, ['product_image' => UploadedFile::fake()->image('product.png', 100, 100), 'allow_negative_stock' => 1]))
             ->assertRedirect();
         $product = Product::query()->firstOrFail();
+        $thumbnailUrl = route('inventory.products.image', [$product, 'variant' => 'thumbnail']);
 
-        $this->actingAs($manager)->get(route('inventory.products.index'))->assertOk()->assertSee(route('inventory.products.image', $product));
+        $this->actingAs($manager)->get(route('inventory.products.index'))->assertOk()->assertSee($thumbnailUrl);
         $this->actingAs($manager)->get(route('inventory.products.show', $product))->assertOk()->assertSee(route('inventory.products.image', $product));
-        $this->actingAs($manager)->get(route('inventory.stock.availability', ['search' => 'Image Product']))->assertOk()->assertSee(route('inventory.products.image', $product));
-        $this->actingAs($manager)->get(route('inventory.stock.product', $product))->assertOk()->assertSee(route('inventory.products.image', $product));
-        $this->actingAs($manager)->get(route('pos.index'))->assertOk()->assertSee(route('inventory.products.image', $product));
+        $this->actingAs($manager)->get(route('inventory.stock.availability', ['search' => 'Image Product']))->assertOk()->assertSee($thumbnailUrl);
+        $this->actingAs($manager)->get(route('inventory.stock.product', $product))->assertOk()->assertSee($thumbnailUrl);
+        $this->actingAs($manager)->get(route('pos.index'))->assertOk()->assertSee($thumbnailUrl);
 
         $source = $this->warehouse($manager, 'IMAGE-SOURCE');
         $destination = $this->warehouse($manager, 'IMAGE-DEST');
@@ -258,7 +310,11 @@ class CustomerInvoiceProductImageUxTest extends TestCase
             'q' => 'Image Product',
             'source_warehouse_id' => $source->id,
             'destination_warehouse_id' => $destination->id,
-        ]))->assertOk()->assertJsonPath('products.0.image', route('inventory.products.image', $product));
+        ]))->assertOk()->assertJsonPath('products.0.image', $thumbnailUrl);
+
+        $thumbnailPath = dirname($product->image).'/thumbnail-'.basename($product->image);
+        Storage::disk('local')->delete($thumbnailPath);
+        $this->actingAs($manager)->get(route('inventory.products.index'))->assertOk()->assertDontSee($thumbnailUrl);
 
         $product->update(['image' => 'companies/'.$manager->company_id.'/products/'.$product->id.'/missing.png']);
         $this->actingAs($manager)->get(route('inventory.products.show', $product))->assertOk()->assertDontSee('<img', false);
@@ -328,6 +384,7 @@ class CustomerInvoiceProductImageUxTest extends TestCase
             'selling_price' => 499,
             'status' => 'active',
             'track_inventory' => 1,
+            'attribute_value_ids' => [''],
         ], $overrides);
     }
 

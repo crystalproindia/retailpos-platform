@@ -60,7 +60,7 @@ class ProductRequest extends FormRequest
             'has_variants' => ['nullable', 'boolean'],
             'is_variant' => ['nullable', 'boolean'],
             'attribute_value_ids' => ['nullable', 'array'],
-            'attribute_value_ids.*' => ['integer', 'exists:product_attribute_values,id'],
+            'attribute_value_ids.*' => ['nullable', 'integer', 'exists:product_attribute_values,id'],
         ];
     }
 }

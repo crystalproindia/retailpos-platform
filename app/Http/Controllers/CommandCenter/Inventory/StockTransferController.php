@@ -124,7 +124,7 @@ class StockTransferController extends Controller
                 'name' => $product->name,
                 'sku' => $product->sku,
                 'barcode' => $product->barcode,
-                'image' => $product->imageUrl(),
+                'image' => $product->imageUrl(true),
                 'unit' => $product->unit?->short_code,
                 'track_serials' => $product->track_serials,
                 'track_batches' => $product->track_batches,

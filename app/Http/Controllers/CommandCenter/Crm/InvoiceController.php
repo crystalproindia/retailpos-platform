@@ -62,10 +62,11 @@ class InvoiceController extends Controller
     {
         $data = $request->validate(['q' => ['required', 'string', 'min:2', 'max:120']]);
         $records = $customers->searchForInvoice($request->user(), $data['q']);
+        $outstanding = $invoices->outstandingByCustomers($request->user(), $records->pluck('id'));
 
         return response()->json(['customers' => $records->map(fn ($customer): array => $this->customerPayload(
             $customer,
-            $invoices->customerHistory($request->user(), $customer->id)['outstanding'],
+            $outstanding->get($customer->id, '0.00'),
         ))]);
     }
 

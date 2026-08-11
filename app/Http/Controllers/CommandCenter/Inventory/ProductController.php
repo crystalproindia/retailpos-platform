@@ -89,6 +89,9 @@ class ProductController extends Controller
 
     public function image(Request $request, ProductRepository $products, ProductImageService $images, int $product): StreamedResponse
     {
-        return $images->response($products->findForCompany($request->user()->company_id, $product, true));
+        return $images->response(
+            $products->findForCompany($request->user()->company_id, $product, true),
+            $request->query('variant') === 'thumbnail',
+        );
     }
 }

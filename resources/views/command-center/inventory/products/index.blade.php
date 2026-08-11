@@ -48,7 +48,7 @@
                     @forelse ($products as $product)
                         <tr>
                             <td class="px-5 py-3">
-                                <div class="flex items-center gap-3"><div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-sm font-semibold text-slate-400 dark:bg-slate-800">@if($product->imageUrl())<img src="{{ $product->imageUrl() }}" alt="" class="size-full object-cover" loading="lazy">@else{{ str($product->name)->substr(0, 1) }}@endif</div><div class="min-w-0"><a href="{{ route('inventory.products.show', $product) }}" class="font-semibold text-slate-950 hover:text-teal-700 dark:text-white">{{ $product->name }}</a><p class="text-xs text-slate-500">{{ $product->brand?->name ?? 'No brand' }}</p></div></div>
+                                <div class="flex items-center gap-3"><div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-sm font-semibold text-slate-400 dark:bg-slate-800">@if($product->imageUrl(true))<img src="{{ $product->imageUrl(true) }}" alt="" class="size-full object-cover" loading="lazy">@else{{ str($product->name)->substr(0, 1) }}@endif</div><div class="min-w-0"><a href="{{ route('inventory.products.show', $product) }}" class="font-semibold text-slate-950 hover:text-teal-700 dark:text-white">{{ $product->name }}</a><p class="text-xs text-slate-500">{{ $product->brand?->name ?? 'No brand' }}</p></div></div>
                             </td>
                             <td class="px-5 py-3 font-mono text-xs">{{ $product->sku }}</td>
                             <td class="px-5 py-3 text-slate-500">{{ $product->category?->name ?? 'Unassigned' }}</td>

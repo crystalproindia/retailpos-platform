@@ -132,12 +132,19 @@ class Product extends Model
         return (string) $this->stockLevels->sum('quantity_available');
     }
 
-    public function imageUrl(): ?string
+    public function imageUrl(bool $thumbnail = false): ?string
     {
         $prefix = "companies/{$this->company_id}/products/{$this->id}/";
 
-        return $this->image && str_starts_with($this->image, $prefix) && Storage::disk('local')->exists($this->image)
-            ? route('inventory.products.image', $this)
-            : null;
+        if (! $this->image || ! str_starts_with($this->image, $prefix) || ! Storage::disk('local')->exists($this->image)) {
+            return null;
+        }
+
+        $path = $thumbnail ? dirname($this->image).'/thumbnail-'.basename($this->image) : $this->image;
+        if (! Storage::disk('local')->exists($path)) {
+            return null;
+        }
+
+        return route('inventory.products.image', $thumbnail ? [$this, 'variant' => 'thumbnail'] : $this);
     }
 }

@@ -50,6 +50,22 @@ class InvoiceRepository
         ];
     }
 
+    /** @param Collection<int, int> $customerIds @return Collection<int, string> */
+    public function outstandingByCustomers(User $user, Collection $customerIds): Collection
+    {
+        if ($customerIds->isEmpty()) {
+            return collect();
+        }
+
+        return $this->queryForUser($user)
+            ->whereIn('customer_id', $customerIds)
+            ->whereNotIn('status', ['cancelled', 'void'])
+            ->selectRaw('customer_id, SUM(balance_due) as outstanding')
+            ->groupBy('customer_id')
+            ->pluck('outstanding', 'customer_id')
+            ->map(fn ($outstanding): string => (string) $outstanding);
+    }
+
     /** @return Collection<int, array{currency:string,total_invoiced:string,total_collected:string,outstanding:string,overdue:string}> */
     public function collectionSummary(User $user): Collection
     {

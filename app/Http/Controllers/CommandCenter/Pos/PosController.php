@@ -208,6 +208,6 @@ class PosController extends Controller
     {
         $stock = (float) $product->stockLevels->sum('quantity_available');
 
-        return ['id' => $product->id, 'name' => $product->name, 'sku' => $product->sku, 'barcode' => $product->barcode, 'price' => (float) $product->selling_price, 'category' => $product->category?->name, 'brand' => $product->brand?->name, 'category_id' => $product->category_id, 'image' => $product->imageUrl(), 'track_inventory' => (bool) $product->track_inventory, 'available_stock' => $stock, 'low_stock' => $product->track_inventory && $stock > 0 && $stock <= 5];
+        return ['id' => $product->id, 'name' => $product->name, 'sku' => $product->sku, 'barcode' => $product->barcode, 'price' => (float) $product->selling_price, 'category' => $product->category?->name, 'brand' => $product->brand?->name, 'category_id' => $product->category_id, 'image' => $product->imageUrl(true), 'track_inventory' => (bool) $product->track_inventory, 'available_stock' => $stock, 'low_stock' => $product->track_inventory && $stock > 0 && $stock <= 5];
     }
 }

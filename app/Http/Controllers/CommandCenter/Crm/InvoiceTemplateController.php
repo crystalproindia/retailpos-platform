@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\CommandCenter\Crm;
 
 use App\Http\Controllers\Controller;
+use App\Enums\Crm\InvoiceStatus;
+use App\Models\Company;
+use App\Models\Crm\CrmInvoice;
+use App\Models\Crm\CrmInvoiceItem;
 use App\Repositories\Crm\InvoiceRepository;
 use App\Services\Branding\CompanyBrandingService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoicePaymentQrService;
 use App\Services\Crm\InvoiceTemplateService;
+use App\Support\Invoices\InvoiceTemplateRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,29 +21,49 @@ class InvoiceTemplateController extends Controller
 {
     public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices, CompanyBrandingService $branding): View
     {
+        $previewInvoice = $invoices->paginate($request->user())->first();
+
         return view('command-center.crm.invoices.templates', [
             'setting' => $templates->setting($request->user()->company),
             'templates' => $templates->definitions(),
+            'formats' => InvoiceTemplateRegistry::FORMATS,
             'defaults' => $templates->defaultOptions(),
-            'previewInvoice' => $invoices->paginate($request->user())->first(),
+            'previewInvoice' => $previewInvoice,
+            'previewRouteInvoice' => $previewInvoice?->id ?? 0,
             'branding' => $branding->forCompany($request->user()->company),
         ]);
     }
 
-    public function preview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, int $invoice): \Illuminate\Http\Response
+    public function preview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, InvoicePaymentQrService $paymentQr, int $invoice): \Illuminate\Http\Response
     {
-        $record = $invoices->find($request->user(), $invoice);
+        $record = $invoice === 0
+            ? $this->sampleInvoice($request->user()->company)
+            : $invoices->find($request->user(), $invoice);
 
-        return $pdf->document($record)->stream($pdf->filename($record));
+        return $pdf->document($record, $this->validatedSettings($request, $paymentQr, false))->stream($pdf->filename($record));
     }
 
     public function update(Request $request, InvoiceTemplateService $templates, InvoicePaymentQrService $paymentQr): RedirectResponse
     {
-        $data = $request->validate([
-            'template_key' => ['required', 'in:'.implode(',', InvoiceTemplateService::KEYS)],
-            'brand_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'copy_label' => ['required', 'in:original,duplicate,triplicate'],
-            'orientation' => ['required', 'in:portrait,landscape'],
+        $data = $this->validatedSettings($request, $paymentQr, true);
+        foreach (['show_gst_breakup', 'show_gst_summary', 'show_hsn_sac'] as $required) {
+            $data['options'][$required] = true;
+        }
+        $templates->update($request->user()->company, $request->user(), $data);
+
+        return back()->with('status', 'Invoice design saved. GST fields remain enabled for compliant invoice output.');
+    }
+
+    /** @return array<string,mixed> */
+    private function validatedSettings(Request $request, InvoicePaymentQrService $paymentQr, bool $requireTemplate): array
+    {
+        $rules = [
+            'template_key' => [$requireTemplate ? 'required' : 'nullable', 'in:'.implode(',', InvoiceTemplateService::KEYS)],
+            'paper_format' => [$requireTemplate ? 'required' : 'nullable', 'in:a4,a5,thermal_80,thermal_58'],
+            'gst_presentation' => ['nullable', 'in:summary,detailed'],
+            'brand_color' => [$requireTemplate ? 'required' : 'nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'copy_label' => [$requireTemplate ? 'required' : 'nullable', 'in:original,duplicate,triplicate,customer_copy,office_copy'],
+            'orientation' => [$requireTemplate ? 'required' : 'nullable', 'in:portrait,landscape'],
             'payment_qr_uri' => [
                 'nullable',
                 'string',
@@ -49,7 +74,7 @@ class InvoiceTemplateController extends Controller
                     }
                 },
             ],
-            'options' => ['array'],
+            'options' => ['nullable', 'array'],
             'options.show_logo' => ['nullable', 'boolean'], 'options.show_bill_to' => ['nullable', 'boolean'], 'options.show_ship_to' => ['nullable', 'boolean'],
             'options.logo_position' => ['nullable', 'in:left,center,right'], 'options.logo_size' => ['nullable', 'in:small,medium,large'], 'options.show_company_name' => ['nullable', 'boolean'],
             'options.show_bank_details' => ['nullable', 'boolean'], 'options.show_terms' => ['nullable', 'boolean'], 'options.show_signature' => ['nullable', 'boolean'],
@@ -57,12 +82,49 @@ class InvoiceTemplateController extends Controller
             'options.show_previous_balance' => ['nullable', 'boolean'], 'options.show_current_balance' => ['nullable', 'boolean'], 'options.show_hsn_sac' => ['nullable', 'boolean'],
             'options.show_sku' => ['nullable', 'boolean'], 'options.show_discount' => ['nullable', 'boolean'], 'options.show_gst_breakup' => ['nullable', 'boolean'],
             'options.show_gst_summary' => ['nullable', 'boolean'], 'options.show_payment_status' => ['nullable', 'boolean'],
-        ]);
-        foreach (['show_gst_breakup', 'show_gst_summary', 'show_hsn_sac'] as $required) {
-            $data['options'][$required] = true;
-        }
-        $templates->update($request->user()->company, $request->user(), $data);
+        ];
 
-        return back()->with('status', 'Invoice design saved. GST fields remain enabled for compliant invoice output.');
+        return $request->validate($rules);
+    }
+
+    private function sampleInvoice(Company $company): CrmInvoice
+    {
+        $invoice = new CrmInvoice([
+            'company_id' => $company->id,
+            'invoice_number' => 'SAMPLE-INV-001',
+            'currency' => 'INR',
+            'status' => InvoiceStatus::Issued,
+            'billing_name' => 'Asha Sharma',
+            'billing_company' => 'Asha Retail Studio',
+            'billing_email' => 'asha@example.test',
+            'billing_phone' => '+91 98765 43210',
+            'billing_address' => 'MG Road, Bengaluru, Karnataka 560001',
+            'customer_tax_number' => '29ABCDE1234F1Z5',
+            'place_of_supply' => 'Karnataka',
+            'place_of_supply_state_code' => '29',
+            'tax_classification' => 'Intra-state supply',
+            'supplier_gstin_snapshot' => $company->tax_id,
+            'issue_date' => today(),
+            'due_date' => today()->addDays(14),
+            'subtotal' => 2500,
+            'discount_total' => 100,
+            'taxable_total' => 2400,
+            'tax_total' => 432,
+            'cgst_total' => 216,
+            'sgst_total' => 216,
+            'igst_total' => 0,
+            'cess_total' => 0,
+            'grand_total' => 2832,
+            'amount_paid' => 1000,
+            'balance_due' => 1832,
+            'terms_conditions' => 'Thank you for choosing us. Payment is due within fourteen days.',
+        ]);
+        $invoice->setRelation('company', $company);
+        $invoice->setRelation('items', collect([
+            new CrmInvoiceItem(['name' => 'Retail POS starter setup', 'description' => 'Configuration, onboarding and staff handover', 'hsn_sac' => '998313', 'quantity' => 1, 'unit' => 'service', 'unit_price' => 1800, 'discount_amount' => 100, 'tax_rate' => 18, 'tax_treatment_snapshot' => 'standard', 'tax_amount' => 306, 'cgst_amount' => 153, 'sgst_amount' => 153, 'igst_amount' => 0, 'cess_amount' => 0, 'line_subtotal' => 1700, 'line_total' => 2006, 'sort_order' => 1]),
+            new CrmInvoiceItem(['name' => 'Barcode label roll - 100 labels', 'description' => 'Thermal-compatible retail shelf labels', 'hsn_sac' => '482190', 'quantity' => 2, 'unit' => 'roll', 'unit_price' => 350, 'discount_amount' => 0, 'tax_rate' => 18, 'tax_treatment_snapshot' => 'standard', 'tax_amount' => 126, 'cgst_amount' => 63, 'sgst_amount' => 63, 'igst_amount' => 0, 'cess_amount' => 0, 'line_subtotal' => 700, 'line_total' => 826, 'sort_order' => 2]),
+        ]));
+
+        return $invoice;
     }
 }

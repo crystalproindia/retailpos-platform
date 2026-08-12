@@ -17,13 +17,14 @@ class InvoiceTemplateDesignTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_all_five_templates_render_authoritative_gst_snapshots(): void
+    public function test_all_a4_templates_render_authoritative_gst_snapshots(): void
     {
         [$user, $invoice] = $this->invoice();
         $service = app(InvoiceTemplateService::class);
         $pdf = app(InvoicePdfService::class);
         $renderedViews = [];
-        foreach (InvoiceTemplateService::KEYS as $key) {
+        $a4Keys = array_keys(app(\App\Support\Invoices\InvoiceTemplateRegistry::class)->forFormat('a4'));
+        foreach ($a4Keys as $key) {
             $service->update($user->company, $user, ['template_key' => $key, 'brand_color' => '#0f766e', 'copy_label' => 'original', 'orientation' => 'portrait', 'options' => $service->defaultOptions()]);
             $render = $service->renderData($invoice->fresh()->load(['company', 'items']));
             $this->assertSame($key, $render['setting']->template_key);
@@ -37,7 +38,7 @@ class InvoiceTemplateDesignTest extends TestCase
             $renderedViews[] = hash('sha256', $markup);
             $this->assertNotEmpty($pdf->document($invoice->fresh())->output());
         }
-        $this->assertCount(5, array_unique($renderedViews));
+        $this->assertCount(count($a4Keys), array_unique($renderedViews));
     }
 
     public function test_interstate_tax_uses_igst_and_required_gst_options_cannot_be_disabled(): void

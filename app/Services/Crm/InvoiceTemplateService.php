@@ -8,21 +8,22 @@ use App\Models\InvoiceTemplateSetting;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Branding\CompanyBrandingService;
+use App\Support\Invoices\InvoiceTemplateRegistry;
 
 class InvoiceTemplateService
 {
-    public const KEYS = ['structured_gst_grid', 'premium_elegant', 'compact_detailed_gst', 'modern_split_panel', 'executive_corporate_gst'];
+    public const KEYS = [
+        'structured_gst_grid', 'premium_elegant', 'compact_detailed_gst', 'modern_split_panel', 'executive_corporate_gst',
+        'modern_blue_corporate', 'bold_retail', 'minimal_professional', 'modern_orange', 'dark_header', 'green_business', 'elegant_purple',
+        'a5_modern_retail', 'a5_compact_gst', 'a5_boutique', 'a5_professional', 'a5_bold', 'a5_minimal', 'a5_service_invoice',
+        'thermal_80_classic', 'thermal_80_modern', 'thermal_80_compact', 'thermal_80_gst_detailed',
+        'thermal_58_mini', 'thermal_58_essential', 'thermal_58_gst_compact',
+    ];
 
     /** @return array<string,array<string,mixed>> */
     public function definitions(): array
     {
-        return [
-            'structured_gst_grid' => ['name' => 'Structured GST Grid', 'density' => 'balanced', 'gst_detail' => 'detailed', 'businesses' => 'Wholesale, hardware, manufacturing and distribution'],
-            'premium_elegant' => ['name' => 'Premium Elegant', 'density' => 'spacious', 'gst_detail' => 'summary', 'businesses' => 'Fashion, jewellery, furniture and premium retail'],
-            'compact_detailed_gst' => ['name' => 'Compact Detailed GST', 'density' => 'compact', 'gst_detail' => 'detailed', 'businesses' => 'Retail, FMCG, supermarkets and trading'],
-            'modern_split_panel' => ['name' => 'Modern Split Panel', 'density' => 'balanced', 'gst_detail' => 'summary', 'businesses' => 'Agencies, consultants, software and modern brands'],
-            'executive_corporate_gst' => ['name' => 'Executive Corporate GST', 'density' => 'balanced', 'gst_detail' => 'detailed', 'businesses' => 'B2B, multi-branch and GST-intensive businesses'],
-        ];
+        return $this->registry->all();
     }
 
     public function __construct(
@@ -30,17 +31,22 @@ class InvoiceTemplateService
         private readonly InvoicePaymentQrService $paymentQr,
         private readonly CompanyBrandingService $branding,
         private readonly AuditLogger $audit,
+        private readonly InvoiceTemplateRegistry $registry,
     ) {}
 
     public function setting(Company $company): InvoiceTemplateSetting
     {
-        return InvoiceTemplateSetting::firstOrCreate(['company_id' => $company->id], ['options' => $this->defaultOptions()])->refresh();
+        return InvoiceTemplateSetting::firstOrCreate(['company_id' => $company->id], [
+            'paper_format' => 'a4',
+            'gst_presentation' => 'detailed',
+            'options' => $this->defaultOptions(),
+        ])->refresh();
     }
 
     /** @return array{data_uri: ?string, source: ?string, show_logo: bool, logo_position: string, logo_size: string, show_company_name: bool} */
-    public function brandingFor(Company $company): array
+    public function brandingFor(Company $company, ?InvoiceTemplateSetting $setting = null): array
     {
-        $setting = $this->setting($company);
+        $setting ??= $this->setting($company);
         $options = array_replace($this->defaultOptions(), $setting->options ?? []);
         $logo = $this->branding->forInvoice($company);
 
@@ -58,20 +64,30 @@ class InvoiceTemplateService
     public function update(Company $company, User $user, array $data): InvoiceTemplateSetting
     {
         $setting = $this->setting($company);
+        $templateKey = (string) $data['template_key'];
+        $definition = $this->registry->find($templateKey);
+        $paperFormat = $this->registry->isCompatible($templateKey, (string) ($data['paper_format'] ?? $definition['paper_format']))
+            ? (string) ($data['paper_format'] ?? $definition['paper_format'])
+            : $definition['paper_format'];
+        $orientations = $this->registry->orientations($templateKey, $paperFormat);
+        $orientation = in_array($data['orientation'] ?? 'portrait', $orientations, true) ? $data['orientation'] : 'portrait';
         $setting->update([
-            'template_key' => $data['template_key'], 'brand_color' => $data['brand_color'], 'copy_label' => $data['copy_label'],
-            'orientation' => $data['orientation'], 'payment_qr_uri' => $data['payment_qr_uri'] ?? null,
+            'template_key' => $templateKey, 'paper_format' => $paperFormat, 'brand_color' => $data['brand_color'], 'copy_label' => $data['copy_label'],
+            'orientation' => $orientation, 'gst_presentation' => $data['gst_presentation'] ?? $setting->gst_presentation ?? 'detailed', 'payment_qr_uri' => $data['payment_qr_uri'] ?? null,
             'options' => array_replace($this->defaultOptions(), $data['options'] ?? []), 'updated_by' => $user->id,
         ]);
-        $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', ['company_id' => $company->id, 'template_key' => $setting->template_key]);
+        $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', ['company_id' => $company->id, 'template_key' => $setting->template_key, 'paper_format' => $setting->paper_format]);
 
         return $setting->refresh();
     }
 
     /** @return array<string,mixed> */
-    public function renderData(CrmInvoice $invoice): array
+    public function renderData(CrmInvoice $invoice, array $overrides = []): array
     {
         $setting = $this->setting($invoice->company);
+        if ($overrides !== []) {
+            $setting = $this->previewSetting($setting, $overrides);
+        }
         $items = $invoice->items;
         $rows = [];
         foreach ($items as $item) {
@@ -93,13 +109,13 @@ class InvoiceTemplateService
 
         return [
             'setting' => $setting,
-            'template' => $this->definitions()[$setting->template_key] ?? $this->definitions()['structured_gst_grid'],
+            'template' => $this->registry->find($setting->template_key),
             'item_chunks' => $items->chunk(50),
             'tax_rows' => array_values($rows),
             'balance' => $balance,
             'payment_qr_uri' => $paymentQr['payload'] ?? null,
             'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null,
-            'branding' => $this->brandingFor($invoice->company),
+            'branding' => $this->brandingFor($invoice->company, $setting),
         ];
     }
 
@@ -107,5 +123,31 @@ class InvoiceTemplateService
     public function defaultOptions(): array
     {
         return ['show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
+    }
+
+    /** @param array<string,mixed> $overrides */
+    private function previewSetting(InvoiceTemplateSetting $setting, array $overrides): InvoiceTemplateSetting
+    {
+        $preview = clone $setting;
+        $key = (string) ($overrides['template_key'] ?? $setting->template_key);
+        $definition = $this->registry->find($key);
+        $format = (string) ($overrides['paper_format'] ?? $setting->paper_format ?? $definition['paper_format']);
+        if (! $this->registry->isCompatible($key, $format)) {
+            $format = $definition['paper_format'];
+        }
+        $orientations = $this->registry->orientations($key, $format);
+        $orientation = in_array($overrides['orientation'] ?? $setting->orientation, $orientations, true) ? $overrides['orientation'] ?? $setting->orientation : 'portrait';
+        $preview->forceFill([
+            'template_key' => $key,
+            'paper_format' => $format,
+            'orientation' => $orientation,
+            'brand_color' => $overrides['brand_color'] ?? $setting->brand_color,
+            'copy_label' => $overrides['copy_label'] ?? $setting->copy_label,
+            'gst_presentation' => $overrides['gst_presentation'] ?? $setting->gst_presentation ?? $definition['gst_detail'],
+            'payment_qr_uri' => $overrides['payment_qr_uri'] ?? $setting->payment_qr_uri,
+            'options' => array_replace($this->defaultOptions(), $setting->options ?? [], $overrides['options'] ?? []),
+        ]);
+
+        return $preview;
     }
 }

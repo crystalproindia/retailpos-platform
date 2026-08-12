@@ -4,29 +4,27 @@ namespace App\Services\Crm;
 
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
+use App\Support\Invoices\InvoiceTemplateRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DompdfDocument;
 
 class InvoicePdfService
 {
-    private const TEMPLATE_VIEWS = [
-        'structured_gst_grid' => 'invoice-templates.structured-gst-grid',
-        'premium_elegant' => 'invoice-templates.premium-elegant',
-        'compact_detailed_gst' => 'invoice-templates.compact-detailed-gst',
-        'modern_split_panel' => 'invoice-templates.modern-split-panel',
-        'executive_corporate_gst' => 'invoice-templates.executive-corporate-gst',
-    ];
+    public function __construct(
+        private readonly InvoiceTemplateService $templates,
+        private readonly InvoiceTemplateRegistry $registry,
+    ) {}
 
-    public function __construct(private readonly InvoiceTemplateService $templates) {}
-
-    public function document(CrmInvoice $invoice): DompdfDocument
+    /** @param array<string,mixed> $overrides */
+    public function document(CrmInvoice $invoice, array $overrides = []): DompdfDocument
     {
-        $render = $this->templates->renderData($invoice->loadMissing(['company', 'items']));
-
-        return Pdf::loadView($this->templateView($render['setting']->template_key), [
+        $render = $this->templates->renderData($invoice->loadMissing(['company', 'items']), $overrides);
+        $document = Pdf::loadView($this->templateView($render['setting']->template_key), [
             'invoice' => $invoice,
             'render' => $render,
-        ])->setPaper('a4', $render['setting']->orientation);
+        ]);
+
+        return $this->applyPaper($document, $render, $invoice);
     }
 
     /** @return array{contents: string, filename: string, mime: string} */
@@ -41,7 +39,7 @@ class InvoicePdfService
 
     public function templateView(string $templateKey): string
     {
-        return self::TEMPLATE_VIEWS[$templateKey] ?? self::TEMPLATE_VIEWS['structured_gst_grid'];
+        return $this->registry->find($templateKey)['view'];
     }
 
     public function receipt(CrmInvoice $invoice, CrmInvoicePayment $payment): DompdfDocument
@@ -66,5 +64,28 @@ class InvoicePdfService
     public function receiptFilename(CrmInvoicePayment $payment): string
     {
         return 'RetailPOS-Receipt-'.$payment->receipt_number.'.pdf';
+    }
+
+    /** @param array<string,mixed> $render */
+    private function applyPaper(DompdfDocument $document, array $render, CrmInvoice $invoice): DompdfDocument
+    {
+        $format = $render['setting']->paper_format ?? 'a4';
+        $orientation = $render['setting']->orientation ?? 'portrait';
+
+        return match ($format) {
+            'a5' => $document->setPaper([0, 0, 419.53, 595.28], $orientation),
+            'thermal_80' => $document->setPaper([0, 0, 226.77, $this->thermalHeight($invoice, $render)], 'portrait'),
+            'thermal_58' => $document->setPaper([0, 0, 164.41, $this->thermalHeight($invoice, $render)], 'portrait'),
+            default => $document->setPaper('a4', $orientation),
+        };
+    }
+
+    /** @param array<string,mixed> $render */
+    private function thermalHeight(CrmInvoice $invoice, array $render): float
+    {
+        $rows = $invoice->items->count();
+        $taxRows = count($render['tax_rows'] ?? []);
+
+        return min(7200.0, max(576.0, 280.0 + ($rows * 22.0) + ($taxRows * 20.0)));
     }
 }

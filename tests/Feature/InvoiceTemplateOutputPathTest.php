@@ -49,7 +49,7 @@ class InvoiceTemplateOutputPathTest extends TestCase
 
     #[DataProvider('longDocumentCases')]
     #[RunInSeparateProcess]
-    public function test_each_template_renders_long_documents_with_repeated_headers_and_embedded_qr(string $templateKey, int $lineCount): void
+    public function test_representative_a4_templates_render_long_documents_with_repeated_headers_and_embedded_qr(string $templateKey, int $lineCount): void
     {
         [$user, $invoice] = $this->invoiceWithItems($lineCount);
         $templates = app(InvoiceTemplateService::class);
@@ -74,7 +74,7 @@ class InvoiceTemplateOutputPathTest extends TestCase
     public static function longDocumentCases(): iterable
     {
         foreach ([50, 100, 200] as $lineCount) {
-            foreach (InvoiceTemplateService::KEYS as $templateKey) {
+            foreach (['structured_gst_grid', 'premium_elegant', 'compact_detailed_gst', 'modern_split_panel', 'executive_corporate_gst'] as $templateKey) {
                 yield $templateKey.'-'.$lineCount => [$templateKey, $lineCount];
             }
         }

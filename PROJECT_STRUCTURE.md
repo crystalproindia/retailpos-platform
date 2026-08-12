@@ -3119,7 +3119,7 @@ See `docs/saas-billing/` for architecture, GST, test-mode gateway setup, webhook
 
 # CRM Invoice Template Designs
 
-CRM invoice presentation is configured per company in invoice_template_settings. The CRM invoice template, balance presentation, payment QR, and PDF services form the display boundary for the five selected PDF layouts in resources/views/invoice-templates.
+CRM invoice presentation is configured per company in invoice_template_settings. The InvoiceTemplateRegistry, CRM invoice template, balance presentation, payment QR, and PDF services form the display boundary for the A4, A5, 80mm thermal, and 58mm thermal PDF layouts in resources/views/invoice-templates. The format setting is forward-only and existing selections remain valid as A4 designs.
 
 The Sales invoice workspace exposes settings, a tenant-authorized inline preview route, CRM browser print, PDF download, and the existing secure public PDF path. Invoice calculations, stored GST snapshots, invoice numbering, payment allocation, accounting records, SaaS billing PDFs, and Google Calendar/Meet remain unchanged. See docs/invoice-templates for architecture, templates, settings, GST presentation, PDF rendering, and tests.
 

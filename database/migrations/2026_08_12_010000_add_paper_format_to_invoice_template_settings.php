@@ -23,16 +23,8 @@ return new class extends Migration
 
     public function down(): void
     {
-        $hasPaperFormat = Schema::hasColumn('invoice_template_settings', 'paper_format');
-        $hasGstPresentation = Schema::hasColumn('invoice_template_settings', 'gst_presentation');
-
-        Schema::table('invoice_template_settings', function (Blueprint $table) use ($hasPaperFormat, $hasGstPresentation): void {
-            if ($hasGstPresentation) {
-                $table->dropColumn('gst_presentation');
-            }
-            if ($hasPaperFormat) {
-                $table->dropColumn('paper_format');
-            }
-        });
+        // This release tolerates pre-existing columns. Dropping either during a
+        // rollback could remove a column introduced by an earlier deployment.
+        // The migration is therefore forward-only and safely re-runnable.
     }
 };

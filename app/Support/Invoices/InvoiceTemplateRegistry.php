@@ -50,6 +50,11 @@ class InvoiceTemplateRegistry
         return $this->all()[$key] ?? $this->all()['structured_gst_grid'];
     }
 
+    public function has(string $key): bool
+    {
+        return array_key_exists($key, $this->all());
+    }
+
     /** @return list<string> */
     public function keys(): array
     {

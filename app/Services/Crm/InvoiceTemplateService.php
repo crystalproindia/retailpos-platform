@@ -65,6 +65,9 @@ class InvoiceTemplateService
     {
         $setting = $this->setting($company);
         $templateKey = (string) $data['template_key'];
+        if (! $this->registry->has($templateKey)) {
+            $templateKey = $this->registry->defaultFor('a4');
+        }
         $definition = $this->registry->find($templateKey);
         $paperFormat = $this->registry->isCompatible($templateKey, (string) ($data['paper_format'] ?? $definition['paper_format']))
             ? (string) ($data['paper_format'] ?? $definition['paper_format'])
@@ -85,6 +88,13 @@ class InvoiceTemplateService
     public function renderData(CrmInvoice $invoice, array $overrides = []): array
     {
         $setting = $this->setting($invoice->company);
+        if (! $this->registry->has((string) $setting->template_key)) {
+            $setting = $this->previewSetting($setting, [
+                'template_key' => $this->registry->defaultFor('a4'),
+                'paper_format' => 'a4',
+                'orientation' => 'portrait',
+            ]);
+        }
         if ($overrides !== []) {
             $setting = $this->previewSetting($setting, $overrides);
         }

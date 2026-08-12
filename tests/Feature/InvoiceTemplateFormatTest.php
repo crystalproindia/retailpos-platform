@@ -58,6 +58,19 @@ class InvoiceTemplateFormatTest extends TestCase
         $this->assertSame(180.0, (float) $invoice->fresh()->tax_total);
     }
 
+    public function test_unknown_legacy_template_key_uses_a_safe_a4_rendering_fallback(): void
+    {
+        [$user, $invoice] = $this->invoice();
+        $setting = app(InvoiceTemplateService::class)->setting($user->company);
+        $setting->update(['template_key' => 'retired-template', 'paper_format' => 'thermal_58', 'orientation' => 'portrait']);
+
+        $render = app(InvoiceTemplateService::class)->renderData($invoice->fresh()->load(['company', 'items']));
+
+        $this->assertSame('structured_gst_grid', $render['setting']->template_key);
+        $this->assertSame('a4', $render['setting']->paper_format);
+        $this->assertSame(1180.0, (float) $invoice->fresh()->grand_total);
+    }
+
     public function test_format_specific_views_and_print_markup_are_used_for_a5_and_thermal(): void
     {
         [$user, $invoice] = $this->invoice();

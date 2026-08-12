@@ -47,6 +47,22 @@ class InvoiceTemplateFormatTest extends TestCase
         $this->assertSame('portrait', $setting->orientation);
     }
 
+    public function test_legacy_update_request_without_a_paper_format_derives_the_template_format(): void
+    {
+        [$user] = $this->invoice();
+        $templates = app(InvoiceTemplateService::class);
+
+        $this->actingAs($user)->put(route('sales.invoices.templates.update'), [
+            'template_key' => 'a5_compact_gst',
+            'brand_color' => '#0f766e',
+            'copy_label' => 'original',
+            'orientation' => 'portrait',
+            'options' => $templates->defaultOptions(),
+        ])->assertRedirect();
+
+        $this->assertSame('a5', $templates->setting($user->company)->paper_format);
+    }
+
     public function test_legacy_setting_defaults_to_a4_without_mutating_invoice_financials(): void
     {
         [$user, $invoice] = $this->invoice();

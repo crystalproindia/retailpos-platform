@@ -59,7 +59,9 @@ class InvoiceTemplateController extends Controller
     {
         $rules = [
             'template_key' => [$requireTemplate ? 'required' : 'nullable', 'in:'.implode(',', InvoiceTemplateService::KEYS)],
-            'paper_format' => [$requireTemplate ? 'required' : 'nullable', 'in:a4,a5,thermal_80,thermal_58'],
+            // Existing integrations submitted only a template key. The service
+            // safely derives its paper format from the registry in that case.
+            'paper_format' => ['nullable', 'in:a4,a5,thermal_80,thermal_58'],
             'gst_presentation' => ['nullable', 'in:summary,detailed'],
             'brand_color' => [$requireTemplate ? 'required' : 'nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'copy_label' => [$requireTemplate ? 'required' : 'nullable', 'in:original,duplicate,triplicate,customer_copy,office_copy'],

@@ -248,6 +248,16 @@
                             {{ session('error') }}
                         </div>
                     @endif
+                    @if ($errors->any())
+                        <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">
+                            <p class="font-semibold">Please correct the highlighted information.</p>
+                            <ul class="mt-2 list-disc space-y-1 pl-5">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
 
                     @yield('content')
                 </main>
@@ -280,5 +290,6 @@
             </section>
         </div>
         <script id="global-menu-search-aliases" type="application/json">@json($globalMenuSearch->aliases())</script>
+        @stack('scripts')
     </body>
 </html>

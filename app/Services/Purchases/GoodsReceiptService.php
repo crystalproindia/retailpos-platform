@@ -85,16 +85,16 @@ class GoodsReceiptService
                         ->findOrFail((int) $item['purchase_order_item_id'])
                     : ($order?->items->firstWhere('product_id', (int) ($item['product_id'] ?? 0)));
 
-                $acceptedQuantity = (float) ($item['accepted_quantity'] ?? $item['received_quantity']);
-                $receivedQuantity = (float) $item['received_quantity'];
-                $rejectedQuantity = (float) ($item['rejected_quantity'] ?? max(0, $receivedQuantity - $acceptedQuantity));
-                $damagedQuantity = (float) ($item['damaged_quantity'] ?? 0);
-                if ($acceptedQuantity < 0 || $rejectedQuantity < 0 || $damagedQuantity < 0 || $acceptedQuantity + $rejectedQuantity + $damagedQuantity > $receivedQuantity + 0.0005) {
+                $acceptedQuantity = $this->mills($item['accepted_quantity'] ?? $item['received_quantity']);
+                $receivedQuantity = $this->mills($item['received_quantity']);
+                $rejectedQuantity = $this->mills($item['rejected_quantity'] ?? max(0, $receivedQuantity - $acceptedQuantity));
+                $damagedQuantity = $this->mills($item['damaged_quantity'] ?? 0);
+                if ($acceptedQuantity < 0 || $rejectedQuantity < 0 || $damagedQuantity < 0 || $acceptedQuantity + $rejectedQuantity + $damagedQuantity > $receivedQuantity) {
                     throw ValidationException::withMessages(['items' => 'Accepted, rejected, and damaged quantities cannot exceed the received quantity.']);
                 }
                 if ($orderItem) {
-                    $remaining = (float) $orderItem->pending_quantity;
-                    if ($acceptedQuantity > $remaining + 0.0005) {
+                    $remaining = $this->mills($orderItem->pending_quantity);
+                    if ($acceptedQuantity > $remaining) {
                         throw ValidationException::withMessages(['items' => "Accepted quantity for {$orderItem->product_name_snapshot} exceeds the remaining PO quantity."]);
                     }
                 }
@@ -104,11 +104,11 @@ class GoodsReceiptService
                     'product_id' => $orderItem?->product_id ?? $item['product_id'],
                     'stock_location_id' => $item['stock_location_id'] ?? null,
                     'ordered_quantity' => $orderItem?->ordered_quantity ?? $item['ordered_quantity'] ?? null,
-                    'received_quantity' => $receivedQuantity,
-                    'accepted_quantity' => $acceptedQuantity,
-                    'rejected_quantity' => $rejectedQuantity,
-                    'damaged_quantity' => $damagedQuantity,
-                    'short_quantity' => max(0, (float) ($orderItem?->pending_quantity ?? 0) - $acceptedQuantity),
+                    'received_quantity' => $this->quantityDecimal($receivedQuantity),
+                    'accepted_quantity' => $this->quantityDecimal($acceptedQuantity),
+                    'rejected_quantity' => $this->quantityDecimal($rejectedQuantity),
+                    'damaged_quantity' => $this->quantityDecimal($damagedQuantity),
+                    'short_quantity' => $this->quantityDecimal(max(0, $this->mills($orderItem?->pending_quantity) - $acceptedQuantity)),
                     'unit_cost' => $item['unit_cost'] ?? $orderItem?->unit_price ?? 0,
                     'batch_number' => $item['batch_number'] ?? null,
                     'expiry_date' => $item['expiry_date'] ?? null,
@@ -136,7 +136,7 @@ class GoodsReceiptService
             }
 
             foreach ($receipt->items as $item) {
-                if ((float) $item->accepted_quantity <= 0) {
+                if ($this->mills($item->accepted_quantity) <= 0) {
                     continue;
                 }
 
@@ -157,11 +157,11 @@ class GoodsReceiptService
                 ]);
 
                 if ($item->purchaseOrderItem) {
-                    $received = (float) $item->purchaseOrderItem->received_quantity + (float) $item->accepted_quantity;
-                    $pending = max(0, (float) $item->purchaseOrderItem->ordered_quantity - $received);
+                    $received = $this->mills($item->purchaseOrderItem->received_quantity) + $this->mills($item->accepted_quantity);
+                    $pending = max(0, $this->mills($item->purchaseOrderItem->ordered_quantity) - $received);
                     $item->purchaseOrderItem->update([
-                        'received_quantity' => $received,
-                        'pending_quantity' => $pending,
+                        'received_quantity' => $this->quantityDecimal($received),
+                        'pending_quantity' => $this->quantityDecimal($pending),
                     ]);
                 }
 
@@ -175,7 +175,7 @@ class GoodsReceiptService
                     ]);
             }
 
-            $status = $receipt->items->sum('rejected_quantity') > 0
+            $status = $receipt->items->sum(fn (GoodsReceiptItem $item) => $this->mills($item->rejected_quantity) + $this->mills($item->damaged_quantity)) > 0
                 ? GoodsReceiptStatus::PartiallyAccepted->value
                 : GoodsReceiptStatus::Received->value;
 
@@ -248,5 +248,29 @@ class GoodsReceiptService
         $item->update(['inventory_batch_id' => $batch->id]);
 
         return $batch->refresh();
+    }
+
+    private function mills(string|int|float|null $value): int
+    {
+        $value = trim((string) ($value ?? '0'));
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $whole = preg_replace('/\D/', '', $whole) ?: '0';
+        $fraction = preg_replace('/\D/', '', $fraction) ?: '';
+        $mills = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0');
+        if (isset($fraction[3]) && $fraction[3] >= '5') {
+            $mills++;
+        }
+
+        return $negative ? -$mills : $mills;
+    }
+
+    private function quantityDecimal(int $mills): string
+    {
+        $negative = $mills < 0;
+        $digits = str_pad((string) abs($mills), 4, '0', STR_PAD_LEFT);
+
+        return ($negative ? '-' : '').substr($digits, 0, -3).'.'.substr($digits, -3);
     }
 }

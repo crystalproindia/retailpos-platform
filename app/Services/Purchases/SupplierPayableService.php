@@ -15,8 +15,8 @@ class SupplierPayableService
         $payments = SupplierPayment::query()->where('company_id', $companyId)->where('status', 'recorded');
         if ($supplierId) { $invoices->where('supplier_id', $supplierId); $payments->where('supplier_id', $supplierId); }
         if ($branchId) { $invoices->where('branch_id', $branchId); $payments->where('branch_id', $branchId); }
-        $outstanding = (int) round((float) $invoices->sum('outstanding_total') * 100);
-        $advances = (int) round((float) $payments->sum('unallocated_amount') * 100);
+        $outstanding = $this->paise($invoices->sum('outstanding_total'));
+        $advances = $this->paise($payments->sum('unallocated_amount'));
         return ['outstanding' => $this->decimal($outstanding), 'advances' => $this->decimal($advances), 'net_payable' => $this->decimal(max(0, $outstanding - $advances))];
     }
 
@@ -29,10 +29,32 @@ class SupplierPayableService
         $query->select(['due_date', 'outstanding_total'])->orderBy('due_date')->each(function (PurchaseInvoice $invoice) use (&$buckets): void {
             $days = max(0, $invoice->due_date->diffInDays(today(), false));
             $key = $days === 0 ? 'current' : ($days <= 30 ? '1_30' : ($days <= 60 ? '31_60' : ($days <= 90 ? '61_90' : '90_plus')));
-            $buckets[$key] += (int) round((float) $invoice->outstanding_total * 100);
+            $buckets[$key] += $this->paise($invoice->outstanding_total);
         });
         return $buckets;
     }
 
-    private function decimal(int $paise): string { return number_format($paise / 100, 2, '.', ''); }
+    private function paise(string|int|float $value): int
+    {
+        $value = trim((string) $value);
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $whole = preg_replace('/\D/', '', $whole) ?: '0';
+        $fraction = preg_replace('/\D/', '', $fraction) ?: '';
+        $paise = ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0');
+        if (isset($fraction[2]) && $fraction[2] >= '5') {
+            $paise++;
+        }
+
+        return $negative ? -$paise : $paise;
+    }
+
+    private function decimal(int $paise): string
+    {
+        $negative = $paise < 0;
+        $digits = str_pad((string) abs($paise), 3, '0', STR_PAD_LEFT);
+
+        return ($negative ? '-' : '').substr($digits, 0, -2).'.'.substr($digits, -2);
+    }
 }

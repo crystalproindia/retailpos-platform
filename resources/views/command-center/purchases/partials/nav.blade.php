@@ -15,7 +15,7 @@
     ];
 @endphp
 
-<div class="mb-6 overflow-x-auto">
+<div class="mb-6 w-full max-w-full overflow-x-auto">
     <nav class="flex min-w-max gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="Purchase sections">
         @foreach ($links as $link)
             @can($link['can'])

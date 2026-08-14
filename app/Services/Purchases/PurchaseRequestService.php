@@ -95,13 +95,20 @@ class PurchaseRequestService
             foreach ($request->items as $item) {
                 $decision = $decisions->get($item->id);
                 $quantity = $decision['approved_quantity'] ?? $item->requested_quantity;
-                if (! is_numeric($quantity) || (float) $quantity < 0 || (float) $quantity > (float) $item->requested_quantity) {
+                if (! is_numeric($quantity)) {
                     throw ValidationException::withMessages(['items' => 'Approved quantities must be between zero and the requested quantity.']);
                 }
-                $approvedAny = $approvedAny || (float) $quantity > 0;
-                $hasPartialApproval = $hasPartialApproval || (float) $quantity !== (float) $item->requested_quantity;
+
+                $approvedQuantity = $this->mills($quantity);
+                $requestedQuantity = $this->mills($item->requested_quantity);
+                if ($approvedQuantity < 0 || $approvedQuantity > $requestedQuantity) {
+                    throw ValidationException::withMessages(['items' => 'Approved quantities must be between zero and the requested quantity.']);
+                }
+
+                $approvedAny = $approvedAny || $approvedQuantity > 0;
+                $hasPartialApproval = $hasPartialApproval || $approvedQuantity !== $requestedQuantity;
                 $item->update([
-                    'approved_quantity' => $quantity,
+                    'approved_quantity' => $this->quantityDecimal($approvedQuantity),
                     'approval_notes' => $decision['approval_notes'] ?? null,
                 ]);
             }
@@ -252,5 +259,20 @@ class PurchaseRequestService
             aggregateId: $request->id,
             payload: $payload,
         ));
+    }
+
+    private function mills(mixed $value): int
+    {
+        $value = trim((string) $value);
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+
+        return ($negative ? -1 : 1) * (((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0'));
+    }
+
+    private function quantityDecimal(int $mills): string
+    {
+        return sprintf('%d.%03d', intdiv($mills, 1000), abs($mills % 1000));
     }
 }

@@ -114,7 +114,7 @@ class PurchaseInvoiceService
     {
         return DB::transaction(function () use ($invoice, $user, $reason): PurchaseInvoice {
             $invoice = PurchaseInvoice::query()->lockForUpdate()->findOrFail($invoice->id);
-            if ((int) round((float) $invoice->paid_total * 100) > 0) {
+            if ($this->paise($invoice->paid_total) > 0) {
                 throw ValidationException::withMessages(['status' => 'Reverse payment allocations before cancelling an invoice.']);
             }
             if ($invoice->status === 'cancelled') {
@@ -172,8 +172,8 @@ class PurchaseInvoiceService
             }
 
             $taxable = intdiv(($quantityMills * $unitPrice) + 500, 1000);
-            $taxRateBasisPoints = (int) round(((float) ($item['tax_rate'] ?? 0)) * 100);
-            $tax = intdiv(($taxable * $taxRateBasisPoints) + 5000, 10000);
+            $taxRateMills = $this->scaledInteger($item['tax_rate'] ?? 0, 3);
+            $tax = intdiv(($taxable * $taxRateMills) + 50_000, 100_000);
             $cgst = $intraState ? intdiv($tax, 2) : 0;
             $sgst = $intraState ? $tax - $cgst : 0;
             $igst = $intraState ? 0 : $tax;
@@ -191,7 +191,7 @@ class PurchaseInvoiceService
                 'quantity' => $this->quantityDecimal($quantityMills),
                 'unit_price' => $this->decimal($unitPrice),
                 'taxable_value' => $this->decimal($taxable),
-                'tax_rate' => number_format($taxRateBasisPoints / 100, 3, '.', ''),
+                'tax_rate' => $this->formatScaled($taxRateMills, 3),
                 'cgst_amount' => $this->decimal($cgst),
                 'sgst_amount' => $this->decimal($sgst),
                 'igst_amount' => $this->decimal($igst),
@@ -229,8 +229,36 @@ class PurchaseInvoiceService
         return sprintf('%d-%02d', $start, ($start + 1) % 100);
     }
 
-    private function paise(string|int|float $value): int { return (int) round(((float) $value) * 100); }
-    private function mills(string|int|float $value): int { return (int) round(((float) $value) * 1000); }
-    private function decimal(int $paise): string { return number_format($paise / 100, 2, '.', ''); }
-    private function quantityDecimal(int $mills): string { return number_format($mills / 1000, 3, '.', ''); }
+    private function paise(string|int|float $value): int { return $this->scaledInteger($value, 2); }
+    private function mills(string|int|float $value): int { return $this->scaledInteger($value, 3); }
+    private function decimal(int $paise): string { return $this->formatScaled($paise, 2); }
+    private function quantityDecimal(int $mills): string { return $this->formatScaled($mills, 3); }
+
+    private function scaledInteger(string|int|float $value, int $scale): int
+    {
+        $value = trim((string) $value);
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $whole = preg_replace('/\D/', '', $whole) ?: '0';
+        $fraction = preg_replace('/\D/', '', $fraction) ?: '';
+        $factor = 10 ** $scale;
+        $scaled = ((int) $whole * $factor) + (int) str_pad(substr($fraction, 0, $scale), $scale, '0');
+
+        if (isset($fraction[$scale]) && $fraction[$scale] >= '5') {
+            $scaled++;
+        }
+
+        return $negative ? -$scaled : $scaled;
+    }
+
+    private function formatScaled(int $value, int $scale): string
+    {
+        $negative = $value < 0;
+        $digits = str_pad((string) abs($value), $scale + 1, '0', STR_PAD_LEFT);
+        $whole = substr($digits, 0, -$scale);
+        $fraction = substr($digits, -$scale);
+
+        return ($negative ? '-' : '').$whole.'.'.$fraction;
+    }
 }

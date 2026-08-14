@@ -165,6 +165,31 @@ class PurchaseFoundationTest extends TestCase
         $this->assertDatabaseHas('domain_event_logs', ['event_key' => 'purchase.order.sent']);
     }
 
+    public function test_purchase_order_rejects_invalid_lifecycle_transitions(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+
+        $this->actingAs($manager)->post('/purchases/orders', [
+            'warehouse_id' => $fixtures['warehouse']->id,
+            'supplier_id' => $fixtures['supplier']->id,
+            'items' => [[
+                'product_id' => $fixtures['product']->id,
+                'ordered_quantity' => '1.000',
+                'unit_price' => '58.00',
+                'tax_rate' => '5.000',
+            ]],
+        ])->assertRedirect();
+
+        $order = PurchaseOrder::query()->firstOrFail();
+        $this->actingAs($manager)->post("/purchases/orders/{$order->id}/send")->assertSessionHasErrors('status');
+        $this->assertSame('draft', $order->refresh()->status->value);
+
+        $this->actingAs($manager)->post("/purchases/orders/{$order->id}/submit")->assertRedirect();
+        $this->actingAs($manager)->post("/purchases/orders/{$order->id}/supplier-confirm")->assertSessionHasErrors('status');
+        $this->assertSame('pending_approval', $order->refresh()->status->value);
+    }
+
     public function test_goods_receipt_posts_stock_updates_po_and_supplier_product(): void
     {
         $manager = $this->user(UserRole::Manager);
@@ -174,6 +199,8 @@ class PurchaseFoundationTest extends TestCase
 
         $this->actingAs($manager)->post('/purchases/grn', [
             'purchase_order_id' => $order->id,
+            'supplier_id' => '',
+            'warehouse_id' => '',
             'items' => [[
                 'purchase_order_item_id' => $orderItem->id,
                 'product_id' => $fixtures['product']->id,
@@ -347,15 +374,15 @@ class PurchaseFoundationTest extends TestCase
             'company_id' => $manager->company_id, 'branch_id' => $manager->branch_id, 'warehouse_id' => $fixtures['warehouse']->id,
             'request_number' => 'PR-PARTIAL-001', 'status' => 'pending_review', 'priority' => 'normal', 'requested_by' => $manager->id,
         ]);
-        $item = $request->items()->create(['product_id' => $fixtures['product']->id, 'supplier_id' => $fixtures['supplier']->id, 'requested_quantity' => 10, 'estimated_price' => 58]);
+        $item = $request->items()->create(['product_id' => $fixtures['product']->id, 'supplier_id' => $fixtures['supplier']->id, 'requested_quantity' => '10.001', 'estimated_price' => 58]);
 
         $this->actingAs($manager)->post("/purchases/requests/{$request->id}/approve", ['items' => [[
-            'item_id' => $item->id, 'approved_quantity' => 6, 'approval_notes' => 'Match this week demand.',
+            'item_id' => $item->id, 'approved_quantity' => '6.001', 'approval_notes' => 'Match this week demand.',
         ]]])->assertRedirect();
         $this->assertSame('partially_approved', $request->refresh()->status->value);
 
         $this->actingAs($manager)->post("/purchases/requests/{$request->id}/convert")->assertRedirect();
-        $this->assertSame('6.000', $item->refresh()->converted_quantity);
+        $this->assertSame('6.001', $item->refresh()->converted_quantity);
         $this->actingAs($manager)->post("/purchases/requests/{$request->id}/convert")->assertSessionHasErrors('status');
     }
 
@@ -415,6 +442,28 @@ class PurchaseFoundationTest extends TestCase
         $exception = \App\Models\Purchases\PurchaseInvoiceMatchException::query()->where('purchase_invoice_id', $invoice->id)->firstOrFail();
         $this->actingAs($manager)->post("/purchases/invoices/{$invoice->id}/match-exceptions/{$exception->id}/resolve", ['resolution_notes' => 'Supplier credit note requested.'])->assertRedirect();
         $this->assertSame('resolved', $exception->refresh()->status);
+    }
+
+    public function test_three_way_matching_preserves_fixed_decimal_tax_precision(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+        $order = $this->purchaseOrder($manager, $fixtures);
+        $receipt = GoodsReceipt::create([
+            'company_id' => $manager->company_id, 'branch_id' => $manager->branch_id, 'warehouse_id' => $fixtures['warehouse']->id,
+            'supplier_id' => $fixtures['supplier']->id, 'purchase_order_id' => $order->id, 'grn_number' => 'GRN-MATCH-DECIMAL-001', 'receipt_date' => now(), 'status' => 'received', 'received_by' => $manager->id,
+        ]);
+        $line = $receipt->items()->create(['purchase_order_item_id' => $order->items()->first()->id, 'product_id' => $fixtures['product']->id, 'ordered_quantity' => 1, 'received_quantity' => 1, 'accepted_quantity' => 1, 'rejected_quantity' => 0, 'unit_cost' => 58]);
+
+        $this->actingAs($manager)->post('/purchases/invoices', [
+            'supplier_id' => $fixtures['supplier']->id, 'purchase_order_id' => $order->id, 'supplier_invoice_number' => 'SUP-MATCH-DECIMAL-001', 'supplier_invoice_date' => now()->toDateString(),
+            'supplier_state_code' => 'KA', 'place_of_supply_state_code' => 'KA', 'items' => [[
+                'goods_receipt_item_id' => $line->id, 'quantity' => 1, 'unit_price' => 58, 'tax_rate' => '5.004',
+            ]],
+        ])->assertRedirect();
+
+        $invoice = PurchaseInvoice::query()->firstOrFail();
+        $this->assertDatabaseHas('purchase_invoice_match_exceptions', ['purchase_invoice_id' => $invoice->id, 'type' => 'tax_mismatch', 'status' => 'open']);
     }
 
     public function test_supplier_payment_allocates_and_reversal_restores_purchase_invoice_outstanding(): void

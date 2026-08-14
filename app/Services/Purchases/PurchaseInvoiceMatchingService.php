@@ -17,13 +17,13 @@ class PurchaseInvoiceMatchingService
     {
         return DB::transaction(function () use ($invoice, $actor): PurchaseInvoice {
             $invoice = PurchaseInvoice::query()
-                ->with(['items.product', 'items', 'matchExceptions'])
+                ->with(['items.product', 'items.goodsReceiptItem.purchaseOrderItem', 'matchExceptions'])
                 ->lockForUpdate()
                 ->findOrFail($invoice->id);
 
             $invoice->matchExceptions()->where('status', 'open')->delete();
             foreach ($invoice->items as $line) {
-                $receiptItem = $line->goodsReceiptItem()->with('purchaseOrderItem')->first();
+                $receiptItem = $line->goodsReceiptItem;
                 if (! $receiptItem) {
                     $this->exception($invoice, $line->id, null, 'unreceived_item', 'This invoice line is not linked to an accepted goods receipt item.');
                     continue;
@@ -31,15 +31,15 @@ class PurchaseInvoiceMatchingService
                 if ($line->product_id !== $receiptItem->product_id) {
                     $this->exception($invoice, $line->id, $receiptItem->id, 'product_mismatch', 'The invoice product does not match the received product.');
                 }
-                if ((float) $line->quantity > (float) $receiptItem->accepted_quantity + 0.0005) {
-                    $this->exception($invoice, $line->id, $receiptItem->id, 'quantity_mismatch', 'The supplier invoiced more than the accepted quantity.', (float) $receiptItem->accepted_quantity, (float) $line->quantity);
+                if ($this->compareDecimal($line->quantity, $receiptItem->accepted_quantity, 3) > 0) {
+                    $this->exception($invoice, $line->id, $receiptItem->id, 'quantity_mismatch', 'The supplier invoiced more than the accepted quantity.', $receiptItem->accepted_quantity, $line->quantity);
                 }
                 $orderItem = $receiptItem->purchaseOrderItem;
-                if ($orderItem && abs((float) $line->unit_price - (float) $orderItem->unit_price) > 0.005) {
-                    $this->exception($invoice, $line->id, $receiptItem->id, 'price_mismatch', 'The invoiced unit price differs from the purchase order.', null, null, (float) $orderItem->unit_price, (float) $line->unit_price);
+                if ($orderItem && $this->compareDecimal($line->unit_price, $orderItem->unit_price, 2) !== 0) {
+                    $this->exception($invoice, $line->id, $receiptItem->id, 'price_mismatch', 'The invoiced unit price differs from the purchase order.', null, null, $orderItem->unit_price, $line->unit_price);
                 }
-                if ($orderItem && abs((float) $line->tax_rate - (float) $orderItem->tax_rate) > 0.005) {
-                    $this->exception($invoice, $line->id, $receiptItem->id, 'tax_mismatch', 'The invoiced GST rate differs from the purchase order.', null, null, (float) $orderItem->tax_rate, (float) $line->tax_rate);
+                if ($orderItem && $this->compareDecimal($line->tax_rate, $orderItem->tax_rate, 3) !== 0) {
+                    $this->exception($invoice, $line->id, $receiptItem->id, 'tax_mismatch', 'The invoiced GST rate differs from the purchase order.', null, null, $orderItem->tax_rate, $line->tax_rate);
                 }
             }
             $hasExceptions = $invoice->matchExceptions()->where('status', 'open')->exists();
@@ -68,7 +68,7 @@ class PurchaseInvoiceMatchingService
         return $exception->refresh();
     }
 
-    private function exception(PurchaseInvoice $invoice, ?int $invoiceItemId, ?int $receiptItemId, string $type, string $details, ?float $expectedQuantity = null, ?float $actualQuantity = null, ?float $expectedAmount = null, ?float $actualAmount = null): void
+    private function exception(PurchaseInvoice $invoice, ?int $invoiceItemId, ?int $receiptItemId, string $type, string $details, ?string $expectedQuantity = null, ?string $actualQuantity = null, ?string $expectedAmount = null, ?string $actualAmount = null): void
     {
         PurchaseInvoiceMatchException::create([
             'company_id' => $invoice->company_id,
@@ -83,5 +83,32 @@ class PurchaseInvoiceMatchingService
             'actual_amount' => $actualAmount,
             'details' => $details,
         ]);
+    }
+
+    private function compareDecimal(string|int|float|null $left, string|int|float|null $right, int $scale): int
+    {
+        $left = $this->decimalParts($left, $scale);
+        $right = $this->decimalParts($right, $scale);
+
+        if ($left['negative'] !== $right['negative']) {
+            return $left['negative'] ? -1 : 1;
+        }
+
+        $comparison = strlen($left['value']) <=> strlen($right['value']) ?: $left['value'] <=> $right['value'];
+
+        return $left['negative'] ? -$comparison : $comparison;
+    }
+
+    /** @return array{negative: bool, value: string} */
+    private function decimalParts(string|int|float|null $value, int $scale): array
+    {
+        $value = trim((string) ($value ?? '0'));
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $normalized = (ltrim($whole, '0') ?: '0').str_pad(substr($fraction, 0, $scale), $scale, '0');
+        $normalized = ltrim($normalized, '0') ?: '0';
+
+        return ['negative' => $negative && $normalized !== '0', 'value' => $normalized];
     }
 }

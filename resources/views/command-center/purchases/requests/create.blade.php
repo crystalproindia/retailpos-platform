@@ -35,9 +35,13 @@
             <textarea name="notes" rows="2" class="mt-1 w-full rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"></textarea>
         </label>
 
-        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800">
-            <div class="border-b border-slate-200 px-4 py-3 text-sm font-semibold dark:border-slate-800">Request item</div>
-            <div class="grid gap-4 p-4 md:grid-cols-5">
+        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800" data-purchase-item-repeater data-next-index="1">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                <span class="text-sm font-semibold">Request items</span>
+                <button type="button" data-add-purchase-item class="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium dark:border-slate-700">Add item</button>
+            </div>
+            <div class="space-y-3 p-4" data-purchase-items-list>
+                <div class="grid gap-4 md:grid-cols-6" data-purchase-item>
                 <select name="items[0][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                     <option value="">Product</option>
                     @foreach ($products as $product)
@@ -53,7 +57,10 @@
                 <input name="items[0][requested_quantity]" type="number" min="0.001" step="0.001" placeholder="Quantity" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                 <input name="items[0][estimated_price]" type="number" min="0" step="0.01" placeholder="Estimated price" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
                 <input name="items[0][notes]" placeholder="Notes" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
+                <button type="button" data-remove-purchase-item class="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700">Remove</button>
+                </div>
             </div>
+            <template data-purchase-item-template><div class="grid gap-4 border-t border-slate-200 pt-3 dark:border-slate-800 md:grid-cols-6" data-purchase-item><select name="items[__INDEX__][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><option value="">Product</option>@foreach ($products as $product)<option value="{{ $product->id }}">{{ $product->name }}</option>@endforeach</select><select name="items[__INDEX__][supplier_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><option value="">Supplier optional</option>@foreach ($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->name }}</option>@endforeach</select><input name="items[__INDEX__][requested_quantity]" type="number" min="0.001" step="0.001" placeholder="Quantity" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><input name="items[__INDEX__][estimated_price]" type="number" min="0" step="0.01" placeholder="Estimated price" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><input name="items[__INDEX__][notes]" placeholder="Notes" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><button type="button" data-remove-purchase-item class="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700">Remove</button></div></template>
         </div>
         <div class="mt-6 flex justify-end gap-3">
             <a href="{{ route('purchases.requests.index') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">Cancel</a>
@@ -61,3 +68,5 @@
         </div>
     </form>
 @endsection
+
+@include('command-center.purchases.partials.item-repeater-script')

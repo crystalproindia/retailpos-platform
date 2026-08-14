@@ -27,8 +27,8 @@
         @endforeach
     </div>
 
-    <div class="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div class="mt-6 grid min-w-0 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <p class="text-sm font-semibold text-slate-500 dark:text-slate-400">Purchase value</p>
             <p class="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">₹{{ number_format($dashboard['purchaseValue'], 2) }}</p>
             <div class="mt-5 space-y-3">
@@ -50,7 +50,7 @@
             </div>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Recent purchase orders</h2>
                 <a href="{{ route('purchases.orders.create') }}" class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">New PO</a>

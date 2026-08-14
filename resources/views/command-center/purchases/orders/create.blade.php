@@ -38,9 +38,9 @@
             <input name="currency" value="INR" maxlength="3" class="rounded-md border-slate-300 uppercase dark:border-slate-700 dark:bg-slate-950">
         </div>
 
-        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800">
-            <div class="border-b border-slate-200 px-4 py-3 text-sm font-semibold dark:border-slate-800">Order item</div>
-            <div class="grid gap-4 p-4 md:grid-cols-5">
+        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800" data-purchase-item-repeater data-next-index="1">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800"><span class="text-sm font-semibold">Order items</span><button type="button" data-add-purchase-item class="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium dark:border-slate-700">Add item</button></div>
+            <div class="space-y-3 p-4" data-purchase-items-list><div class="grid gap-4 md:grid-cols-6" data-purchase-item>
                 <select name="items[0][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                     <option value="">Product</option>
                     @foreach ($products as $product)
@@ -51,7 +51,8 @@
                 <input name="items[0][unit_price]" type="number" min="0" step="0.01" placeholder="Unit price" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                 <input name="items[0][tax_rate]" type="number" min="0" step="0.001" placeholder="Tax %" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
                 <input name="items[0][discount_amount]" type="number" min="0" step="0.01" placeholder="Discount" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
-            </div>
+                <button type="button" data-remove-purchase-item class="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700">Remove</button></div></div>
+            <template data-purchase-item-template><div class="grid gap-4 border-t border-slate-200 pt-3 dark:border-slate-800 md:grid-cols-6" data-purchase-item><select name="items[__INDEX__][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><option value="">Product</option>@foreach ($products as $product)<option value="{{ $product->id }}">{{ $product->name }}</option>@endforeach</select><input name="items[__INDEX__][ordered_quantity]" type="number" min="0.001" step="0.001" placeholder="Quantity" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><input name="items[__INDEX__][unit_price]" type="number" min="0" step="0.01" placeholder="Unit price" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><input name="items[__INDEX__][tax_rate]" type="number" min="0" step="0.001" placeholder="Tax %" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><input name="items[__INDEX__][discount_amount]" type="number" min="0" step="0.01" placeholder="Discount" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><button type="button" data-remove-purchase-item class="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700">Remove</button></div></template>
         </div>
         <label class="mt-4 block text-sm font-medium">Notes
             <textarea name="notes" rows="2" class="mt-1 w-full rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"></textarea>
@@ -62,3 +63,5 @@
         </div>
     </form>
 @endsection
+
+@include('command-center.purchases.partials.item-repeater-script')

@@ -30,7 +30,7 @@ class GoodsReceiptController extends Controller
         return view('command-center.purchases.grn.create', [
             'products' => $products->activeForCompany($request->user()->company_id),
             'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
-            'orders' => $orders->paginateForUser($request->user(), ['status' => 'sent'], 100),
+            'orders' => $orders->paginateForUser($request->user(), ['status' => ['approved', 'sent', 'supplier_confirmed', 'partially_received']], 100),
             'warehouses' => $warehouses,
             'locations' => $lookups->formOptions($request->user()->company_id)['locations']->whereIn('warehouse_id', $warehouses->pluck('id')),
         ]);
@@ -63,8 +63,8 @@ class GoodsReceiptController extends Controller
     private function validatedReceipt(Request $request): array
     {
         return $request->validate([
-            'warehouse_id' => ['required_without:purchase_order_id', 'integer', Rule::exists('warehouses', 'id')->where('company_id', $request->user()->company_id)],
-            'supplier_id' => ['required_without:purchase_order_id', 'integer', Rule::exists('suppliers', 'id')->where('company_id', $request->user()->company_id)],
+            'warehouse_id' => ['nullable', 'required_without:purchase_order_id', 'integer', Rule::exists('warehouses', 'id')->where('company_id', $request->user()->company_id)],
+            'supplier_id' => ['nullable', 'required_without:purchase_order_id', 'integer', Rule::exists('suppliers', 'id')->where('company_id', $request->user()->company_id)],
             'purchase_order_id' => ['nullable', 'integer', Rule::exists('purchase_orders', 'id')->where('company_id', $request->user()->company_id)],
             'idempotency_key' => ['nullable', 'string', 'max:80'],
             'receipt_date' => ['nullable', 'date'],

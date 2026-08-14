@@ -43,9 +43,9 @@
             <input name="supplier_invoice_date" type="date" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
             <input name="receipt_date" type="date" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
         </div>
-        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800">
-            <div class="border-b border-slate-200 px-4 py-3 text-sm font-semibold dark:border-slate-800">Received item</div>
-            <div class="grid gap-4 p-4 md:grid-cols-7">
+        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800" data-purchase-item-repeater data-next-index="1">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800"><span class="text-sm font-semibold">Received items</span><button type="button" data-add-purchase-item class="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium dark:border-slate-700">Add item</button></div>
+            <div class="space-y-3 p-4" data-purchase-items-list><div class="grid gap-4 md:grid-cols-8" data-purchase-item>
                 <select name="items[0][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                     <option value="">Product</option>
                     @foreach ($products as $product)
@@ -63,7 +63,8 @@
                 <input name="items[0][rejected_quantity]" type="number" min="0" step="0.001" placeholder="Rejected" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
                 <input name="items[0][damaged_quantity]" type="number" min="0" step="0.001" placeholder="Damaged" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
                 <input name="items[0][unit_cost]" type="number" min="0" step="0.01" placeholder="Unit cost" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
-            </div>
+                <button type="button" data-remove-purchase-item class="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700">Remove</button></div></div>
+            <template data-purchase-item-template><div class="grid gap-4 border-t border-slate-200 pt-3 dark:border-slate-800 md:grid-cols-8" data-purchase-item><select name="items[__INDEX__][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><option value="">Product</option>@foreach ($products as $product)<option value="{{ $product->id }}">{{ $product->name }}</option>@endforeach</select><select name="items[__INDEX__][stock_location_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><option value="">Default location</option>@foreach ($locations as $location)<option value="{{ $location->id }}">{{ $location->name }}</option>@endforeach</select><input name="items[__INDEX__][received_quantity]" type="number" min="0.001" step="0.001" placeholder="Received" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required><input name="items[__INDEX__][accepted_quantity]" type="number" min="0" step="0.001" placeholder="Accepted" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><input name="items[__INDEX__][rejected_quantity]" type="number" min="0" step="0.001" placeholder="Rejected" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><input name="items[__INDEX__][damaged_quantity]" type="number" min="0" step="0.001" placeholder="Damaged" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><input name="items[__INDEX__][unit_cost]" type="number" min="0" step="0.01" placeholder="Unit cost" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950"><button type="button" data-remove-purchase-item class="rounded-md border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700">Remove</button></div></template>
         </div>
         <div class="mt-6 flex justify-end gap-3">
             <a href="{{ route('purchases.grn.index') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">Cancel</a>
@@ -71,3 +72,5 @@
         </div>
     </form>
 @endsection
+
+@include('command-center.purchases.partials.item-repeater-script')

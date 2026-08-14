@@ -113,6 +113,27 @@ class SupplierPaymentService
         });
     }
 
-    private function paise(string|int|float $value): int { return (int) round(((float) $value) * 100); }
-    private function decimal(int $paise): string { return number_format($paise / 100, 2, '.', ''); }
+    private function paise(string|int|float $value): int
+    {
+        $value = trim((string) $value);
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $whole = preg_replace('/\D/', '', $whole) ?: '0';
+        $fraction = preg_replace('/\D/', '', $fraction) ?: '';
+        $paise = ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0');
+        if (isset($fraction[2]) && $fraction[2] >= '5') {
+            $paise++;
+        }
+
+        return $negative ? -$paise : $paise;
+    }
+
+    private function decimal(int $paise): string
+    {
+        $negative = $paise < 0;
+        $digits = str_pad((string) abs($paise), 3, '0', STR_PAD_LEFT);
+
+        return ($negative ? '-' : '').substr($digits, 0, -2).'.'.substr($digits, -2);
+    }
 }

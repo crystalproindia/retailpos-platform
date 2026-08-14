@@ -52,7 +52,7 @@ class PurchaseOrderService
                 'order_date' => $data['order_date'] ?? now()->toDateString(),
                 'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
                 'currency' => $data['currency'] ?? 'INR',
-                'shipping_total' => $data['shipping_total'] ?? 0,
+                'shipping_total' => $this->decimal($this->paise($data['shipping_total'] ?? 0)),
                 'payment_terms' => $data['payment_terms'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'internal_notes' => $data['internal_notes'] ?? null,
@@ -84,8 +84,8 @@ class PurchaseOrderService
             }
 
             $items = $request->items->map(function ($item) use ($supplierId): ?array {
-                $remaining = max(0, (float) ($item->approved_quantity ?? 0) - (float) $item->converted_quantity);
-                if ($remaining <= 0) {
+                $remaining = max(0, $this->mills($item->approved_quantity) - $this->mills($item->converted_quantity));
+                if ($remaining === 0) {
                     return null;
                 }
             $supplierProduct = SupplierProduct::query()
@@ -96,7 +96,7 @@ class PurchaseOrderService
             return [
                 'product_id' => $item->product_id,
                 'supplier_product_id' => $supplierProduct?->id,
-                'ordered_quantity' => $remaining,
+                'ordered_quantity' => $this->quantityDecimal($remaining),
                 'unit_price' => $supplierProduct?->purchase_price ?? $item->estimated_price ?? $item->product->cost_price ?? 0,
                 'tax_rate' => $supplierProduct?->taxRate?->rate ?? 0,
                 'discount_amount' => 0,
@@ -118,12 +118,12 @@ class PurchaseOrderService
 
             foreach ($request->items as $item) {
                 $converted = $items->firstWhere('product_id', $item->product_id)['ordered_quantity'] ?? 0;
-                if ($converted > 0) {
+                if ($this->mills($converted) > 0) {
                     $item->increment('converted_quantity', $converted);
                 }
             }
             $request->refresh()->load('items');
-            $fullyConverted = $request->items->every(fn ($item) => (float) $item->converted_quantity >= (float) ($item->approved_quantity ?? 0));
+            $fullyConverted = $request->items->every(fn ($item) => $this->mills($item->converted_quantity) >= $this->mills($item->approved_quantity));
             if ($fullyConverted) {
                 $this->requests->markConverted($request, $user, $order->id);
             }
@@ -134,75 +134,86 @@ class PurchaseOrderService
 
     public function submit(PurchaseOrder $order, User $user): PurchaseOrder
     {
-        return $this->transition($order, $user, PurchaseOrderStatus::PendingApproval, 'submitted', 'purchase.order.submitted', 'Purchase order submitted');
+        return $this->transition($order, $user, [PurchaseOrderStatus::Draft], PurchaseOrderStatus::PendingApproval, 'submitted', 'purchase.order.submitted', 'Purchase order submitted');
     }
 
     public function approve(PurchaseOrder $order, User $user): PurchaseOrder
     {
-        $from = $order->status->value;
-        $order->update([
-            'status' => PurchaseOrderStatus::Approved->value,
-            'approved_by' => $user->id,
-            'approved_at' => now(),
-        ]);
+        return DB::transaction(function () use ($order, $user): PurchaseOrder {
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            if ($order->status === PurchaseOrderStatus::Approved) {
+                return $order;
+            }
+            $this->ensureStatus($order, [PurchaseOrderStatus::PendingApproval], 'Only a submitted purchase order can be approved.');
+            $from = $order->status->value;
+            $order->update(['status' => PurchaseOrderStatus::Approved->value, 'approved_by' => $user->id, 'approved_at' => now()]);
+            $this->approvalLog($order, $user, 'approved', $from, PurchaseOrderStatus::Approved->value);
+            $this->auditLogger->record('purchase.order.approved', $order, 'Purchase order approved');
+            $this->dispatch('purchase.order.approved', $order, $user, ['po_number' => $order->po_number]);
 
-        $this->approvalLog($order, $user, 'approved', $from, PurchaseOrderStatus::Approved->value);
-        $this->auditLogger->record('purchase.order.approved', $order, 'Purchase order approved');
-        $this->dispatch('purchase.order.approved', $order, $user, ['po_number' => $order->po_number]);
-
-        return $order->refresh();
+            return $order->refresh();
+        });
     }
 
     public function markSent(PurchaseOrder $order, User $user): PurchaseOrder
     {
-        $from = $order->status->value;
-        $order->update([
-            'status' => PurchaseOrderStatus::Sent->value,
-            'sent_at' => now(),
-        ]);
+        return DB::transaction(function () use ($order, $user): PurchaseOrder {
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            if ($order->status === PurchaseOrderStatus::Sent) {
+                return $order;
+            }
+            $this->ensureStatus($order, [PurchaseOrderStatus::Approved], 'Only an approved purchase order can be sent.');
+            $from = $order->status->value;
+            $order->update(['status' => PurchaseOrderStatus::Sent->value, 'sent_at' => now()]);
+            $this->approvalLog($order, $user, 'sent', $from, PurchaseOrderStatus::Sent->value);
+            $this->auditLogger->record('purchase.order.sent', $order, 'Purchase order marked sent');
+            $this->dispatch('purchase.order.sent', $order, $user, ['po_number' => $order->po_number]);
 
-        $this->approvalLog($order, $user, 'sent', $from, PurchaseOrderStatus::Sent->value);
-        $this->auditLogger->record('purchase.order.sent', $order, 'Purchase order marked sent');
-        $this->dispatch('purchase.order.sent', $order, $user, ['po_number' => $order->po_number]);
-
-        return $order->refresh();
+            return $order->refresh();
+        });
     }
 
     public function markSupplierConfirmed(PurchaseOrder $order, User $user, ?string $reference = null): PurchaseOrder
     {
-        if (! in_array($order->status, [PurchaseOrderStatus::Sent, PurchaseOrderStatus::Approved], true)) {
-            throw ValidationException::withMessages(['status' => 'Only a sent or approved purchase order can be supplier confirmed.']);
-        }
-        $from = $order->status->value;
-        $order->update(['status' => PurchaseOrderStatus::SupplierConfirmed->value, 'supplier_confirmed_at' => now(), 'supplier_confirmation_reference' => $reference]);
-        $this->approvalLog($order, $user, 'supplier_confirmed', $from, PurchaseOrderStatus::SupplierConfirmed->value);
-        $this->auditLogger->record('purchase.order.supplier_confirmed', $order, 'Supplier confirmed purchase order');
-        $this->dispatch('purchase.order.supplier_confirmed', $order, $user, ['po_number' => $order->po_number]);
+        return DB::transaction(function () use ($order, $user, $reference): PurchaseOrder {
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            if ($order->status === PurchaseOrderStatus::SupplierConfirmed) {
+                return $order;
+            }
+            $this->ensureStatus($order, [PurchaseOrderStatus::Sent], 'Only a sent purchase order can be supplier confirmed.');
+            $from = $order->status->value;
+            $order->update(['status' => PurchaseOrderStatus::SupplierConfirmed->value, 'supplier_confirmed_at' => now(), 'supplier_confirmation_reference' => $reference]);
+            $this->approvalLog($order, $user, 'supplier_confirmed', $from, PurchaseOrderStatus::SupplierConfirmed->value);
+            $this->auditLogger->record('purchase.order.supplier_confirmed', $order, 'Supplier confirmed purchase order');
+            $this->dispatch('purchase.order.supplier_confirmed', $order, $user, ['po_number' => $order->po_number]);
 
-        return $order->refresh();
+            return $order->refresh();
+        });
     }
 
     public function cancel(PurchaseOrder $order, User $user): PurchaseOrder
     {
-        $from = $order->status->value;
-        $order->update([
-            'status' => PurchaseOrderStatus::Cancelled->value,
-            'cancelled_by' => $user->id,
-            'cancelled_at' => now(),
-        ]);
+        return DB::transaction(function () use ($order, $user): PurchaseOrder {
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            if ($order->status === PurchaseOrderStatus::Cancelled) {
+                return $order;
+            }
+            $this->ensureStatus($order, [PurchaseOrderStatus::Draft, PurchaseOrderStatus::PendingApproval, PurchaseOrderStatus::Approved, PurchaseOrderStatus::Sent, PurchaseOrderStatus::SupplierConfirmed], 'Only an unreceived purchase order can be cancelled.');
+            $from = $order->status->value;
+            $order->update(['status' => PurchaseOrderStatus::Cancelled->value, 'cancelled_by' => $user->id, 'cancelled_at' => now()]);
+            $this->approvalLog($order, $user, 'cancelled', $from, PurchaseOrderStatus::Cancelled->value);
+            $this->auditLogger->record('purchase.order.cancelled', $order, 'Purchase order cancelled');
+            $this->dispatch('purchase.order.cancelled', $order, $user, ['po_number' => $order->po_number]);
 
-        $this->approvalLog($order, $user, 'cancelled', $from, PurchaseOrderStatus::Cancelled->value);
-        $this->auditLogger->record('purchase.order.cancelled', $order, 'Purchase order cancelled');
-        $this->dispatch('purchase.order.cancelled', $order, $user, ['po_number' => $order->po_number]);
-
-        return $order->refresh();
+            return $order->refresh();
+        });
     }
 
     public function updateReceiptStatus(PurchaseOrder $order): PurchaseOrder
     {
         $order->load('items');
-        $totalPending = (float) $order->items->sum('pending_quantity');
-        $totalOrdered = (float) $order->items->sum('ordered_quantity');
+        $totalPending = $order->items->sum(fn ($item) => $this->mills($item->pending_quantity));
+        $totalOrdered = $order->items->sum(fn ($item) => $this->mills($item->ordered_quantity));
 
         $status = $totalPending <= 0
             ? PurchaseOrderStatus::Received->value
@@ -219,26 +230,28 @@ class PurchaseOrderService
     private function createItem(PurchaseOrder $order, array $item): void
     {
         $product = Product::query()->where('company_id', $order->company_id)->findOrFail($item['product_id']);
-        $quantity = (float) $item['ordered_quantity'];
-        $unitPrice = (float) $item['unit_price'];
-        $discount = (float) ($item['discount_amount'] ?? 0);
-        $taxRate = (float) ($item['tax_rate'] ?? 0);
-        $taxAmount = (($quantity * $unitPrice) - $discount) * ($taxRate / 100);
-        $lineTotal = (($quantity * $unitPrice) - $discount) + $taxAmount;
+        $quantity = $this->mills($item['ordered_quantity']);
+        $unitPrice = $this->paise($item['unit_price']);
+        $discount = $this->paise($item['discount_amount'] ?? 0);
+        $taxRate = $this->mills($item['tax_rate'] ?? 0);
+        $subtotal = intdiv(($quantity * $unitPrice) + 500, 1000);
+        $taxable = max(0, $subtotal - $discount);
+        $taxAmount = intdiv(($taxable * $taxRate) + 50_000, 100_000);
+        $lineTotal = $taxable + $taxAmount;
 
         $order->items()->create([
             'product_id' => $product->id,
             'supplier_product_id' => $item['supplier_product_id'] ?? null,
             'product_name_snapshot' => $product->name,
             'sku_snapshot' => $product->sku,
-            'ordered_quantity' => $quantity,
+            'ordered_quantity' => $this->quantityDecimal($quantity),
             'received_quantity' => 0,
-            'pending_quantity' => $quantity,
-            'unit_price' => $unitPrice,
-            'discount_amount' => $discount,
-            'tax_rate' => $taxRate,
-            'tax_amount' => $taxAmount,
-            'line_total' => $lineTotal,
+            'pending_quantity' => $this->quantityDecimal($quantity),
+            'unit_price' => $this->decimal($unitPrice),
+            'discount_amount' => $this->decimal($discount),
+            'tax_rate' => $this->quantityDecimal($taxRate),
+            'tax_amount' => $this->decimal($taxAmount),
+            'line_total' => $this->decimal($lineTotal),
             'notes' => $item['notes'] ?? null,
         ]);
     }
@@ -246,28 +259,44 @@ class PurchaseOrderService
     private function recalculate(PurchaseOrder $order): void
     {
         $order->load('items');
-        $subtotal = (float) $order->items->sum(fn ($item) => ((float) $item->ordered_quantity * (float) $item->unit_price));
-        $discount = (float) $order->items->sum('discount_amount');
-        $tax = (float) $order->items->sum('tax_amount');
-        $shipping = (float) $order->shipping_total;
+        $subtotal = $order->items->sum(fn ($item) => intdiv(($this->mills($item->ordered_quantity) * $this->paise($item->unit_price)) + 500, 1000));
+        $discount = $order->items->sum(fn ($item) => $this->paise($item->discount_amount));
+        $tax = $order->items->sum(fn ($item) => $this->paise($item->tax_amount));
+        $shipping = $this->paise($order->shipping_total);
 
         $order->update([
-            'subtotal' => $subtotal,
-            'discount_total' => $discount,
-            'tax_total' => $tax,
-            'grand_total' => $subtotal - $discount + $tax + $shipping,
+            'subtotal' => $this->decimal($subtotal),
+            'discount_total' => $this->decimal($discount),
+            'tax_total' => $this->decimal($tax),
+            'grand_total' => $this->decimal($subtotal - $discount + $tax + $shipping),
         ]);
     }
 
-    private function transition(PurchaseOrder $order, User $user, PurchaseOrderStatus $status, string $action, string $eventKey, string $description): PurchaseOrder
+    /** @param array<int, PurchaseOrderStatus> $allowedStatuses */
+    private function transition(PurchaseOrder $order, User $user, array $allowedStatuses, PurchaseOrderStatus $status, string $action, string $eventKey, string $description): PurchaseOrder
     {
-        $from = $order->status->value;
-        $order->update(['status' => $status->value]);
-        $this->approvalLog($order, $user, $action, $from, $status->value);
-        $this->auditLogger->record($eventKey, $order, $description);
-        $this->dispatch($eventKey, $order, $user, ['po_number' => $order->po_number]);
+        return DB::transaction(function () use ($order, $user, $allowedStatuses, $status, $action, $eventKey, $description): PurchaseOrder {
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            if ($order->status === $status) {
+                return $order;
+            }
+            $this->ensureStatus($order, $allowedStatuses, 'This purchase order cannot be moved to the requested status.');
+            $from = $order->status->value;
+            $order->update(['status' => $status->value]);
+            $this->approvalLog($order, $user, $action, $from, $status->value);
+            $this->auditLogger->record($eventKey, $order, $description);
+            $this->dispatch($eventKey, $order, $user, ['po_number' => $order->po_number]);
 
-        return $order->refresh();
+            return $order->refresh();
+        });
+    }
+
+    /** @param array<int, PurchaseOrderStatus> $allowedStatuses */
+    private function ensureStatus(PurchaseOrder $order, array $allowedStatuses, string $message): void
+    {
+        if (! in_array($order->status, $allowedStatuses, true)) {
+            throw ValidationException::withMessages(['status' => $message]);
+        }
     }
 
     private function approvalLog(PurchaseOrder $order, User $user, string $action, ?string $from, string $to): void
@@ -296,5 +325,34 @@ class PurchaseOrderService
             aggregateId: $order->id,
             payload: $payload,
         ));
+    }
+
+    private function paise(string|int|float|null $value): int { return $this->scaledInteger($value, 2); }
+    private function mills(string|int|float|null $value): int { return $this->scaledInteger($value, 3); }
+    private function decimal(int $value): string { return $this->formatScaled($value, 2); }
+    private function quantityDecimal(int $value): string { return $this->formatScaled($value, 3); }
+
+    private function scaledInteger(string|int|float|null $value, int $scale): int
+    {
+        $value = trim((string) ($value ?? '0'));
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '+-');
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+        $whole = preg_replace('/\D/', '', $whole) ?: '0';
+        $fraction = preg_replace('/\D/', '', $fraction) ?: '';
+        $scaled = ((int) $whole * (10 ** $scale)) + (int) str_pad(substr($fraction, 0, $scale), $scale, '0');
+        if (isset($fraction[$scale]) && $fraction[$scale] >= '5') {
+            $scaled++;
+        }
+
+        return $negative ? -$scaled : $scaled;
+    }
+
+    private function formatScaled(int $value, int $scale): string
+    {
+        $negative = $value < 0;
+        $digits = str_pad((string) abs($value), $scale + 1, '0', STR_PAD_LEFT);
+
+        return ($negative ? '-' : '').substr($digits, 0, -$scale).'.'.substr($digits, -$scale);
     }
 }

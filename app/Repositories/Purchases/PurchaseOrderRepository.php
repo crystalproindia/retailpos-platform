@@ -20,7 +20,7 @@ class PurchaseOrderRepository
             ->with(['supplier', 'warehouse', 'items.product'])
             ->where('company_id', $companyId)
             ->when(($filters['search'] ?? null), fn ($query, $search) => $query->where('po_number', 'like', "%{$search}%"))
-            ->when(($filters['status'] ?? null), fn ($query, $status) => $query->where('status', $status))
+            ->when(($filters['status'] ?? null), fn ($query, $status) => is_array($status) ? $query->whereIn('status', $status) : $query->where('status', $status))
             ->when(($filters['supplier_id'] ?? null), fn ($query, $supplierId) => $query->where('supplier_id', $supplierId))
             ->when(($filters['warehouse_id'] ?? null), fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
             ->latest()
@@ -41,7 +41,7 @@ class PurchaseOrderRepository
     {
         return $this->access->scope(PurchaseOrder::query()->with(['supplier', 'warehouse', 'items.product']), $user)
             ->when(($filters['search'] ?? null), fn ($query, $search) => $query->where('po_number', 'like', "%{$search}%"))
-            ->when(($filters['status'] ?? null), fn ($query, $status) => $query->where('status', $status))
+            ->when(($filters['status'] ?? null), fn ($query, $status) => is_array($status) ? $query->whereIn('status', $status) : $query->where('status', $status))
             ->when(($filters['supplier_id'] ?? null), fn ($query, $supplierId) => $query->where('supplier_id', $supplierId))
             ->when(($filters['warehouse_id'] ?? null), fn ($query, $warehouseId) => $query->where('warehouse_id', $warehouseId))
             ->latest()->paginate($perPage)->withQueryString();

@@ -13,13 +13,21 @@
         <div class="text-sm text-slate-500 dark:text-slate-400">{{ $order->supplier?->name }} · {{ $order->warehouse?->name }} · {{ str($order->status->value)->headline() }}</div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('purchases.orders.print', $order) }}" class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">Print</a>
-            <form method="POST" action="{{ route('purchases.orders.submit', $order) }}">@csrf<button class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">Submit</button></form>
-            <form method="POST" action="{{ route('purchases.orders.approve', $order) }}">@csrf<button class="rounded-md border border-teal-300 px-3 py-2 text-sm text-teal-700 dark:border-teal-800 dark:text-teal-200">Approve</button></form>
-            <form method="POST" action="{{ route('purchases.orders.send', $order) }}">@csrf<button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Mark sent</button></form>
-            @if (in_array($order->status->value, ['approved', 'sent']))
+            @if ($order->status->value === 'draft')
+                <form method="POST" action="{{ route('purchases.orders.submit', $order) }}">@csrf<button class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">Submit</button></form>
+            @endif
+            @if ($order->status->value === 'pending_approval')
+                <form method="POST" action="{{ route('purchases.orders.approve', $order) }}">@csrf<button class="rounded-md border border-teal-300 px-3 py-2 text-sm text-teal-700 dark:border-teal-800 dark:text-teal-200">Approve</button></form>
+            @endif
+            @if ($order->status->value === 'approved')
+                <form method="POST" action="{{ route('purchases.orders.send', $order) }}">@csrf<button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Mark sent</button></form>
+            @endif
+            @if ($order->status->value === 'sent')
                 <form method="POST" action="{{ route('purchases.orders.supplier-confirm', $order) }}">@csrf<button class="rounded-md border border-sky-300 px-3 py-2 text-sm text-sky-700 dark:border-sky-800 dark:text-sky-200">Supplier confirmed</button></form>
             @endif
-            <form method="POST" action="{{ route('purchases.orders.cancel', $order) }}">@csrf<button class="rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:text-rose-200">Cancel</button></form>
+            @if (in_array($order->status->value, ['draft', 'pending_approval', 'approved', 'sent', 'supplier_confirmed']))
+                <form method="POST" action="{{ route('purchases.orders.cancel', $order) }}">@csrf<button class="rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:text-rose-200">Cancel</button></form>
+            @endif
         </div>
     </div>
 

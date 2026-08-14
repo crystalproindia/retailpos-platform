@@ -45,10 +45,11 @@ class PurchaseRequestController extends Controller
         return redirect()->route('purchases.requests.show', $purchaseRequest)->with('status', 'Purchase request created.');
     }
 
-    public function show(Request $request, PurchaseRequestRepository $requests, int $purchaseRequest): View
+    public function show(Request $request, PurchaseRequestRepository $requests, SupplierRepository $suppliers, int $purchaseRequest): View
     {
         return view('command-center.purchases.requests.show', [
             'purchaseRequest' => $requests->findForUser($request->user(), $purchaseRequest),
+            'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
         ]);
     }
 

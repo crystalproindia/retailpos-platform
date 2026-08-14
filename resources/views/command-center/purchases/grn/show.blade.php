@@ -11,7 +11,9 @@
 
     <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <p class="text-sm text-slate-500 dark:text-slate-400">{{ $receipt->supplier?->name }} · {{ $receipt->warehouse?->name }} · {{ str($receipt->status->value)->headline() }}</p>
-        <form method="POST" action="{{ route('purchases.grn.receive', $receipt) }}">@csrf<button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Post to stock</button></form>
+        @if (! $receipt->posted_at && $receipt->status->value === 'draft')
+            <form method="POST" action="{{ route('purchases.grn.receive', $receipt) }}">@csrf<button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Post to stock</button></form>
+        @endif
     </div>
 
     <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

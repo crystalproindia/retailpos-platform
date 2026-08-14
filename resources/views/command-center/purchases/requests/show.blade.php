@@ -19,7 +19,17 @@
             @endif
             <form method="POST" action="{{ route('purchases.requests.duplicate', $purchaseRequest) }}">@csrf<button class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">Duplicate</button></form>
             @if (in_array($purchaseRequest->status->value, ['approved', 'partially_approved']))
-                <form method="POST" action="{{ route('purchases.requests.convert', $purchaseRequest) }}">@csrf<button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Convert remaining to PO</button></form>
+                @php($preferredSupplierId = $purchaseRequest->items->pluck('supplier_id')->filter()->unique()->count() === 1 ? $purchaseRequest->items->pluck('supplier_id')->filter()->unique()->first() : null)
+                <form method="POST" action="{{ route('purchases.requests.convert', $purchaseRequest) }}" class="flex items-center gap-2">@csrf
+                    <label class="sr-only" for="conversion-supplier">Supplier for purchase order</label>
+                    <select id="conversion-supplier" name="supplier_id" required class="rounded-md border-slate-300 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+                        <option value="">Select supplier</option>
+                        @foreach ($suppliers as $supplier)
+                            <option value="{{ $supplier->id }}" @selected($preferredSupplierId === $supplier->id)>{{ $supplier->name }}</option>
+                        @endforeach
+                    </select>
+                    <button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Convert remaining to PO</button>
+                </form>
             @endif
         </div>
     </div>

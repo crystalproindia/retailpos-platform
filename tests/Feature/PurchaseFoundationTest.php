@@ -412,6 +412,9 @@ class PurchaseFoundationTest extends TestCase
         $this->assertSame('exceptions', $invoice->match_status);
         $this->assertDatabaseHas('purchase_invoice_match_exceptions', ['purchase_invoice_id' => $invoice->id, 'type' => 'quantity_mismatch', 'status' => 'open']);
         $this->assertDatabaseHas('purchase_invoice_match_exceptions', ['purchase_invoice_id' => $invoice->id, 'type' => 'price_mismatch', 'status' => 'open']);
+        $exception = \App\Models\Purchases\PurchaseInvoiceMatchException::query()->where('purchase_invoice_id', $invoice->id)->firstOrFail();
+        $this->actingAs($manager)->post("/purchases/invoices/{$invoice->id}/match-exceptions/{$exception->id}/resolve", ['resolution_notes' => 'Supplier credit note requested.'])->assertRedirect();
+        $this->assertSame('resolved', $exception->refresh()->status);
     }
 
     public function test_supplier_payment_allocates_and_reversal_restores_purchase_invoice_outstanding(): void

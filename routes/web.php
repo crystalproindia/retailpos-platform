@@ -1033,6 +1033,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::post('invoices/{purchaseInvoice}/verify', [PurchaseInvoiceController::class, 'verify'])->middleware('can:purchase-invoices.verify')->name('invoices.verify');
         Route::post('invoices/{purchaseInvoice}/approve', [PurchaseInvoiceController::class, 'approve'])->middleware('can:purchase-invoices.approve')->name('invoices.approve');
         Route::post('invoices/{purchaseInvoice}/cancel', [PurchaseInvoiceController::class, 'cancel'])->middleware('can:purchase-invoices.cancel')->name('invoices.cancel');
+        Route::post('invoices/{purchaseInvoice}/match-exceptions/{exception}/resolve', [PurchaseInvoiceController::class, 'resolveMatchException'])->middleware('can:purchase-invoices.approve')->name('invoices.match-exceptions.resolve');
 
         Route::get('payments', [SupplierPaymentController::class, 'index'])->middleware('can:supplier-payments.view')->name('payments.index');
         Route::get('payments/create', [SupplierPaymentController::class, 'create'])->middleware('can:supplier-payments.create')->name('payments.create');

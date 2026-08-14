@@ -87,6 +87,9 @@ class PurchaseRequestService
             }
 
             $decisions = collect($items)->keyBy('item_id');
+            if ($decisions->keys()->diff($request->items->pluck('id'))->isNotEmpty()) {
+                throw ValidationException::withMessages(['items' => 'A submitted approval decision does not belong to this purchase request.']);
+            }
             $hasPartialApproval = false;
             $approvedAny = false;
             foreach ($request->items as $item) {

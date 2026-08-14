@@ -5,7 +5,9 @@ namespace App\Http\Controllers\CommandCenter\Purchases;
 use App\Http\Controllers\Controller;
 use App\Models\Purchases\GoodsReceipt;
 use App\Models\Purchases\PurchaseInvoice;
+use App\Models\Purchases\PurchaseInvoiceMatchException;
 use App\Models\Purchases\Supplier;
+use App\Services\Purchases\PurchaseInvoiceMatchingService;
 use App\Services\Purchases\PurchaseInvoiceService;
 use App\Services\Purchases\SupplierPayableService;
 use App\Services\Purchases\PurchaseAccessService;
@@ -61,6 +63,19 @@ class PurchaseInvoiceController extends Controller
         $request->validate(['reason' => ['required', 'string', 'max:1000']]);
         $service->cancel($this->invoice($request, $purchaseInvoice), $request->user(), $request->string('reason')->toString());
         return back()->with('status', 'Purchase invoice cancelled.');
+    }
+
+    public function resolveMatchException(Request $request, PurchaseInvoiceMatchingService $matching, int $purchaseInvoice, int $exception): RedirectResponse
+    {
+        $validated = $request->validate(['resolution_notes' => ['required', 'string', 'max:2000']]);
+        $invoice = $this->invoice($request, $purchaseInvoice);
+        $matchException = PurchaseInvoiceMatchException::query()
+            ->where('purchase_invoice_id', $invoice->id)
+            ->where('company_id', $request->user()->company_id)
+            ->findOrFail($exception);
+        $matching->resolve($matchException, $request->user(), $validated['resolution_notes']);
+
+        return back()->with('status', 'Invoice match exception resolved and recorded.');
     }
 
     private function invoice(Request $request, int $id): PurchaseInvoice

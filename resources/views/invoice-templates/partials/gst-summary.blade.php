@@ -1,4 +1,4 @@
-<section class="gst-summary avoid-break">
+@if($render['is_gst'])<section class="gst-summary avoid-break">
     <h3>GST rate-wise summary</h3>
     <table role="presentation">
         <thead>
@@ -21,3 +21,4 @@
         </tbody>
     </table>
 </section>
+@endif

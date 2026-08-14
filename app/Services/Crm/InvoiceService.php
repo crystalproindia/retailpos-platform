@@ -13,6 +13,7 @@ use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Services\AuditLogger;
+use App\Services\Branding\CompanyBrandingService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Saas\UsageService;
 use Illuminate\Support\Arr;
@@ -26,6 +27,9 @@ class InvoiceService
         private readonly UsageService $usage,
         private readonly OutletAccessService $outlets,
         private readonly CrmCustomerRepository $customers,
+        private readonly SalesDocumentNumberService $numbers,
+        private readonly DocumentTaxModeService $taxModes,
+        private readonly CompanyBrandingService $branding,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -34,12 +38,14 @@ class InvoiceService
         return DB::transaction(function () use ($user, $data): CrmInvoice {
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
             $data = $this->customerData($user, $data);
+            $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $outlet = $this->outlets->current($user);
-            $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
-            $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + [
+            $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0', $taxMode);
+            $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + [
                 'company_id' => $user->company_id,
                 'branch_id' => $outlet->id,
-                'invoice_number' => $this->nextNumber($user->company_id),
+                'invoice_number' => $this->numbers->nextInvoiceNumber($user->company_id),
+                'tax_mode' => $taxMode,
                 'status' => InvoiceStatus::Draft,
                 'amount_paid' => '0.00',
                 'balance_due' => $calculation['grand_total'],
@@ -83,7 +89,7 @@ class InvoiceService
             'billing_company' => $quotation->customer_company, 'billing_email' => $quotation->customer_email,
             'billing_phone' => $quotation->customer_phone, 'billing_address' => $quotation->billing_address,
             'currency' => $quotation->currency, 'issue_date' => now()->toDateString(), 'due_date' => now()->addDays(14)->toDateString(),
-            'notes' => $quotation->notes, 'terms_conditions' => $quotation->terms_conditions, 'adjustment_total' => '0', 'items' => $items,
+            'notes' => $quotation->notes, 'terms_conditions' => $quotation->terms_conditions, 'tax_mode' => $quotation->tax_mode, 'show_authorized_signature' => $quotation->show_authorized_signature, 'adjustment_total' => '0', 'items' => $items,
         ]);
         $this->audit->record('crm.invoice.converted_from_quotation', $invoice, 'Invoice created from accepted quotation', ['company_id' => $invoice->company_id, 'quotation_id' => $quotation->id]);
 
@@ -112,12 +118,14 @@ class InvoiceService
             $this->ensureDraft($invoice);
             $previousCustomerId = $invoice->customer_id;
             $data = $this->customerData($user, $data);
-            $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0');
+            $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? $invoice->tax_mode);
+            $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0', $taxMode);
             $invoice->update(Arr::only($data, [
                 'customer_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
                 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date',
                 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before',
-            ]) + $calculation + [
+            ]) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $invoice->show_authorized_signature)) + [
+                'tax_mode' => $taxMode,
                 'balance_due' => $calculation['grand_total'],
                 'updated_by' => $user->id,
             ]);
@@ -254,7 +262,7 @@ class InvoiceService
     }
 
     /** @param array<int,array<string,mixed>> $items @return array<string,mixed> */
-    public function calculate(array $items, string|int|float $adjustment = '0'): array
+    public function calculate(array $items, string|int|float $adjustment = '0', string $taxMode = DocumentTaxModeService::GST): array
     {
         $subtotal = $discountTotal = $taxTotal = 0;
         $normalized = [];
@@ -269,7 +277,7 @@ class InvoiceService
             $discountValue = $item['discount_value'] ?? ($item['discount_amount'] ?? 0);
             $discount = $discountType === 'percentage' ? intdiv($gross * $this->milli((string) $discountValue) + 50000, 100000) : $this->cents((string) $discountValue);
             $discount = min(max(0, $discount), $gross);
-            $taxRateMilli = $this->milli((string) ($item['tax_rate'] ?? 0));
+            $taxRateMilli = $taxMode === DocumentTaxModeService::NO_GST ? 0 : $this->milli((string) ($item['tax_rate'] ?? 0));
             if ($taxRateMilli < 0 || $taxRateMilli > 100000) {
                 throw ValidationException::withMessages(['items' => 'Tax rate must be between zero and 100 percent.']);
             }
@@ -344,12 +352,17 @@ class InvoiceService
         }
     }
 
-    private function nextNumber(int $companyId): string
+    /** @return array<string,mixed> */
+    private function signatureSnapshot($company, bool $show): array
     {
-        $year = now()->format('Y');
-        $last = CrmInvoice::query()->where('company_id', $companyId)->where('invoice_number', 'like', "RPOS-INV-{$year}-%")->lockForUpdate()->latest('id')->value('invoice_number');
+        $signature = $this->branding->signatureForCompany($company);
 
-        return "RPOS-INV-{$year}-".str_pad((string) ((int) substr((string) $last, -5) + 1), 5, '0', STR_PAD_LEFT);
+        return [
+            'show_authorized_signature' => $show,
+            'signature_path_snapshot' => $show ? $signature['path'] : null,
+            'signatory_name_snapshot' => $show ? $signature['name'] : null,
+            'signatory_designation_snapshot' => $show ? $signature['designation'] : null,
+        ];
     }
 
     private function nextPaymentReference(int $companyId): string

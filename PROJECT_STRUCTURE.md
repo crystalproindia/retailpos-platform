@@ -3123,6 +3123,14 @@ CRM invoice presentation is configured per company in invoice_template_settings.
 
 The Sales invoice workspace exposes settings, a tenant-authorized inline preview route, CRM browser print, PDF download, and the existing secure public PDF path. Invoice calculations, stored GST snapshots, invoice numbering, payment allocation, accounting records, SaaS billing PDFs, and Google Calendar/Meet remain unchanged. See docs/invoice-templates for architecture, templates, settings, GST presentation, PDF rendering, and tests.
 
+## Advanced Invoice and Quotation Customization
+
+`sales_document_settings` stores one tenant-scoped prefix configuration for sales invoices, quotations, and supported proforma invoices. `SalesDocumentNumberService` serializes number allocation on the company row inside the caller transaction, continues the highest same-year sequence across prefix changes, preserves legacy document formats where a company keeps its legacy prefix, and never rewrites historical records. The Document Numbering screen is available through Settings only to users with `sales.invoices.update`; every change is audit logged.
+
+`crm_invoices`, `crm_quotations`, and `crm_proforma_invoices` retain their selected `tax_mode` plus authorized-signature presentation snapshots. GST stays on the established calculation path. No-GST mode is a server-side, configured eligibility decision for unregistered or exempt companies; it forces new document line-tax and total-tax values to zero without changing product tax masters. A quotation-to-invoice conversion revalidates the saved mode against current company configuration.
+
+Company branding stores the authorized-signature image on the tenant-private local disk with validated PNG/JPEG/WEBP input and a 1 MB limit. Signature paths, signatory name, designation, and display choice are snapshotted per document, so later branding changes cannot alter historical output. Old signature files are retained while any invoice, quotation, or proforma snapshot references them. The expanded `InvoiceTemplateRegistry` contains 46 A4, A5, and purpose-built thermal templates with paper, style, GST-presentation, and tax-mode compatibility metadata. The design picker filters by paper, tax compatibility, GST detail, and style without rendering full documents for every card.
+
 # Phase 8C — Invoice Delivery and Communication Hardening
 
 The customer Sales Invoice send action now queues the selected tenant invoice design as an in-memory PDF attachment through the established `EmailDeliveryService` and `SendNotificationDeliveryJob`. `InvoiceEmailAttachmentService` validates the delivery's CRM invoice reference and company boundary before invoking the existing `InvoicePdfService`, so email attachments, print, preview, download, and protected public PDF links share the same design, GST, totals, and payment-QR rendering path. The secure public link remains in the email body.

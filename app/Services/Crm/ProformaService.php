@@ -10,6 +10,7 @@ use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmProformaInvoice;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Branding\CompanyBrandingService;
 use App\Services\Events\DomainEventDispatcher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,19 +22,24 @@ class ProformaService
         private readonly AuditLogger $audit,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly CrmLeadScoringService $leadScoring,
+        private readonly SalesDocumentNumberService $numbers,
+        private readonly DocumentTaxModeService $taxModes,
+        private readonly CompanyBrandingService $branding,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function create(User $user, array $data, ?int $leadId = null, ?int $customerId = null, ?int $quotationId = null): CrmProformaInvoice
     {
         return DB::transaction(function () use ($user, $data, $leadId, $customerId, $quotationId): CrmProformaInvoice {
-            $calculation = $this->calc($data['items']);
-            $proforma = CrmProformaInvoice::create(array_merge(collect($data)->except('items')->all(), $calculation, [
+            $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
+            $calculation = $this->calc($data['items'], $taxMode);
+            $proforma = CrmProformaInvoice::create(array_merge(collect($data)->except('items')->all(), $calculation, $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)), [
                 'company_id' => $user->company_id,
                 'lead_id' => $leadId,
                 'customer_id' => $customerId,
                 'quotation_id' => $quotationId,
-                'proforma_number' => $this->number($user->company_id),
+                'proforma_number' => $this->numbers->nextProformaNumber($user->company_id),
+                'tax_mode' => $taxMode,
                 'status' => ProformaStatus::Draft,
                 'paid_amount' => 0,
                 'balance_amount' => $calculation['grand_total'],
@@ -116,7 +122,7 @@ class ProformaService
     /** @param array<int, array<string, mixed>> $items
      * @return array<string, mixed>
      */
-    private function calc(array $items): array
+    private function calc(array $items, string $taxMode = DocumentTaxModeService::GST): array
     {
         $subtotal = $discountTotal = $taxTotal = 0;
         $normalized = [];
@@ -125,7 +131,7 @@ class ProformaService
             $unitPrice = (float) $item['unit_price'];
             $gross = $quantity * $unitPrice;
             $discount = min((float) ($item['discount_amount'] ?? 0), $gross);
-            $taxRate = (float) ($item['tax_rate'] ?? 0);
+            $taxRate = $taxMode === DocumentTaxModeService::NO_GST ? 0.0 : (float) ($item['tax_rate'] ?? 0);
             $tax = round(($gross - $discount) * $taxRate / 100, 2);
             $lineTotal = round($gross - $discount + $tax, 2);
             $subtotal += $gross;
@@ -137,12 +143,16 @@ class ProformaService
         return ['subtotal' => $subtotal, 'discount_total' => $discountTotal, 'tax_total' => $taxTotal, 'grand_total' => round($subtotal - $discountTotal + $taxTotal, 2), 'items' => $normalized];
     }
 
-    private function number(int $companyId): string
+    private function signatureSnapshot($company, bool $show): array
     {
-        $year = now()->format('Y');
-        $last = CrmProformaInvoice::where('company_id', $companyId)->where('proforma_number', 'like', "RPI-{$year}-%")->lockForUpdate()->latest('id')->value('proforma_number');
+        $signature = $this->branding->signatureForCompany($company);
 
-        return "RPI-{$year}-".str_pad((string) ((int) substr((string) $last, -6) + 1), 6, '0', STR_PAD_LEFT);
+        return [
+            'show_authorized_signature' => $show,
+            'signature_path_snapshot' => $show ? $signature['path'] : null,
+            'signatory_name_snapshot' => $show ? $signature['name'] : null,
+            'signatory_designation_snapshot' => $show ? $signature['designation'] : null,
+        ];
     }
 
     private function activity(CrmProformaInvoice $proforma, User $user, string $subject): void

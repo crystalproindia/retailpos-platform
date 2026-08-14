@@ -66,6 +66,10 @@
                         <label class="text-sm font-medium">Customer tax number<input name="customer_tax_number" value="{{ old('customer_tax_number', $invoice?->customer_tax_number ?? $selectedCustomer?->tax_number) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Place of supply<input name="place_of_supply" value="{{ old('place_of_supply', $invoice?->place_of_supply) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                     </div>
+                    @php($taxMode = old('tax_mode', $invoice?->tax_mode ?? 'gst'))
+                    <section class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950" data-tax-mode>
+                        <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-semibold text-slate-950 dark:text-white">Tax mode</h2><p class="mt-1 text-sm text-slate-500">The saved document decides tax calculations. No-GST sets all line taxes to zero on the server when your GST Settings permit it.</p></div><div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"><label><input class="sr-only" type="radio" name="tax_mode" value="gst" @checked($taxMode === 'gst')><span class="block rounded-md px-4 py-2 text-sm font-semibold has-[:checked]:bg-slate-950 has-[:checked]:text-white">GST</span></label><label><input class="sr-only" type="radio" name="tax_mode" value="no_gst" @checked($taxMode === 'no_gst')><span class="block rounded-md px-4 py-2 text-sm font-semibold has-[:checked]:bg-slate-950 has-[:checked]:text-white">No-GST</span></label></div></div>
+                    </section>
                     <label class="mt-4 block text-sm font-medium">Billing address<textarea name="billing_address" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('billing_address', $invoice?->billing_address ?? $selectedCustomer?->billing_address) }}</textarea></label>
                 </section>
 
@@ -95,6 +99,7 @@
                     <label class="rounded-lg border border-slate-200 bg-white p-5 text-sm font-medium shadow-sm dark:border-slate-800 dark:bg-slate-900">Customer notes<textarea name="notes" rows="5" class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('notes', $invoice?->notes) }}</textarea><span class="mt-2 block text-xs font-normal text-slate-500">Visible on the customer invoice.</span></label>
                     <label class="rounded-lg border border-slate-200 bg-white p-5 text-sm font-medium shadow-sm dark:border-slate-800 dark:bg-slate-900">Terms and conditions<textarea name="terms_conditions" rows="5" class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('terms_conditions', $invoice?->terms_conditions) }}</textarea><span class="mt-2 block text-xs font-normal text-slate-500">Visible on the customer invoice.</span></label>
                 </section>
+                <label class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium shadow-sm dark:border-slate-800 dark:bg-slate-900"><input type="hidden" name="show_authorized_signature" value="0"><input type="checkbox" name="show_authorized_signature" value="1" @checked(old('show_authorized_signature', $invoice?->show_authorized_signature ?? true))>Show authorized signature on this document</label>
 
                 <div class="flex justify-end"><button class="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">{{ $invoice ? 'Save draft changes' : 'Save draft' }}</button></div>
             </form>

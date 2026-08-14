@@ -1,3 +1,4 @@
+<!-- {{ $render['template']['label'] }} -->
 @php
     $branding = $render['branding'] ?? [];
     $position = in_array($branding['logo_position'] ?? null, ['left', 'center', 'right'], true) ? $branding['logo_position'] : 'left';

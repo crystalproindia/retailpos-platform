@@ -49,7 +49,7 @@ class SidebarNavigationInventoryTest extends TestCase
             'ai-assistant' => [],
             'company' => [],
             'branches' => [],
-            'settings' => ['invoice-designs', 'invoice-reminders'],
+            'settings' => ['invoice-designs', 'sales-document-numbering', 'invoice-reminders'],
             'integrations' => [],
             'operations' => ['operations-health', 'operations-queue', 'operations-failed-jobs', 'operations-schedule', 'operations-notification-deliveries', 'operations-webhooks', 'operations-event-logs', 'operations-application'],
             'notifications' => ['notification-inbox', 'notification-preferences', 'notification-event-log', 'notification-webhooks', 'notification-delivery-log'],
@@ -82,7 +82,7 @@ class SidebarNavigationInventoryTest extends TestCase
         }
         $this->assertSame(['tasks-today', 'tasks-personal', 'tasks-work', 'tasks-team', 'tasks-rules'], $administrator['tasks']);
         $this->assertSame(['workforce-dashboard', 'workforce-employees', 'users', 'roles'], $administrator['workforce']);
-        $this->assertSame(['invoice-designs', 'invoice-reminders'], $administrator['settings']);
+        $this->assertSame(['invoice-designs', 'sales-document-numbering', 'invoice-reminders'], $administrator['settings']);
         $this->assertArrayHasKey('reports', $manager);
         $this->assertArrayHasKey('ai-assistant', $manager);
         $this->assertSame(['workforce-dashboard', 'workforce-employees'], $manager['workforce']);

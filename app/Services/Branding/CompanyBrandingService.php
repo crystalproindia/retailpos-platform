@@ -3,6 +3,9 @@
 namespace App\Services\Branding;
 
 use App\Models\Company;
+use App\Models\Crm\CrmInvoice;
+use App\Models\Crm\CrmQuotation;
+use App\Models\Crm\CrmProformaInvoice;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\UploadedFile;
@@ -50,13 +53,33 @@ class CompanyBrandingService
         return ['data_uri' => $branding['active_logo'], 'source' => $branding['source']];
     }
 
+    /** @return array{path:?string,data_uri:?string,name:?string,designation:?string} */
+    public function signatureForCompany(Company $company): array
+    {
+        return [
+            'path' => $company->authorized_signature_path,
+            'data_uri' => $this->dataUri($company->authorized_signature_path),
+            'name' => $company->authorized_signatory_name,
+            'designation' => $company->authorized_signatory_designation,
+        ];
+    }
+
+    /** @return array{data_uri:?string,name:?string,designation:?string} */
+    public function signatureForPath(?string $path, ?string $name, ?string $designation): array
+    {
+        return ['data_uri' => $this->dataUri($path), 'name' => $name, 'designation' => $designation];
+    }
+
     public function replace(Company $company, User $user, UploadedFile $file, string $kind): Company
     {
         $field = $this->fieldFor($kind);
         $extension = self::EXTENSIONS[$file->getMimeType() ?: ''] ?? null;
 
-        if ($extension === null) {
+        if ($extension === null || ! $file->isValid() || ($kind === 'signature' && $file->getSize() > 1024 * 1024)) {
             throw new RuntimeException('The uploaded branding file is not a supported image.');
+        }
+        if ($kind === 'signature' && ! @getimagesize($file->getRealPath())) {
+            throw new RuntimeException('The signature upload must contain a valid image.');
         }
 
         $path = sprintf('companies/%d/branding/%s.%s', $company->id, Str::uuid(), $extension);
@@ -89,7 +112,7 @@ class CompanyBrandingService
             throw $exception;
         }
 
-        if ($previousPath && $previousPath !== $path) {
+        if ($previousPath && $previousPath !== $path && $this->canDelete($kind, $previousPath)) {
             Storage::disk(self::DISK)->delete($previousPath);
         }
 
@@ -115,7 +138,9 @@ class CompanyBrandingService
             );
         });
 
-        Storage::disk(self::DISK)->delete($previousPath);
+        if ($this->canDelete($kind, $previousPath)) {
+            Storage::disk(self::DISK)->delete($previousPath);
+        }
 
         return $company->refresh();
     }
@@ -125,8 +150,20 @@ class CompanyBrandingService
         return match ($kind) {
             'company' => 'company_logo_path',
             'invoice' => 'invoice_logo_path',
+            'signature' => 'authorized_signature_path',
             default => throw new RuntimeException('Unknown company branding logo type.'),
         };
+    }
+
+    private function canDelete(string $kind, string $path): bool
+    {
+        if ($kind !== 'signature') {
+            return true;
+        }
+
+        return ! CrmInvoice::query()->where('signature_path_snapshot', $path)->exists()
+            && ! CrmQuotation::query()->where('signature_path_snapshot', $path)->exists()
+            && ! CrmProformaInvoice::query()->where('signature_path_snapshot', $path)->exists();
     }
 
     private function dataUri(?string $path): ?string

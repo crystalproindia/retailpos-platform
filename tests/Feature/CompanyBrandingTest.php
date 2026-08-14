@@ -131,7 +131,7 @@ class CompanyBrandingTest extends TestCase
             $templates->update($manager->company, $manager, ['template_key' => $key, 'brand_color' => '#123456', 'copy_label' => 'original', 'orientation' => 'portrait', 'options' => array_replace($templates->defaultOptions(), ['show_logo' => false])]);
             $markup = view(app(InvoicePdfService::class)->templateView($key), ['invoice' => $invoice->fresh()->load(['company', 'items']), 'render' => $templates->renderData($invoice->fresh()->load(['company', 'items']))])->render();
             $this->assertStringNotContainsString('data:image/png;base64,', $markup);
-            $this->assertStringContainsString($manager->company->legal_name, $markup);
+            $this->assertStringContainsString($manager->company->legal_name, html_entity_decode($markup, ENT_QUOTES, 'UTF-8'));
         }
 
         $receiptMarkup = $this->actingAs($manager)->get(route('pos.receipts.show', $sale))->assertOk()->getContent();

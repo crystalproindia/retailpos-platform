@@ -21,6 +21,12 @@ class UpdateCompanyProfileRequest extends FormRequest
             File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max('2mb'),
             'dimensions:max_width=5000,max_height=5000',
         ];
+        $signature = [
+            'nullable',
+            'file',
+            File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max('1mb'),
+            'dimensions:max_width=3000,max_height=1500',
+        ];
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -32,8 +38,12 @@ class UpdateCompanyProfileRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'company_logo' => $logo,
             'invoice_logo' => $logo,
+            'authorized_signature' => $signature,
+            'authorized_signatory_name' => ['nullable', 'string', 'max:120'],
+            'authorized_signatory_designation' => ['nullable', 'string', 'max:120'],
             'remove_company_logo' => ['nullable', 'boolean'],
             'remove_invoice_logo' => ['nullable', 'boolean'],
+            'remove_authorized_signature' => ['nullable', 'boolean'],
         ];
     }
 }

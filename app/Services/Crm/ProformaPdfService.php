@@ -3,14 +3,23 @@
 namespace App\Services\Crm;
 
 use App\Models\Crm\CrmProformaInvoice;
+use App\Services\Branding\CompanyBrandingService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DompdfDocument;
 
 class ProformaPdfService
 {
+    public function __construct(private readonly CompanyBrandingService $branding) {}
+
     public function document(CrmProformaInvoice $proforma): DompdfDocument
     {
-        return Pdf::loadView('pdf.crm-proforma', ['proforma' => $proforma])
+        $proforma->loadMissing(['company', 'items']);
+
+        return Pdf::loadView('pdf.crm-proforma', [
+            'proforma' => $proforma,
+            'isGst' => $proforma->tax_mode !== DocumentTaxModeService::NO_GST,
+            'signature' => $this->branding->signatureForPath($proforma->signature_path_snapshot, $proforma->signatory_name_snapshot, $proforma->signatory_designation_snapshot),
+        ])
             ->setPaper('a4');
     }
 

@@ -19,12 +19,13 @@ class CompanyProfileController extends Controller
             'company' => $request->user()->company,
             'industries' => $industries->enabled(),
             'branding' => $branding->forCompany($request->user()->company),
+            'signature' => $branding->signatureForCompany($request->user()->company),
         ]);
     }
 
     public function update(UpdateCompanyProfileRequest $request, AuditLogger $audit, IndustryRegistry $industries, CompanyBrandingService $branding): RedirectResponse
     {
-        $data = $request->safe()->only(['name', 'industry', 'legal_name', 'address', 'tax_id', 'phone', 'email']);
+        $data = $request->safe()->only(['name', 'industry', 'legal_name', 'address', 'tax_id', 'phone', 'email', 'authorized_signatory_name', 'authorized_signatory_designation']);
         $industries->selectable($data['industry']);
         $company = $request->user()->company;
         $company->update($data);
@@ -37,6 +38,12 @@ class CompanyProfileController extends Controller
             } elseif ($request->boolean('remove_'.$fileKey)) {
                 $company = $branding->remove($company, $request->user(), $kind);
             }
+        }
+
+        if ($request->hasFile('authorized_signature')) {
+            $company = $branding->replace($company, $request->user(), $request->file('authorized_signature'), 'signature');
+        } elseif ($request->boolean('remove_authorized_signature')) {
+            $company = $branding->remove($company, $request->user(), 'signature');
         }
 
         return back()->with('status', 'Company profile and branding saved.');

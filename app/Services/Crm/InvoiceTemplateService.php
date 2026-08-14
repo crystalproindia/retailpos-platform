@@ -18,6 +18,9 @@ class InvoiceTemplateService
         'a5_modern_retail', 'a5_compact_gst', 'a5_boutique', 'a5_professional', 'a5_bold', 'a5_minimal', 'a5_service_invoice',
         'thermal_80_classic', 'thermal_80_modern', 'thermal_80_compact', 'thermal_80_gst_detailed',
         'thermal_58_mini', 'thermal_58_essential', 'thermal_58_gst_compact',
+        'corporate_split', 'premium_business', 'commercial_services', 'consultation_minimal', 'client_billing_modern', 'freelancer_blue',
+        'creative_studio', 'licensing_premium', 'publishing_royalty', 'construction_blue', 'contractor_red', 'medical_consultation',
+        'catering_modern', 'rental_orange', 'a5_consultation', 'a5_creative', 'thermal_80_service', 'thermal_58_retail',
     ];
 
     /** @return array<string,array<string,mixed>> */
@@ -126,6 +129,8 @@ class InvoiceTemplateService
             'payment_qr_uri' => $paymentQr['payload'] ?? null,
             'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null,
             'branding' => $this->brandingFor($invoice->company, $setting),
+            'is_gst' => $invoice->tax_mode !== DocumentTaxModeService::NO_GST,
+            'signature' => $this->branding->signatureForPath($invoice->signature_path_snapshot, $invoice->signatory_name_snapshot, $invoice->signatory_designation_snapshot),
         ];
     }
 

@@ -17,6 +17,7 @@ use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Branding\CompanyBrandingService;
 use App\Services\Events\DomainEventDispatcher;
 use App\Support\Crm\PublicQuotationLink;
 use Illuminate\Support\Arr;
@@ -29,15 +30,20 @@ class QuotationService
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly CrmLeadScoringService $leadScoring,
+        private readonly SalesDocumentNumberService $numbers,
+        private readonly DocumentTaxModeService $taxModes,
+        private readonly CompanyBrandingService $branding,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function create(CrmLead $lead, User $user, array $data): CrmQuotation
     {
         return DB::transaction(function () use ($lead, $user, $data): CrmQuotation {
-            $calculation = $this->calculate($data['items']);
-            $quotation = CrmQuotation::create($this->quotationPayload($lead, $user, $data, $calculation) + [
-                'quotation_number' => $this->nextQuotationNumber($lead->company_id),
+            $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
+            $calculation = $this->calculate($data['items'], $taxMode);
+            $quotation = CrmQuotation::create($this->quotationPayload($lead, $user, $data, $calculation) + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + [
+                'quotation_number' => $this->numbers->nextQuotationNumber($lead->company_id),
+                'tax_mode' => $taxMode,
                 'status' => QuotationStatus::Draft,
                 'created_by' => $user->id,
             ]);
@@ -68,8 +74,10 @@ class QuotationService
         $this->ensureEditable($quotation);
 
         return DB::transaction(function () use ($quotation, $user, $data): CrmQuotation {
-            $calculation = $this->calculate($data['items']);
-            $quotation->update($this->quotationPayload($quotation->lead()->firstOrFail(), $user, $data, $calculation) + [
+            $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? $quotation->tax_mode);
+            $calculation = $this->calculate($data['items'], $taxMode);
+            $quotation->update($this->quotationPayload($quotation->lead()->firstOrFail(), $user, $data, $calculation) + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $quotation->show_authorized_signature)) + [
+                'tax_mode' => $taxMode,
                 'updated_by' => $user->id,
             ]);
             $this->replaceItems($quotation, $calculation['items']);
@@ -124,7 +132,7 @@ class QuotationService
                 'public_response_name', 'public_response_message', 'rejection_reason', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at',
             ]);
             $revision->fill([
-                'quotation_number' => $this->nextQuotationNumber($quotation->company_id),
+                'quotation_number' => $this->numbers->nextQuotationNumber($quotation->company_id),
                 'status' => QuotationStatus::Draft,
                 'version_number' => max(1, (int) $quotation->version_number) + 1,
                 'parent_quotation_id' => $quotation->id,
@@ -197,7 +205,7 @@ class QuotationService
     /** @param array<int, array<string, mixed>> $items
      * @return array{subtotal: float, discount_total: float, tax_total: float, grand_total: float, items: array<int, array<string, mixed>>}
      */
-    private function calculate(array $items): array
+    private function calculate(array $items, string $taxMode = DocumentTaxModeService::GST): array
     {
         $subtotal = 0.0;
         $discountTotal = 0.0;
@@ -214,7 +222,7 @@ class QuotationService
                 ? round($gross * $discountPercentage / 100, 2)
                 : round((float) ($item['discount_amount'] ?? 0), 2);
             $discount = min($requestedDiscount, $gross);
-            $taxRate = round((float) ($item['tax_rate'] ?? 0), 3);
+            $taxRate = $taxMode === DocumentTaxModeService::NO_GST ? 0.0 : round((float) ($item['tax_rate'] ?? 0), 3);
             $taxAmount = round(($gross - $discount) * $taxRate / 100, 2);
             $lineTotal = round($gross - $discount + $taxAmount, 2);
 
@@ -351,19 +359,17 @@ class QuotationService
         ]);
     }
 
-    private function nextQuotationNumber(int $companyId): string
+    /** @return array<string,mixed> */
+    private function signatureSnapshot($company, bool $show): array
     {
-        $year = now()->format('Y');
-        $prefix = "RPQ-{$year}-";
-        $lastNumber = CrmQuotation::query()
-            ->where('company_id', $companyId)
-            ->where('quotation_number', 'like', $prefix.'%')
-            ->lockForUpdate()
-            ->latest('id')
-            ->value('quotation_number');
-        $lastSequence = $lastNumber ? (int) substr($lastNumber, -6) : 0;
+        $signature = $this->branding->signatureForCompany($company);
 
-        return $prefix.str_pad((string) ($lastSequence + 1), 6, '0', STR_PAD_LEFT);
+        return [
+            'show_authorized_signature' => $show,
+            'signature_path_snapshot' => $show ? $signature['path'] : null,
+            'signatory_name_snapshot' => $show ? $signature['name'] : null,
+            'signatory_designation_snapshot' => $show ? $signature['designation'] : null,
+        ];
     }
 
     private function eventFor(QuotationStatus $status, CrmQuotation $quotation, CrmLead $lead, User $user): DomainEvent

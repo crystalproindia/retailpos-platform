@@ -11,6 +11,7 @@
 
     <form method="POST" action="{{ route('purchases.grn.store') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         @csrf
+        <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
         <div class="grid gap-4 md:grid-cols-3">
             <label class="text-sm font-medium">Purchase order
                 <select name="purchase_order_id" class="mt-1 w-full rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
@@ -44,7 +45,7 @@
         </div>
         <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-800">
             <div class="border-b border-slate-200 px-4 py-3 text-sm font-semibold dark:border-slate-800">Received item</div>
-            <div class="grid gap-4 p-4 md:grid-cols-6">
+            <div class="grid gap-4 p-4 md:grid-cols-7">
                 <select name="items[0][product_id]" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                     <option value="">Product</option>
                     @foreach ($products as $product)
@@ -60,6 +61,7 @@
                 <input name="items[0][received_quantity]" type="number" min="0.001" step="0.001" placeholder="Received" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950" required>
                 <input name="items[0][accepted_quantity]" type="number" min="0" step="0.001" placeholder="Accepted" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
                 <input name="items[0][rejected_quantity]" type="number" min="0" step="0.001" placeholder="Rejected" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
+                <input name="items[0][damaged_quantity]" type="number" min="0" step="0.001" placeholder="Damaged" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
                 <input name="items[0][unit_cost]" type="number" min="0" step="0.01" placeholder="Unit cost" class="rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-950">
             </div>
         </div>

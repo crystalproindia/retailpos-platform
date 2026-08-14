@@ -9,6 +9,7 @@ use App\Repositories\Inventory\InventoryLookupRepository;
 use App\Repositories\Inventory\ProductRepository;
 use App\Repositories\Purchases\PurchaseRequestRepository;
 use App\Repositories\Purchases\SupplierRepository;
+use App\Services\Inventory\InventoryLocationAccessService;
 use App\Services\Purchases\PurchaseOrderService;
 use App\Services\Purchases\PurchaseRequestService;
 use Illuminate\Http\RedirectResponse;
@@ -21,18 +22,18 @@ class PurchaseRequestController extends Controller
     public function index(Request $request, PurchaseRequestRepository $requests): View
     {
         return view('command-center.purchases.requests.index', [
-            'requests' => $requests->paginateForCompany($request->user()->company_id, $request->only(['search', 'status', 'priority', 'source_type'])),
+            'requests' => $requests->paginateForUser($request->user(), $request->only(['search', 'status', 'priority', 'source_type'])),
             'priorities' => PurchaseRequestPriority::cases(),
             'sources' => PurchaseSourceType::cases(),
         ]);
     }
 
-    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, InventoryLookupRepository $lookups): View
+    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, InventoryLookupRepository $lookups, InventoryLocationAccessService $access): View
     {
         return view('command-center.purchases.requests.create', [
             'products' => $products->activeForCompany($request->user()->company_id),
             'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
-            'warehouses' => $lookups->formOptions($request->user()->company_id)['warehouses'],
+            'warehouses' => $access->accessibleWarehouses($request->user()),
             'priorities' => PurchaseRequestPriority::cases(),
         ]);
     }
@@ -47,27 +48,34 @@ class PurchaseRequestController extends Controller
     public function show(Request $request, PurchaseRequestRepository $requests, int $purchaseRequest): View
     {
         return view('command-center.purchases.requests.show', [
-            'purchaseRequest' => $requests->findForCompany($request->user()->company_id, $purchaseRequest),
+            'purchaseRequest' => $requests->findForUser($request->user(), $purchaseRequest),
         ]);
     }
 
     public function submit(Request $request, PurchaseRequestService $service, PurchaseRequestRepository $requests, int $purchaseRequest): RedirectResponse
     {
-        $service->submit($requests->findForCompany($request->user()->company_id, $purchaseRequest), $request->user());
+        $service->submit($requests->findForUser($request->user(), $purchaseRequest), $request->user());
 
         return back()->with('status', 'Purchase request submitted.');
     }
 
     public function approve(Request $request, PurchaseRequestService $service, PurchaseRequestRepository $requests, int $purchaseRequest): RedirectResponse
     {
-        $service->approve($requests->findForCompany($request->user()->company_id, $purchaseRequest), $request->user());
+        $validated = $request->validate([
+            'comments' => ['nullable', 'string', 'max:2000'],
+            'items' => ['nullable', 'array'],
+            'items.*.item_id' => ['required_with:items', 'integer'],
+            'items.*.approved_quantity' => ['required_with:items', 'numeric', 'min:0'],
+            'items.*.approval_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $service->approve($requests->findForUser($request->user(), $purchaseRequest), $request->user(), $validated['items'] ?? [], $validated['comments'] ?? null);
 
         return back()->with('status', 'Purchase request approved.');
     }
 
     public function reject(Request $request, PurchaseRequestService $service, PurchaseRequestRepository $requests, int $purchaseRequest): RedirectResponse
     {
-        $service->reject($requests->findForCompany($request->user()->company_id, $purchaseRequest), $request->user(), $request->input('comments'));
+        $service->reject($requests->findForUser($request->user(), $purchaseRequest), $request->user(), $request->input('comments'));
 
         return back()->with('status', 'Purchase request rejected.');
     }
@@ -77,7 +85,7 @@ class PurchaseRequestController extends Controller
         $validated = $request->validate([
             'supplier_id' => ['nullable', 'integer', Rule::exists('suppliers', 'id')->where('company_id', $request->user()->company_id)],
         ]);
-        $order = $orders->createFromRequest($requests->findForCompany($request->user()->company_id, $purchaseRequest), $request->user(), $validated['supplier_id'] ?? null);
+        $order = $orders->createFromRequest($requests->findForUser($request->user(), $purchaseRequest), $request->user(), $validated['supplier_id'] ?? null);
 
         return redirect()->route('purchases.orders.show', $order)->with('status', 'Purchase request converted to purchase order.');
     }
@@ -92,6 +100,13 @@ class PurchaseRequestController extends Controller
         $purchaseRequest = $service->createFromReorderSuggestions($request->user(), $validated['suggestion_ids']);
 
         return redirect()->route('purchases.requests.show', $purchaseRequest)->with('status', 'Purchase request created from reorder suggestions.');
+    }
+
+    public function duplicate(Request $request, PurchaseRequestService $service, PurchaseRequestRepository $requests, int $purchaseRequest): RedirectResponse
+    {
+        $copy = $service->duplicate($requests->findForUser($request->user(), $purchaseRequest), $request->user());
+
+        return redirect()->route('purchases.requests.show', $copy)->with('status', 'Purchase request duplicated as a draft.');
     }
 
     /**

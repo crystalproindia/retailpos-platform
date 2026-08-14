@@ -3,12 +3,13 @@
 namespace App\Models\Purchases;
 
 use App\Models\Inventory\Product;
+use App\Models\Inventory\InventoryBatch;
 use App\Models\Inventory\StockLocation;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['goods_receipt_id', 'purchase_order_item_id', 'product_id', 'stock_location_id', 'ordered_quantity', 'received_quantity', 'accepted_quantity', 'rejected_quantity', 'unit_cost', 'batch_number', 'expiry_date', 'manufacture_date', 'notes'])]
+#[Fillable(['goods_receipt_id', 'purchase_order_item_id', 'product_id', 'stock_location_id', 'inventory_batch_id', 'ordered_quantity', 'received_quantity', 'accepted_quantity', 'rejected_quantity', 'damaged_quantity', 'short_quantity', 'unit_cost', 'batch_number', 'expiry_date', 'manufacture_date', 'notes'])]
 class GoodsReceiptItem extends Model
 {
     protected function casts(): array
@@ -18,6 +19,8 @@ class GoodsReceiptItem extends Model
             'received_quantity' => 'decimal:3',
             'accepted_quantity' => 'decimal:3',
             'rejected_quantity' => 'decimal:3',
+            'damaged_quantity' => 'decimal:3',
+            'short_quantity' => 'decimal:3',
             'unit_cost' => 'decimal:2',
             'expiry_date' => 'date',
             'manufacture_date' => 'date',
@@ -42,5 +45,10 @@ class GoodsReceiptItem extends Model
     public function stockLocation(): BelongsTo
     {
         return $this->belongsTo(StockLocation::class);
+    }
+
+    public function inventoryBatch(): BelongsTo
+    {
+        return $this->belongsTo(InventoryBatch::class);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\Supplier;
 use App\Services\Purchases\PurchaseInvoiceService;
 use App\Services\Purchases\SupplierPayableService;
+use App\Services\Purchases\PurchaseAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,9 +16,11 @@ use Illuminate\View\View;
 
 class PurchaseInvoiceController extends Controller
 {
+    public function __construct(private readonly PurchaseAccessService $access) {}
+
     public function index(Request $request, SupplierPayableService $payables): View
     {
-        $invoices = PurchaseInvoice::query()->with('supplier')->where('company_id', $request->user()->company_id)
+        $invoices = $this->access->scope(PurchaseInvoice::query()->with('supplier'), $request->user())
             ->when($request->status, fn ($query, $status) => $query->where('status', $status))
             ->when($request->supplier_id, fn ($query, $supplier) => $query->where('supplier_id', $supplier))
             ->latest('supplier_invoice_date')->paginate(20)->withQueryString();
@@ -26,7 +29,7 @@ class PurchaseInvoiceController extends Controller
 
     public function create(Request $request): View
     {
-        $receipts = GoodsReceipt::query()->with(['supplier', 'items.product'])->where('company_id', $request->user()->company_id)->whereIn('status', ['received', 'partially_accepted', 'closed'])->latest('receipt_date')->get();
+        $receipts = $this->access->scope(GoodsReceipt::query()->with(['supplier', 'items.product']), $request->user())->whereIn('status', ['received', 'partially_accepted', 'closed'])->latest('receipt_date')->get();
         return view('command-center.purchases.invoices.create', ['receipts' => $receipts, 'suppliers' => Supplier::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->orderBy('name')->get(['id', 'name'])]);
     }
 
@@ -38,7 +41,7 @@ class PurchaseInvoiceController extends Controller
 
     public function show(Request $request, int $purchaseInvoice): View
     {
-        return view('command-center.purchases.invoices.show', ['invoice' => $this->invoice($request, $purchaseInvoice)->load(['supplier', 'items.product', 'payments.payment'])]);
+        return view('command-center.purchases.invoices.show', ['invoice' => $this->invoice($request, $purchaseInvoice)->load(['supplier', 'items.product', 'payments.payment', 'matchExceptions'])]);
     }
 
     public function verify(Request $request, PurchaseInvoiceService $service, int $purchaseInvoice): RedirectResponse
@@ -62,7 +65,7 @@ class PurchaseInvoiceController extends Controller
 
     private function invoice(Request $request, int $id): PurchaseInvoice
     {
-        return PurchaseInvoice::query()->where('company_id', $request->user()->company_id)->findOrFail($id);
+        return $this->access->scope(PurchaseInvoice::query(), $request->user())->findOrFail($id);
     }
 
     /** @return array<string, mixed> */

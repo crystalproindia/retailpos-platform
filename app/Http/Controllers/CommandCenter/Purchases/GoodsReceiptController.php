@@ -9,6 +9,7 @@ use App\Repositories\Purchases\GoodsReceiptRepository;
 use App\Repositories\Purchases\PurchaseOrderRepository;
 use App\Repositories\Purchases\SupplierRepository;
 use App\Services\Purchases\GoodsReceiptService;
+use App\Services\Inventory\InventoryLocationAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,18 +20,19 @@ class GoodsReceiptController extends Controller
     public function index(Request $request, GoodsReceiptRepository $receipts): View
     {
         return view('command-center.purchases.grn.index', [
-            'receipts' => $receipts->paginateForCompany($request->user()->company_id),
+            'receipts' => $receipts->paginateForAuthorizedUser($request->user()),
         ]);
     }
 
-    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, PurchaseOrderRepository $orders, InventoryLookupRepository $lookups): View
+    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, PurchaseOrderRepository $orders, InventoryLookupRepository $lookups, InventoryLocationAccessService $access): View
     {
+        $warehouses = $access->accessibleWarehouses($request->user());
         return view('command-center.purchases.grn.create', [
             'products' => $products->activeForCompany($request->user()->company_id),
             'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
-            'orders' => $orders->paginateForCompany($request->user()->company_id, ['status' => 'sent'], 100),
-            'warehouses' => $lookups->formOptions($request->user()->company_id)['warehouses'],
-            'locations' => $lookups->formOptions($request->user()->company_id)['locations'],
+            'orders' => $orders->paginateForUser($request->user(), ['status' => 'sent'], 100),
+            'warehouses' => $warehouses,
+            'locations' => $lookups->formOptions($request->user()->company_id)['locations']->whereIn('warehouse_id', $warehouses->pluck('id')),
         ]);
     }
 
@@ -44,13 +46,13 @@ class GoodsReceiptController extends Controller
     public function show(Request $request, GoodsReceiptRepository $receipts, int $goodsReceipt): View
     {
         return view('command-center.purchases.grn.show', [
-            'receipt' => $receipts->findForCompany($request->user()->company_id, $goodsReceipt),
+            'receipt' => $receipts->findForUser($request->user(), $goodsReceipt),
         ]);
     }
 
     public function receive(Request $request, GoodsReceiptService $service, GoodsReceiptRepository $receipts, int $goodsReceipt): RedirectResponse
     {
-        $service->receive($receipts->findForCompany($request->user()->company_id, $goodsReceipt), $request->user());
+        $service->receive($receipts->findForUser($request->user(), $goodsReceipt), $request->user());
 
         return back()->with('status', 'Goods receipt posted to stock.');
     }
@@ -64,6 +66,7 @@ class GoodsReceiptController extends Controller
             'warehouse_id' => ['required_without:purchase_order_id', 'integer', Rule::exists('warehouses', 'id')->where('company_id', $request->user()->company_id)],
             'supplier_id' => ['required_without:purchase_order_id', 'integer', Rule::exists('suppliers', 'id')->where('company_id', $request->user()->company_id)],
             'purchase_order_id' => ['nullable', 'integer', Rule::exists('purchase_orders', 'id')->where('company_id', $request->user()->company_id)],
+            'idempotency_key' => ['nullable', 'string', 'max:80'],
             'receipt_date' => ['nullable', 'date'],
             'supplier_invoice_number' => ['nullable', 'string', 'max:255'],
             'supplier_invoice_date' => ['nullable', 'date'],
@@ -76,6 +79,7 @@ class GoodsReceiptController extends Controller
             'items.*.received_quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.accepted_quantity' => ['nullable', 'numeric', 'min:0'],
             'items.*.rejected_quantity' => ['nullable', 'numeric', 'min:0'],
+            'items.*.damaged_quantity' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.batch_number' => ['nullable', 'string', 'max:255'],
             'items.*.expiry_date' => ['nullable', 'date'],

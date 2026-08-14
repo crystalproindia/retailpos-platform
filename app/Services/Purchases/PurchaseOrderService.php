@@ -9,11 +9,14 @@ use App\Models\Inventory\Product;
 use App\Models\Purchases\PurchaseApprovalLog;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseRequest;
+use App\Models\Purchases\Supplier;
 use App\Models\Purchases\SupplierProduct;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
+use App\Services\Inventory\InventoryLocationAccessService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderService
 {
@@ -22,6 +25,7 @@ class PurchaseOrderService
         private readonly PurchaseRequestService $requests,
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly InventoryLocationAccessService $locations,
     ) {}
 
     /**
@@ -30,10 +34,17 @@ class PurchaseOrderService
     public function create(User $user, array $data): PurchaseOrder
     {
         return DB::transaction(function () use ($user, $data): PurchaseOrder {
+            $warehouse = $this->locations->authorize($user, (int) $data['warehouse_id']);
+            $request = ! empty($data['purchase_request_id'])
+                ? PurchaseRequest::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail((int) $data['purchase_request_id'])
+                : null;
+            if ($request && $request->warehouse_id !== $warehouse->id) {
+                throw ValidationException::withMessages(['warehouse_id' => 'The purchase order must use the approved request destination warehouse.']);
+            }
             $order = PurchaseOrder::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $user->branch_id,
-                'warehouse_id' => $data['warehouse_id'],
+                'branch_id' => $warehouse->branch_id,
+                'warehouse_id' => $warehouse->id,
                 'supplier_id' => $data['supplier_id'],
                 'purchase_request_id' => $data['purchase_request_id'] ?? null,
                 'po_number' => $this->numbers->next($user->company_id, 'po'),
@@ -62,13 +73,21 @@ class PurchaseOrderService
 
     public function createFromRequest(PurchaseRequest $request, User $user, ?int $supplierId = null): PurchaseOrder
     {
-        abort_unless($request->status === PurchaseRequestStatus::Approved, 422, 'Only approved purchase requests can be converted to purchase orders.');
+        return DB::transaction(function () use ($request, $user, $supplierId): PurchaseOrder {
+            $request = PurchaseRequest::query()->with('items.product')->lockForUpdate()->findOrFail($request->id);
+            if (! in_array($request->status, [PurchaseRequestStatus::Approved, PurchaseRequestStatus::PartiallyApproved], true)) {
+                throw ValidationException::withMessages(['status' => 'Only approved purchase requests can be converted to purchase orders.']);
+            }
+            $supplierId ??= (int) $request->items->firstWhere('supplier_id', '!=', null)?->supplier_id;
+            if (! $supplierId || ! Supplier::query()->where('company_id', $user->company_id)->whereKey($supplierId)->where('is_active', true)->exists()) {
+                throw ValidationException::withMessages(['supplier_id' => 'Select an active supplier in your company before converting to a purchase order.']);
+            }
 
-        $request->load('items.product');
-        $supplierId ??= (int) $request->items->firstWhere('supplier_id', '!=', null)?->supplier_id;
-        abort_if(! $supplierId, 422, 'Select a supplier before converting to a purchase order.');
-
-        $items = $request->items->map(function ($item) use ($supplierId): array {
+            $items = $request->items->map(function ($item) use ($supplierId): ?array {
+                $remaining = max(0, (float) ($item->approved_quantity ?? 0) - (float) $item->converted_quantity);
+                if ($remaining <= 0) {
+                    return null;
+                }
             $supplierProduct = SupplierProduct::query()
                 ->where('supplier_id', $supplierId)
                 ->where('product_id', $item->product_id)
@@ -77,26 +96,40 @@ class PurchaseOrderService
             return [
                 'product_id' => $item->product_id,
                 'supplier_product_id' => $supplierProduct?->id,
-                'ordered_quantity' => $item->approved_quantity ?? $item->requested_quantity,
+                'ordered_quantity' => $remaining,
                 'unit_price' => $supplierProduct?->purchase_price ?? $item->estimated_price ?? $item->product->cost_price ?? 0,
                 'tax_rate' => $supplierProduct?->taxRate?->rate ?? 0,
                 'discount_amount' => 0,
                 'notes' => $item->notes,
             ];
-        })->all();
+            })->filter()->values();
+            if ($items->isEmpty()) {
+                throw ValidationException::withMessages(['request' => 'All approved quantities from this request have already been converted to purchase orders.']);
+            }
 
-        $order = $this->create($user, [
+            $order = $this->create($user, [
             'warehouse_id' => $request->warehouse_id,
             'supplier_id' => $supplierId,
             'purchase_request_id' => $request->id,
             'order_date' => now()->toDateString(),
             'expected_delivery_date' => $request->expected_by?->toDateString(),
-            'items' => $items,
-        ]);
+            'items' => $items->all(),
+            ]);
 
-        $this->requests->markConverted($request, $user, $order->id);
+            foreach ($request->items as $item) {
+                $converted = $items->firstWhere('product_id', $item->product_id)['ordered_quantity'] ?? 0;
+                if ($converted > 0) {
+                    $item->increment('converted_quantity', $converted);
+                }
+            }
+            $request->refresh()->load('items');
+            $fullyConverted = $request->items->every(fn ($item) => (float) $item->converted_quantity >= (float) ($item->approved_quantity ?? 0));
+            if ($fullyConverted) {
+                $this->requests->markConverted($request, $user, $order->id);
+            }
 
-        return $order;
+            return $order;
+        });
     }
 
     public function submit(PurchaseOrder $order, User $user): PurchaseOrder
@@ -131,6 +164,20 @@ class PurchaseOrderService
         $this->approvalLog($order, $user, 'sent', $from, PurchaseOrderStatus::Sent->value);
         $this->auditLogger->record('purchase.order.sent', $order, 'Purchase order marked sent');
         $this->dispatch('purchase.order.sent', $order, $user, ['po_number' => $order->po_number]);
+
+        return $order->refresh();
+    }
+
+    public function markSupplierConfirmed(PurchaseOrder $order, User $user, ?string $reference = null): PurchaseOrder
+    {
+        if (! in_array($order->status, [PurchaseOrderStatus::Sent, PurchaseOrderStatus::Approved], true)) {
+            throw ValidationException::withMessages(['status' => 'Only a sent or approved purchase order can be supplier confirmed.']);
+        }
+        $from = $order->status->value;
+        $order->update(['status' => PurchaseOrderStatus::SupplierConfirmed->value, 'supplier_confirmed_at' => now(), 'supplier_confirmation_reference' => $reference]);
+        $this->approvalLog($order, $user, 'supplier_confirmed', $from, PurchaseOrderStatus::SupplierConfirmed->value);
+        $this->auditLogger->record('purchase.order.supplier_confirmed', $order, 'Supplier confirmed purchase order');
+        $this->dispatch('purchase.order.supplier_confirmed', $order, $user, ['po_number' => $order->po_number]);
 
         return $order->refresh();
     }

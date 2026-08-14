@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'request_number', 'source_type', 'source_id', 'status', 'priority', 'requested_by', 'reviewed_by', 'reviewed_at', 'notes', 'expected_by'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'request_number', 'source_type', 'source_id', 'status', 'priority', 'requested_by', 'reviewed_by', 'cancelled_by', 'reviewed_at', 'submitted_at', 'cancelled_at', 'notes', 'expected_by'])]
 class PurchaseRequest extends Model
 {
     use Auditable, SoftDeletes;
@@ -28,6 +28,8 @@ class PurchaseRequest extends Model
             'status' => PurchaseRequestStatus::class,
             'priority' => PurchaseRequestPriority::class,
             'reviewed_at' => 'datetime',
+            'submitted_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'expected_by' => 'date',
         ];
     }
@@ -55,6 +57,11 @@ class PurchaseRequest extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function canceller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function items(): HasMany

@@ -339,6 +339,81 @@ class PurchaseFoundationTest extends TestCase
         ])->assertSessionHasErrors('items');
     }
 
+    public function test_partial_approval_only_converts_remaining_quantities_once(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+        $request = PurchaseRequest::create([
+            'company_id' => $manager->company_id, 'branch_id' => $manager->branch_id, 'warehouse_id' => $fixtures['warehouse']->id,
+            'request_number' => 'PR-PARTIAL-001', 'status' => 'pending_review', 'priority' => 'normal', 'requested_by' => $manager->id,
+        ]);
+        $item = $request->items()->create(['product_id' => $fixtures['product']->id, 'supplier_id' => $fixtures['supplier']->id, 'requested_quantity' => 10, 'estimated_price' => 58]);
+
+        $this->actingAs($manager)->post("/purchases/requests/{$request->id}/approve", ['items' => [[
+            'item_id' => $item->id, 'approved_quantity' => 6, 'approval_notes' => 'Match this week demand.',
+        ]]])->assertRedirect();
+        $this->assertSame('partially_approved', $request->refresh()->status->value);
+
+        $this->actingAs($manager)->post("/purchases/requests/{$request->id}/convert")->assertRedirect();
+        $this->assertSame('6.000', $item->refresh()->converted_quantity);
+        $this->actingAs($manager)->post("/purchases/requests/{$request->id}/convert")->assertSessionHasErrors('status');
+    }
+
+    public function test_grn_is_idempotent_blocks_over_receipt_and_posts_tracked_batches(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+        $fixtures['product']->update(['track_batches' => true]);
+        $order = $this->purchaseOrder($manager, $fixtures);
+        $orderItem = $order->items()->firstOrFail();
+        $payload = [
+            'purchase_order_id' => $order->id, 'idempotency_key' => 'grn-idempotency-key',
+            'items' => [[
+                'purchase_order_item_id' => $orderItem->id, 'product_id' => $fixtures['product']->id, 'stock_location_id' => $fixtures['location']->id,
+                'received_quantity' => 4, 'accepted_quantity' => 4, 'unit_cost' => 58, 'batch_number' => 'BATCH-001',
+            ]],
+        ];
+        $this->actingAs($manager)->post('/purchases/grn', $payload)->assertRedirect();
+        $receipt = GoodsReceipt::query()->firstOrFail();
+        $this->actingAs($manager)->post('/purchases/grn', $payload)->assertRedirect();
+        $this->assertSame(1, GoodsReceipt::query()->count());
+        $this->actingAs($manager)->post("/purchases/grn/{$receipt->id}/receive")->assertRedirect();
+        $this->actingAs($manager)->post("/purchases/grn/{$receipt->id}/receive")->assertRedirect();
+        $this->assertSame(1, StockMovement::query()->where('reference_type', GoodsReceipt::class)->where('reference_id', $receipt->id)->count());
+        $this->assertDatabaseHas('inventory_batches', ['batch_number' => 'BATCH-001', 'quantity_on_hand' => 4]);
+
+        $this->actingAs($manager)->post('/purchases/grn', [
+            'purchase_order_id' => $order->id,
+            'items' => [[
+                'purchase_order_item_id' => $orderItem->id, 'product_id' => $fixtures['product']->id, 'stock_location_id' => $fixtures['location']->id,
+                'received_quantity' => 7, 'accepted_quantity' => 7, 'unit_cost' => 58,
+            ]],
+        ])->assertSessionHasErrors('items');
+    }
+
+    public function test_three_way_matching_records_human_review_exceptions(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $fixtures = $this->purchaseFixtures($manager);
+        $order = $this->purchaseOrder($manager, $fixtures);
+        $receipt = GoodsReceipt::create([
+            'company_id' => $manager->company_id, 'branch_id' => $manager->branch_id, 'warehouse_id' => $fixtures['warehouse']->id,
+            'supplier_id' => $fixtures['supplier']->id, 'purchase_order_id' => $order->id, 'grn_number' => 'GRN-MATCH-001', 'receipt_date' => now(), 'status' => 'received', 'received_by' => $manager->id,
+        ]);
+        $line = $receipt->items()->create(['purchase_order_item_id' => $order->items()->first()->id, 'product_id' => $fixtures['product']->id, 'ordered_quantity' => 10, 'received_quantity' => 10, 'accepted_quantity' => 8, 'rejected_quantity' => 2, 'unit_cost' => 58]);
+
+        $this->actingAs($manager)->post('/purchases/invoices', [
+            'supplier_id' => $fixtures['supplier']->id, 'purchase_order_id' => $order->id, 'supplier_invoice_number' => 'SUP-MATCH-001', 'supplier_invoice_date' => now()->toDateString(),
+            'supplier_state_code' => 'KA', 'place_of_supply_state_code' => 'KA', 'items' => [[
+                'goods_receipt_item_id' => $line->id, 'quantity' => 10, 'unit_price' => 60, 'tax_rate' => 18,
+            ]],
+        ])->assertRedirect();
+        $invoice = PurchaseInvoice::query()->firstOrFail();
+        $this->assertSame('exceptions', $invoice->match_status);
+        $this->assertDatabaseHas('purchase_invoice_match_exceptions', ['purchase_invoice_id' => $invoice->id, 'type' => 'quantity_mismatch', 'status' => 'open']);
+        $this->assertDatabaseHas('purchase_invoice_match_exceptions', ['purchase_invoice_id' => $invoice->id, 'type' => 'price_mismatch', 'status' => 'open']);
+    }
+
     public function test_supplier_payment_allocates_and_reversal_restores_purchase_invoice_outstanding(): void
     {
         $manager = $this->user(UserRole::Manager);

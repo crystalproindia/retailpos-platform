@@ -4,7 +4,10 @@ namespace App\Services\Purchases;
 
 use App\Enums\Purchases\GoodsReceiptStatus;
 use App\Events\Domain\Purchases\PurchaseDomainEvent;
+use App\Models\Inventory\InventoryBatch;
+use App\Models\Inventory\Product;
 use App\Models\Purchases\GoodsReceipt;
+use App\Models\Purchases\GoodsReceiptItem;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseOrderItem;
 use App\Models\Purchases\SupplierProduct;
@@ -32,6 +35,15 @@ class GoodsReceiptService
     public function create(User $user, array $data): GoodsReceipt
     {
         return DB::transaction(function () use ($user, $data): GoodsReceipt {
+            if (! empty($data['idempotency_key'])) {
+                $existing = GoodsReceipt::query()
+                    ->where('company_id', $user->company_id)
+                    ->where('idempotency_key', $data['idempotency_key'])
+                    ->first();
+                if ($existing) {
+                    return $existing->load(['supplier', 'warehouse', 'purchaseOrder.items', 'items.product']);
+                }
+            }
             if (empty($data['purchase_order_id']) && ! $this->numbers->settings($user->company_id)->allow_receive_without_po) {
                 throw ValidationException::withMessages([
                     'purchase_order_id' => 'Receiving without a purchase order is disabled in purchase settings.',
@@ -43,7 +55,12 @@ class GoodsReceiptService
                 : PurchaseOrder::query()
                     ->with('items')
                     ->where('company_id', $user->company_id)
+                    ->lockForUpdate()
                     ->findOrFail((int) $data['purchase_order_id']);
+
+            if ($order && ! in_array($order->status->value, ['approved', 'sent', 'supplier_confirmed', 'partially_received'], true)) {
+                throw ValidationException::withMessages(['purchase_order_id' => 'Goods can only be received against an approved, sent, confirmed, or partially received purchase order.']);
+            }
 
             $receipt = GoodsReceipt::create([
                 'company_id' => $user->company_id,
@@ -52,6 +69,7 @@ class GoodsReceiptService
                 'supplier_id' => $order?->supplier_id ?? $data['supplier_id'],
                 'purchase_order_id' => $order?->id,
                 'grn_number' => $this->numbers->next($user->company_id, 'grn'),
+                'idempotency_key' => $data['idempotency_key'] ?? null,
                 'receipt_date' => $data['receipt_date'] ?? now()->toDateString(),
                 'status' => $data['status'] ?? GoodsReceiptStatus::Draft->value,
                 'received_by' => $user->id,
@@ -70,6 +88,16 @@ class GoodsReceiptService
                 $acceptedQuantity = (float) ($item['accepted_quantity'] ?? $item['received_quantity']);
                 $receivedQuantity = (float) $item['received_quantity'];
                 $rejectedQuantity = (float) ($item['rejected_quantity'] ?? max(0, $receivedQuantity - $acceptedQuantity));
+                $damagedQuantity = (float) ($item['damaged_quantity'] ?? 0);
+                if ($acceptedQuantity < 0 || $rejectedQuantity < 0 || $damagedQuantity < 0 || $acceptedQuantity + $rejectedQuantity + $damagedQuantity > $receivedQuantity + 0.0005) {
+                    throw ValidationException::withMessages(['items' => 'Accepted, rejected, and damaged quantities cannot exceed the received quantity.']);
+                }
+                if ($orderItem) {
+                    $remaining = (float) $orderItem->pending_quantity;
+                    if ($acceptedQuantity > $remaining + 0.0005) {
+                        throw ValidationException::withMessages(['items' => "Accepted quantity for {$orderItem->product_name_snapshot} exceeds the remaining PO quantity."]);
+                    }
+                }
 
                 $receipt->items()->create([
                     'purchase_order_item_id' => $orderItem?->id,
@@ -79,6 +107,8 @@ class GoodsReceiptService
                     'received_quantity' => $receivedQuantity,
                     'accepted_quantity' => $acceptedQuantity,
                     'rejected_quantity' => $rejectedQuantity,
+                    'damaged_quantity' => $damagedQuantity,
+                    'short_quantity' => max(0, (float) ($orderItem?->pending_quantity ?? 0) - $acceptedQuantity),
                     'unit_cost' => $item['unit_cost'] ?? $orderItem?->unit_price ?? 0,
                     'batch_number' => $item['batch_number'] ?? null,
                     'expiry_date' => $item['expiry_date'] ?? null,
@@ -95,17 +125,22 @@ class GoodsReceiptService
 
     public function receive(GoodsReceipt $receipt, User $user): GoodsReceipt
     {
-        if ($receipt->status === GoodsReceiptStatus::Received || $receipt->status === GoodsReceiptStatus::Closed) {
+        if ($receipt->posted_at || $receipt->status === GoodsReceiptStatus::Received || $receipt->status === GoodsReceiptStatus::Closed) {
             return $receipt;
         }
 
         return DB::transaction(function () use ($receipt, $user): GoodsReceipt {
-            $receipt->load(['items.purchaseOrderItem', 'purchaseOrder.items', 'supplier']);
+            $receipt = GoodsReceipt::query()->with(['items.purchaseOrderItem', 'items.product', 'purchaseOrder.items', 'supplier'])->lockForUpdate()->findOrFail($receipt->id);
+            if ($receipt->posted_at) {
+                return $receipt;
+            }
 
             foreach ($receipt->items as $item) {
                 if ((float) $item->accepted_quantity <= 0) {
                     continue;
                 }
+
+                $batch = $this->recordBatch($receipt, $item);
 
                 $this->stockService->recordPurchaseReceipt($user, [
                     'branch_id' => $receipt->branch_id,
@@ -114,6 +149,7 @@ class GoodsReceiptService
                     'product_id' => $item->product_id,
                     'quantity' => $item->accepted_quantity,
                     'unit_cost' => $item->unit_cost,
+                    'inventory_batch_id' => $batch?->id,
                     'reference_type' => GoodsReceipt::class,
                     'reference_id' => $receipt->id,
                     'reason' => 'Goods receipt '.$receipt->grn_number,
@@ -147,6 +183,8 @@ class GoodsReceiptService
                 'status' => $status,
                 'checked_by' => $user->id,
                 'checked_at' => now(),
+                'posted_by' => $user->id,
+                'posted_at' => now(),
             ]);
 
             if ($receipt->purchaseOrder) {
@@ -171,5 +209,44 @@ class GoodsReceiptService
 
             return $receipt->refresh()->load(['supplier', 'warehouse', 'purchaseOrder.items', 'items.product']);
         });
+    }
+
+    private function recordBatch(GoodsReceipt $receipt, GoodsReceiptItem $item): ?InventoryBatch
+    {
+        $product = $item->product ?? Product::query()->findOrFail($item->product_id);
+        if (! $product->track_batches || blank($item->batch_number)) {
+            return null;
+        }
+
+        $query = InventoryBatch::query()
+            ->where('company_id', $receipt->company_id)
+            ->where('product_id', $item->product_id)
+            ->where('warehouse_id', $receipt->warehouse_id)
+            ->where('batch_number', $item->batch_number)
+            ->lockForUpdate();
+        $item->stock_location_id ? $query->where('stock_location_id', $item->stock_location_id) : $query->whereNull('stock_location_id');
+        $batch = $query->first();
+        if (! $batch) {
+            $batch = InventoryBatch::create([
+                'company_id' => $receipt->company_id,
+                'product_id' => $item->product_id,
+                'warehouse_id' => $receipt->warehouse_id,
+                'stock_location_id' => $item->stock_location_id,
+                'batch_number' => $item->batch_number,
+                'manufactured_at' => $item->manufacture_date,
+                'expires_at' => $item->expiry_date,
+                'quantity_on_hand' => 0,
+                'quantity_available' => 0,
+                'unit_cost' => $item->unit_cost,
+                'supplier_reference' => (string) $receipt->supplier_id,
+                'receipt_reference' => $receipt->grn_number,
+                'status' => 'active',
+            ]);
+        }
+        $batch->increment('quantity_on_hand', $item->accepted_quantity);
+        $batch->increment('quantity_available', $item->accepted_quantity);
+        $item->update(['inventory_batch_id' => $batch->id]);
+
+        return $batch->refresh();
     }
 }

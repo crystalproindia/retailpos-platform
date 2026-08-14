@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'supplier_id', 'purchase_order_id', 'grn_number', 'receipt_date', 'status', 'received_by', 'checked_by', 'checked_at', 'supplier_invoice_number', 'supplier_invoice_date', 'notes'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'supplier_id', 'purchase_order_id', 'grn_number', 'idempotency_key', 'receipt_date', 'status', 'received_by', 'checked_by', 'posted_by', 'checked_at', 'posted_at', 'supplier_invoice_number', 'supplier_invoice_date', 'notes'])]
 class GoodsReceipt extends Model
 {
     use Auditable, SoftDeletes;
@@ -25,6 +25,7 @@ class GoodsReceipt extends Model
             'status' => GoodsReceiptStatus::class,
             'receipt_date' => 'date',
             'checked_at' => 'datetime',
+            'posted_at' => 'datetime',
             'supplier_invoice_date' => 'date',
         ];
     }
@@ -57,6 +58,11 @@ class GoodsReceipt extends Model
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function poster(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'posted_by');
     }
 
     public function items(): HasMany

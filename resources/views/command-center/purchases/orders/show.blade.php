@@ -16,6 +16,9 @@
             <form method="POST" action="{{ route('purchases.orders.submit', $order) }}">@csrf<button class="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700">Submit</button></form>
             <form method="POST" action="{{ route('purchases.orders.approve', $order) }}">@csrf<button class="rounded-md border border-teal-300 px-3 py-2 text-sm text-teal-700 dark:border-teal-800 dark:text-teal-200">Approve</button></form>
             <form method="POST" action="{{ route('purchases.orders.send', $order) }}">@csrf<button class="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white dark:bg-teal-300 dark:text-slate-950">Mark sent</button></form>
+            @if (in_array($order->status->value, ['approved', 'sent']))
+                <form method="POST" action="{{ route('purchases.orders.supplier-confirm', $order) }}">@csrf<button class="rounded-md border border-sky-300 px-3 py-2 text-sm text-sky-700 dark:border-sky-800 dark:text-sky-200">Supplier confirmed</button></form>
+            @endif
             <form method="POST" action="{{ route('purchases.orders.cancel', $order) }}">@csrf<button class="rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:text-rose-200">Cancel</button></form>
         </div>
     </div>

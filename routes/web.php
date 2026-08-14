@@ -1006,6 +1006,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::post('requests/{purchaseRequest}/submit', [PurchaseRequestController::class, 'submit'])->middleware('can:purchases.requests.update')->name('requests.submit');
         Route::post('requests/{purchaseRequest}/approve', [PurchaseRequestController::class, 'approve'])->middleware('can:purchases.requests.approve')->name('requests.approve');
         Route::post('requests/{purchaseRequest}/reject', [PurchaseRequestController::class, 'reject'])->middleware('can:purchases.requests.reject')->name('requests.reject');
+        Route::post('requests/{purchaseRequest}/duplicate', [PurchaseRequestController::class, 'duplicate'])->middleware('can:purchases.requests.create')->name('requests.duplicate');
         Route::post('requests/{purchaseRequest}/convert', [PurchaseRequestController::class, 'convert'])->middleware('can:purchases.requests.convert')->name('requests.convert');
 
         Route::get('orders', [PurchaseOrderController::class, 'index'])->middleware('can:purchases.orders.view')->name('orders.index');
@@ -1016,6 +1017,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::post('orders/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit'])->middleware('can:purchases.orders.update')->name('orders.submit');
         Route::post('orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->middleware('can:purchases.orders.approve')->name('orders.approve');
         Route::post('orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send'])->middleware('can:purchases.orders.send')->name('orders.send');
+        Route::post('orders/{purchaseOrder}/supplier-confirm', [PurchaseOrderController::class, 'supplierConfirm'])->middleware('can:purchases.orders.update')->name('orders.supplier-confirm');
         Route::post('orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('can:purchases.orders.cancel')->name('orders.cancel');
 
         Route::get('grn', [GoodsReceiptController::class, 'index'])->middleware('can:purchases.grn.view')->name('grn.index');

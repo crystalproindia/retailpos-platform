@@ -8,6 +8,8 @@ use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseRequest;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\Purchases\Supplier;
+use App\Models\Purchases\PurchaseInvoice;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class PurchaseDashboardService
@@ -59,6 +61,33 @@ class PurchaseDashboardService
                 ->orderByDesc(DB::raw('SUM(purchase_orders.grand_total)'))
                 ->limit(6)
                 ->get(['suppliers.name', DB::raw('SUM(purchase_orders.grand_total) as value')]),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function metricsForUser(User $user): array
+    {
+        $scope = app(PurchaseAccessService::class);
+        $requests = $scope->scope(PurchaseRequest::query(), $user);
+        $orders = $scope->scope(PurchaseOrder::query(), $user);
+        $receipts = $scope->scope(GoodsReceipt::query(), $user);
+        $invoices = $scope->scope(PurchaseInvoice::query(), $user);
+
+        return [
+            'cards' => [
+                ['label' => 'Pending Requests', 'value' => (clone $requests)->where('status', 'pending_review')->count(), 'tone' => 'warning'],
+                ['label' => 'Pending Approvals', 'value' => (clone $orders)->where('status', 'pending_approval')->count(), 'tone' => 'warning'],
+                ['label' => 'Open POs', 'value' => (clone $orders)->whereIn('status', ['approved', 'sent', 'supplier_confirmed', 'partially_received'])->count(), 'tone' => 'info'],
+                ['label' => 'Due Deliveries', 'value' => (clone $orders)->whereIn('status', ['sent', 'supplier_confirmed'])->whereDate('expected_delivery_date', '<=', today())->count(), 'tone' => 'warning'],
+                ['label' => 'Partial Receipts', 'value' => (clone $receipts)->where('status', 'partially_accepted')->count(), 'tone' => 'info'],
+                ['label' => 'Invoice Mismatches', 'value' => (clone $invoices)->where('match_status', 'exceptions')->count(), 'tone' => 'danger'],
+            ],
+            'purchaseValue' => (float) (clone $orders)->whereNotIn('status', ['cancelled'])->sum('grand_total'),
+            'pendingApprovals' => [
+                'requests' => (clone $requests)->with(['warehouse', 'requester'])->where('status', 'pending_review')->latest()->limit(5)->get(),
+                'orders' => (clone $orders)->with(['supplier', 'warehouse'])->where('status', 'pending_approval')->latest()->limit(5)->get(),
+            ],
+            'recentOrders' => (clone $orders)->with(['supplier', 'warehouse'])->latest()->limit(8)->get(),
         ];
     }
 }

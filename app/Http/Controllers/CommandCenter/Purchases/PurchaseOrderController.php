@@ -7,6 +7,7 @@ use App\Repositories\Inventory\InventoryLookupRepository;
 use App\Repositories\Inventory\ProductRepository;
 use App\Repositories\Purchases\PurchaseOrderRepository;
 use App\Repositories\Purchases\SupplierRepository;
+use App\Services\Inventory\InventoryLocationAccessService;
 use App\Services\Purchases\PurchaseOrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,21 +16,21 @@ use Illuminate\View\View;
 
 class PurchaseOrderController extends Controller
 {
-    public function index(Request $request, PurchaseOrderRepository $orders, SupplierRepository $suppliers, InventoryLookupRepository $lookups): View
+    public function index(Request $request, PurchaseOrderRepository $orders, SupplierRepository $suppliers, InventoryLookupRepository $lookups, InventoryLocationAccessService $access): View
     {
         return view('command-center.purchases.orders.index', [
-            'orders' => $orders->paginateForCompany($request->user()->company_id, $request->only(['search', 'status', 'supplier_id', 'warehouse_id'])),
+            'orders' => $orders->paginateForUser($request->user(), $request->only(['search', 'status', 'supplier_id', 'warehouse_id'])),
             'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
-            'warehouses' => $lookups->formOptions($request->user()->company_id)['warehouses'],
+            'warehouses' => $access->accessibleWarehouses($request->user()),
         ]);
     }
 
-    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, InventoryLookupRepository $lookups): View
+    public function create(Request $request, ProductRepository $products, SupplierRepository $suppliers, InventoryLookupRepository $lookups, InventoryLocationAccessService $access): View
     {
         return view('command-center.purchases.orders.create', [
             'products' => $products->activeForCompany($request->user()->company_id),
             'suppliers' => $suppliers->activeForCompany($request->user()->company_id),
-            'warehouses' => $lookups->formOptions($request->user()->company_id)['warehouses'],
+            'warehouses' => $access->accessibleWarehouses($request->user()),
         ]);
     }
 
@@ -43,34 +44,42 @@ class PurchaseOrderController extends Controller
     public function show(Request $request, PurchaseOrderRepository $orders, int $purchaseOrder): View
     {
         return view('command-center.purchases.orders.show', [
-            'order' => $orders->findForCompany($request->user()->company_id, $purchaseOrder),
+            'order' => $orders->findForUser($request->user(), $purchaseOrder),
         ]);
     }
 
     public function submit(Request $request, PurchaseOrderService $service, PurchaseOrderRepository $orders, int $purchaseOrder): RedirectResponse
     {
-        $service->submit($orders->findForCompany($request->user()->company_id, $purchaseOrder), $request->user());
+        $service->submit($orders->findForUser($request->user(), $purchaseOrder), $request->user());
 
         return back()->with('status', 'Purchase order submitted.');
     }
 
     public function approve(Request $request, PurchaseOrderService $service, PurchaseOrderRepository $orders, int $purchaseOrder): RedirectResponse
     {
-        $service->approve($orders->findForCompany($request->user()->company_id, $purchaseOrder), $request->user());
+        $service->approve($orders->findForUser($request->user(), $purchaseOrder), $request->user());
 
         return back()->with('status', 'Purchase order approved.');
     }
 
     public function send(Request $request, PurchaseOrderService $service, PurchaseOrderRepository $orders, int $purchaseOrder): RedirectResponse
     {
-        $service->markSent($orders->findForCompany($request->user()->company_id, $purchaseOrder), $request->user());
+        $service->markSent($orders->findForUser($request->user(), $purchaseOrder), $request->user());
 
         return back()->with('status', 'Purchase order marked sent.');
     }
 
+    public function supplierConfirm(Request $request, PurchaseOrderService $service, PurchaseOrderRepository $orders, int $purchaseOrder): RedirectResponse
+    {
+        $validated = $request->validate(['reference' => ['nullable', 'string', 'max:120']]);
+        $service->markSupplierConfirmed($orders->findForUser($request->user(), $purchaseOrder), $request->user(), $validated['reference'] ?? null);
+
+        return back()->with('status', 'Supplier confirmation recorded.');
+    }
+
     public function cancel(Request $request, PurchaseOrderService $service, PurchaseOrderRepository $orders, int $purchaseOrder): RedirectResponse
     {
-        $service->cancel($orders->findForCompany($request->user()->company_id, $purchaseOrder), $request->user());
+        $service->cancel($orders->findForUser($request->user(), $purchaseOrder), $request->user());
 
         return back()->with('status', 'Purchase order cancelled.');
     }
@@ -78,7 +87,7 @@ class PurchaseOrderController extends Controller
     public function print(Request $request, PurchaseOrderRepository $orders, int $purchaseOrder): View
     {
         return view('command-center.purchases.orders.print', [
-            'order' => $orders->findForCompany($request->user()->company_id, $purchaseOrder),
+            'order' => $orders->findForUser($request->user(), $purchaseOrder),
         ]);
     }
 

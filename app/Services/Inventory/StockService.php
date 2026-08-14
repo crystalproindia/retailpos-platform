@@ -256,6 +256,8 @@ class StockService
                 'branch_id' => $warehouse->branch_id,
                 'warehouse_id' => $warehouse->id,
                 'stock_location_id' => $locationId,
+                'inventory_batch_id' => $data['inventory_batch_id'] ?? null,
+                'inventory_serial_number_id' => $data['inventory_serial_number_id'] ?? null,
                 'product_id' => $product->id,
                 'movement_type' => $movementType,
                 'direction' => $direction,

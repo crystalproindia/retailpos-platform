@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'supplier_id', 'purchase_request_id', 'po_number', 'status', 'order_date', 'expected_delivery_date', 'currency', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'grand_total', 'payment_terms', 'notes', 'internal_notes', 'created_by', 'approved_by', 'approved_at', 'sent_at', 'cancelled_by', 'cancelled_at'])]
+#[Fillable(['company_id', 'branch_id', 'warehouse_id', 'supplier_id', 'purchase_request_id', 'po_number', 'status', 'order_date', 'expected_delivery_date', 'currency', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'grand_total', 'payment_terms', 'notes', 'internal_notes', 'created_by', 'approved_by', 'approved_at', 'sent_at', 'supplier_confirmed_at', 'supplier_confirmation_reference', 'cancelled_by', 'cancelled_at'])]
 class PurchaseOrder extends Model
 {
     use Auditable, SoftDeletes;
@@ -32,6 +32,7 @@ class PurchaseOrder extends Model
             'grand_total' => 'decimal:2',
             'approved_at' => 'datetime',
             'sent_at' => 'datetime',
+            'supplier_confirmed_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
     }

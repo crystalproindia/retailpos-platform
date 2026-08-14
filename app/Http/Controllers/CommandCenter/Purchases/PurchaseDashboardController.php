@@ -12,7 +12,7 @@ class PurchaseDashboardController extends Controller
     public function __invoke(Request $request, PurchaseDashboardService $dashboard): View
     {
         return view('command-center.purchases.dashboard', [
-            'dashboard' => $dashboard->metrics($request->user()->company_id),
+            'dashboard' => $dashboard->metricsForUser($request->user()),
         ]);
     }
 }

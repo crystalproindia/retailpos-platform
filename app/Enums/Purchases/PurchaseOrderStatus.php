@@ -8,6 +8,7 @@ enum PurchaseOrderStatus: string
     case PendingApproval = 'pending_approval';
     case Approved = 'approved';
     case Sent = 'sent';
+    case SupplierConfirmed = 'supplier_confirmed';
     case PartiallyReceived = 'partially_received';
     case Received = 'received';
     case Cancelled = 'cancelled';

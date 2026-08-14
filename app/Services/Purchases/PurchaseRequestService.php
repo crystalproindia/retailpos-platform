@@ -13,7 +13,9 @@ use App\Models\Purchases\SupplierProduct;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Events\DomainEventDispatcher;
+use App\Services\Inventory\InventoryLocationAccessService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseRequestService
 {
@@ -21,6 +23,7 @@ class PurchaseRequestService
         private readonly PurchaseNumberService $numbers,
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
+        private readonly InventoryLocationAccessService $locations,
     ) {}
 
     /**
@@ -29,10 +32,13 @@ class PurchaseRequestService
     public function create(User $user, array $data): PurchaseRequest
     {
         return DB::transaction(function () use ($user, $data): PurchaseRequest {
+            $warehouse = ! empty($data['warehouse_id'])
+                ? $this->locations->authorize($user, (int) $data['warehouse_id'])
+                : null;
             $request = PurchaseRequest::create([
                 'company_id' => $user->company_id,
-                'branch_id' => $user->branch_id,
-                'warehouse_id' => $data['warehouse_id'] ?? null,
+                'branch_id' => $warehouse?->branch_id ?? $user->branch_id,
+                'warehouse_id' => $warehouse?->id,
                 'request_number' => $this->numbers->next($user->company_id, 'pr'),
                 'source_type' => $data['source_type'] ?? PurchaseSourceType::Manual->value,
                 'source_id' => $data['source_id'] ?? null,
@@ -56,38 +62,66 @@ class PurchaseRequestService
 
     public function submit(PurchaseRequest $request, User $user): PurchaseRequest
     {
-        $from = $request->status->value;
-        $request->update(['status' => PurchaseRequestStatus::PendingReview->value]);
-        $this->approvalLog($request, $user, 'submitted', $from, PurchaseRequestStatus::PendingReview->value);
-        $this->auditLogger->record('purchase.request.submitted', $request, 'Purchase request submitted');
-        $this->dispatch('purchase.request.submitted', $request, $user, ['request_number' => $request->request_number]);
+        return DB::transaction(function () use ($request, $user): PurchaseRequest {
+            $request = PurchaseRequest::query()->lockForUpdate()->findOrFail($request->id);
+            if ($request->status !== PurchaseRequestStatus::Draft) {
+                throw ValidationException::withMessages(['status' => 'Only a draft purchase request can be submitted.']);
+            }
+            $from = $request->status->value;
+            $request->update(['status' => PurchaseRequestStatus::PendingReview->value, 'submitted_at' => now()]);
+            $this->approvalLog($request, $user, 'submitted', $from, PurchaseRequestStatus::PendingReview->value);
+            $this->auditLogger->record('purchase.request.submitted', $request, 'Purchase request submitted');
+            $this->dispatch('purchase.request.submitted', $request, $user, ['request_number' => $request->request_number]);
 
-        return $request->refresh();
+            return $request->refresh();
+        });
     }
 
-    public function approve(PurchaseRequest $request, User $user): PurchaseRequest
+    /** @param array<int, array{item_id:int,approved_quantity:string|int|float,approval_notes?:string|null}> $items */
+    public function approve(PurchaseRequest $request, User $user, array $items = [], ?string $comments = null): PurchaseRequest
     {
-        $from = $request->status->value;
-        $request->load('items');
-        foreach ($request->items as $item) {
-            $item->update(['approved_quantity' => $item->approved_quantity ?? $item->requested_quantity]);
-        }
+        return DB::transaction(function () use ($request, $user, $items, $comments): PurchaseRequest {
+            $request = PurchaseRequest::query()->with('items')->lockForUpdate()->findOrFail($request->id);
+            if ($request->status !== PurchaseRequestStatus::PendingReview) {
+                throw ValidationException::withMessages(['status' => 'Only a submitted purchase request can be approved.']);
+            }
 
-        $request->update([
-            'status' => PurchaseRequestStatus::Approved->value,
-            'reviewed_by' => $user->id,
-            'reviewed_at' => now(),
-        ]);
+            $decisions = collect($items)->keyBy('item_id');
+            $hasPartialApproval = false;
+            $approvedAny = false;
+            foreach ($request->items as $item) {
+                $decision = $decisions->get($item->id);
+                $quantity = $decision['approved_quantity'] ?? $item->requested_quantity;
+                if (! is_numeric($quantity) || (float) $quantity < 0 || (float) $quantity > (float) $item->requested_quantity) {
+                    throw ValidationException::withMessages(['items' => 'Approved quantities must be between zero and the requested quantity.']);
+                }
+                $approvedAny = $approvedAny || (float) $quantity > 0;
+                $hasPartialApproval = $hasPartialApproval || (float) $quantity !== (float) $item->requested_quantity;
+                $item->update([
+                    'approved_quantity' => $quantity,
+                    'approval_notes' => $decision['approval_notes'] ?? null,
+                ]);
+            }
+            if (! $approvedAny) {
+                throw ValidationException::withMessages(['items' => 'Approve at least one requested quantity or reject the request with a reason.']);
+            }
 
-        $this->approvalLog($request, $user, 'approved', $from, PurchaseRequestStatus::Approved->value);
-        $this->auditLogger->record('purchase.request.approved', $request, 'Purchase request approved');
-        $this->dispatch('purchase.request.approved', $request, $user, ['request_number' => $request->request_number]);
+            $from = $request->status->value;
+            $to = $hasPartialApproval ? PurchaseRequestStatus::PartiallyApproved : PurchaseRequestStatus::Approved;
+            $request->update(['status' => $to->value, 'reviewed_by' => $user->id, 'reviewed_at' => now()]);
+            $this->approvalLog($request, $user, 'approved', $from, $to->value, $comments);
+            $this->auditLogger->record('purchase.request.approved', $request, $hasPartialApproval ? 'Purchase request partially approved' : 'Purchase request approved');
+            $this->dispatch('purchase.request.approved', $request, $user, ['request_number' => $request->request_number, 'partial' => $hasPartialApproval]);
 
-        return $request->refresh();
+            return $request->refresh();
+        });
     }
 
     public function reject(PurchaseRequest $request, User $user, ?string $comments = null): PurchaseRequest
     {
+        if (blank($comments)) {
+            throw ValidationException::withMessages(['comments' => 'Provide a reason when rejecting a purchase request.']);
+        }
         $from = $request->status->value;
         $request->update([
             'status' => PurchaseRequestStatus::Rejected->value,
@@ -111,6 +145,26 @@ class PurchaseRequestService
         $this->dispatch('purchase.request.converted_to_po', $request, $user, ['request_number' => $request->request_number, 'purchase_order_id' => $purchaseOrderId]);
 
         return $request->refresh();
+    }
+
+    public function duplicate(PurchaseRequest $request, User $user): PurchaseRequest
+    {
+        $request->load('items');
+
+        return $this->create($user, [
+            'warehouse_id' => $request->warehouse_id,
+            'priority' => $request->priority->value,
+            'expected_by' => $request->expected_by?->toDateString(),
+            'notes' => 'Duplicated from '.$request->request_number.'. '.($request->notes ?? ''),
+            'items' => $request->items->map(fn ($item) => [
+                'product_id' => $item->product_id,
+                'supplier_id' => $item->supplier_id,
+                'requested_quantity' => $item->requested_quantity,
+                'estimated_price' => $item->estimated_price,
+                'expected_by' => $item->expected_by?->toDateString(),
+                'notes' => $item->notes,
+            ])->all(),
+        ]);
     }
 
     /**

@@ -15,6 +15,7 @@ class PurchaseInvoiceService
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly PurchaseNumberService $numbers,
+        private readonly PurchaseInvoiceMatchingService $matching,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -80,7 +81,7 @@ class PurchaseInvoiceService
 
             $this->audit->record('purchase.invoice.created', $invoice, 'Purchase invoice created from GRN lines.');
 
-            return $invoice->load(['supplier', 'items']);
+            return $this->matching->reconcile($invoice, $user)->load(['supplier', 'items']);
         });
     }
 
@@ -163,7 +164,9 @@ class PurchaseInvoiceService
                     ->where('goods_receipt_item_id', $receiptItem->id)
                     ->sum(fn ($line) => $this->mills($line->quantity));
                 $remaining = $this->mills($receiptItem->accepted_quantity) - $alreadyInvoiced;
-                if ($quantityMills > $remaining && ! $user->can('purchase-invoices.override-quantity')) {
+                // Preserve a first supplier document for review when it exceeds accepted stock, but never allow
+                // repeated invoice lines to consume the same accepted quantity without an explicit override.
+                if ($quantityMills > $remaining && $alreadyInvoiced > 0 && ! $user->can('purchase-invoices.override-quantity')) {
                     throw ValidationException::withMessages(['items' => 'A GRN line cannot be invoiced above its accepted, uninvoiced quantity.']);
                 }
             }

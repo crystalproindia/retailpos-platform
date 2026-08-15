@@ -10,13 +10,17 @@ use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Compliance\GstSetting;
 use App\Models\Crm\CrmInvoice;
-use App\Models\Crm\CrmQuotation;
+use App\Models\Crm\CrmLead;
+use App\Models\Crm\CrmLeadSource;
+use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmProformaInvoice;
+use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Services\Branding\CompanyBrandingService;
 use App\Services\Crm\DocumentTaxModeService;
 use App\Services\Crm\InvoiceService;
 use App\Services\Crm\InvoiceTemplateService;
+use App\Services\Crm\QuotationService;
 use App\Services\Crm\SalesDocumentNumberService;
 use App\Support\Invoices\InvoiceTemplateRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -100,12 +104,22 @@ class AdvancedInvoiceCustomizationTest extends TestCase
         $registry = app(InvoiceTemplateRegistry::class);
         $definitions = $registry->all();
 
-        $this->assertGreaterThanOrEqual(40, count($definitions));
+        $this->assertCount(44, $definitions);
         $this->assertSame(array_keys($definitions), array_unique(array_keys($definitions)));
+        $catalogSignatures = [];
         foreach ($definitions as $definition) {
             $this->assertContains($definition['paper_format'], InvoiceTemplateRegistry::FORMATS);
+            $this->assertSame(['gst', 'no_gst'], $definition['tax_modes']);
+            $this->assertTrue($definition['supports_signature']);
             $this->assertTrue(view()->exists($definition['view']));
+            $catalogSignatures[] = implode('|', [
+                $definition['label'],
+                $definition['paper_format'],
+                $definition['style'],
+                $definition['variant'],
+            ]);
         }
+        $this->assertSame($catalogSignatures, array_values(array_unique($catalogSignatures)));
     }
 
     public function test_document_numbering_settings_are_tenant_isolated_and_reject_unsafe_prefixes(): void
@@ -182,6 +196,45 @@ class AdvancedInvoiceCustomizationTest extends TestCase
         $this->assertStringNotContainsString('GST summary', $output);
     }
 
+    public function test_quote_to_invoice_conversion_revalidates_no_gst_eligibility(): void
+    {
+        $user = $this->manager();
+        $lead = CrmLead::query()->findOrFail($this->leadId($user));
+        $gst = GstSetting::create([
+            'company_id' => $user->company_id,
+            'legal_name' => $user->company->name,
+            'registration_type' => 'exempt',
+        ]);
+        $quotation = app(QuotationService::class)->create($lead, $user, [
+            'title' => 'No-GST eligibility review',
+            'customer_name' => 'Historical Customer',
+            'currency' => 'INR',
+            'tax_mode' => 'no_gst',
+            'items' => [[
+                'name' => 'Exempt service',
+                'quantity' => '1',
+                'unit_price' => '100.00',
+                'tax_rate' => '18',
+            ]],
+        ]);
+        $quotation->update(['status' => 'accepted']);
+        $gst->update(['registration_type' => 'regular']);
+
+        try {
+            app(InvoiceService::class)->createFromQuotation($quotation->refresh(), $user);
+            $this->fail('Conversion must revalidate the current company GST eligibility.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('tax_mode', $exception->errors());
+        }
+
+        $this->assertDatabaseMissing('crm_invoices', ['quotation_id' => $quotation->id]);
+        $this->assertDatabaseHas('crm_quotations', [
+            'id' => $quotation->id,
+            'tax_mode' => 'no_gst',
+            'tax_total' => 0,
+        ]);
+    }
+
     private function manager(): User
     {
         $company = Company::factory()->create(['industry' => 'general_retail']);
@@ -192,10 +245,10 @@ class AdvancedInvoiceCustomizationTest extends TestCase
 
     private function leadId(User $user): int
     {
-        $source = \App\Models\Crm\CrmLeadSource::create(['company_id' => $user->company_id, 'name' => 'Website', 'slug' => 'website', 'is_active' => true]);
-        $status = \App\Models\Crm\CrmLeadStatus::create(['company_id' => $user->company_id, 'name' => 'New', 'slug' => 'new', 'stage_type' => LeadStageType::New, 'is_active' => true]);
+        $source = CrmLeadSource::create(['company_id' => $user->company_id, 'name' => 'Website', 'slug' => 'website', 'is_active' => true]);
+        $status = CrmLeadStatus::create(['company_id' => $user->company_id, 'name' => 'New', 'slug' => 'new', 'stage_type' => LeadStageType::New, 'is_active' => true]);
 
-        return \App\Models\Crm\CrmLead::create([
+        return CrmLead::create([
             'company_id' => $user->company_id,
             'branch_id' => $user->branch_id,
             'source_id' => $source->id,

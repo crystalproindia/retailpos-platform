@@ -7,6 +7,14 @@ proformas; server-authoritative GST and No-GST document modes; private image
 signature storage; authorized-signatory snapshots; and a 44-design invoice
 registry across A4, A5, Thermal 80mm, and Thermal 58mm output.
 
+The 44 designs are intentionally recomposed through corporate, retail,
+minimal, professional, creative, industry, A5, and thermal families. Shared
+rendering primitives retain GST and totals consistency, while each variant has
+its own masthead, metadata treatment, table rhythm, totals emphasis, and
+footer composition. Thermal 58mm omits the image-signature block to preserve
+readability on the narrow roll; this limitation is exposed in registry
+metadata.
+
 It preserves existing document numbers, GST records, payments, purchasing,
 stock, and Phase S behaviour. A prefix change applies only to the next number
 issued for that tenant and document type. It does not rewrite history.

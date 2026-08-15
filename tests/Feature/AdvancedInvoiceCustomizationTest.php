@@ -110,7 +110,7 @@ class AdvancedInvoiceCustomizationTest extends TestCase
         foreach ($definitions as $definition) {
             $this->assertContains($definition['paper_format'], InvoiceTemplateRegistry::FORMATS);
             $this->assertSame(['gst', 'no_gst'], $definition['tax_modes']);
-            $this->assertTrue($definition['supports_signature']);
+            $this->assertSame($definition['paper_format'] !== 'thermal_58', $definition['supports_signature']);
             $this->assertTrue(view()->exists($definition['view']));
             $catalogSignatures[] = implode('|', [
                 $definition['label'],
@@ -120,6 +120,72 @@ class AdvancedInvoiceCustomizationTest extends TestCase
             ]);
         }
         $this->assertSame($catalogSignatures, array_values(array_unique($catalogSignatures)));
+    }
+
+    public function test_template_variants_render_distinct_compositions_and_intentional_no_gst_output(): void
+    {
+        $user = $this->manager();
+        $invoice = CrmInvoice::create([
+            'company_id' => $user->company_id,
+            'branch_id' => $user->branch_id,
+            'invoice_number' => 'RPOS-VISUAL-CATALOG',
+            'currency' => 'INR',
+            'status' => InvoiceStatus::Issued,
+            'tax_mode' => 'no_gst',
+            'show_authorized_signature' => true,
+            'signatory_name_snapshot' => 'A. Dangal',
+            'signatory_designation_snapshot' => 'Director',
+            'taxable_total' => 125,
+            'grand_total' => 125,
+            'balance_due' => 125,
+        ]);
+        $invoice->items()->create([
+            'name' => 'Long professional service description that must wrap without clipping on compact paper',
+            'quantity' => 1,
+            'unit_price' => 125,
+            'line_subtotal' => 125,
+            'line_total' => 125,
+        ]);
+
+        $invoice->load(['company', 'items']);
+        $templates = app(InvoiceTemplateService::class);
+        $baseRender = $templates->renderData($invoice);
+        $fingerprints = [];
+
+        foreach (app(InvoiceTemplateRegistry::class)->all() as $key => $definition) {
+            $render = $baseRender;
+            $render['template'] = $definition;
+            $render['setting'] = clone $baseRender['setting'];
+            $render['setting']->forceFill([
+                'template_key' => $key,
+                'paper_format' => $definition['paper_format'],
+                'gst_presentation' => $definition['gst_detail'],
+            ]);
+
+            $markup = view($definition['view'], compact('invoice', 'render'))->render();
+            $body = str($markup)->after('</style>')->toString();
+            $fingerprints[$key] = hash('sha256', $markup);
+
+            $this->assertStringNotContainsString('TAX INVOICE', $body, $key);
+            $this->assertStringNotContainsString('GSTIN', $body, $key);
+            $this->assertStringNotContainsString('GST summary', $body, $key);
+
+            if (str_starts_with($definition['view'], 'invoice-templates.layouts.')) {
+                $this->assertStringContainsString('variant-'.$definition['variant'], $markup, $key);
+            }
+
+            if ($definition['supports_signature']) {
+                $this->assertStringContainsString('A. Dangal', $body, $key);
+            } else {
+                $this->assertStringNotContainsString('A. Dangal', $body, $key);
+            }
+
+            if (str_starts_with($definition['paper_format'], 'thermal_')) {
+                $this->assertStringContainsString('Long professional service description that must wrap without clipping on compact paper', $body, $key);
+            }
+        }
+
+        $this->assertCount(44, array_unique($fingerprints));
     }
 
     public function test_document_numbering_settings_are_tenant_isolated_and_reject_unsafe_prefixes(): void

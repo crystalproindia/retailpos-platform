@@ -111,7 +111,7 @@ class InvoiceTemplateRegistry
             'style' => $style,
             'gst_detail' => $gstDetail,
             'tax_modes' => ['gst', 'no_gst'],
-            'supports_signature' => true,
+            'supports_signature' => $paperFormat !== 'thermal_58',
             'description' => $description,
             'businesses' => $description,
             'view' => $view,

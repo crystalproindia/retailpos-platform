@@ -85,7 +85,11 @@ class InvoicePdfService
     {
         $rows = $invoice->items->count();
         $taxRows = count($render['tax_rows'] ?? []);
+        $charactersPerLine = ($render['setting']->paper_format ?? null) === 'thermal_58' ? 22 : 34;
+        $wrappedLines = $invoice->items->sum(
+            fn ($item): int => max(0, (int) ceil(mb_strlen((string) $item->name) / $charactersPerLine) - 1),
+        );
 
-        return min(7200.0, max(576.0, 280.0 + ($rows * 22.0) + ($taxRows * 20.0)));
+        return min(7200.0, max(576.0, 280.0 + ($rows * 22.0) + ($wrappedLines * 11.0) + ($taxRows * 20.0)));
     }
 }

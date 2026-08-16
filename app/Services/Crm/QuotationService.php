@@ -33,6 +33,7 @@ class QuotationService
         private readonly SalesDocumentNumberService $numbers,
         private readonly DocumentTaxModeService $taxModes,
         private readonly CompanyBrandingService $branding,
+        private readonly SalesDocumentPresentationService $presentations,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -41,7 +42,7 @@ class QuotationService
         return DB::transaction(function () use ($lead, $user, $data): CrmQuotation {
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $calculation = $this->calculate($data['items'], $taxMode);
-            $quotation = CrmQuotation::create($this->quotationPayload($lead, $user, $data, $calculation) + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + [
+            $quotation = CrmQuotation::create($this->quotationPayload($lead, $user, $data, $calculation) + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::QUOTATION) + [
                 'quotation_number' => $this->numbers->nextQuotationNumber($lead->company_id),
                 'tax_mode' => $taxMode,
                 'status' => QuotationStatus::Draft,
@@ -76,7 +77,7 @@ class QuotationService
         return DB::transaction(function () use ($quotation, $user, $data): CrmQuotation {
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? $quotation->tax_mode);
             $calculation = $this->calculate($data['items'], $taxMode);
-            $quotation->update($this->quotationPayload($quotation->lead()->firstOrFail(), $user, $data, $calculation) + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $quotation->show_authorized_signature)) + [
+            $quotation->update($this->quotationPayload($quotation->lead()->firstOrFail(), $user, $data, $calculation) + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $quotation->show_authorized_signature)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::QUOTATION) + [
                 'tax_mode' => $taxMode,
                 'updated_by' => $user->id,
             ]);
@@ -255,7 +256,7 @@ class QuotationService
     }
 
     /** @param array<string, mixed> $data
-     * @param array{subtotal: float, discount_total: float, tax_total: float, grand_total: float, items: array<int, array<string, mixed>>} $calculation
+     * @param  array{subtotal: float, discount_total: float, tax_total: float, grand_total: float, items: array<int, array<string, mixed>>}  $calculation
      * @return array<string, mixed>
      */
     private function quotationPayload(CrmLead $lead, User $user, array $data, array $calculation): array

@@ -9,7 +9,10 @@ use Barryvdh\DomPDF\PDF as DompdfDocument;
 
 class QuotationPdfService
 {
-    public function __construct(private readonly CompanyBrandingService $branding) {}
+    public function __construct(
+        private readonly CompanyBrandingService $branding,
+        private readonly SalesDocumentPresentationService $presentations,
+    ) {}
 
     public function document(CrmQuotation $quotation): DompdfDocument
     {
@@ -17,6 +20,7 @@ class QuotationPdfService
             'quotation' => $quotation->loadMissing('company'),
             'isGst' => $quotation->tax_mode !== DocumentTaxModeService::NO_GST,
             'signature' => $this->branding->signatureForPath($quotation->signature_path_snapshot, $quotation->signatory_name_snapshot, $quotation->signatory_designation_snapshot),
+            'presentation' => $this->presentations->forDocument($quotation, SalesDocumentPresentationService::QUOTATION),
         ])
             ->setPaper('a4');
     }

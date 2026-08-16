@@ -9,7 +9,10 @@ use Barryvdh\DomPDF\PDF as DompdfDocument;
 
 class ProformaPdfService
 {
-    public function __construct(private readonly CompanyBrandingService $branding) {}
+    public function __construct(
+        private readonly CompanyBrandingService $branding,
+        private readonly SalesDocumentPresentationService $presentations,
+    ) {}
 
     public function document(CrmProformaInvoice $proforma): DompdfDocument
     {
@@ -19,6 +22,7 @@ class ProformaPdfService
             'proforma' => $proforma,
             'isGst' => $proforma->tax_mode !== DocumentTaxModeService::NO_GST,
             'signature' => $this->branding->signatureForPath($proforma->signature_path_snapshot, $proforma->signatory_name_snapshot, $proforma->signatory_designation_snapshot),
+            'presentation' => $this->presentations->forDocument($proforma, SalesDocumentPresentationService::PROFORMA),
         ])
             ->setPaper('a4');
     }

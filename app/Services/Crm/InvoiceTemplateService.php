@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Branding\CompanyBrandingService;
 use App\Support\Invoices\InvoiceTemplateRegistry;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 class InvoiceTemplateService
 {
@@ -33,6 +35,8 @@ class InvoiceTemplateService
         private readonly InvoiceBalancePresentationService $balances,
         private readonly InvoicePaymentQrService $paymentQr,
         private readonly CompanyBrandingService $branding,
+        private readonly SalesDocumentPresentationService $presentations,
+        private readonly InvoiceWatermarkService $watermarks,
         private readonly AuditLogger $audit,
         private readonly InvoiceTemplateRegistry $registry,
     ) {}
@@ -64,8 +68,13 @@ class InvoiceTemplateService
     }
 
     /** @param array<string,mixed> $data */
-    public function update(Company $company, User $user, array $data): InvoiceTemplateSetting
-    {
+    public function update(
+        Company $company,
+        User $user,
+        array $data,
+        ?UploadedFile $watermark = null,
+        bool $removeWatermark = false,
+    ): InvoiceTemplateSetting {
         $setting = $this->setting($company);
         $templateKey = (string) $data['template_key'];
         if (! $this->registry->has($templateKey)) {
@@ -77,12 +86,55 @@ class InvoiceTemplateService
             : $definition['paper_format'];
         $orientations = $this->registry->orientations($templateKey, $paperFormat);
         $orientation = in_array($data['orientation'] ?? 'portrait', $orientations, true) ? $data['orientation'] : 'portrait';
-        $setting->update([
-            'template_key' => $templateKey, 'paper_format' => $paperFormat, 'brand_color' => $data['brand_color'], 'copy_label' => $data['copy_label'],
-            'orientation' => $orientation, 'gst_presentation' => $data['gst_presentation'] ?? $setting->gst_presentation ?? 'detailed', 'payment_qr_uri' => $data['payment_qr_uri'] ?? null,
-            'options' => array_replace($this->defaultOptions(), $data['options'] ?? []), 'updated_by' => $user->id,
-        ]);
-        $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', ['company_id' => $company->id, 'template_key' => $setting->template_key, 'paper_format' => $setting->paper_format]);
+        $previousWatermark = $setting->watermark_path;
+        $newWatermark = $watermark ? $this->watermarks->store($watermark, $company->id) : null;
+
+        try {
+            DB::transaction(function () use ($setting, $data, $user, $company, $templateKey, $paperFormat, $orientation, $newWatermark, $removeWatermark, $previousWatermark): void {
+                $setting->update([
+                    'template_key' => $templateKey,
+                    'paper_format' => $paperFormat,
+                    'brand_color' => $data['brand_color'],
+                    'copy_label' => $data['copy_label'],
+                    'orientation' => $orientation,
+                    'gst_presentation' => $data['gst_presentation'] ?? $setting->gst_presentation ?? 'detailed',
+                    'payment_qr_uri' => $data['payment_qr_uri'] ?? null,
+                    'account_holder_name' => array_key_exists('account_holder_name', $data) ? $data['account_holder_name'] : $setting->account_holder_name,
+                    'bank_name' => array_key_exists('bank_name', $data) ? $data['bank_name'] : $setting->bank_name,
+                    'account_number' => array_key_exists('account_number', $data) ? $data['account_number'] : $setting->account_number,
+                    'ifsc_code' => array_key_exists('ifsc_code', $data) ? strtoupper((string) $data['ifsc_code']) ?: null : $setting->ifsc_code,
+                    'bank_branch_name' => array_key_exists('bank_branch_name', $data) ? $data['bank_branch_name'] : $setting->bank_branch_name,
+                    'swift_bic' => array_key_exists('swift_bic', $data) ? strtoupper((string) $data['swift_bic']) ?: null : $setting->swift_bic,
+                    'upi_id' => array_key_exists('upi_id', $data) ? $data['upi_id'] : $setting->upi_id,
+                    'payment_url' => array_key_exists('payment_url', $data) ? $data['payment_url'] : $setting->payment_url,
+                    'payment_note' => array_key_exists('payment_note', $data) ? $data['payment_note'] : $setting->payment_note,
+                    'watermark_path' => $newWatermark ?: ($removeWatermark ? null : $previousWatermark),
+                    'watermark_enabled' => $removeWatermark
+                        ? false
+                        : (array_key_exists('watermark_enabled', $data) ? (bool) $data['watermark_enabled'] : $setting->watermark_enabled),
+                    'options' => array_replace($this->defaultOptions(), $data['options'] ?? []),
+                    'updated_by' => $user->id,
+                ]);
+                $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', [
+                    'company_id' => $company->id,
+                    'template_key' => $setting->template_key,
+                    'paper_format' => $setting->paper_format,
+                    'payment_details_configured' => (bool) $setting->account_number || (bool) $setting->upi_id || (bool) $setting->payment_url,
+                    'watermark_enabled' => $setting->watermark_enabled,
+                    'watermark_changed' => (bool) $newWatermark || $removeWatermark,
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            if ($newWatermark) {
+                $this->watermarks->delete($newWatermark);
+            }
+
+            throw $exception;
+        }
+
+        if (($newWatermark || $removeWatermark) && $previousWatermark !== $newWatermark) {
+            $this->watermarks->deleteIfUnreferenced($previousWatermark);
+        }
 
         return $setting->refresh();
     }
@@ -120,6 +172,17 @@ class InvoiceTemplateService
         $balance = $this->balances->forInvoice($invoice);
         $paymentQr = $this->paymentQr->forInvoice($invoice, $setting);
 
+        $presentation = $this->presentations->forDocument(
+            $invoice,
+            SalesDocumentPresentationService::INVOICE,
+            $setting,
+            (bool) ($overrides['_preview_live_presentation'] ?? false),
+        );
+        if (($setting->paper_format ?? null) === 'thermal_58') {
+            $presentation['watermark']['enabled'] = false;
+            $presentation['watermark']['data_uri'] = null;
+        }
+
         return [
             'setting' => $setting,
             'template' => $this->registry->find($setting->template_key),
@@ -131,13 +194,15 @@ class InvoiceTemplateService
             'branding' => $this->brandingFor($invoice->company, $setting),
             'is_gst' => $invoice->tax_mode !== DocumentTaxModeService::NO_GST,
             'signature' => $this->branding->signatureForPath($invoice->signature_path_snapshot, $invoice->signatory_name_snapshot, $invoice->signatory_designation_snapshot),
+            'payment_details' => $presentation['payment_details'],
+            'watermark' => $presentation['watermark'],
         ];
     }
 
     /** @return array<string,bool> */
     public function defaultOptions(): array
     {
-        return ['show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
+        return ['show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_payment_details_on_quotation' => false, 'show_payment_details_on_proforma' => false, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
     }
 
     /** @param array<string,mixed> $overrides */

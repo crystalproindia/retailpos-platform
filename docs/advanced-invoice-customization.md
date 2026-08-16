@@ -7,6 +7,12 @@ proformas; server-authoritative GST and No-GST document modes; private image
 signature storage; authorized-signatory snapshots; and a 44-design invoice
 registry across A4, A5, Thermal 80mm, and Thermal 58mm output.
 
+Tenant invoice settings also retain reusable account/payment details and one
+private watermark image. The account number and each document payment snapshot
+use Laravel encrypted casts. New invoices, quotations, and proformas snapshot
+their enabled payment details, watermark path, and capture time; historical
+documents created before this extension intentionally remain unchanged.
+
 The 44 designs are intentionally recomposed through corporate, retail,
 minimal, professional, creative, industry, A5, and thermal families. Shared
 rendering primitives retain GST and totals consistency, while each variant has
@@ -14,6 +20,13 @@ its own masthead, metadata treatment, table rhythm, totals emphasis, and
 footer composition. Thermal 58mm omits the image-signature block to preserve
 readability on the narrow roll; this limitation is exposed in registry
 metadata.
+
+Watermarks use generated tenant-scoped private storage paths, real-image MIME
+validation, and a fixed visual treatment of 12% opacity centered behind content.
+A4, A5, and Thermal 80mm render the watermark. Thermal 58mm deliberately omits
+it and limits payment details to a compact UPI, payment-link, or account-number
+line. Replaced files remain while a historical document snapshot references
+them.
 
 It preserves existing document numbers, GST records, payments, purchasing,
 stock, and Phase S behaviour. A prefix change applies only to the next number
@@ -24,6 +37,11 @@ issued for that tenant and document type. It does not rewrite history.
 - No-GST eligibility and tax totals are determined on the server.
 - Signature uploads are private tenant-scoped PNG, JPEG, or WEBP images. They
   are visual signature images, not cryptographic digital signatures.
+- Watermark uploads accept real PNG, JPEG, or WEBP images up to 2 MB and never
+  expose their private storage path through a download route.
+- Payment visibility is independently configurable for invoices, quotations,
+  and proforma invoices. Settings changes affect newly created or subsequently
+  edited draft documents only.
 - The advanced migration is additive, uses short explicit MySQL identifiers,
   and tolerates its own partially applied foreign keys and unique index.
 - Production rollback should use a forward remediation after data is created;

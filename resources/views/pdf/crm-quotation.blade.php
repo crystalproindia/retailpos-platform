@@ -23,9 +23,19 @@
         .summary .total td { border-top: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; padding-top: 8px; }
         .footer { border-top: 1px solid #e2e8f0; color: #64748b; font-size: 8px; margin-top: 28px; padding-top: 12px; }
         .link { color: #0f766e; font-size: 8px; overflow-wrap: break-word; }
+        .invoice-watermark { height: 38%; left: 15%; opacity: .12; position: fixed; text-align: center; top: 31%; width: 70%; z-index: 0; }
+        .invoice-watermark img { height: 100%; max-width: 100%; object-fit: contain; width: auto; }
+        .invoice-watermark ~ * { position: relative; z-index: 1; }
+        .payment-details { border-top: 1px solid #cbd5e1; font-size: 8px; line-height: 1.4; margin-top: 15px; padding-top: 8px; page-break-inside: avoid; }
+        .payment-details table { margin-top: 4px; table-layout: fixed; width: 100%; }
+        .payment-details td { border: 0; padding: 1px 5px 1px 0; vertical-align: top; }
+        .payment-details td:first-child { color: #64748b; width: 28%; }
+        .payment-details-value { overflow-wrap: anywhere; word-break: break-word; }
     </style>
 </head>
 <body>
+    @php($render = ['watermark' => $presentation['watermark'], 'payment_details' => $presentation['payment_details'], 'setting' => (object) ['paper_format' => 'a4']])
+    @include('invoice-templates.partials.watermark')
     <table class="brand-table brand"><tr><td><div class="eyebrow">{{ $quotation->company?->name ?: 'RetailPOS.biz' }}</div><h1>Proposal</h1><p class="muted">{{ $isGst ? 'GST quotation' : 'Non-GST quotation' }}</p></td><td class="right"><strong>{{ $quotation->quotation_number }}</strong><br><span class="muted">Issued {{ $quotation->created_at?->format('d M Y') }}</span><br><span class="muted">Valid until {{ $quotation->valid_until?->format('d M Y') ?? 'Not specified' }}</span></td></tr></table>
 
     <table class="brand-table section"><tr><td width="50%"><h2>Prepared for</h2><strong>{{ $quotation->customer_company ?: $quotation->customer_name ?: 'Customer' }}</strong><br>{{ $quotation->customer_name }}<br>{{ $quotation->customer_email }}<br>{{ $quotation->customer_phone }}</td><td width="50%"><h2>Proposal reference</h2>{{ $quotation->title }}<br>{{ $quotation->lead?->business_name ?: $quotation->lead?->title }}@if($quotation->billing_address)<br><br><span class="muted">Billing address</span><br>{!! nl2br(e($quotation->billing_address)) !!}@endif</td></tr></table>
@@ -36,6 +46,7 @@
 
     @if($quotation->notes)<div class="panel section"><h2>Notes</h2>{!! nl2br(e($quotation->notes)) !!}</div>@endif
     @if($quotation->terms_conditions)<div class="panel section"><h2>Terms and conditions</h2>{!! nl2br(e($quotation->terms_conditions)) !!}</div>@endif
+    @include('invoice-templates.partials.payment-details')
     @if($quotation->show_authorized_signature && ($signature['data_uri'] || $signature['name']))<div class="section right"><strong>For {{ $quotation->company?->legal_name ?: $quotation->company?->name }}</strong><br>@if($signature['data_uri'])<img src="{{ $signature['data_uri'] }}" alt="Authorized signature" style="max-width:130px;max-height:52px;margin:6px 0">@else<br><br>@endif<br>@if($signature['name'])<strong>{{ $signature['name'] }}</strong><br>@endif{{ $signature['designation'] ?: 'Authorized Signatory' }}</div>@endif
     <div class="footer">RetailPOS.biz · India +91 8072682244 · Malaysia +60 104305163 · Singapore +65 92475024 · info@retailpos.biz · global@retailpos.biz</div>
 </body>

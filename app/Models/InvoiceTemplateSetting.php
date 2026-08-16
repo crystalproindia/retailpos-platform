@@ -11,9 +11,20 @@ class InvoiceTemplateSetting extends Model
 
     protected function casts(): array
     {
-        return ['options' => 'array'];
+        return [
+            'options' => 'array',
+            'watermark_enabled' => 'boolean',
+            'account_number' => 'encrypted',
+        ];
     }
 
-    public function company(): BelongsTo { return $this->belongsTo(Company::class); }
-    public function updater(): BelongsTo { return $this->belongsTo(User::class, 'updated_by'); }
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services\Crm;
 
 use App\Enums\Crm\ActivityType;
@@ -25,6 +26,7 @@ class ProformaService
         private readonly SalesDocumentNumberService $numbers,
         private readonly DocumentTaxModeService $taxModes,
         private readonly CompanyBrandingService $branding,
+        private readonly SalesDocumentPresentationService $presentations,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -33,7 +35,7 @@ class ProformaService
         return DB::transaction(function () use ($user, $data, $leadId, $customerId, $quotationId): CrmProformaInvoice {
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $calculation = $this->calc($data['items'], $taxMode);
-            $proforma = CrmProformaInvoice::create(array_merge(collect($data)->except('items')->all(), $calculation, $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)), [
+            $proforma = CrmProformaInvoice::create(array_merge(collect($data)->except('items')->all(), $calculation, $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)), $this->presentations->snapshot($user->company, SalesDocumentPresentationService::PROFORMA), [
                 'company_id' => $user->company_id,
                 'lead_id' => $leadId,
                 'customer_id' => $customerId,

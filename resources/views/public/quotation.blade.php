@@ -9,14 +9,15 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
     <main class="mx-auto max-w-4xl p-4 sm:p-8">
-        <article class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <header class="bg-slate-950 p-6 text-white sm:p-8">
+        <article class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            @include('public.partials.document-watermark')
+            <header class="relative z-10 bg-slate-950 p-6 text-white sm:p-8">
                 <div class="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
                     <div><p class="text-sm font-semibold uppercase text-teal-300">RetailPOS</p><h1 class="mt-2 text-2xl font-semibold">{{ $quotation->title }}</h1><p class="mt-2 text-sm text-slate-300">{{ $quotation->quotation_number }}</p></div>
                     <div class="text-sm text-slate-300"><p>Valid until</p><p class="mt-1 font-semibold text-white">{{ $quotation->valid_until?->format('d M Y') ?? 'No expiry specified' }}</p></div>
                 </div>
             </header>
-            <div class="p-6 sm:p-8">
+            <div class="relative z-10 p-6 sm:p-8">
                 <section class="grid gap-6 border-b border-slate-200 pb-6 sm:grid-cols-2">
                     <div><p class="text-xs font-semibold uppercase text-slate-500">Prepared for</p><p class="mt-2 font-semibold">{{ $quotation->customer_name ?? 'Customer' }}</p><p class="mt-1 text-sm text-slate-600">{{ $quotation->customer_company }}</p><p class="mt-1 text-sm text-slate-600">{{ $quotation->customer_email }}</p></div>
                     <div class="sm:text-right"><p class="text-xs font-semibold uppercase text-slate-500">Proposal total</p><p class="mt-2 text-2xl font-semibold">{{ $quotation->currency }} {{ number_format((float) $quotation->grand_total, 2) }}</p><p class="mt-1 text-sm text-slate-600">{{ $quotation->items->count() }} line items</p></div>
@@ -33,8 +34,9 @@
                 @if ($quotation->valid_until?->isPast())<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This quotation expired on {{ $quotation->valid_until->format('d M Y') }}. Please contact RetailPOS for an updated quotation.</div>@endif
                 @if ($quotation->notes)<section class="mt-8 border-t border-slate-200 pt-6"><h2 class="font-semibold">Notes</h2><p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{{ $quotation->notes }}</p></section>@endif
                 @if ($quotation->terms_conditions)<section class="mt-8 border-t border-slate-200 pt-6"><h2 class="font-semibold">Terms and conditions</h2><p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{{ $quotation->terms_conditions }}</p></section>@endif
+                @include('public.partials.payment-details')
             </div>
-            <footer class="border-t border-slate-200 bg-slate-50 p-6">
+            <footer class="relative z-10 border-t border-slate-200 bg-slate-50 p-6">
                 <div class="flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><p class="text-sm font-semibold">Questions about this quotation?</p><p class="mt-2 text-sm text-slate-600">India: +91 8072682244 · Malaysia: +60 104305163 · Singapore: +65 92475024<br>info@retailpos.biz · global@retailpos.biz</p></div><a href="{{ route('quotations.public.pdf', $publicToken) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-800">Download PDF</a></div>
                 @if (! $quotation->public_responded_at && ! $quotation->valid_until?->isPast())
                     <form method="POST" action="{{ route('quotations.public.decision', $publicToken) }}" class="mt-6 grid gap-3 border-t border-slate-200 pt-6">@csrf

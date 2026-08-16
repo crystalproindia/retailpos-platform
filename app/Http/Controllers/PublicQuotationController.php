@@ -5,18 +5,23 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Crm\PublicQuotationDecisionRequest;
 use App\Services\Crm\PublicQuotationService;
 use App\Services\Crm\QuotationPdfService;
+use App\Services\Crm\SalesDocumentPresentationService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Response;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class PublicQuotationController extends Controller
 {
-    public function show(Request $request, PublicQuotationService $publicQuotations, string $publicToken): Response
+    public function show(Request $request, PublicQuotationService $publicQuotations, SalesDocumentPresentationService $presentations, string $publicToken): Response
     {
         $quotation = $publicQuotations->recordView($publicQuotations->find($publicToken));
 
         return response()
-            ->view('public.quotation', ['quotation' => $quotation, 'publicToken' => $publicToken])
+            ->view('public.quotation', [
+                'quotation' => $quotation,
+                'publicToken' => $publicToken,
+                'presentation' => $presentations->forDocument($quotation, SalesDocumentPresentationService::QUOTATION),
+            ])
             ->header('X-Robots-Tag', 'noindex, nofollow');
     }
 

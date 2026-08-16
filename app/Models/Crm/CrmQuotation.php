@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['lead_id', 'opportunity_id', 'company_id', 'quotation_number', 'title', 'customer_name', 'customer_company', 'customer_email', 'customer_phone', 'billing_address', 'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'valid_until', 'status', 'notes', 'terms_conditions', 'show_authorized_signature', 'signature_path_snapshot', 'signatory_name_snapshot', 'signatory_designation_snapshot', 'internal_remarks', 'public_token_hash', 'public_token_expires_at', 'public_token_revoked_at', 'first_viewed_at', 'last_viewed_at', 'public_view_count', 'public_responded_at', 'public_response_name', 'public_response_message', 'rejection_reason', 'version_number', 'parent_quotation_id', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at', 'created_by', 'updated_by'])]
+#[Fillable(['lead_id', 'opportunity_id', 'company_id', 'quotation_number', 'title', 'customer_name', 'customer_company', 'customer_email', 'customer_phone', 'billing_address', 'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'valid_until', 'status', 'notes', 'terms_conditions', 'show_authorized_signature', 'signature_path_snapshot', 'signatory_name_snapshot', 'signatory_designation_snapshot', 'payment_details_snapshot', 'watermark_path_snapshot', 'presentation_snapshot_at', 'internal_remarks', 'public_token_hash', 'public_token_expires_at', 'public_token_revoked_at', 'first_viewed_at', 'last_viewed_at', 'public_view_count', 'public_responded_at', 'public_response_name', 'public_response_message', 'rejection_reason', 'version_number', 'parent_quotation_id', 'sent_at', 'accepted_at', 'rejected_at', 'converted_at', 'created_by', 'updated_by'])]
 class CrmQuotation extends Model
 {
     use Auditable;
@@ -38,6 +38,8 @@ class CrmQuotation extends Model
             'last_viewed_at' => 'datetime',
             'public_responded_at' => 'datetime',
             'show_authorized_signature' => 'boolean',
+            'payment_details_snapshot' => 'encrypted:array',
+            'presentation_snapshot_at' => 'datetime',
         ];
     }
 
@@ -51,11 +53,25 @@ class CrmQuotation extends Model
         return $this->belongsTo(CrmLead::class, 'lead_id');
     }
 
-    public function opportunity(): BelongsTo { return $this->belongsTo(CrmOpportunity::class, 'opportunity_id'); }
-    public function parentQuotation(): BelongsTo { return $this->belongsTo(self::class, 'parent_quotation_id'); }
-    public function revisions(): HasMany { return $this->hasMany(self::class, 'parent_quotation_id')->latest('version_number'); }
+    public function opportunity(): BelongsTo
+    {
+        return $this->belongsTo(CrmOpportunity::class, 'opportunity_id');
+    }
 
-    public function invoices(): HasMany { return $this->hasMany(CrmInvoice::class, 'quotation_id')->latest('created_at'); }
+    public function parentQuotation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_quotation_id');
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_quotation_id')->latest('version_number');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(CrmInvoice::class, 'quotation_id')->latest('created_at');
+    }
 
     public function items(): HasMany
     {

@@ -16,7 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'grand_total', 'paid_amount',
     'balance_amount', 'invoice_date', 'due_date', 'status', 'public_token', 'public_url', 'notes',
     'terms_conditions', 'show_authorized_signature', 'signature_path_snapshot', 'signatory_name_snapshot',
-    'signatory_designation_snapshot', 'internal_remarks', 'sent_at', 'paid_at', 'cancelled_at', 'created_by',
+    'signatory_designation_snapshot', 'payment_details_snapshot', 'watermark_path_snapshot',
+    'presentation_snapshot_at', 'internal_remarks', 'sent_at', 'paid_at', 'cancelled_at', 'created_by',
     'updated_by',
 ])]
 class CrmProformaInvoice extends Model
@@ -37,17 +38,58 @@ class CrmProformaInvoice extends Model
             'sent_at' => 'datetime',
             'paid_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'payment_details_snapshot' => 'encrypted:array',
+            'presentation_snapshot_at' => 'datetime',
         ];
     }
 
-    public function company(): BelongsTo { return $this->belongsTo(Company::class); }
-    public function lead(): BelongsTo { return $this->belongsTo(CrmLead::class); }
-    public function customer(): BelongsTo { return $this->belongsTo(CrmCustomer::class); }
-    public function quotation(): BelongsTo { return $this->belongsTo(CrmQuotation::class); }
-    public function onboarding(): HasMany { return $this->hasMany(CrmCustomerOnboarding::class, 'proforma_invoice_id')->latest('created_at'); }
-    public function items(): HasMany { return $this->hasMany(CrmProformaInvoiceItem::class, 'proforma_invoice_id')->orderBy('sort_order'); }
-    public function payments(): HasMany { return $this->hasMany(CrmProformaPayment::class, 'proforma_invoice_id')->latest('payment_date'); }
-    public function shares(): HasMany { return $this->hasMany(CrmProformaShare::class, 'proforma_invoice_id')->latest('created_at'); }
-    public function supportTickets(): HasMany { return $this->hasMany(CrmSupportTicket::class, 'proforma_invoice_id')->latest('updated_at'); }
-    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(CrmLead::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(CrmCustomer::class);
+    }
+
+    public function quotation(): BelongsTo
+    {
+        return $this->belongsTo(CrmQuotation::class);
+    }
+
+    public function onboarding(): HasMany
+    {
+        return $this->hasMany(CrmCustomerOnboarding::class, 'proforma_invoice_id')->latest('created_at');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(CrmProformaInvoiceItem::class, 'proforma_invoice_id')->orderBy('sort_order');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(CrmProformaPayment::class, 'proforma_invoice_id')->latest('payment_date');
+    }
+
+    public function shares(): HasMany
+    {
+        return $this->hasMany(CrmProformaShare::class, 'proforma_invoice_id')->latest('created_at');
+    }
+
+    public function supportTickets(): HasMany
+    {
+        return $this->hasMany(CrmSupportTicket::class, 'proforma_invoice_id')->latest('updated_at');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

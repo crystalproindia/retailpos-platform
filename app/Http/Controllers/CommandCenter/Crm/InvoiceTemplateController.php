@@ -2,45 +2,52 @@
 
 namespace App\Http\Controllers\CommandCenter\Crm;
 
-use App\Http\Controllers\Controller;
 use App\Enums\Crm\InvoiceStatus;
+use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoiceItem;
 use App\Repositories\Crm\InvoiceRepository;
 use App\Services\Branding\CompanyBrandingService;
-use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoicePaymentQrService;
+use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceTemplateService;
+use App\Services\Crm\InvoiceWatermarkService;
 use App\Support\Invoices\InvoiceTemplateRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class InvoiceTemplateController extends Controller
 {
-    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices, CompanyBrandingService $branding): View
+    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices, CompanyBrandingService $branding, InvoiceWatermarkService $watermarks): View
     {
         $previewInvoice = $invoices->paginate($request->user())->first();
+        $setting = $templates->setting($request->user()->company);
 
         return view('command-center.crm.invoices.templates', [
-            'setting' => $templates->setting($request->user()->company),
+            'setting' => $setting,
             'templates' => $templates->definitions(),
             'formats' => InvoiceTemplateRegistry::FORMATS,
             'defaults' => $templates->defaultOptions(),
             'previewInvoice' => $previewInvoice,
             'previewRouteInvoice' => $previewInvoice?->id ?? 0,
             'branding' => $branding->forCompany($request->user()->company),
+            'watermarkDataUri' => $watermarks->dataUri($setting->watermark_path),
         ]);
     }
 
-    public function preview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, InvoicePaymentQrService $paymentQr, int $invoice): \Illuminate\Http\Response
+    public function preview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, InvoicePaymentQrService $paymentQr, int $invoice): Response
     {
         $record = $invoice === 0
             ? $this->sampleInvoice($request->user()->company)
             : $invoices->find($request->user(), $invoice);
 
-        return $pdf->document($record, $this->validatedSettings($request, $paymentQr, false))->stream($pdf->filename($record));
+        $settings = $this->validatedSettings($request, $paymentQr, false);
+        $settings['_preview_live_presentation'] = true;
+
+        return $pdf->document($record, $settings)->stream($pdf->filename($record));
     }
 
     public function update(Request $request, InvoiceTemplateService $templates, InvoicePaymentQrService $paymentQr): RedirectResponse
@@ -49,9 +56,15 @@ class InvoiceTemplateController extends Controller
         foreach (['show_gst_breakup', 'show_gst_summary', 'show_hsn_sac'] as $required) {
             $data['options'][$required] = true;
         }
-        $templates->update($request->user()->company, $request->user(), $data);
+        $templates->update(
+            $request->user()->company,
+            $request->user(),
+            $data,
+            $request->file('watermark'),
+            $request->boolean('remove_watermark'),
+        );
 
-        return back()->with('status', 'Invoice design saved. GST fields remain enabled for compliant invoice output.');
+        return back()->with('status', 'Invoice design, payment details, and watermark settings saved. GST fields remain enabled for compliant invoice output.');
     }
 
     /** @return array<string,mixed> */
@@ -76,6 +89,18 @@ class InvoiceTemplateController extends Controller
                     }
                 },
             ],
+            'account_holder_name' => ['nullable', 'string', 'max:255'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'account_number' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9 .\\-\\/]+$/'],
+            'ifsc_code' => ['nullable', 'string', 'max:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'],
+            'bank_branch_name' => ['nullable', 'string', 'max:255'],
+            'swift_bic' => ['nullable', 'string', 'regex:/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/'],
+            'upi_id' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9._-]{2,}@[A-Za-z0-9.-]{2,}$/'],
+            'payment_url' => ['nullable', 'url:https', 'max:2048'],
+            'payment_note' => ['nullable', 'string', 'max:1000'],
+            'watermark_enabled' => ['nullable', 'boolean'],
+            'watermark' => ['nullable', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'mimetypes:image/png,image/jpeg,image/webp', 'max:2048', 'dimensions:max_width=3000,max_height=3000'],
+            'remove_watermark' => ['nullable', 'boolean'],
             'options' => ['nullable', 'array'],
             'options.show_logo' => ['nullable', 'boolean'], 'options.show_bill_to' => ['nullable', 'boolean'], 'options.show_ship_to' => ['nullable', 'boolean'],
             'options.logo_position' => ['nullable', 'in:left,center,right'], 'options.logo_size' => ['nullable', 'in:small,medium,large'], 'options.show_company_name' => ['nullable', 'boolean'],
@@ -84,6 +109,7 @@ class InvoiceTemplateController extends Controller
             'options.show_previous_balance' => ['nullable', 'boolean'], 'options.show_current_balance' => ['nullable', 'boolean'], 'options.show_hsn_sac' => ['nullable', 'boolean'],
             'options.show_sku' => ['nullable', 'boolean'], 'options.show_discount' => ['nullable', 'boolean'], 'options.show_gst_breakup' => ['nullable', 'boolean'],
             'options.show_gst_summary' => ['nullable', 'boolean'], 'options.show_payment_status' => ['nullable', 'boolean'],
+            'options.show_payment_details_on_quotation' => ['nullable', 'boolean'], 'options.show_payment_details_on_proforma' => ['nullable', 'boolean'],
         ];
 
         return $request->validate($rules);

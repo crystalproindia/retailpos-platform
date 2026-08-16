@@ -30,6 +30,7 @@ class InvoiceService
         private readonly SalesDocumentNumberService $numbers,
         private readonly DocumentTaxModeService $taxModes,
         private readonly CompanyBrandingService $branding,
+        private readonly SalesDocumentPresentationService $presentations,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -41,7 +42,7 @@ class InvoiceService
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $outlet = $this->outlets->current($user);
             $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0', $taxMode);
-            $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + [
+            $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::INVOICE) + [
                 'company_id' => $user->company_id,
                 'branch_id' => $outlet->id,
                 'invoice_number' => $this->numbers->nextInvoiceNumber($user->company_id),
@@ -124,7 +125,7 @@ class InvoiceService
                 'customer_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
                 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date',
                 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before',
-            ]) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $invoice->show_authorized_signature)) + [
+            ]) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $invoice->show_authorized_signature)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::INVOICE) + [
                 'tax_mode' => $taxMode,
                 'balance_due' => $calculation['grand_total'],
                 'updated_by' => $user->id,

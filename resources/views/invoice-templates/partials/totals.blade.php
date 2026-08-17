@@ -1,6 +1,5 @@
 <table class="totals" role="presentation">
     <tbody>
-        <tr><td>{{ $render['is_gst'] ? 'Taxable value' : 'Subtotal after discount' }}</td><td class="right">{{ number_format((float) $invoice->taxable_total, 2) }}</td></tr>
         @if((float) $invoice->cgst_total !== 0.0)<tr><td>CGST</td><td class="right">{{ number_format((float) $invoice->cgst_total, 2) }}</td></tr>@endif
         @if((float) $invoice->sgst_total !== 0.0)<tr><td>SGST</td><td class="right">{{ number_format((float) $invoice->sgst_total, 2) }}</td></tr>@endif
         @if((float) $invoice->igst_total !== 0.0)<tr><td>IGST</td><td class="right">{{ number_format((float) $invoice->igst_total, 2) }}</td></tr>@endif

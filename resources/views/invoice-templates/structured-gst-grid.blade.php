@@ -9,6 +9,6 @@
 @include('invoice-templates.partials.items-grid')
 @include('invoice-templates.partials.gst-summary')
 <table class="bottom" role="presentation"><tr><td width="54%">@include('invoice-templates.partials.payment-qr')<div class="avoid-break"><strong>Bank and payment details</strong><br>Payment is accepted against the outstanding amount shown on this invoice.</div><div class="avoid-break" style="margin-top:10px"><strong>Terms and conditions</strong><br>{{ $invoice->terms_conditions ?: 'Payment is due according to the invoice due date.' }}</div></td><td>@include('invoice-templates.partials.totals')</td></tr></table>
-<table class="party" role="presentation"><tr><td><strong>Declaration</strong><br>{{ $render['is_gst'] ? 'We declare that this invoice shows the applicable GST snapshots for the supply.' : 'We declare that the particulars given above are true and correct.' }}</td><td class="right">@include('invoice-templates.partials.authorized-signature')</td></tr></table>
+<table class="party" role="presentation"><tr><td><strong>Declaration</strong><br>{{ $render['is_gst'] ? 'We declare that this invoice shows the applicable GST snapshots for the supply.' : 'We declare that the particulars given above are true and correct.' }}</td></tr></table>
 @include('invoice-templates.partials.payment-details')
 </body></html>

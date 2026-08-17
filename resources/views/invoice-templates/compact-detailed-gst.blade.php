@@ -8,6 +8,6 @@
 <table class="parties" role="presentation"><tr><td width="65%"><strong>Buyer</strong><br>{{ $invoice->billing_company ?: $invoice->billing_name }}<br>{{ $invoice->billing_address }}@if($render['is_gst'])<br>GSTIN: {{ $invoice->customer_tax_number ?: '—' }}@endif</td><td><strong>Reference</strong><br>Currency: {{ $invoice->currency }}@if($render['is_gst'])<br>Tax classification: {{ $invoice->tax_classification ?: '—' }}@endif</td></tr></table>
 @include('invoice-templates.partials.items-grid')
 <table class="summary" role="presentation"><tr><td width="57%">@include('invoice-templates.partials.gst-summary')</td><td>@include('invoice-templates.partials.totals')</td></tr></table>
-<table class="parties avoid-break" role="presentation"><tr><td width="55%"><strong>Terms</strong><br>{{ $invoice->terms_conditions ?: 'Payment is due according to the terms stated above.' }}</td><td>@include('invoice-templates.partials.payment-qr')</td><td class="right">@include('invoice-templates.partials.authorized-signature')</td></tr></table>
+<table class="parties avoid-break" role="presentation"><tr><td width="55%"><strong>Terms</strong><br>{{ $invoice->terms_conditions ?: 'Payment is due according to the terms stated above.' }}</td><td>@include('invoice-templates.partials.payment-qr')</td></tr></table>
 @include('invoice-templates.partials.payment-details')
 </body></html>

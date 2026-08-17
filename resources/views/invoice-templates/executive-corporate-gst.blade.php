@@ -9,6 +9,6 @@
 @include('invoice-templates.partials.items-grid')
 @include('invoice-templates.partials.gst-summary')
 <table class="footer-grid" role="presentation"><tr><td width="57%"><div class="declaration"><strong>Declaration</strong><br>We declare that the particulars given above are true and the tax presentation uses the GST information retained with this invoice.<br><br><strong>Terms</strong><br>{{ $invoice->terms_conditions ?: 'Payment is due according to the stated due date.' }}</div>@include('invoice-templates.partials.payment-qr')</td><td><div class="payable"><strong>Payable and outstanding</strong>@include('invoice-templates.partials.totals')</div></td></tr></table>
-<table class="footer-grid" role="presentation"><tr><td><div class="seal">Company seal</div></td><td class="right"><strong>For {{ $invoice->company->legal_name ?: $invoice->company->name }}</strong><br><br><br>Authorised signatory</td></tr></table>
+<table class="footer-grid" role="presentation"><tr><td><div class="seal">Company seal</div></td></tr></table>
 @include('invoice-templates.partials.payment-details')
 </body></html>

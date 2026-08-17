@@ -9,7 +9,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-slate-950 text-slate-950 antialiased">
+    <body class="command-center-theme min-h-screen bg-slate-950 text-slate-950 antialiased dark:text-slate-100">
         <main class="grid min-h-screen lg:grid-cols-[1fr_520px]">
             <section class="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(20,184,166,0.22),transparent_32%),radial-gradient(circle_at_82%_18%,rgba(59,130,246,0.16),transparent_28%)]"></div>
@@ -28,7 +28,7 @@
                 </div>
             </section>
 
-            <section class="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+            <section class="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
                 <div class="w-full max-w-md">
                     <div class="mb-8 flex items-center gap-3 lg:hidden">
                         <div class="grid size-11 place-items-center rounded-lg bg-slate-950 font-semibold text-white">RP</div>
@@ -38,7 +38,7 @@
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+                    <div class="rounded-lg border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         {{ $slot ?? '' }}
                         @yield('content')
                     </div>

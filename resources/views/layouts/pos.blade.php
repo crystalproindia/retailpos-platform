@@ -11,7 +11,7 @@
     <title>@yield('title', 'Point of Sale') - {{ config('app.name') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="pos-shell min-h-screen bg-slate-100 text-slate-950 antialiased">
+<body class="command-center-theme pos-shell min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100">
     @yield('content')
     @stack('scripts')
 </body>

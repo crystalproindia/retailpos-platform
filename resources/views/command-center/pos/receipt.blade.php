@@ -21,7 +21,7 @@
             </div>
         </div>
 
-        <article class="pos-receipt rounded-xl bg-white p-6 shadow-[0_8px_28px_rgb(15_23_42_/_0.08)] sm:p-8">
+        <article class="theme-preserve-light pos-receipt rounded-xl bg-white p-6 text-slate-950 shadow-[0_8px_28px_rgb(15_23_42_/_0.08)] sm:p-8">
             @php
                 $receiptLogo = ($branding['show_logo'] ?? false) ? ($branding['data_uri'] ?? null) : null;
                 $receiptAlignment = in_array($branding['logo_position'] ?? null, ['left', 'center', 'right'], true) ? $branding['logo_position'] : 'center';

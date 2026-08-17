@@ -9,7 +9,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100 {{ request()->routeIs('cms.*') ? 'cms-light-workspace' : '' }}">
+    <body class="command-center-theme min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100 {{ request()->routeIs('cms.*') ? 'cms-light-workspace' : '' }}">
         @php
             $user = auth()->user();
             $moduleGroups = $user ? app(\App\Support\Modules\ModuleRegistry::class)->sidebarForUser($user)->groupBy('category') : collect();

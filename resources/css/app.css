@@ -87,6 +87,17 @@
         color: rgb(148 163 184) !important;
     }
 
+    .dark input:disabled,
+    .dark select:disabled,
+    .dark textarea:disabled,
+    .dark input[readonly],
+    .dark textarea[readonly] {
+        border-color: rgb(71 85 105) !important;
+        background-color: rgb(15 23 42) !important;
+        color: rgb(203 213 225) !important;
+        opacity: 1;
+    }
+
     input[type='checkbox'],
     input[type='radio'] {
         accent-color: rgb(13 148 136);
@@ -501,6 +512,73 @@
         @apply mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800;
     }
 
+    .dark .cms-light-workspace {
+        background: rgb(2 6 23);
+    }
+
+    .dark .cms-light-workspace .cms-workspace-main {
+        background: rgb(2 6 23);
+    }
+
+    .dark .cms-light-workspace .form-section,
+    .dark .cms-light-workspace .cms-card,
+    .dark .cms-light-workspace .cms-panel,
+    .dark .cms-light-workspace .cms-section-card {
+        border-color: rgb(30 41 59);
+        background-color: rgb(15 23 42) !important;
+        box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+    }
+
+    .dark .cms-light-workspace .cms-subtle-panel,
+    .dark .cms-light-workspace .cms-preview {
+        border-color: rgb(51 65 85);
+        background-color: rgb(30 41 59);
+    }
+
+    .dark .cms-light-workspace .form-section-title,
+    .dark .cms-light-workspace .cms-control-label,
+    .dark .cms-light-workspace label {
+        color: rgb(226 232 240);
+    }
+
+    .dark .cms-light-workspace .form-section-help,
+    .dark .cms-light-workspace .cms-control-help {
+        color: rgb(148 163 184);
+    }
+
+    .dark .cms-light-workspace input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+    .dark .cms-light-workspace select,
+    .dark .cms-light-workspace textarea {
+        border-color: rgb(71 85 105) !important;
+        background-color: rgb(15 23 42) !important;
+        color: rgb(241 245 249) !important;
+    }
+
+    .dark .cms-light-workspace .sticky-form-actions,
+    .dark .cms-light-workspace .cms-preview-header,
+    .dark .cms-light-workspace .cms-button-secondary {
+        border-color: rgb(51 65 85);
+        background-color: rgb(15 23 42);
+        color: rgb(226 232 240);
+    }
+
+    .dark .cms-light-workspace .cms-toggle {
+        border-color: rgb(51 65 85);
+        background-color: rgb(30 41 59);
+        color: rgb(226 232 240);
+    }
+
+    .dark .cms-light-workspace .cms-chip {
+        background-color: rgb(19 78 74);
+        color: rgb(153 246 228);
+    }
+
+    .dark .cms-light-workspace .cms-error {
+        border-color: rgb(136 19 55);
+        background-color: rgb(76 5 25 / 0.45);
+        color: rgb(254 205 211);
+    }
+
     .inventory-product-workspace .product-form-card {
         @apply rounded-xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgb(15_23_42_/_0.045)] dark:border-slate-800 dark:bg-slate-900;
     }
@@ -848,6 +926,136 @@
         @apply grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-700;
     }
 
+    .dark .pos-workspace,
+    .dark .pos-catalog-pane {
+        background-color: rgb(2 6 23);
+        color: rgb(241 245 249);
+    }
+
+    .dark .pos-terminal-header,
+    .dark .pos-cart-pane,
+    .dark .pos-bill-footer,
+    .dark .pos-mobile-header,
+    .dark .pos-mobile-bottom-nav,
+    .dark .pos-premium-command-bar,
+    .dark .pos-category-rail {
+        border-color: rgb(30 41 59);
+        background-color: rgb(15 23 42 / 0.97);
+    }
+
+    .dark .pos-product-card,
+    .dark .pos-icon-button,
+    .dark .pos-secondary-action,
+    .dark .pos-payment-method,
+    .dark .pos-category,
+    .dark .pos-more-row,
+    .dark .pos-dashboard-stat,
+    .dark .pos-dashboard-panel,
+    .dark .pos-held-card,
+    .dark .pos-modal-payment-method,
+    .dark .pos-quick-amount,
+    .dark .pos-split-row {
+        border-color: rgb(51 65 85);
+        background-color: rgb(15 23 42);
+        color: rgb(203 213 225);
+    }
+
+    .dark .pos-product-card:hover,
+    .dark .pos-icon-button:hover,
+    .dark .pos-secondary-action:hover,
+    .dark .pos-category:hover,
+    .dark .pos-more-row:hover {
+        border-color: rgb(13 148 136);
+        background-color: rgb(30 41 59);
+        color: rgb(153 246 228);
+    }
+
+    .dark .pos-product-card.is-added {
+        border-color: rgb(20 184 166);
+        background-color: rgb(19 78 74 / 0.45);
+    }
+
+    .dark .pos-product-visual,
+    .dark .pos-compact-visual {
+        background: rgb(19 78 74 / 0.45);
+        color: rgb(153 246 228);
+    }
+
+    .dark .pos-empty-cart,
+    .dark .pos-empty-list,
+    .dark .pos-command-input,
+    .dark .pos-payment-method-list {
+        border-color: rgb(51 65 85);
+        background-color: rgb(30 41 59);
+    }
+
+    .dark .pos-feedback {
+        border-color: rgb(13 148 136);
+        background-color: rgb(6 78 59 / 0.55);
+        color: rgb(153 246 228);
+    }
+
+    .dark .pos-feedback.is-error {
+        border-color: rgb(159 18 57);
+        background-color: rgb(76 5 25 / 0.55);
+        color: rgb(254 205 211);
+    }
+
+    .dark .pos-cart-heading,
+    .dark .pos-customer-lookup,
+    .dark .pos-premium-cart {
+        border-color: rgb(30 41 59);
+    }
+
+    .dark .pos-dashboard-stat span,
+    .dark .pos-mobile-nav,
+    .dark .pos-rail-filter,
+    .dark .pos-rail-filter b {
+        color: rgb(148 163 184);
+    }
+
+    .dark .pos-dashboard-stat strong {
+        color: rgb(248 250 252);
+    }
+
+    .dark .pos-rail-filter:hover {
+        background-color: rgb(30 41 59);
+        color: rgb(153 246 228);
+    }
+
+    .dark .pos-rail-filter b {
+        background-color: rgb(30 41 59);
+    }
+
+    .dark .pos-payment-sheet {
+        border-color: rgb(51 65 85);
+        background-color: rgb(15 23 42);
+        color: rgb(241 245 249);
+    }
+
+    .dark .pos-modal-payment-method:disabled {
+        border-color: rgb(51 65 85);
+        background-color: rgb(30 41 59);
+        color: rgb(100 116 139);
+    }
+
+    .dark .pos-connectivity b {
+        background-color: rgb(15 23 42);
+        color: rgb(203 213 225);
+    }
+
+    .dark .pos-connectivity,
+    .dark .pos-stock-badge {
+        background-color: rgb(6 78 59 / 0.6);
+        color: rgb(167 243 208);
+    }
+
+    .dark .pos-connectivity.is-offline,
+    .dark .pos-stock-badge.is-low {
+        background-color: rgb(69 26 3 / 0.65);
+        color: rgb(253 230 138);
+    }
+
     [data-pos-mobile-pane]:not(.hidden) {
         animation: pos-pane-in 180ms ease-out;
     }
@@ -916,4 +1124,182 @@
         padding-left: 0.75rem;
         padding-right: 0.75rem;
     }
+}
+
+/* Legacy Command Center views use light utility classes directly. Keep this
+   compatibility layer scoped to authenticated application surfaces so public
+   pages and printable document canvases retain their intended appearance. */
+.dark .command-center-theme .bg-white:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *),
+.dark .command-center-theme [class~='bg-white/95']:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *),
+.dark .command-center-theme [class~='bg-white/90']:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *),
+.dark .command-center-theme [class~='bg-white/80']:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *) {
+    background-color: rgb(15 23 42);
+}
+
+.dark .command-center-theme [class~='bg-white/75']:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *),
+.dark .command-center-theme [class~='bg-white/70']:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *),
+.dark .command-center-theme [class~='bg-white/60']:not([class*='dark:bg-']):not(.theme-preserve-light):not(.theme-preserve-light *) {
+    background-color: rgb(30 41 59 / 0.85);
+}
+
+.dark .command-center-theme .bg-slate-50:not([class*='dark:bg-']):not(.theme-preserve-light *),
+.dark .command-center-theme [class~='bg-slate-50/80']:not([class*='dark:bg-']):not(.theme-preserve-light *),
+.dark .command-center-theme .bg-slate-100:not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(30 41 59);
+}
+
+.dark .command-center-theme [class~='bg-slate-50/70']:not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(15 23 42 / 0.65);
+}
+
+.dark .command-center-theme :is(.bg-gray-50, .bg-gray-100):not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(30 41 59);
+}
+
+.dark .command-center-theme .bg-gray-200:not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(51 65 85);
+}
+
+.dark .command-center-theme .bg-slate-200:not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(51 65 85);
+}
+
+.dark .command-center-theme .border-slate-100:not([class*='dark:border-']):not(.theme-preserve-light *),
+.dark .command-center-theme .border-slate-200:not([class*='dark:border-']):not(.theme-preserve-light *),
+.dark .command-center-theme .border-slate-300:not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(51 65 85);
+}
+
+.dark .command-center-theme :is(.border-gray-100, .border-gray-200, .border-gray-300):not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(51 65 85);
+}
+
+.dark .command-center-theme .divide-slate-100:not([class*='dark:divide-']):not(.theme-preserve-light *) > :not(:last-child),
+.dark .command-center-theme .divide-slate-200:not([class*='dark:divide-']):not(.theme-preserve-light *) > :not(:last-child) {
+    border-color: rgb(30 41 59);
+}
+
+.dark .command-center-theme .text-slate-950:not([class*='dark:text-']):not(.theme-preserve-light *),
+.dark .command-center-theme .text-slate-900:not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(248 250 252);
+}
+
+.dark .command-center-theme .text-slate-800:not([class*='dark:text-']):not(.theme-preserve-light *),
+.dark .command-center-theme .text-slate-700:not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(203 213 225);
+}
+
+.dark .command-center-theme .text-slate-600:not([class*='dark:text-']):not(.theme-preserve-light *),
+.dark .command-center-theme .text-slate-500:not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(148 163 184);
+}
+
+.dark .command-center-theme :is(.text-gray-900, .text-gray-800):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(248 250 252);
+}
+
+.dark .command-center-theme :is(.text-gray-700, .text-gray-600):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(203 213 225);
+}
+
+.dark .command-center-theme :is(.text-gray-500, .text-gray-400):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(148 163 184);
+}
+
+.dark .command-center-theme .bg-amber-50:not([class*='dark:bg-']):not(.theme-preserve-light *),
+.dark .command-center-theme .bg-amber-100:not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(69 26 3 / 0.5);
+}
+
+.dark .command-center-theme .border-amber-200:not([class*='dark:border-']):not(.theme-preserve-light *),
+.dark .command-center-theme .border-amber-300:not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(146 64 14);
+}
+
+.dark .command-center-theme :is(.text-amber-700, .text-amber-800, .text-amber-900, .text-amber-950):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(253 230 138);
+}
+
+.dark .command-center-theme .bg-rose-50:not([class*='dark:bg-']):not(.theme-preserve-light *),
+.dark .command-center-theme .bg-rose-100:not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(76 5 25 / 0.5);
+}
+
+.dark .command-center-theme .border-rose-200:not([class*='dark:border-']):not(.theme-preserve-light *),
+.dark .command-center-theme .border-rose-300:not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(159 18 57);
+}
+
+.dark .command-center-theme :is(.text-rose-700, .text-rose-800, .text-rose-900, .text-rose-950):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(254 205 211);
+}
+
+.dark .command-center-theme :is(.bg-emerald-50, .bg-emerald-100, .bg-teal-50, .bg-teal-100):not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(6 78 59 / 0.5);
+}
+
+.dark .command-center-theme :is(.border-emerald-200, .border-emerald-300, .border-teal-200, .border-teal-300):not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(13 148 136);
+}
+
+.dark .command-center-theme :is(.text-emerald-700, .text-emerald-800, .text-emerald-900, .text-teal-700, .text-teal-800, .text-teal-900):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(153 246 228);
+}
+
+.dark .command-center-theme :is(.bg-sky-50, .bg-sky-100, .bg-blue-50, .bg-blue-100):not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(12 74 110 / 0.5);
+}
+
+.dark .command-center-theme :is(.border-sky-200, .border-sky-300, .border-blue-200, .border-blue-300):not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(3 105 161);
+}
+
+.dark .command-center-theme :is(.text-sky-700, .text-sky-800, .text-sky-900, .text-blue-700, .text-blue-800, .text-blue-900):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(186 230 253);
+}
+
+.dark .command-center-theme :is(.bg-indigo-50, .bg-indigo-100, .bg-violet-50, .bg-violet-100):not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(49 46 129 / 0.4);
+}
+
+.dark .command-center-theme :is(.border-indigo-200, .border-indigo-300, .border-violet-200, .border-violet-300):not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(79 70 229);
+}
+
+.dark .command-center-theme :is(.text-indigo-700, .text-indigo-800, .text-indigo-900, .text-violet-700, .text-violet-800, .text-violet-900, .text-violet-950):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(221 214 254);
+}
+
+.dark .command-center-theme :is(.bg-red-50, .bg-red-100, .bg-orange-50, .bg-orange-100):not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(127 29 29 / 0.42);
+}
+
+.dark .command-center-theme :is(.border-red-200, .border-red-300, .border-orange-200, .border-orange-300):not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(185 28 28);
+}
+
+.dark .command-center-theme :is(.text-red-700, .text-red-800, .text-red-900, .text-orange-700, .text-orange-800, .text-orange-900):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(254 202 202);
+}
+
+.dark .command-center-theme :is(.bg-cyan-50, .bg-cyan-100):not([class*='dark:bg-']):not(.theme-preserve-light *) {
+    background-color: rgb(22 78 99 / 0.45);
+}
+
+.dark .command-center-theme :is(.border-cyan-200, .border-cyan-300):not([class*='dark:border-']):not(.theme-preserve-light *) {
+    border-color: rgb(8 145 178);
+}
+
+.dark .command-center-theme :is(.text-cyan-700, .text-cyan-800, .text-cyan-900):not([class*='dark:text-']):not(.theme-preserve-light *) {
+    color: rgb(165 243 252);
+}
+
+.dark .command-center-theme .hover\:bg-slate-50:hover:not([class*='dark:hover:bg-']),
+.dark .command-center-theme .hover\:bg-slate-100:hover:not([class*='dark:hover:bg-']) {
+    background-color: rgb(30 41 59);
+}
+
+.dark .command-center-theme .theme-preserve-light,
+.dark .command-center-theme .theme-preserve-light * {
+    color-scheme: light;
 }

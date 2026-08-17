@@ -13,6 +13,14 @@ use Laravel encrypted casts. New invoices, quotations, and proformas snapshot
 their enabled payment details, watermark path, and capture time; historical
 documents created before this extension intentionally remain unchanged.
 
+Invoice Designs also has a tenant-scoped document-heading setting. Standard
+headings are Invoice, Tax Invoice, GST Invoice, Sales Invoice, and Commercial
+Invoice; a plain-text custom heading is limited to 60 characters. Every newly
+created invoice snapshots its selected heading, so a later design change does
+not rewrite a historical invoice. Legacy invoices without a heading snapshot
+retain their established GST/non-GST heading. Quotations and proforma invoices
+keep their own fixed document titles and never inherit the invoice heading.
+
 The 44 designs are intentionally recomposed through corporate, retail,
 minimal, professional, creative, industry, A5, and thermal families. Shared
 rendering primitives retain GST and totals consistency, while each variant has

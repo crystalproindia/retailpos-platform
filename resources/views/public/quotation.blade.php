@@ -13,7 +13,7 @@
             @include('public.partials.document-watermark')
             <header class="relative z-10 bg-slate-950 p-6 text-white sm:p-8">
                 <div class="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
-                    <div><p class="text-sm font-semibold uppercase text-teal-300">RetailPOS</p><h1 class="mt-2 text-2xl font-semibold">{{ $quotation->title }}</h1><p class="mt-2 text-sm text-slate-300">{{ $quotation->quotation_number }}</p></div>
+                    <div><p class="text-sm font-semibold uppercase text-teal-300">RetailPOS</p><h1 class="mt-2 text-2xl font-semibold">{{ $presentation['document_title'] }}</h1><p class="mt-2 text-sm text-slate-300">{{ $quotation->title }} · {{ $quotation->quotation_number }}</p></div>
                     <div class="text-sm text-slate-300"><p>Valid until</p><p class="mt-1 font-semibold text-white">{{ $quotation->valid_until?->format('d M Y') ?? 'No expiry specified' }}</p></div>
                 </div>
             </header>

@@ -1,5 +1,5 @@
 @php($variant = $render['template']['variant'])
-@php($documentTitle = match($variant) {'licensing' => 'LICENSING INVOICE', 'publishing' => 'ROYALTY STATEMENT', default => $render['is_gst'] ? 'TAX INVOICE' : 'INVOICE'})
+@php($documentTitle = $render['document_title'])
 <!doctype html>
 <!-- {{ $render['template']['label'] }} -->
 <html><head><style>

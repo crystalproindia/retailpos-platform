@@ -196,13 +196,14 @@ class InvoiceTemplateService
             'signature' => $this->branding->signatureForPath($invoice->signature_path_snapshot, $invoice->signatory_name_snapshot, $invoice->signatory_designation_snapshot),
             'payment_details' => $presentation['payment_details'],
             'watermark' => $presentation['watermark'],
+            'document_title' => $presentation['document_title'],
         ];
     }
 
     /** @return array<string,bool> */
     public function defaultOptions(): array
     {
-        return ['show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_payment_details_on_quotation' => false, 'show_payment_details_on_proforma' => false, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
+        return ['document_title' => 'invoice', 'show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_payment_details_on_quotation' => false, 'show_payment_details_on_proforma' => false, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
     }
 
     /** @param array<string,mixed> $overrides */

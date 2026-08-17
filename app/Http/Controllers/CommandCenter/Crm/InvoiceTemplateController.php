@@ -13,6 +13,7 @@ use App\Services\Crm\InvoicePaymentQrService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceTemplateService;
 use App\Services\Crm\InvoiceWatermarkService;
+use App\Services\Crm\SalesDocumentPresentationService;
 use App\Support\Invoices\InvoiceTemplateRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ use Illuminate\View\View;
 
 class InvoiceTemplateController extends Controller
 {
-    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices, CompanyBrandingService $branding, InvoiceWatermarkService $watermarks): View
+    public function index(Request $request, InvoiceTemplateService $templates, InvoiceRepository $invoices, CompanyBrandingService $branding, InvoiceWatermarkService $watermarks, SalesDocumentPresentationService $presentations): View
     {
         $previewInvoice = $invoices->paginate($request->user())->first();
         $setting = $templates->setting($request->user()->company);
@@ -35,6 +36,8 @@ class InvoiceTemplateController extends Controller
             'previewRouteInvoice' => $previewInvoice?->id ?? 0,
             'branding' => $branding->forCompany($request->user()->company),
             'watermarkDataUri' => $watermarks->dataUri($setting->watermark_path),
+            'documentTitle' => $presentations->configuredInvoiceTitle($setting),
+            'documentTitleOptions' => SalesDocumentPresentationService::INVOICE_DOCUMENT_TITLES,
         ]);
     }
 
@@ -79,6 +82,8 @@ class InvoiceTemplateController extends Controller
             'brand_color' => [$requireTemplate ? 'required' : 'nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'copy_label' => [$requireTemplate ? 'required' : 'nullable', 'in:original,duplicate,triplicate,customer_copy,office_copy'],
             'orientation' => [$requireTemplate ? 'required' : 'nullable', 'in:portrait,landscape'],
+            'document_title' => ['nullable', 'in:'.implode(',', array_keys(SalesDocumentPresentationService::INVOICE_DOCUMENT_TITLES))],
+            'custom_document_title' => ['nullable', 'required_if:document_title,custom', 'string', 'max:60', 'not_regex:/[<>\\p{Cc}]/u'],
             'payment_qr_uri' => [
                 'nullable',
                 'string',
@@ -112,7 +117,17 @@ class InvoiceTemplateController extends Controller
             'options.show_payment_details_on_quotation' => ['nullable', 'boolean'], 'options.show_payment_details_on_proforma' => ['nullable', 'boolean'],
         ];
 
-        return $request->validate($rules);
+        $data = $request->validate($rules);
+        $data['options'] ??= [];
+
+        if (array_key_exists('document_title', $data)) {
+            $data['options']['document_title'] = $data['document_title'];
+            $data['options']['custom_document_title'] = $data['document_title'] === 'custom'
+                ? trim((string) ($data['custom_document_title'] ?? ''))
+                : null;
+        }
+
+        return $data;
     }
 
     private function sampleInvoice(Company $company): CrmInvoice

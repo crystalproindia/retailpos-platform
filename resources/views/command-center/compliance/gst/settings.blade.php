@@ -5,11 +5,11 @@
 
 @section('content')
 <div class="mx-auto max-w-5xl space-y-6">
-    <section class="rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950">
-        <h1 class="font-semibold">Accountant review required</h1>
-        <p class="mt-1 text-sm">These settings support reviewable GST documents and exports. RetailPOS does not verify GSTIN authenticity, file returns, or submit e-invoices or e-way bills in this phase.</p>
+    <section class="rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950 dark:border-amber-800/70 dark:bg-amber-950/30 dark:text-amber-100">
+        <h1 class="font-semibold dark:text-amber-200">Accountant review required</h1>
+        <p class="mt-1 text-sm leading-6">These settings support reviewable GST documents and exports. RetailPOS does not verify GSTIN authenticity, file returns, or submit e-invoices or e-way bills in this phase.</p>
     </section>
-    <form method="POST" action="{{ route('compliance.gst.settings.update') }}" class="grid gap-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-2">
+    <form method="POST" action="{{ route('compliance.gst.settings.update') }}" class="grid gap-5 rounded-lg border border-slate-200 bg-white p-6 text-slate-950 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 md:grid-cols-2">
         @csrf @method('PUT')
         <label class="text-sm font-medium">Legal name<input name="legal_name" value="{{ old('legal_name', $settings->legal_name) }}" required class="mt-1 w-full rounded-lg border-slate-300"></label>
         <label class="text-sm font-medium">Trade name<input name="trade_name" value="{{ old('trade_name', $settings->trade_name) }}" class="mt-1 w-full rounded-lg border-slate-300"></label>

@@ -11,6 +11,7 @@ use App\Models\Crm\CrmProformaInvoice;
 use App\Models\Crm\CrmQuotation;
 use App\Models\User;
 use App\Services\Crm\InvoiceTemplateService;
+use App\Services\Crm\SalesDocumentPresentationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -108,14 +109,22 @@ class CustomerDocumentTotalsDisplayTest extends TestCase
         ]);
         $proforma->setRelation('company', $company);
         $proforma->setRelation('items', collect());
-        $presentation = ['payment_details' => null, 'watermark' => ['enabled' => false, 'data_uri' => null, 'opacity' => 0.12, 'position' => 'center']];
         $signature = ['data_uri' => null, 'name' => null, 'designation' => null];
+        $presentations = app(SalesDocumentPresentationService::class);
+        $quotationPresentation = $presentations->forDocument($quotation, SalesDocumentPresentationService::QUOTATION);
+        $proformaPresentation = $presentations->forDocument($proforma, SalesDocumentPresentationService::PROFORMA);
 
-        $quotationMarkup = view('pdf.crm-quotation', compact('quotation', 'presentation', 'signature') + ['isGst' => true])->render();
-        $proformaMarkup = view('pdf.crm-proforma', compact('proforma', 'presentation', 'signature') + ['isGst' => true])->render();
+        $quotationMarkup = view('pdf.crm-quotation', ['quotation' => $quotation, 'presentation' => $quotationPresentation, 'signature' => $signature, 'isGst' => true])->render();
+        $proformaMarkup = view('pdf.crm-proforma', ['proforma' => $proforma, 'presentation' => $proformaPresentation, 'signature' => $signature, 'isGst' => true])->render();
+        $publicQuotationMarkup = view('public.quotation', ['quotation' => $quotation, 'presentation' => $quotationPresentation, 'publicToken' => 'safe-token'])->render();
+        $publicProformaMarkup = view('public.proforma', ['proforma' => $proforma, 'presentation' => $proformaPresentation])->render();
 
+        $this->assertStringContainsString('>QUOTATION<', $quotationMarkup);
+        $this->assertStringContainsString('>QUOTATION<', $publicQuotationMarkup);
         $this->assertStringNotContainsString('Taxable value', $quotationMarkup);
         $this->assertStringContainsString('Grand total', $quotationMarkup);
+        $this->assertStringContainsString('>PROFORMA INVOICE<', $proformaMarkup);
+        $this->assertStringContainsString('>PROFORMA INVOICE<', $publicProformaMarkup);
         $this->assertStringNotContainsString('Taxable value', $proformaMarkup);
         $this->assertStringContainsString('>GST<', $proformaMarkup);
         $this->assertStringContainsString('INR 1,180.00', $proformaMarkup);

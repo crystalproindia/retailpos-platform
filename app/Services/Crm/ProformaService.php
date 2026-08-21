@@ -7,9 +7,13 @@ use App\Enums\Crm\LeadPriority;
 use App\Enums\Crm\ProformaStatus;
 use App\Events\Domain\Crm\ProformaEvent;
 use App\Models\Crm\CrmActivity;
+use App\Models\Crm\CrmCustomer;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmProformaInvoice;
 use App\Models\User;
+use App\Repositories\Crm\CrmCustomerRepository;
+use App\Repositories\Crm\LeadRepository;
+use App\Repositories\Crm\QuotationRepository;
 use App\Services\AuditLogger;
 use App\Services\Branding\CompanyBrandingService;
 use App\Services\Events\DomainEventDispatcher;
@@ -27,15 +31,25 @@ class ProformaService
         private readonly DocumentTaxModeService $taxModes,
         private readonly CompanyBrandingService $branding,
         private readonly SalesDocumentPresentationService $presentations,
+        private readonly CrmCustomerRepository $customers,
+        private readonly LeadRepository $leads,
+        private readonly QuotationRepository $quotations,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function create(User $user, array $data, ?int $leadId = null, ?int $customerId = null, ?int $quotationId = null): CrmProformaInvoice
     {
         return DB::transaction(function () use ($user, $data, $leadId, $customerId, $quotationId): CrmProformaInvoice {
+            $customer = $customerId ? $this->customers->findForUser($user, $customerId) : null;
+            $lead = $leadId ? $this->leads->findForUser($user, $leadId) : null;
+            $quotation = $quotationId ? $this->quotations->findForUser($user, $quotationId) : null;
+
+            $this->assertDocumentContextIsConsistent($customer, $lead?->id, $quotation?->lead_id);
+
+            $leadId = $lead?->id ?? $quotation?->lead_id ?? $customer?->lead_id;
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $calculation = $this->calc($data['items'], $taxMode);
-            $proforma = CrmProformaInvoice::create(array_merge(collect($data)->except('items')->all(), $calculation, $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)), $this->presentations->snapshot($user->company, SalesDocumentPresentationService::PROFORMA), [
+            $proforma = CrmProformaInvoice::create(array_merge($this->documentData($data, $customer), $calculation, $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)), $this->presentations->snapshot($user->company, SalesDocumentPresentationService::PROFORMA), [
                 'company_id' => $user->company_id,
                 'lead_id' => $leadId,
                 'customer_id' => $customerId,
@@ -155,6 +169,39 @@ class ProformaService
             'signatory_name_snapshot' => $show ? $signature['name'] : null,
             'signatory_designation_snapshot' => $show ? $signature['designation'] : null,
         ];
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function documentData(array $data, ?CrmCustomer $customer): array
+    {
+        $document = collect($data)->except(['items', 'customer_id', 'lead_id', 'quotation_id'])->all();
+
+        if (! $customer) {
+            return $document;
+        }
+
+        return array_merge($document, [
+            'customer_name' => $customer->display_name,
+            'customer_company' => $customer->company_name,
+            'customer_email' => $customer->email,
+            'customer_phone' => $customer->phone,
+            'billing_address' => $customer->billing_address,
+        ]);
+    }
+
+    private function assertDocumentContextIsConsistent(?CrmCustomer $customer, ?int $leadId, ?int $quotationLeadId): void
+    {
+        if ($leadId && $quotationLeadId && $leadId !== $quotationLeadId) {
+            throw ValidationException::withMessages(['quotation_id' => 'The quotation does not belong to the selected lead.']);
+        }
+
+        if ($customer?->lead_id && $leadId && $customer->lead_id !== $leadId) {
+            throw ValidationException::withMessages(['customer_id' => 'The customer does not belong to the selected lead.']);
+        }
+
+        if ($customer?->lead_id && $quotationLeadId && $customer->lead_id !== $quotationLeadId) {
+            throw ValidationException::withMessages(['customer_id' => 'The customer does not belong to the selected quotation.']);
+        }
     }
 
     private function activity(CrmProformaInvoice $proforma, User $user, string $subject): void

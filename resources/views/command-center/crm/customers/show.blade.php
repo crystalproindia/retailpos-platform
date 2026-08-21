@@ -29,6 +29,11 @@
             </div>
         </section>
         <div class="flex flex-wrap justify-end gap-3">
+            @can('crm.quotations.create')
+                @if ($customer->lead)
+                    <a href="{{ route('crm.quotations.create', $customer->lead) }}" class="inline-flex min-h-11 items-center rounded-lg border border-indigo-300 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-200 dark:hover:bg-indigo-950/30">Create Quotation</a>
+                @endif
+            @endcan
             @can('sales.invoices.create')
                 <a href="{{ route('sales.invoices.create', ['customer' => $customer->id]) }}" class="inline-flex min-h-11 items-center rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">Create Invoice</a>
             @endcan
@@ -38,7 +43,9 @@
             @can('tasks.create_work')
                 <a href="{{ route('tasks.index', ['create_related_type' => 'customer', 'create_related_id' => $customer->id]) }}#quick-add" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200">Add task</a>
             @endcan
-            <a href="{{ route('crm.proformas.create-from-customer', $customer) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create Proforma Invoice</a>
+            @can('crm.proformas.create')
+                <a href="{{ route('crm.proformas.create', ['customer_id' => $customer->id]) }}" class="inline-flex min-h-11 items-center rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Create Proforma</a>
+            @endcan
             @can('crm.support.create')<a href="{{ route('crm.support.tickets.create', ['customer' => $customer->id]) }}" class="rounded-lg border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/30">Create Support Ticket</a>@endcan
             @if($customer->activeOnboarding)<a href="{{ route('crm.onboarding.show', $customer->activeOnboarding) }}" class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-700 dark:border-teal-800 dark:text-teal-300">Open Onboarding · {{ $customer->activeOnboarding->progress_percent }}%</a>@else<form method="POST" action="{{ route('crm.customers.onboarding.start', $customer) }}">@csrf<button class="rounded-lg border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-700 dark:border-teal-800 dark:text-teal-300">Start Onboarding</button></form>@endif
         </div>

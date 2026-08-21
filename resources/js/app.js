@@ -750,6 +750,63 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTotals();
     });
 
+    document.querySelectorAll('[data-proforma-form]').forEach((form) => {
+        const items = form.querySelector('[data-proforma-items]');
+        const template = form.querySelector('[data-proforma-item-template]');
+        const addButton = form.querySelector('[data-proforma-add-item]');
+        const taxMode = form.querySelectorAll('input[name="tax_mode"]');
+        const customerSelect = form.querySelector('[data-proforma-customer-select]');
+        if (!items || !template || !addButton) return;
+
+        const number = (value) => Number.parseFloat(value || '0') || 0;
+        const usesNoGst = () => [...taxMode].some((input) => input.checked && input.value === 'no_gst');
+        const renderTotals = () => {
+            let subtotal = 0; let discount = 0; let tax = 0;
+            items.querySelectorAll('[data-proforma-item]').forEach((item) => {
+                const gross = number(item.querySelector('[data-proforma-quantity]')?.value) * number(item.querySelector('[data-proforma-unit-price]')?.value);
+                const itemDiscount = Math.min(number(item.querySelector('[data-proforma-discount]')?.value), gross);
+                subtotal += gross;
+                discount += itemDiscount;
+                tax += usesNoGst() ? 0 : (gross - itemDiscount) * number(item.querySelector('[data-proforma-tax-rate]')?.value) / 100;
+            });
+            const put = (selector, value) => form.querySelectorAll(selector).forEach((node) => { node.textContent = value.toFixed(2); });
+            put('[data-proforma-subtotal]', subtotal);
+            put('[data-proforma-discount-total]', discount);
+            put('[data-proforma-tax-total]', tax);
+            put('[data-proforma-grand-total]', subtotal - discount + tax);
+        };
+        const bindItem = (item) => {
+            item.querySelectorAll('input').forEach((input) => input.addEventListener('input', renderTotals));
+            item.querySelector('[data-proforma-remove-item]')?.addEventListener('click', () => {
+                if (items.querySelectorAll('[data-proforma-item]').length > 1) {
+                    item.remove();
+                    renderTotals();
+                }
+            });
+        };
+        const prefillCustomer = () => {
+            const option = customerSelect?.selectedOptions?.[0];
+            if (!option?.value) return;
+            ['name', 'company', 'email', 'phone', 'address'].forEach((field) => {
+                const input = form.querySelector(`[data-proforma-customer-field="${field}"]`);
+                if (input) input.value = option.dataset[field] || '';
+            });
+        };
+
+        items.querySelectorAll('[data-proforma-item]').forEach(bindItem);
+        addButton.addEventListener('click', () => {
+            const fragment = template.content.cloneNode(true);
+            const index = items.querySelectorAll('[data-proforma-item]').length;
+            fragment.querySelectorAll('[name]').forEach((input) => { input.name = input.name.replaceAll('__INDEX__', index); });
+            items.appendChild(fragment);
+            bindItem(items.lastElementChild);
+            renderTotals();
+        });
+        taxMode.forEach((input) => input.addEventListener('change', renderTotals));
+        customerSelect?.addEventListener('change', prefillCustomer);
+        renderTotals();
+    });
+
     document.addEventListener('click', () => closeDropdowns());
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {

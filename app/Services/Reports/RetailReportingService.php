@@ -6,11 +6,14 @@ use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Customers\Customer;
 use App\Models\Inventory\InventoryCategory;
+use App\Models\Inventory\InventoryBrand;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\StockLevel;
 use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosSale;
+use App\Models\Pos\PosSaleItem;
+use App\Models\Pos\PosReturnItem;
 use App\Models\Pos\PosReturn;
 use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseReturnItem;
@@ -64,7 +67,7 @@ class RetailReportingService
                 'purchases' => $purchases + ['rows' => $this->purchaseRows($user, $scope, $range, $context)],
                 'inventory' => $stock + ['rows' => $this->stockRows($user, $scope, $context)],
                 'movements' => $this->stockMovements($user, $scope, $range, $context),
-                'profitability' => ['net_sales' => $netSalesAfterReturns, 'cost_of_goods_sold' => null, 'gross_profit' => null, 'notice' => 'Gross profit is unavailable until a reliable invoice-level cost snapshot exists.'],
+                'profitability' => $this->profitability($user, $scope, $range, $context),
                 'gst' => $this->gst($user, $scope, $range, $context) + ['rows' => $this->gstRows($user, $scope, $range, $context)],
                 'payments' => $payments + ['rows' => $this->paymentRows($user, $scope, $range, $context)],
                 'outstanding' => $invoices + ['rows' => $this->outstandingRows($user, $scope, $range, $context)],
@@ -147,6 +150,7 @@ class RetailReportingService
         return [
             'product_id' => $this->companyModelId($user, $filters, 'product_id', Product::class),
             'category_id' => $this->companyModelId($user, $filters, 'category_id', InventoryCategory::class),
+            'brand_id' => $this->companyModelId($user, $filters, 'brand_id', InventoryBrand::class),
             'customer_id' => $this->companyModelId($user, $filters, 'customer_id', Customer::class),
             'supplier_id' => $this->companyModelId($user, $filters, 'supplier_id', Supplier::class),
             'cashier_id' => $this->companyModelId($user, $filters, 'cashier_id', User::class),
@@ -293,6 +297,147 @@ class RetailReportingService
                     'unit_cost' => $this->minor($movement->unit_cost),
                 ])->all(),
         ];
+    }
+
+    /**
+     * Gross-profit reporting deliberately reads only captured sale-time snapshots.
+     * Earlier sales are surfaced as unavailable rather than estimated from current product costs.
+     */
+    private function profitability(User $user, array $scope, array $range, array $context): array
+    {
+        $items = $this->profitabilityItems($user, $scope, $range, $context);
+        $returns = $this->profitabilityReturns($user, $scope, $range, $context);
+        $total = fn (string $field): int => $this->minor((clone $items)->sum($field));
+        $grossSales = $total('gross_sales_snapshot');
+        $netSales = $total('net_sales_snapshot');
+        $cost = $total('total_cost_snapshot');
+        $profitBeforeDiscount = $total('gross_profit_before_discount');
+        $grossProfit = $total('gross_profit_snapshot');
+        $returnGross = $this->minor($returns['gross_sales']);
+        $returnNet = $this->minor($returns['net_sales']);
+        $returnCost = $this->minor($returns['cost']);
+        $returnProfit = $this->minor($returns['gross_profit']);
+        $netGrossSales = $grossSales - $returnGross;
+        $netSalesAfterReturns = $netSales - $returnNet;
+        $netCost = $cost - $returnCost;
+        $netGrossProfit = $grossProfit - $returnProfit;
+        $unavailable = $this->profitabilityUnavailableCount($user, $scope, $range, $context);
+
+        return [
+            'gross_sales' => $netGrossSales,
+            'net_sales' => $netSalesAfterReturns,
+            'cost_of_goods_sold' => $netCost,
+            'gross_profit_before_discount' => $profitBeforeDiscount - $returnProfit,
+            'gross_profit' => $netGrossProfit,
+            'gross_margin_percent' => $this->margin($netGrossProfit, $netSalesAfterReturns),
+            'total_discounts' => $netGrossSales - $netSalesAfterReturns,
+            'discount_impact_on_profit' => ($profitBeforeDiscount - $returnProfit) - $netGrossProfit,
+            'sales_returns' => $returnNet,
+            'unavailable_cost_item_count' => $unavailable,
+            'notice' => $unavailable
+                ? 'Only captured sale-time cost snapshots are included. '.$unavailable.' historical item(s) have no verified cost and are excluded from gross-profit totals.'
+                : 'Gross profit is tax-exclusive and based on immutable POS sale-time cost snapshots. It is not company net profit.',
+            'invoice_rows' => $this->profitabilityInvoiceRows($items, $returns, $range),
+            'product_rows' => $this->profitabilityGroups($items, ['product_id', 'product_name', 'sku'], 'gross_profit_snapshot'),
+            'category_rows' => $this->profitabilityGroups($items, ['category_id', 'category_name_snapshot'], 'gross_profit_snapshot'),
+            'brand_rows' => $this->profitabilityGroups($items, ['brand_id_snapshot', 'brand_name_snapshot'], 'gross_profit_snapshot'),
+            'outlet_rows' => $this->profitabilityGroups($items, ['branch_id', 'branch_name'], 'gross_profit_snapshot'),
+            'salesperson_rows' => $this->profitabilityGroups($items, ['salesperson_id', 'salesperson_name'], 'gross_profit_snapshot'),
+        ];
+    }
+
+    private function profitabilityItems(User $user, array $scope, array $range, array $context): Builder
+    {
+        return PosSaleItem::query()
+            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
+            ->leftJoin('branches', 'branches.id', '=', 'pos_sales.branch_id')
+            ->leftJoin('users', 'users.id', '=', 'pos_sales.completed_by')
+            ->where('pos_sale_items.company_id', $user->company_id)
+            ->where('pos_sales.status', 'completed')
+            ->where('pos_sale_items.cost_snapshot_status', 'captured')
+            ->when($scope['ids'] !== null, fn (Builder $query) => $query->whereIn('pos_sales.branch_id', $scope['ids']))
+            ->when($scope['warehouse_id'], fn (Builder $query, int $warehouseId) => $query->whereExists(function ($stock) use ($warehouseId): void {
+                $stock->selectRaw('1')->from('stock_movements')->whereColumn('stock_movements.reference_id', 'pos_sales.id')->where('stock_movements.reference_type', PosSale::class)->where('stock_movements.movement_type', 'sale')->where('stock_movements.warehouse_id', $warehouseId);
+            }))
+            ->whereBetween('pos_sales.sold_at', $this->timestampRange($range))
+            ->when($context['product_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.product_id', $id))
+            ->when($context['category_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.category_id', $id))
+            ->when($context['brand_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.brand_id_snapshot', $id))
+            ->when($context['customer_id'], fn (Builder $query, int $id) => $query->where('pos_sales.customer_id', $id))
+            ->when($context['cashier_id'], fn (Builder $query, int $id) => $query->where('pos_sales.completed_by', $id))
+            ->when($context['sale_channel'], fn (Builder $query, string $value) => $query->where('pos_sales.sale_type', $value))
+            ->when($context['discounted'] !== null, fn (Builder $query) => $context['discounted'] ? $query->where('pos_sale_items.discount_amount', '>', 0) : $query->where('pos_sale_items.discount_amount', 0));
+    }
+
+    /** @return array{gross_sales:string,net_sales:string,cost:string,gross_profit:string} */
+    private function profitabilityReturns(User $user, array $scope, array $range, array $context): array
+    {
+        $query = PosReturnItem::query()
+            ->join('pos_returns', 'pos_returns.id', '=', 'pos_return_items.pos_return_id')
+            ->join('pos_sale_items', 'pos_sale_items.id', '=', 'pos_return_items.original_sale_item_id')
+            ->where('pos_returns.company_id', $user->company_id)
+            ->where('pos_returns.status', PosReturn::STATUS_COMPLETED)
+            ->where('pos_sale_items.cost_snapshot_status', 'captured')
+            ->when($scope['ids'] !== null, fn (Builder $builder) => $builder->whereIn('pos_returns.branch_id', $scope['ids']))
+            ->whereBetween('pos_returns.completed_at', $this->timestampRange($range))
+            ->when($context['product_id'], fn (Builder $builder, int $id) => $builder->where('pos_return_items.product_id', $id))
+            ->when($context['category_id'], fn (Builder $builder, int $id) => $builder->where('pos_sale_items.category_id', $id))
+            ->when($context['brand_id'], fn (Builder $builder, int $id) => $builder->where('pos_sale_items.brand_id_snapshot', $id));
+        $row = $query->selectRaw('COALESCE(SUM(pos_return_items.gross_adjustment), 0) as gross_sales, COALESCE(SUM(pos_return_items.taxable_adjustment), 0) as net_sales, COALESCE(SUM(pos_return_items.return_quantity * pos_sale_items.unit_cost_snapshot), 0) as cost, COALESCE(SUM(pos_return_items.taxable_adjustment - (pos_return_items.return_quantity * pos_sale_items.unit_cost_snapshot)), 0) as gross_profit')->first();
+
+        return ['gross_sales' => (string) $row->gross_sales, 'net_sales' => (string) $row->net_sales, 'cost' => (string) $row->cost, 'gross_profit' => (string) $row->gross_profit];
+    }
+
+    private function profitabilityUnavailableCount(User $user, array $scope, array $range, array $context): int
+    {
+        return PosSaleItem::query()->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
+            ->where('pos_sale_items.company_id', $user->company_id)->where('pos_sales.status', 'completed')
+            ->where(function (Builder $query): void { $query->whereNull('pos_sale_items.cost_snapshot_status')->orWhere('pos_sale_items.cost_snapshot_status', '!=', 'captured'); })
+            ->when($scope['ids'] !== null, fn (Builder $query) => $query->whereIn('pos_sales.branch_id', $scope['ids']))
+            ->whereBetween('pos_sales.sold_at', $this->timestampRange($range))
+            ->when($context['product_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.product_id', $id))
+            ->when($context['category_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.category_id', $id))
+            ->when($context['brand_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.brand_id_snapshot', $id))
+            ->count();
+    }
+
+    /** @return array<int, array<string, int|string|null>> */
+    private function profitabilityInvoiceRows(Builder $items, array $returns, array $range): array
+    {
+        return (clone $items)->selectRaw("pos_sale_items.pos_sale_id, pos_sales.sale_number, pos_sales.sold_at, COALESCE(branches.name, 'Unassigned') as branch_name, COALESCE(users.name, 'Unassigned') as salesperson_name, COUNT(*) as item_count, COALESCE(SUM(pos_sale_items.net_sales_snapshot), 0) as net_sales, COALESCE(SUM(pos_sale_items.total_cost_snapshot), 0) as cost, COALESCE(SUM(pos_sale_items.gross_profit_snapshot), 0) as gross_profit, COALESCE(SUM(pos_sale_items.gross_sales_snapshot - pos_sale_items.net_sales_snapshot), 0) as discounts")
+            ->groupByRaw("pos_sale_items.pos_sale_id, pos_sales.sale_number, pos_sales.sold_at, COALESCE(branches.name, 'Unassigned'), COALESCE(users.name, 'Unassigned')")
+            ->orderByDesc('gross_profit')->limit(500)->get()
+            ->map(fn ($row) => ['date' => CarbonImmutable::parse($row->sold_at)->setTimezone($range['timezone'])->toDateString(), 'invoice' => $row->sale_number, 'outlet' => $row->branch_name, 'salesperson' => $row->salesperson_name, 'items' => (int) $row->item_count, 'net_sales' => $this->minor($row->net_sales), 'cost' => $this->minor($row->cost), 'gross_profit' => $this->minor($row->gross_profit), 'margin_percent' => $this->margin($this->minor($row->gross_profit), $this->minor($row->net_sales)), 'discounts' => $this->minor($row->discounts)])->all();
+    }
+
+    /** @param array<int,string> $dimensions @return array<int, array<string, int|string|null>> */
+    private function profitabilityGroups(Builder $items, array $dimensions, string $profitColumn): array
+    {
+        $columns = match ($dimensions[0]) {
+            'branch_id' => ["pos_sales.branch_id", "COALESCE(branches.name, 'Unassigned') as branch_name"],
+            'salesperson_id' => ["pos_sales.completed_by as salesperson_id", "COALESCE(users.name, 'Unassigned') as salesperson_name"],
+            default => array_map(fn (string $dimension) => "pos_sale_items.{$dimension}", $dimensions),
+        };
+        $selects = implode(', ', $columns);
+        $group = match ($dimensions[0]) {
+            'branch_id' => "pos_sales.branch_id, COALESCE(branches.name, 'Unassigned')",
+            'salesperson_id' => "pos_sales.completed_by, COALESCE(users.name, 'Unassigned')",
+            default => implode(', ', $columns),
+        };
+        return (clone $items)->selectRaw("{$selects}, COUNT(DISTINCT pos_sale_items.pos_sale_id) as invoice_count, COALESCE(SUM(pos_sale_items.quantity), 0) as quantity, COALESCE(SUM(pos_sale_items.net_sales_snapshot), 0) as net_sales, COALESCE(SUM(pos_sale_items.total_cost_snapshot), 0) as cost, COALESCE(SUM(pos_sale_items.{$profitColumn}), 0) as gross_profit, COALESCE(SUM(pos_sale_items.gross_sales_snapshot - pos_sale_items.net_sales_snapshot), 0) as discounts")
+            ->groupByRaw($group)->orderByDesc('gross_profit')->limit(500)->get()
+            ->map(function ($row) use ($dimensions): array {
+                $netSales = $this->minor($row->net_sales);
+                $profit = $this->minor($row->gross_profit);
+                $label = match ($dimensions[0]) {
+                    'product_id' => $row->product_name,
+                    'category_id' => $row->category_name_snapshot ?: 'Uncategorized',
+                    'brand_id_snapshot' => $row->brand_name_snapshot ?: 'Unbranded',
+                    'branch_id' => $row->branch_name,
+                    default => $row->salesperson_name,
+                };
+                return ['dimension' => $label, 'sku' => $row->sku ?? null, 'invoice_count' => (int) $row->invoice_count, 'quantity' => (string) $row->quantity, 'net_sales' => $netSales, 'cost' => $this->minor($row->cost), 'gross_profit' => $profit, 'margin_percent' => $this->margin($profit, $netSales), 'discounts' => $this->minor($row->discounts)];
+            })->all();
     }
 
     private function gst(User $user, array $scope, array $range, array $context): array
@@ -546,5 +691,17 @@ class RetailReportingService
         $numerator = $thousandths * $this->minor($unitCost);
 
         return $numerator < 0 ? -intdiv(abs($numerator) + 500, 1000) : intdiv($numerator + 500, 1000);
+    }
+
+    private function margin(int $profit, int $sales): string
+    {
+        if ($sales === 0) {
+            return '0.0000';
+        }
+
+        $scaled = intdiv((abs($profit) * 1000000) + intdiv(abs($sales), 2), abs($sales));
+        $scaled = $profit < 0 ? -$scaled : $scaled;
+
+        return intdiv($scaled, 10000).'.'.str_pad((string) abs($scaled % 10000), 4, '0', STR_PAD_LEFT);
     }
 }

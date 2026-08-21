@@ -7,9 +7,9 @@ class ReportValueFormatter
     /** @var array<int, string> */
     private const MONEY_KEYS = [
         'amount', 'average_order_value', 'balance_due', 'cess', 'cost_of_goods_sold',
-        'discounts', 'gross_profit', 'gross_sales', 'gross_total', 'igst', 'net_sales',
+        'discount_impact_on_profit', 'discounts', 'gross_profit', 'gross_profit_before_discount', 'gross_sales', 'gross_total', 'igst', 'net_sales',
         'outstanding', 'paid', 'payments_received', 'purchase_total', 'return_value',
-        'sgst', 'stock_value', 'tax', 'taxable_sales', 'total', 'unit_cost', 'value',
+        'sales_returns', 'sgst', 'stock_value', 'tax', 'taxable_sales', 'total', 'unit_cost', 'value',
     ];
 
     /** @var array<int, string> */
@@ -30,6 +30,10 @@ class ReportValueFormatter
 
         if (in_array($key, self::COUNT_KEYS, true) && is_numeric($value)) {
             return number_format((int) $value);
+        }
+
+        if (str_ends_with($key, 'margin_percent') && is_numeric($value)) {
+            return number_format((float) $value, 2).'%';
         }
 
         return (string) $value;

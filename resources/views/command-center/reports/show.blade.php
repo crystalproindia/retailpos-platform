@@ -7,7 +7,7 @@
 <div class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('reports.index', request()->query()) }}" class="text-sm font-semibold text-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-500/20 dark:text-teal-300">Back to reports</a>
-        @can('crm.reports.export')
+        @can($report['selected_report'] === 'profitability' ? 'reports.profitability.export' : 'crm.reports.export')
             <a href="{{ route('reports.export', [$report['selected_report']] + request()->query()) }}" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-teal-500/20 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">Export CSV</a>
         @endcan
     </div>

@@ -435,6 +435,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::post('quotations/{quotation}/email/send', [QuotationShareController::class, 'sendEmail'])->middleware('can:crm.quotations.send')->name('quotations.email.send');
         Route::get('quotations/{quotation}/whatsapp', [QuotationShareController::class, 'whatsapp'])->middleware('can:crm.quotations.send')->name('quotations.whatsapp');
         Route::get('proforma-invoices', [ProformaController::class, 'index'])->middleware('can:crm.proformas.view')->name('proformas.index');
+        Route::get('proforma-invoices/create', [ProformaController::class, 'create'])->middleware('can:crm.proformas.create')->name('proformas.create');
         Route::get('quotations/{quotation}/proforma/create', [ProformaController::class, 'createFromQuotation'])->middleware('can:crm.proformas.create')->name('proformas.create-from-quotation');
         Route::get('customers/{customer}/proforma/create', [ProformaController::class, 'createFromCustomer'])->middleware('can:crm.proformas.create')->name('proformas.create-from-customer');
         Route::post('proforma-invoices', [ProformaController::class, 'store'])->middleware('can:crm.proformas.create')->name('proformas.store');

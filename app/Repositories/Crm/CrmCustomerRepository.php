@@ -47,6 +47,16 @@ class CrmCustomerRepository
     }
 
     /** @return Collection<int, CrmCustomer> */
+    public function selectableForDocument(User $user): Collection
+    {
+        return $this->queryForUser($user)
+            ->select(['id', 'lead_id', 'company_name', 'display_name', 'email', 'phone', 'billing_address'])
+            ->orderByRaw('COALESCE(company_name, display_name)')
+            ->limit(200)
+            ->get();
+    }
+
+    /** @return Collection<int, CrmCustomer> */
     public function searchForInvoice(User $user, string $search, int $limit = 10): Collection
     {
         $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($search)).'%';

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\CommandCenter;
 use App\Http\Controllers\Controller;
 use App\Models\Customers\Customer;
 use App\Models\Inventory\InventoryCategory;
+use App\Models\Inventory\InventoryBrand;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\Purchases\Supplier;
@@ -26,11 +27,14 @@ class ReportsController extends Controller
 
     public function show(Request $request, RetailReportingService $reports, OutletAccessService $outlets, string $report): View
     {
+        $this->authorizeProfitability($request, $report, false);
+
         return view('command-center.reports.show', $this->payload($request, $reports, $outlets, $report) + ['report' => $reports->report($request->user(), $report, $this->filters($request))]);
     }
 
     public function export(Request $request, RetailReportingService $reports, ReportValueFormatter $formatter, string $report)
     {
+        $this->authorizeProfitability($request, $report, true);
         $data = $reports->report($request->user(), $report, $this->filters($request));
         $warehouseName = filled($data['scope']['warehouse_id'] ?? null)
             ? Warehouse::query()->where('company_id', $request->user()->company_id)->find($data['scope']['warehouse_id'])?->name
@@ -81,6 +85,7 @@ class ReportsController extends Controller
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'product_id' => ['nullable', 'integer'],
             'category_id' => ['nullable', 'integer'],
+            'brand_id' => ['nullable', 'integer'],
             'customer_id' => ['nullable', 'integer'],
             'supplier_id' => ['nullable', 'integer'],
             'cashier_id' => ['nullable', 'integer'],
@@ -104,6 +109,7 @@ class ReportsController extends Controller
         $options = [
             'products' => Product::query()->where('company_id', $user->company_id)->where('is_active', true)->orderBy('name')->limit(100)->get(['id', 'name']),
             'categories' => InventoryCategory::query()->where('company_id', $user->company_id)->orderBy('name')->limit(100)->get(['id', 'name']),
+            'brands' => InventoryBrand::query()->where('company_id', $user->company_id)->orderBy('name')->limit(100)->get(['id', 'name']),
             'customers' => Customer::query()->where('company_id', $user->company_id)->where('is_active', true)->orderBy('display_name')->limit(100)->get(['id', 'display_name']),
             'suppliers' => Supplier::query()->where('company_id', $user->company_id)->where('is_active', true)->orderBy('name')->limit(100)->get(['id', 'name']),
             'cashiers' => User::query()->where('company_id', $user->company_id)->where('is_active', true)->orderBy('name')->limit(100)->get(['id', 'name']),
@@ -115,6 +121,7 @@ class ReportsController extends Controller
         $sales = [
             $select('product_id', 'Product', $records($options['products'], 'name')),
             $select('category_id', 'Category', $records($options['categories'], 'name')),
+            $select('brand_id', 'Brand', $records($options['brands'], 'name')),
             $select('customer_id', 'Customer', $records($options['customers'], 'display_name')),
             $select('cashier_id', 'Cashier', $records($options['cashiers'], 'name')),
             $select('payment_method', 'Payment method', $status(['cash', 'card', 'upi', 'wallet', 'credit'])),
@@ -161,5 +168,12 @@ class ReportsController extends Controller
             ],
             default => [],
         };
+    }
+
+    private function authorizeProfitability(Request $request, string $report, bool $export): void
+    {
+        if ($report === 'profitability') {
+            abort_unless($request->user()->can($export ? 'reports.profitability.export' : 'reports.profitability.view'), 403);
+        }
     }
 }

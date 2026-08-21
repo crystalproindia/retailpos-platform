@@ -196,7 +196,7 @@ class PosCheckoutService
         $items = [];
         foreach ($data['items'] as $item) {
             $product = Product::query()
-                ->with(['category', 'taxRate', 'unit'])
+                ->with(['category', 'brand', 'taxRate', 'unit'])
                 ->where('company_id', $user->company_id)
                 ->where('is_active', true)
                 ->where('status', Product::STATUS_ACTIVE)
@@ -307,6 +307,10 @@ class PosCheckoutService
 
         foreach ($calculation['lines'] as $index => $line) {
             $product = $line['product'];
+            $unitCost = $this->minor((string) ($product->cost_price ?? '0.00'));
+            $totalCost = $this->quantityValue((string) $line['quantity'], $unitCost);
+            $profitBeforeDiscount = $line['gross_taxable_minor'] - $totalCost;
+            $profitAfterDiscount = $line['taxable_minor'] - $totalCost;
             $sale->items()->create([
                 'company_id' => $user->company_id,
                 'product_id' => $product->id,
@@ -320,7 +324,20 @@ class PosCheckoutService
                 'unit' => $product->unit?->short_code,
                 'quantity' => $line['quantity'],
                 'unit_price' => $this->decimal($line['unit_price_minor']),
+                'unit_cost_snapshot' => $this->decimal($unitCost),
+                'total_cost_snapshot' => $this->decimal($totalCost),
                 'gross_amount' => $this->decimal($line['gross_minor']),
+                'gross_sales_snapshot' => $this->decimal($line['gross_taxable_minor']),
+                'net_sales_snapshot' => $this->decimal($line['taxable_minor']),
+                'gross_profit_before_discount' => $this->decimal($profitBeforeDiscount),
+                'gross_profit_snapshot' => $this->decimal($profitAfterDiscount),
+                'gross_margin_before_discount_percent' => $this->marginPercent($profitBeforeDiscount, $line['gross_taxable_minor']),
+                'gross_margin_percent_snapshot' => $this->marginPercent($profitAfterDiscount, $line['taxable_minor']),
+                'cost_snapshot_method' => 'standard_cost',
+                'cost_snapshot_status' => 'captured',
+                'category_name_snapshot' => $product->category?->name,
+                'brand_id_snapshot' => $product->brand_id,
+                'brand_name_snapshot' => $product->brand?->name,
                 'price_source' => array_key_exists('unit_price', $data['items'][$index]) ? 'manual' : 'product',
                 'discount_type' => $data['items'][$index]['discount_type'] ?? 'fixed',
                 'discount_value' => $data['items'][$index]['discount_value'] ?? '0',
@@ -462,5 +479,25 @@ class PosCheckoutService
     private function sumDecimals(string $first, string $second): string
     {
         return $this->decimal($this->minor($first) + $this->minor($second));
+    }
+
+    private function quantityValue(string $quantity, int $unitCost): int
+    {
+        [$whole, $fraction] = array_pad(explode('.', $quantity, 2), 2, '');
+        $thousandths = ((int) $whole * 1000) + (int) str_pad(substr($fraction, 0, 3), 3, '0');
+
+        return intdiv(($thousandths * $unitCost) + 500, 1000);
+    }
+
+    private function marginPercent(int $profit, int $sales): string
+    {
+        if ($sales === 0) {
+            return '0.0000';
+        }
+
+        $scaled = intdiv((abs($profit) * 1000000) + intdiv(abs($sales), 2), abs($sales));
+        $scaled = $profit < 0 ? -$scaled : $scaled;
+
+        return intdiv($scaled, 10000).'.'.str_pad((string) abs($scaled % 10000), 4, '0', STR_PAD_LEFT);
     }
 }

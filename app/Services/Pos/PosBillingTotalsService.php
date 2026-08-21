@@ -86,12 +86,16 @@ class PosBillingTotalsService
             $remainingOrderDiscount -= $allocation;
             $discounted = max(0, $line['net_before_order_minor'] - $allocation);
             $rate = $this->rate($line['product']->taxRate?->rate ?? '0');
+            $grossTax = $rate > 0
+                ? $this->taxes->calculate($this->decimal($line['gross_minor']), $this->decimalRate($rate), $gst?->state_code, $placeOfSupply, $billing->tax_inclusive_pricing)
+                : ['taxable_value' => $this->decimal($line['gross_minor'])];
             $tax = $rate > 0
                 ? $this->taxes->calculate($this->decimal($discounted), $this->decimalRate($rate), $gst?->state_code, $placeOfSupply, $billing->tax_inclusive_pricing)
                 : ['taxable_value' => $this->decimal($discounted), 'cgst' => '0.00', 'sgst' => '0.00', 'igst' => '0.00', 'cess' => '0.00', 'tax_total' => '0.00', 'line_total' => $this->decimal($discounted), 'treatment' => 'not_taxable'];
 
             $line['order_discount_minor'] = $allocation;
             $line['discount_amount_minor'] = $line['line_discount_minor'] + $allocation;
+            $line['gross_taxable_minor'] = $this->money($grossTax['taxable_value']);
             $line['taxable_minor'] = $this->money($tax['taxable_value']);
             $line['cgst_minor'] = $this->money($tax['cgst']);
             $line['sgst_minor'] = $this->money($tax['sgst']);

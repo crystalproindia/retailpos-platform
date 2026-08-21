@@ -14,9 +14,12 @@
         @endforeach
     </div>
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        @foreach(['sales'=>'Sales','purchases'=>'Purchases','inventory'=>'Inventory','movements'=>'Stock Movements','profitability'=>'Gross Profit','gst'=>'GST & Tax','payments'=>'Payments','outstanding'=>'Outstanding','returns'=>'Purchase Returns','sales_returns'=>'Sales Returns','outlets'=>'Outlet Performance','cashiers'=>'Cashier Performance'] as $key=>$label)
+        @foreach(['sales'=>'Sales','purchases'=>'Purchases','inventory'=>'Inventory','movements'=>'Stock Movements','gst'=>'GST & Tax','payments'=>'Payments','outstanding'=>'Outstanding','returns'=>'Purchase Returns','sales_returns'=>'Sales Returns','outlets'=>'Outlet Performance','cashiers'=>'Cashier Performance'] as $key=>$label)
         <a href="{{ route('reports.show', [$key] + request()->query()) }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900"><h2 class="font-semibold text-slate-950 dark:text-white">{{ $label }}</h2><p class="mt-1 text-sm text-slate-500">Authorized, filter-consistent reporting with CSV export.</p></a>
         @endforeach
+        @can('reports.profitability.view')
+            <a href="{{ route('reports.show', ['profitability'] + request()->query()) }}" class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm hover:border-emerald-400 dark:border-emerald-900/70 dark:bg-emerald-950/20"><h2 class="font-semibold text-slate-950 dark:text-white">Gross Profit</h2><p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Tax-exclusive sale-time cost snapshots with controlled access.</p></a>
+        @endcan
     </div>
 </div>
 @endsection

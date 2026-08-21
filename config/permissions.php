@@ -311,6 +311,8 @@ return [
         'crm.reports.view' => $crmUserRoles,
         'crm.reports.executive' => $crmManagementRoles,
         'crm.reports.export' => $crmManagementRoles,
+        'reports.profitability.view' => $crmManagementRoles,
+        'reports.profitability.export' => $crmManagementRoles,
         'integrations.email.view' => $notificationManagementRoles,
         'integrations.email.manage' => $administratorRoles,
         'email.deliveries.view' => $notificationManagementRoles,

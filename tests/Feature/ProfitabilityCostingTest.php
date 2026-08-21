@@ -10,6 +10,7 @@ use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\InventoryUnit;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\StockLevel;
+use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
 use App\Models\Pos\PosReturn;
 use App\Models\Pos\PosReturnItem;
@@ -17,6 +18,7 @@ use App\Models\Pos\PosSaleItem;
 use App\Models\Crm\CrmInvoiceItem;
 use App\Models\User;
 use App\Services\Pos\PosCheckoutService;
+use App\Services\Reports\PosProfitabilityBackfillService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsReportingData;
 use Tests\TestCase;
@@ -151,6 +153,22 @@ class ProfitabilityCostingTest extends TestCase
 
         $this->assertSame(0, $report['detail']['net_sales']);
         $this->assertSame([], $report['detail']['invoice_rows']);
+    }
+
+    public function test_historical_pos_backfill_reconstructs_only_an_unambiguous_stock_movement_cost(): void
+    {
+        $company = Company::factory()->create(); $outlet = $this->reportBranch($company, 'Backfill Outlet'); $admin = $this->reportUser($company, $outlet);
+        $product = $this->reportProduct($company, $outlet, 'Backfill product', '90.00'); $sale = $this->reportSale($company, $outlet, $admin, 'BACKFILL-1', '100.00');
+        $item = $this->reportSaleItem($sale, $product, null, '2.000', '100.00'); $item->update(['gross_amount' => '100.00', 'taxable_amount' => '100.00']);
+        $warehouse = Warehouse::create(['company_id' => $company->id, 'branch_id' => $outlet->id, 'name' => 'Backfill WH', 'code' => 'BACKFILL-WH', 'type' => 'store', 'country' => 'India', 'is_active' => true]);
+        StockMovement::create(['company_id' => $company->id, 'branch_id' => $outlet->id, 'warehouse_id' => $warehouse->id, 'product_id' => $product->id, 'movement_type' => 'sale', 'direction' => 'out', 'quantity' => '2.000', 'quantity_before' => '2.000', 'quantity_after' => '0.000', 'unit_cost' => '30.00', 'reference_type' => \App\Models\Pos\PosSale::class, 'reference_id' => $sale->id, 'occurred_at' => now()]);
+
+        $dryRun = app(PosProfitabilityBackfillService::class)->run($company->id, true);
+        $this->assertSame(1, $dryRun['reconstructed']); $this->assertNull($item->fresh()->cost_snapshot_status);
+        $result = app(PosProfitabilityBackfillService::class)->run($company->id, false);
+        $item->refresh();
+        $this->assertSame(1, $result['reconstructed']); $this->assertSame('reconstructed', $item->cost_snapshot_status); $this->assertSame('stock_movement', $item->cost_snapshot_method);
+        $this->assertSame('60.00', $item->total_cost_snapshot); $this->assertSame('40.00', $item->gross_profit_snapshot);
     }
 
     /** @return array{User, Product} */

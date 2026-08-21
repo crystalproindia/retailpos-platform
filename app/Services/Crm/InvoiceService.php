@@ -10,6 +10,7 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Crm\CrmQuotation;
+use App\Models\Inventory\Product;
 use App\Models\User;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Services\AuditLogger;
@@ -41,7 +42,7 @@ class InvoiceService
             $data = $this->customerData($user, $data);
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $outlet = $this->outlets->current($user);
-            $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0', $taxMode);
+            $calculation = $this->calculate($this->profitabilityItems($user, $data['items']), $data['adjustment_total'] ?? '0', $taxMode);
             $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::INVOICE) + [
                 'company_id' => $user->company_id,
                 'branch_id' => $outlet->id,
@@ -120,7 +121,7 @@ class InvoiceService
             $previousCustomerId = $invoice->customer_id;
             $data = $this->customerData($user, $data);
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? $invoice->tax_mode);
-            $calculation = $this->calculate($data['items'], $data['adjustment_total'] ?? '0', $taxMode);
+            $calculation = $this->calculate($this->profitabilityItems($user, $data['items']), $data['adjustment_total'] ?? '0', $taxMode);
             $invoice->update(Arr::only($data, [
                 'customer_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
                 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date',
@@ -287,7 +288,9 @@ class InvoiceService
             $subtotal += $gross;
             $discountTotal += $discount;
             $taxTotal += $tax;
-            $normalized[] = ['name' => $item['name'], 'description' => $item['description'] ?? null, 'quantity' => $this->decimal($quantityMilli, 3), 'unit' => $item['unit'] ?? 'unit', 'unit_price' => $this->decimal($priceCents), 'discount_type' => $discountType, 'discount_value' => $discountType === 'percentage' ? $this->decimal($this->milli((string) $discountValue), 3) : $this->decimal($this->cents((string) $discountValue)), 'discount_amount' => $this->decimal($discount), 'tax_rate' => $this->decimal($taxRateMilli, 3), 'tax_amount' => $this->decimal($tax), 'line_subtotal' => $this->decimal($lineSubtotal), 'line_total' => $this->decimal($lineSubtotal + $tax), 'sort_order' => $index + 1];
+            $cost = $item['snapshot_unit_cost_cents'] ?? null;
+            $totalCost = $cost === null ? null : intdiv($quantityMilli * $cost + 500, 1000);
+            $normalized[] = ['product_id'=>$item['product_id'] ?? null,'category_id_snapshot'=>$item['category_id_snapshot'] ?? null,'brand_id_snapshot'=>$item['brand_id_snapshot'] ?? null,'name'=>$item['name'],'sku_snapshot'=>$item['sku_snapshot'] ?? null,'category_name_snapshot'=>$item['category_name_snapshot'] ?? null,'brand_name_snapshot'=>$item['brand_name_snapshot'] ?? null,'description'=>$item['description'] ?? null,'quantity'=>$this->decimal($quantityMilli,3),'unit'=>$item['unit'] ?? 'unit','unit_price'=>$this->decimal($priceCents),'unit_cost_snapshot'=>$cost === null ? null : $this->decimal($cost),'total_cost_snapshot'=>$totalCost === null ? null : $this->decimal($totalCost),'gross_sales_snapshot'=>$this->decimal($gross),'net_sales_snapshot'=>$this->decimal($lineSubtotal),'gross_profit_before_discount'=>$totalCost === null ? null : $this->decimal($gross-$totalCost),'gross_profit_snapshot'=>$totalCost === null ? null : $this->decimal($lineSubtotal-$totalCost),'gross_margin_percent_snapshot'=>$totalCost === null ? null : $this->margin($lineSubtotal-$totalCost,$lineSubtotal),'cost_snapshot_method'=>$cost === null ? null : 'standard_cost','cost_snapshot_status'=>$cost === null ? 'unavailable' : 'captured','discount_type'=>$discountType,'discount_value'=>$discountType === 'percentage' ? $this->decimal($this->milli((string)$discountValue),3) : $this->decimal($this->cents((string)$discountValue)),'discount_amount'=>$this->decimal($discount),'tax_rate'=>$this->decimal($taxRateMilli,3),'tax_amount'=>$this->decimal($tax),'line_subtotal'=>$this->decimal($lineSubtotal),'line_total'=>$this->decimal($lineSubtotal+$tax),'sort_order'=>$index+1];
         }
         $adjustmentCents = $this->cents((string) $adjustment);
         $grandTotal = $subtotal - $discountTotal + $taxTotal + $adjustmentCents;
@@ -385,6 +388,21 @@ class InvoiceService
     {
         return $this->minor($value, 2);
     }
+
+    /** @param array<int,array<string,mixed>> $items @return array<int,array<string,mixed>> */
+    private function profitabilityItems(User $user, array $items): array
+    {
+        $ids = collect($items)->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $products = Product::query()->with(['category:id,name','brand:id,name'])->where('company_id',$user->company_id)->whereIn('id',$ids)->lockForUpdate()->get()->keyBy('id');
+        return collect($items)->map(function (array $item) use ($products): array {
+            if (empty($item['product_id'])) return $item;
+            $product = $products->get((int)$item['product_id']);
+            if (! $product) throw ValidationException::withMessages(['items'=>'The selected product is unavailable.']);
+            return array_replace($item, ['product_id'=>$product->id,'name'=>$product->name,'snapshot_unit_cost_cents'=>$this->cents((string)($product->cost_price ?? '0.00')),'sku_snapshot'=>$product->sku,'category_id_snapshot'=>$product->category_id,'category_name_snapshot'=>$product->category?->name,'brand_id_snapshot'=>$product->brand_id,'brand_name_snapshot'=>$product->brand?->name]);
+        })->all();
+    }
+
+    private function margin(int $profit, int $sales): string { if ($sales === 0) return '0.0000'; $scaled=intdiv(abs($profit)*1000000+intdiv(abs($sales),2),abs($sales)); $scaled=$profit<0?- $scaled:$scaled; return intdiv($scaled,10000).'.'.str_pad((string)abs($scaled%10000),4,'0',STR_PAD_LEFT); }
 
     private function milli(string $value): int
     {

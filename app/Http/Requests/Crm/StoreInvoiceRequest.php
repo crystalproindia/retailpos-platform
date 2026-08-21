@@ -40,6 +40,7 @@ class StoreInvoiceRequest extends FormRequest
             'internal_notes' => ['nullable', 'string', 'max:10000'],
             'adjustment_total' => ['nullable', 'numeric', 'between:-999999999,999999999'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', Rule::exists('products', 'id')->where('company_id', $this->user()?->company_id)],
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string', 'max:5000'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],

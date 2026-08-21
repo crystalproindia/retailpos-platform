@@ -61,8 +61,8 @@ class ResponsiveNavigationTest extends TestCase
             ->assertSee('data-sidebar-scroll', false)
             ->assertSee('data-sidebar-group', false);
         $this->assertStringContainsString('validSidebarGroupIds', $script);
-        $this->assertStringContainsString("desktop: { collapsed: false, scrollTop: 0, groups: {} }", $script);
-        $this->assertStringContainsString("mobile: { scrollTop: 0, groups: {} }", $script);
+        $this->assertStringContainsString('desktop: { collapsed: false, scrollTop: 0, groups: {} }', $script);
+        $this->assertStringContainsString('mobile: { scrollTop: 0, groups: {} }', $script);
         $this->assertStringContainsString('scrollIntoView', $script);
     }
 
@@ -96,7 +96,7 @@ class ResponsiveNavigationTest extends TestCase
             ->assertDontSee('Invoice Designs');
 
         $layout = file_get_contents(resource_path('views/layouts/admin.blade.php'));
-        $this->assertStringContainsString('ModuleRegistry::class', $layout);
+        $this->assertStringContainsString('NavigationPreferenceService::class', $layout);
     }
 
     public function test_platform_billing_navigation_uses_parameter_free_named_routes(): void

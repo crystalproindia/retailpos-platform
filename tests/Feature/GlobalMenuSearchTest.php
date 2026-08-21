@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\User;
 use App\Services\Navigation\GlobalMenuSearchService;
 use App\Support\Modules\ModuleRegistry;
+use App\Support\Navigation\SaasNavigationRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -61,12 +62,12 @@ class GlobalMenuSearchTest extends TestCase
         $this->assertSame(2, $entries->where('route', 'crm.dashboard')->count());
         $this->assertSame(['CRM', 'CRM Dashboard'], $entries->where('route', 'crm.dashboard')->pluck('label')->all());
         $this->assertFalse($entries->contains('label', 'Asha Retail'));
-        $this->assertSame(['navigation_key', 'label', 'route', 'url', 'icon', 'breadcrumb', 'group', 'aliases'], array_keys($entries->first()));
+        $this->assertSame(['navigation_key', 'label', 'route', 'url', 'icon', 'breadcrumb', 'group', 'aliases', 'hidden'], array_keys($entries->first()));
 
         $modules = config('modules.modules');
         $modules['invoice-designs']['enabled'] = false;
         config(['modules.modules' => $modules]);
-        $service = new GlobalMenuSearchService(new ModuleRegistry, app(\App\Support\Navigation\SaasNavigationRegistry::class));
+        $service = new GlobalMenuSearchService(new ModuleRegistry, app(SaasNavigationRegistry::class));
 
         $this->assertFalse($service->entriesFor($administrator)->contains('route', 'sales.invoices.templates.index'));
     }

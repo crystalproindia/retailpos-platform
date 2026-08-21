@@ -310,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const confirmMethod = confirmDialog.querySelector('[data-confirm-method]');
         const confirmTitle = confirmDialog.querySelector('[data-confirm-title]');
         const confirmMessage = confirmDialog.querySelector('[data-confirm-message]');
+        const confirmSubmit = confirmDialog.querySelector('[data-confirm-submit]');
         let confirmTrigger = null;
 
         const closeConfirmDialog = () => {
@@ -328,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirmMethod) confirmMethod.value = button.dataset.confirmMethod || 'DELETE';
                 if (confirmTitle) confirmTitle.textContent = button.dataset.confirmTitle || 'Confirm this action?';
                 if (confirmMessage) confirmMessage.textContent = button.dataset.confirmMessage || 'This action cannot be undone.';
+                if (confirmSubmit) confirmSubmit.textContent = button.dataset.confirmSubmitLabel || 'Delete';
                 confirmDialog.showModal();
                 window.requestAnimationFrame(() => confirmDialog.querySelector('[data-confirm-cancel]')?.focus());
             });
@@ -338,6 +340,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target === confirmDialog) closeConfirmDialog();
         });
     }
+
+    document.querySelectorAll('[data-navigation-customizer]').forEach((customizer) => {
+        customizer.querySelectorAll('[data-navigation-move]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const item = button.closest('[data-navigation-item]');
+                const list = item?.parentElement;
+                if (!item || !list) return;
+
+                if (button.dataset.navigationMove === 'up') {
+                    const previous = item.previousElementSibling;
+                    if (previous) list.insertBefore(item, previous);
+                } else {
+                    const next = item.nextElementSibling;
+                    if (next) list.insertBefore(next, item);
+                }
+            });
+        });
+
+        customizer.querySelectorAll('input[name="visible_module_ids[]"]').forEach((toggle) => {
+            toggle.addEventListener('change', () => {
+                const pin = toggle.closest('[data-navigation-item]')?.querySelector('[data-navigation-pin]');
+                if (!(pin instanceof HTMLInputElement)) return;
+
+                pin.disabled = !toggle.checked;
+                if (!toggle.checked) pin.checked = false;
+            });
+        });
+    });
 
     const menuDialog = document.querySelector('[data-global-menu-dialog]');
 

@@ -129,12 +129,56 @@
             });
 
             (function () {
-                const form = document.querySelector('[data-product-search-url]'); if (!form) return;
-                let timer, controller;
-                const clear = (row) => { row.querySelector('[data-product-id]').value = ''; row.querySelector('[data-product-search]').value = ''; row.querySelector('[data-product-status]').textContent = 'Leave blank for a free-text service or custom line.'; row.querySelector('[data-product-results]').classList.add('hidden'); };
-                form.addEventListener('click', (event) => { const button = event.target.closest('[data-clear-product]'); if (button) clear(button.closest('[data-invoice-item]')); });
-                form.addEventListener('input', (event) => { if (!event.target.matches('[data-product-search]')) return; const input=event.target, row=input.closest('[data-invoice-item]'), results=row.querySelector('[data-product-results]'); clearTimeout(timer); if (input.value.trim().length < 2) { results.classList.add('hidden'); return; } timer=setTimeout(async()=>{ controller?.abort(); controller=new AbortController(); row.querySelector('[data-product-status]').textContent='Searching products…'; try { const response=await fetch(form.dataset.productSearchUrl+'?q='+encodeURIComponent(input.value.trim()),{headers:{Accept:'application/json'},signal:controller.signal}); const data=response.ok?await response.json():{products:[]}; results.innerHTML=data.products.length?data.products.map((p)=>`<button type="button" data-product-option='${JSON.stringify(p).replace(/'/g,'&#039;')}' class="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-teal-50 dark:border-slate-800 dark:hover:bg-slate-800"><span class="font-semibold">${p.name}</span><span class="ml-2 text-xs text-slate-500">${p.sku||'No SKU'} · ${p.selling_price}</span></button>`).join(''):'<p class="px-3 py-3 text-sm text-slate-500">No matching products.</p>'; results.classList.remove('hidden'); row.querySelector('[data-product-status]').textContent='Select a product or keep this as free text.'; } catch (error) { if(error.name!=='AbortError') row.querySelector('[data-product-status]').textContent='Product search is unavailable. You can still use a free-text line.'; } },250); });
-                form.addEventListener('click', (event) => { const option=event.target.closest('[data-product-option]'); if (!option) return; const p=JSON.parse(option.dataset.productOption), row=option.closest('[data-invoice-item]'); row.querySelector('[data-product-id]').value=p.id; row.querySelector('[data-product-search]').value=p.name; row.querySelector('[data-product-status]').textContent='Product linked. The server verifies it and captures profitability only on save.'; row.querySelector('[data-product-results]').classList.add('hidden'); const name=row.querySelector('[name$="[name]"]'), price=row.querySelector('[name$="[unit_price]"]'); if(name) name.value=p.name; if(price && (!price.value || price.value==='0')) price.value=p.selling_price; });
+                const form = document.querySelector('[data-product-search-url]');
+                if (!form) return;
+                const requests = new WeakMap(), timers = new WeakMap();
+                const clear = (row, clearSearch = true) => {
+                    row.querySelector('[data-product-id]').value = '';
+                    if (clearSearch) row.querySelector('[data-product-search]').value = '';
+                    row.querySelector('[data-product-status]').textContent = 'Leave blank for a free-text service or custom line.';
+                    row.querySelector('[data-product-results]').replaceChildren();
+                    row.querySelector('[data-product-results]').classList.add('hidden');
+                };
+                const resultButton = (product) => {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.dataset.productOption = JSON.stringify(product);
+                    button.className = 'block w-full border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-teal-50 dark:border-slate-800 dark:hover:bg-slate-800';
+                    const name = document.createElement('span'); name.className = 'font-semibold'; name.textContent = product.name;
+                    const meta = document.createElement('span'); meta.className = 'ml-2 text-xs text-slate-500'; meta.textContent = `${product.sku || 'No SKU'} · ${product.selling_price}`;
+                    button.append(name, meta); return button;
+                };
+                form.addEventListener('click', (event) => {
+                    const button = event.target.closest('[data-clear-product]');
+                    if (button) clear(button.closest('[data-invoice-item]'));
+                    const option = event.target.closest('[data-product-option]');
+                    if (!option) return;
+                    const product = JSON.parse(option.dataset.productOption), row = option.closest('[data-invoice-item]');
+                    row.querySelector('[data-product-id]').value = product.id;
+                    row.querySelector('[data-product-search]').value = product.name;
+                    row.querySelector('[data-product-status]').textContent = 'Product linked. The server verifies it and captures profitability only on save.';
+                    row.querySelector('[data-product-results]').replaceChildren(); row.querySelector('[data-product-results]').classList.add('hidden');
+                    const name = row.querySelector('[name$="[name]"]'), price = row.querySelector('[name$="[unit_price]"]');
+                    if (name) name.value = product.name;
+                    if (price && (!price.value || price.value === '0')) price.value = product.selling_price;
+                });
+                form.addEventListener('input', (event) => {
+                    if (!event.target.matches('[data-product-search]')) return;
+                    const input = event.target, row = input.closest('[data-invoice-item]'), results = row.querySelector('[data-product-results]');
+                    clear(row, false);
+                    clearTimeout(timers.get(row));
+                    if (input.value.trim().length < 2) return;
+                    timers.set(row, setTimeout(async () => {
+                        requests.get(row)?.abort(); const controller = new AbortController(); requests.set(row, controller);
+                        row.querySelector('[data-product-status]').textContent = 'Searching products…';
+                        try {
+                            const response = await fetch(form.dataset.productSearchUrl+'?q='+encodeURIComponent(input.value.trim()), {headers:{Accept:'application/json'}, signal:controller.signal});
+                            const data = response.ok ? await response.json() : {products: []}; results.replaceChildren();
+                            if (data.products.length) data.products.forEach((product) => results.append(resultButton(product)));
+                            else { const empty = document.createElement('p'); empty.className = 'px-3 py-3 text-sm text-slate-500'; empty.textContent = 'No matching products.'; results.append(empty); }
+                            results.classList.remove('hidden'); row.querySelector('[data-product-status]').textContent = 'Select a product or keep this as free text.';
+                        } catch (error) { if (error.name !== 'AbortError') row.querySelector('[data-product-status]').textContent = 'Product search is unavailable. You can still use a free-text line.'; }
+                    }, 250));
+                });
             })();
 
             (function () {

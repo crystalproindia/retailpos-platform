@@ -27,7 +27,10 @@ use Illuminate\Validation\ValidationException;
 
 class RetailReportingService
 {
-    public function __construct(private readonly OutletAccessService $outlets) {}
+    public function __construct(
+        private readonly OutletAccessService $outlets,
+        private readonly ProfitabilityReportingService $profitabilityReporting,
+    ) {}
 
     /** @param array<string, mixed> $filters */
     public function overview(User $user, array $filters): array
@@ -67,7 +70,7 @@ class RetailReportingService
                 'purchases' => $purchases + ['rows' => $this->purchaseRows($user, $scope, $range, $context)],
                 'inventory' => $stock + ['rows' => $this->stockRows($user, $scope, $context)],
                 'movements' => $this->stockMovements($user, $scope, $range, $context),
-                'profitability' => $this->profitability($user, $scope, $range, $context),
+                'profitability' => $this->profitabilityReporting->report($user, $scope, $range, $context),
                 'gst' => $this->gst($user, $scope, $range, $context) + ['rows' => $this->gstRows($user, $scope, $range, $context)],
                 'payments' => $payments + ['rows' => $this->paymentRows($user, $scope, $range, $context)],
                 'outstanding' => $invoices + ['rows' => $this->outstandingRows($user, $scope, $range, $context)],
@@ -157,6 +160,7 @@ class RetailReportingService
             'payment_method' => $filters['payment_method'] ?? null,
             'status' => $filters['status'] ?? null,
             'sale_channel' => $filters['sale_channel'] ?? null,
+            'source' => $filters['source'] ?? null,
             'discounted' => array_key_exists('discounted', $filters) ? filter_var($filters['discounted'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null,
             'tax_classification' => $filters['tax_classification'] ?? null,
             'movement_type' => $filters['movement_type'] ?? null,

@@ -92,6 +92,7 @@ class ReportsController extends Controller
             'payment_method' => ['nullable', 'string', 'max:32'],
             'status' => ['nullable', 'string', 'max:32'],
             'sale_channel' => ['nullable', 'string', 'max:32'],
+            'source' => ['nullable', Rule::in(['pos', 'crm'])],
             'discounted' => ['nullable', 'boolean'],
             'tax_classification' => ['nullable', 'string', 'max:24'],
             'movement_type' => ['nullable', 'string', 'max:64'],
@@ -126,6 +127,7 @@ class ReportsController extends Controller
             $select('cashier_id', 'Cashier', $records($options['cashiers'], 'name')),
             $select('payment_method', 'Payment method', $status(['cash', 'card', 'upi', 'wallet', 'credit'])),
             $select('sale_channel', 'Sale channel', $status(['retail', 'wholesale', 'online'])),
+            $select('source', 'Source', $status(['pos', 'crm'])),
             $select('discounted', 'Discount', [['value' => '1', 'label' => 'Discount applied'], ['value' => '0', 'label' => 'No discount']]),
             $select('status', 'Sale status', $status(['completed', 'voided'])),
         ];

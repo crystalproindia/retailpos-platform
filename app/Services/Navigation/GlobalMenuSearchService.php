@@ -14,21 +14,28 @@ class GlobalMenuSearchService
     public function __construct(
         private readonly ModuleRegistry $modules,
         private readonly SaasNavigationRegistry $saasNavigation,
+        private readonly ?NavigationPreferenceService $navigationPreferences = null,
     ) {}
 
-    /** @return Collection<int, array{navigation_key:string,label:string,route:string,url:string,icon:string,breadcrumb:string,group:string,aliases:array<int,string>}> */
+    /** @return Collection<int, array{navigation_key:string,label:string,route:string,url:string,icon:string,breadcrumb:string,group:string,aliases:array<int,string>,hidden:bool}> */
     public function entriesFor(User $user): Collection
     {
         $entries = collect();
+        $hiddenModuleIds = ($this->navigationPreferences ?? app(NavigationPreferenceService::class))
+            ->hiddenModules($user)
+            ->pluck('id')
+            ->flip();
 
         foreach ($this->modules->sidebarForUser($user) as $module) {
             foreach ($this->searchableModules($module) as [$item, $parentName]) {
-                $entries->push($this->moduleEntry($item, $parentName));
+                $entries->push($this->moduleEntry($item, $parentName, $hiddenModuleIds->has($item->id)));
             }
         }
 
         foreach ([...$this->saasNavigation->platformItems($user), ...$this->saasNavigation->tenantSubscriptionItems($user)] as $item) {
-            if (! Route::has($item['route'])) continue;
+            if (! Route::has($item['route'])) {
+                continue;
+            }
             $entries->push([
                 'navigation_key' => 'saas:'.$item['route'].':'.http_build_query($item['route_params'] ?? []),
                 'label' => $item['label'],
@@ -38,6 +45,7 @@ class GlobalMenuSearchService
                 'breadcrumb' => $user->is_platform_admin ? 'Administration › SaaS Management' : 'Administration › Subscription',
                 'group' => $user->is_platform_admin ? 'Administration' : 'Settings',
                 'aliases' => [],
+                'hidden' => false,
             ]);
         }
 
@@ -53,8 +61,8 @@ class GlobalMenuSearchService
         return config('modules.navigation_search.aliases', []);
     }
 
-    /** @return array{navigation_key:string,label:string,route:string,url:string,icon:string,breadcrumb:string,group:string,aliases:array<int,string>} */
-    private function moduleEntry(Module $module, ?string $parentName = null): array
+    /** @return array{navigation_key:string,label:string,route:string,url:string,icon:string,breadcrumb:string,group:string,aliases:array<int,string>,hidden:bool} */
+    private function moduleEntry(Module $module, ?string $parentName = null, bool $hidden = false): array
     {
         return [
             'navigation_key' => $module->navigationIdentity(),
@@ -65,6 +73,7 @@ class GlobalMenuSearchService
             'breadcrumb' => $module->category.($parentName ? ' › '.$parentName : ''),
             'group' => $this->groupFor($module->category),
             'aliases' => $module->searchAliases,
+            'hidden' => $hidden,
         ];
     }
 

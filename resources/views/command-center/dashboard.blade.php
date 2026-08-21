@@ -5,15 +5,55 @@
 
 @section('content')
     <div class="space-y-6">
-        <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-                <p class="text-sm font-medium text-teal-700 dark:text-teal-300">{{ auth()->user()->company?->name }}</p>
-                <h1 class="mt-2 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl dark:text-white">Command Center</h1>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Today&apos;s retail operating snapshot across sales, inventory, teams, and growth channels.</p>
+        @php
+            $hour = now(auth()->user()->company?->timezone ?? config('app.timezone'))->hour;
+            $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
+        @endphp
+        <section class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm dark:border-indigo-900/70 dark:bg-slate-900 sm:p-7">
+            <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+                <div>
+                    <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-200">{{ $greeting }}, {{ str(auth()->user()->name)->before(' ') }}</p>
+                    <h1 class="mt-2 text-3xl font-semibold tracking-normal text-slate-950 dark:text-white">Your retail operations, in one view.</h1>
+                    <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{{ auth()->user()->company?->name }} · {{ $currentOutlet?->name ?? 'All authorized outlets' }} · {{ now(auth()->user()->company?->timezone ?? config('app.timezone'))->format('l, d M Y') }}</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <a href="#quick-actions" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-teal-300 dark:text-slate-950">Quick actions</a>
+                    <a href="{{ route('navigation.preferences.edit') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800">Customize</a>
+                </div>
             </div>
-            <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-slate-500 dark:text-slate-400">Signed in as</p>
-                <p class="mt-1 font-semibold text-slate-950 dark:text-white">{{ auth()->user()->role->label() }}</p>
+        </section>
+
+        <section id="quick-actions" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p class="text-sm font-semibold text-teal-700 dark:text-teal-300">Quick Actions</p><h2 class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Move from insight to action.</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Shortcuts are tailored to the modules you are authorized to use.</p></div><a href="{{ route('navigation.preferences.edit') }}" class="text-sm font-semibold text-slate-600 hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300">Customize shortcuts</a></div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                @forelse($quickActions->take(8) as $action)
+                    <a href="{{ $action['url'] }}" class="group rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-800 transition duration-200 hover:border-teal-300 hover:bg-teal-50 hover:shadow-md dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-teal-800 dark:hover:bg-teal-950/30"><span class="grid size-10 place-items-center rounded-xl bg-white shadow-sm dark:bg-slate-800"><x-icon :name="$action['icon']" class="size-5" /></span><p class="mt-4 font-semibold">{{ $action['label'] }}</p><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $action['description'] }}</p></a>
+                @empty
+                    <p class="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">Your available actions will appear here as modules are enabled for your role.</p>
+                @endforelse
+            </div>
+        </section>
+
+        <section class="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-3"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">My Shortcuts</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Your pinned destinations.</p></div><a href="{{ route('navigation.preferences.edit') }}" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Manage</a></div>
+                <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                    @forelse ($pinnedModules->take(6) as $module)
+                        <a href="{{ $module->url() }}" class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:border-teal-300 hover:bg-teal-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-teal-800 dark:hover:bg-teal-950/30"><span class="grid size-9 place-items-center rounded-lg bg-white text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-200"><x-icon :name="$module->icon" class="size-4" /></span><span class="min-w-0 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $module->name }}</span></a>
+                    @empty
+                        <p class="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">Pin your most-used modules to keep them here.</p>
+                    @endforelse
+                </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-3"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">All Modules</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Your visible, authorized workspace.</p></div><button type="button" data-global-menu-search-open class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Search modules</button></div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @foreach ($moduleGroups as $modules)
+                        @foreach ($modules->take(4) as $module)
+                            <a href="{{ $module->url() }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-cyan-800 dark:hover:bg-cyan-950/30"><x-icon :name="$module->icon" class="size-4" />{{ $module->name }}</a>
+                        @endforeach
+                    @endforeach
+                </div>
             </div>
         </section>
 

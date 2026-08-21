@@ -54,7 +54,6 @@ use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceReminderSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceTemplateController;
-use App\Http\Controllers\CommandCenter\Crm\SalesDocumentSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\LeadController;
 use App\Http\Controllers\CommandCenter\Crm\LeadMasterDataController;
 use App\Http\Controllers\CommandCenter\Crm\OpportunityController;
@@ -63,6 +62,7 @@ use App\Http\Controllers\CommandCenter\Crm\ProformaController;
 use App\Http\Controllers\CommandCenter\Crm\ProformaShareController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationController;
 use App\Http\Controllers\CommandCenter\Crm\QuotationShareController;
+use App\Http\Controllers\CommandCenter\Crm\SalesDocumentSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerDashboardController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerGroupController;
@@ -98,6 +98,7 @@ use App\Http\Controllers\CommandCenter\Inventory\StockLocationController;
 use App\Http\Controllers\CommandCenter\Inventory\StockTransferController;
 use App\Http\Controllers\CommandCenter\Inventory\WarehouseController;
 use App\Http\Controllers\CommandCenter\ModuleController;
+use App\Http\Controllers\CommandCenter\NavigationPreferenceController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController;
@@ -239,6 +240,9 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
     Route::post('account/verification/resend', [AccountVerificationController::class, 'resend'])->middleware('throttle:3,1')->name('account.verification.resend');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('navigation/customize', [NavigationPreferenceController::class, 'edit'])->name('navigation.preferences.edit');
+    Route::put('navigation/customize', [NavigationPreferenceController::class, 'update'])->name('navigation.preferences.update');
+    Route::post('navigation/customize/reset', [NavigationPreferenceController::class, 'reset'])->name('navigation.preferences.reset');
     Route::prefix('attendance')->name('attendance.')->middleware('can:attendance.view_own')->group(function (): void {
         Route::get('me', [AttendanceController::class, 'self'])->name('self');
         Route::post('check-in', [AttendanceController::class, 'checkIn'])->middleware('can:attendance.check_in')->name('check-in');

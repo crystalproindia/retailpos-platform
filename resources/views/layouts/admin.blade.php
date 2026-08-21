@@ -12,11 +12,14 @@
     <body class="command-center-theme min-h-screen bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100 {{ request()->routeIs('cms.*') ? 'cms-light-workspace' : '' }}">
         @php
             $user = auth()->user();
-            $moduleGroups = $user ? app(\App\Support\Modules\ModuleRegistry::class)->sidebarForUser($user)->groupBy('category') : collect();
+            $navigationPreferences = app(\App\Services\Navigation\NavigationPreferenceService::class);
+            $moduleGroups = $user ? $navigationPreferences->sidebarForUser($user)->groupBy('category') : collect();
+            $pinnedModules = $user ? $navigationPreferences->pinnedModules($user) : collect();
             $saasNavigation = app(\App\Support\Navigation\SaasNavigationRegistry::class);
             $globalMenuSearch = app(\App\Services\Navigation\GlobalMenuSearchService::class);
             $globalMenuEntries = $user ? $globalMenuSearch->entriesFor($user) : collect();
-            $globalMenuGroups = $globalMenuEntries->groupBy('group');
+            $globalMenuGroups = $globalMenuEntries->where('hidden', false)->groupBy('group');
+            $hiddenGlobalMenuEntries = $globalMenuEntries->where('hidden', true);
             $platformSaasItems = $saasNavigation->platformItems($user);
             $tenantSubscriptionItems = $saasNavigation->tenantSubscriptionItems($user);
             $unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0;
@@ -52,6 +55,14 @@
                 </div>
 
                 <nav class="flex-1 space-y-5 overflow-y-auto p-3" data-sidebar-scroll>
+                    @if ($pinnedModules->isNotEmpty())
+                        <div class="space-y-1" data-sidebar-favorites>
+                            <div class="flex items-center justify-between px-3"><p class="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300" data-sidebar-label>Favorites</p><a href="{{ route('navigation.preferences.edit') }}" class="text-xs font-semibold text-slate-400 hover:text-teal-700 dark:hover:text-teal-300" data-sidebar-label aria-label="Customize favorites"><x-icon name="settings" class="size-4" /></a></div>
+                            @foreach ($pinnedModules as $module)
+                                <a href="{{ $module->url() }}" class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $module->isActive() ? 'bg-teal-600 text-white shadow-sm dark:bg-teal-300 dark:text-slate-950' : 'bg-teal-50 text-teal-800 hover:bg-teal-100 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-900/50' }}" title="{{ $module->name }}" @if($module->isActive()) data-sidebar-active-item @endif><x-icon :name="$module->icon" class="size-5 shrink-0" /><span class="min-w-0 flex-1 truncate" data-sidebar-label>{{ $module->name }}</span></a>
+                            @endforeach
+                        </div>
+                    @endif
                     @foreach ($moduleGroups as $category => $modules)
                         <div class="space-y-1">
                             <p class="px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500" data-sidebar-label>{{ $category }}</p>
@@ -285,6 +296,18 @@
                             @endforeach
                         </div>
                     @endforeach
+                    @if ($hiddenGlobalMenuEntries->isNotEmpty())
+                        <div class="space-y-1 border-t border-slate-100 pt-3 dark:border-slate-800" data-global-menu-group data-global-menu-group-name="Hidden modules">
+                            <div class="flex items-center justify-between px-3 pb-1 pt-1"><p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Hidden modules</p><span class="text-xs text-slate-400">Recoverable</span></div>
+                            @foreach ($hiddenGlobalMenuEntries as $entry)
+                                <button type="button" data-global-menu-result data-navigation-key="{{ $entry['navigation_key'] }}" data-route="{{ $entry['route'] }}" data-url="{{ $entry['url'] }}" data-label="{{ $entry['label'] }}" data-breadcrumb="{{ $entry['breadcrumb'] }}" data-aliases="{{ implode(' ', $entry['aliases']) }}" data-search="{{ strtolower($entry['label'].' '.$entry['route'].' '.$entry['breadcrumb'].' '.implode(' ', $entry['aliases'])) }}" class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800" aria-selected="false">
+                                    <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><x-icon :name="$entry['icon']" class="size-4" /></span>
+                                    <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-slate-900 dark:text-white" data-global-menu-result-label>{{ $entry['label'] }}</span><span class="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400" data-global-menu-result-breadcrumb>{{ $entry['breadcrumb'] }} · Hidden from sidebar</span></span>
+                                    <span class="text-xs font-medium text-slate-400">Hidden</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
                     <div class="hidden px-4 py-12 text-center" data-global-menu-empty><p class="font-semibold text-slate-900 dark:text-white">No matching menu found</p><p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Try Invoice, Stock, GST, Customer, or Settings.</p></div>
                 </div>
             </section>

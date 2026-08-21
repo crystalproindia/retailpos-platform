@@ -538,6 +538,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::put('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'update'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.update');
         Route::post('invoices/reminders/settings/restore-defaults', [InvoiceReminderSettingsController::class, 'restore'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.restore');
         Route::get('invoices/customers/search', [InvoiceController::class, 'customers'])->middleware('can:sales.invoices.create')->name('invoices.customers.search');
+        Route::get('invoices/products/search', [InvoiceController::class, 'products'])->middleware('can:sales.invoices.create')->name('invoices.products.search');
         Route::post('invoices/customers', [InvoiceController::class, 'quickCustomer'])->middleware(['can:sales.invoices.create', 'can:crm.customers.create', 'throttle:20,1'])->name('invoices.customers.store');
         Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');

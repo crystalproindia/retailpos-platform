@@ -11,6 +11,7 @@ use App\Http\Requests\Crm\StoreInvoiceRequest;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Repositories\Crm\InvoiceRepository;
 use App\Repositories\Crm\QuotationRepository;
+use App\Models\Inventory\Product;
 use App\Services\Crm\CrmCustomerService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceReminderService;
@@ -68,6 +69,16 @@ class InvoiceController extends Controller
             $customer,
             $outstanding->get($customer->id, '0.00'),
         ))]);
+    }
+
+    public function products(Request $request): JsonResponse
+    {
+        $data = $request->validate(['q' => ['required', 'string', 'min:2', 'max:120']]);
+        $term = trim($data['q']);
+        $products = Product::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->where('status', Product::STATUS_ACTIVE)
+            ->where(fn ($query) => $query->where('name', 'like', "%{$term}%")->orWhere('sku', 'like', "%{$term}%")->orWhere('barcode', 'like', "%{$term}%"))
+            ->orderBy('name')->limit(20)->get(['id','name','sku','selling_price']);
+        return response()->json(['products' => $products]);
     }
 
     public function quickCustomer(QuickCreateCrmCustomerRequest $request, CrmCustomerService $customers): JsonResponse

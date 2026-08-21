@@ -91,6 +91,8 @@ class ProfitabilityCostingTest extends TestCase
         $this->assertSame(5000, $report['detail']['net_sales']);
         $this->assertSame(3000, $report['detail']['cost_of_goods_sold']);
         $this->assertSame(2000, $report['detail']['gross_profit']);
+        $this->assertCount(1, $report['detail']['invoice_rows']);
+        $this->assertSame(5000, $report['detail']['invoice_rows'][0]['net_sales']);
     }
 
     public function test_profitability_is_management_only_and_historical_unsnapshotted_items_remain_unavailable(): void

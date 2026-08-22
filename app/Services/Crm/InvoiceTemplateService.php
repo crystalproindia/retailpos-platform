@@ -101,7 +101,9 @@ class InvoiceTemplateService
                     'payment_qr_uri' => $data['payment_qr_uri'] ?? null,
                     'account_holder_name' => array_key_exists('account_holder_name', $data) ? $data['account_holder_name'] : $setting->account_holder_name,
                     'bank_name' => array_key_exists('bank_name', $data) ? $data['bank_name'] : $setting->bank_name,
-                    'account_number' => array_key_exists('account_number', $data) ? $data['account_number'] : $setting->account_number,
+                    'account_number' => ($data['replace_account_number'] ?? array_key_exists('account_number', $data)) && array_key_exists('account_number', $data)
+                        ? $data['account_number']
+                        : $setting->account_number,
                     'ifsc_code' => array_key_exists('ifsc_code', $data) ? strtoupper((string) $data['ifsc_code']) ?: null : $setting->ifsc_code,
                     'bank_branch_name' => array_key_exists('bank_branch_name', $data) ? $data['bank_branch_name'] : $setting->bank_branch_name,
                     'swift_bic' => array_key_exists('swift_bic', $data) ? strtoupper((string) $data['swift_bic']) ?: null : $setting->swift_bic,
@@ -203,7 +205,7 @@ class InvoiceTemplateService
     /** @return array<string,bool> */
     public function defaultOptions(): array
     {
-        return ['document_title' => 'invoice', 'show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'show_bank_details' => true, 'show_payment_details_on_quotation' => false, 'show_payment_details_on_proforma' => false, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
+        return ['document_title' => 'invoice', 'show_logo' => true, 'logo_position' => 'left', 'logo_size' => 'medium', 'show_company_name' => true, 'show_bill_to' => true, 'show_ship_to' => false, 'payment_details_enabled' => true, 'show_bank_details' => true, 'show_payment_details_on_quotation' => false, 'show_payment_details_on_proforma' => false, 'show_terms' => true, 'show_signature' => true, 'show_seal' => false, 'show_amount_words' => true, 'show_received_amount' => true, 'show_previous_balance' => true, 'show_current_balance' => true, 'show_hsn_sac' => true, 'show_sku' => false, 'show_discount' => true, 'show_gst_breakup' => true, 'show_gst_summary' => true, 'show_payment_status' => true];
     }
 
     /** @param array<string,mixed> $overrides */

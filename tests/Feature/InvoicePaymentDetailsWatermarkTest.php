@@ -117,6 +117,115 @@ class InvoicePaymentDetailsWatermarkTest extends TestCase
         $this->assertNull($presentations->snapshot($manager->company, SalesDocumentPresentationService::PROFORMA)['payment_details_snapshot']);
     }
 
+    public function test_payment_details_can_be_disabled_for_future_documents_without_rewriting_existing_snapshots(): void
+    {
+        $manager = $this->manager();
+        $this->saveSettings($manager, [
+            'account_holder_name' => 'Existing Account',
+            'account_number' => '111122223333',
+            'options' => $this->settingsOptions(['show_payment_details_on_proforma' => true]),
+        ])->assertRedirect();
+
+        $presentations = app(SalesDocumentPresentationService::class);
+        $historical = CrmProformaInvoice::create($presentations->snapshot($manager->company, SalesDocumentPresentationService::PROFORMA) + [
+            'company_id' => $manager->company_id,
+            'proforma_number' => 'PI-DISABLE-001',
+            'title' => 'Historical proforma',
+            'currency' => 'INR',
+            'invoice_date' => today(),
+            'grand_total' => 100,
+            'balance_amount' => 100,
+            'created_by' => $manager->id,
+        ]);
+
+        $this->saveSettings($manager, [
+            'options' => $this->settingsOptions([
+                'payment_details_enabled' => false,
+                'show_payment_details_on_proforma' => true,
+            ]),
+        ])->assertRedirect();
+
+        $future = $presentations->snapshot($manager->company, SalesDocumentPresentationService::PROFORMA);
+
+        $this->assertSame('Existing Account', $historical->payment_details_snapshot['account_holder_name']);
+        $this->assertNull($future['payment_details_snapshot']);
+    }
+
+    public function test_account_number_is_masked_until_an_authorized_user_chooses_to_replace_it(): void
+    {
+        $manager = $this->manager();
+        $this->saveSettings($manager, ['account_number' => '123456789012'])->assertRedirect();
+
+        $this->actingAs($manager)->get(route('sales.invoices.templates.index'))
+            ->assertOk()
+            ->assertSee('Replace account number')
+            ->assertSee('•••• •••• 9012')
+            ->assertDontSee('123456789012');
+
+        $this->saveSettings($manager, [
+            'replace_account_number' => false,
+            'account_holder_name' => 'Updated holder',
+        ])->assertRedirect();
+        $this->assertSame('123456789012', InvoiceTemplateSetting::query()->where('company_id', $manager->company_id)->firstOrFail()->account_number);
+
+        $this->saveSettings($manager, [
+            'replace_account_number' => true,
+            'account_number' => '999900001111',
+        ])->assertRedirect();
+        $this->assertSame('999900001111', InvoiceTemplateSetting::query()->where('company_id', $manager->company_id)->firstOrFail()->account_number);
+    }
+
+    public function test_proforma_keeps_corrected_payment_details_in_immutable_snapshots_and_uses_mobile_safe_markup(): void
+    {
+        $manager = $this->manager();
+        $this->saveSettings($manager, [
+            'account_holder_name' => 'Original Account',
+            'account_number' => '111122223333',
+            'payment_url' => 'https://pay.example.test/very/long/payment/path',
+            'options' => $this->settingsOptions(['show_payment_details_on_proforma' => true]),
+        ])->assertRedirect();
+
+        $presentations = app(SalesDocumentPresentationService::class);
+        $original = CrmProformaInvoice::create($presentations->snapshot($manager->company, SalesDocumentPresentationService::PROFORMA) + [
+            'company_id' => $manager->company_id,
+            'proforma_number' => 'PI-SNAPSHOT-001',
+            'title' => 'Original payment details',
+            'currency' => 'INR',
+            'invoice_date' => today(),
+            'grand_total' => 100,
+            'balance_amount' => 100,
+            'created_by' => $manager->id,
+        ]);
+
+        $this->saveSettings($manager, [
+            'replace_account_number' => true,
+            'account_number' => '999900001111',
+            'account_holder_name' => 'Corrected Account',
+            'options' => $this->settingsOptions(['show_payment_details_on_proforma' => true]),
+        ])->assertRedirect();
+
+        $corrected = CrmProformaInvoice::create($presentations->snapshot($manager->company, SalesDocumentPresentationService::PROFORMA) + [
+            'company_id' => $manager->company_id,
+            'proforma_number' => 'PI-SNAPSHOT-002',
+            'title' => 'Corrected payment details',
+            'currency' => 'INR',
+            'invoice_date' => today(),
+            'grand_total' => 100,
+            'balance_amount' => 100,
+            'created_by' => $manager->id,
+        ]);
+
+        $originalPresentation = $presentations->forDocument($original, SalesDocumentPresentationService::PROFORMA);
+        $correctedPresentation = $presentations->forDocument($corrected, SalesDocumentPresentationService::PROFORMA);
+        $markup = view('public.proforma', ['proforma' => $corrected, 'presentation' => $correctedPresentation])->render();
+
+        $this->assertSame('111122223333', $originalPresentation['payment_details']['account_number']);
+        $this->assertSame('999900001111', $correctedPresentation['payment_details']['account_number']);
+        $this->assertStringContainsString('sm:grid-cols-2', $markup);
+        $this->assertStringContainsString('break-words', $markup);
+        $this->assertStringContainsString('Corrected Account', $markup);
+    }
+
     public function test_png_jpeg_and_webp_watermarks_are_validated_and_stored_privately(): void
     {
         Storage::fake('local');
@@ -379,7 +488,7 @@ class InvoicePaymentDetailsWatermarkTest extends TestCase
 
         $this->actingAs($manager)->get(route('sales.invoices.templates.index'))
             ->assertOk()
-            ->assertSee('Account and payment details')
+            ->assertSee('Bank account and payment details')
             ->assertSee('Invoice watermark')
             ->assertSee('dark:bg-slate-900', false)
             ->assertSee('md:grid-cols-2', false)

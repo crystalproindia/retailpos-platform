@@ -142,6 +142,12 @@ class SalesDocumentPresentationService
     {
         $options = $setting?->options ?? [];
 
+        // Older settings predate the explicit switch and must keep their existing
+        // document visibility behaviour until a tenant deliberately changes it.
+        if (! ($options['payment_details_enabled'] ?? true)) {
+            return false;
+        }
+
         return match ($documentType) {
             self::QUOTATION => (bool) ($options['show_payment_details_on_quotation'] ?? false),
             self::PROFORMA => (bool) ($options['show_payment_details_on_proforma'] ?? false),

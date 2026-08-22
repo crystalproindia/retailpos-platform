@@ -3175,10 +3175,27 @@ validated within the acting company before querying; data filters do not bypass
 outlet authorisation. `ReportValueFormatter` converts only named monetary fields
 from integer minor units, preserving counts and quantities as their real values.
 
-Current-cost stock valuation and gross-profit/margin remain expressly limited;
-historical valuation, trends, and charts remain future reporting work. Completed
-POS returns/refunds are now separately reported and deducted only from net-sales
-views through the Phase Q return ledger. See `docs/phase-h-reporting-analytics.md`.
+Current-cost stock valuation remains expressly labelled as a present-state snapshot.
+Completed POS returns/refunds are separately reported and deducted only through the
+Phase Q return ledger.
+
+## Owner Command Center
+
+The `/reports` entry screen is a premium, responsive executive dashboard backed by
+`ExecutiveReportingService`. It composes the authorized `RetailReportingService`
+summary with immutable POS/CRM profitability snapshots rather than recalculating
+historical gross profit from current product costs. The read model includes bounded
+daily, weekly, or monthly revenue/profit and sales/purchase trends; receivables,
+payables, and GST position; current inventory valuation; ranked product, outlet,
+salesperson, customer, and supplier views; and deterministic management signals.
+
+The current and previous periods use identical tenant, outlet, warehouse, status,
+return, cancellation, and date boundaries. Inventory value intentionally has no
+historical comparison because the current stock table is not a historical valuation
+ledger. Profit and margin remain hidden when `reports.profitability.view` is absent,
+while company-wide outlet consolidation remains Administrator-only. The executive
+CSV route uses the existing export permission and formula-injection protection.
+See `docs/phase-h-reporting-analytics.md`.
 
 # Phase K — Attendance, Shifts, Leave and Scheduling
 

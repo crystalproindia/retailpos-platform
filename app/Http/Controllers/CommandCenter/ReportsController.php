@@ -4,25 +4,61 @@ namespace App\Http\Controllers\CommandCenter;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customers\Customer;
-use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\InventoryBrand;
+use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\Purchases\Supplier;
 use App\Models\User;
 use App\Services\Outlets\OutletAccessService;
+use App\Services\Reports\ExecutiveReportingService;
 use App\Services\Reports\RetailReportingService;
 use App\Support\Reports\ReportValueFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
-    public function index(Request $request, RetailReportingService $reports, OutletAccessService $outlets): View
+    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets): View
     {
-        return view('command-center.reports.index', $this->payload($request, $reports, $outlets));
+        $filters = $this->executiveFilters($request);
+        $executive = $executiveReports->dashboard($request->user(), $filters, $request->boolean('compare', true));
+
+        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive]);
+    }
+
+    public function exportExecutive(Request $request, ExecutiveReportingService $reports, ReportValueFormatter $formatter): StreamedResponse
+    {
+        $dashboard = $reports->dashboard($request->user(), $this->executiveFilters($request), $request->boolean('compare', true));
+
+        return Response::streamDownload(function () use ($dashboard, $formatter): void {
+            $stream = fopen('php://output', 'w');
+            $write = function (array $row) use ($stream): void {
+                fputcsv($stream, array_map(fn ($value) => preg_match('/^[=+\-@]/', (string) $value) ? "'".$value : $value, $row));
+            };
+            $write(['Owner Command Center']);
+            $write(['Outlet scope', $dashboard['scope']['label']]);
+            $write(['Date range', $dashboard['range']['from']->toDateString().' to '.$dashboard['range']['to']->toDateString()]);
+            fputcsv($stream, []);
+            $write(['Metric', 'Value', 'Previous-period change']);
+            foreach ($dashboard['kpis'] as $kpi) {
+                $value = match ($kpi['format']) {
+                    'percent' => $kpi['value'] === null ? '' : number_format((float) $kpi['value'], 2, '.', '').'%',
+                    'money' => $kpi['value'] === null ? '' : number_format(((int) $kpi['value']) / 100, 2, '.', ''),
+                    default => (string) ($kpi['value'] ?? ''),
+                };
+                $change = $kpi['change'] === null ? '' : $kpi['change'].($kpi['change_unit'] === 'points' ? ' points' : '%');
+                $write([$kpi['label'], $value, $change]);
+            }
+            fputcsv($stream, []);
+            $write(['GST output', $formatter->csv('tax', $dashboard['gst']['output'])]);
+            $write(['GST input', $formatter->csv('tax', $dashboard['gst']['input'])]);
+            $write(['GST position', $formatter->csv('tax', $dashboard['gst']['net'])]);
+            fclose($stream);
+        }, 'retailpos-owner-command-center-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     public function show(Request $request, RetailReportingService $reports, OutletAccessService $outlets, string $report): View
@@ -57,12 +93,12 @@ class ReportsController extends Controller
         }, "retailpos-{$report}-".now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv']);
     }
 
-    private function payload(Request $request, RetailReportingService $reports, OutletAccessService $outlets, ?string $report = null): array
+    private function payload(Request $request, RetailReportingService $reports, OutletAccessService $outlets, ?string $report = null, ?array $overview = null): array
     {
         $availableOutlets = $outlets->accessibleOutlets($request->user());
 
         return [
-            'overview' => $reports->overview($request->user(), $this->filters($request)),
+            'overview' => $overview ?? $reports->overview($request->user(), $this->filters($request)),
             'outlets' => $availableOutlets,
             'warehouses' => Warehouse::query()
                 ->where('company_id', $request->user()->company_id)
@@ -97,6 +133,19 @@ class ReportsController extends Controller
             'tax_classification' => ['nullable', 'string', 'max:24'],
             'movement_type' => ['nullable', 'string', 'max:64'],
             'stock_status' => ['nullable', Rule::in(['negative', 'out', 'low', 'available'])],
+            'compare' => ['nullable', 'boolean'],
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function executiveFilters(Request $request): array
+    {
+        return $request->validate([
+            'outlet_id' => ['nullable', 'string'],
+            'warehouse_id' => ['nullable', 'integer'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'compare' => ['nullable', 'boolean'],
         ]);
     }
 

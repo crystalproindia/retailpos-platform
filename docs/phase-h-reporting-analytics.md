@@ -2,11 +2,12 @@
 
 ## Ownership and authorization
 
-`/reports` is the tenant-scoped reporting hub. `RetailReportingService` owns the
-query path for the overview, detail screens, and CSV exports. It delegates outlet
+`/reports` is the tenant-scoped Owner Command Center. `ExecutiveReportingService`
+composes a lean executive read model from `RetailReportingService`, which owns the
+query path for summaries, detail screens, and CSV exports. It delegates outlet
 scope to `OutletAccessService`: Administrators may select **All Outlets**;
 managers are limited to their active assignment/current outlet; Staff users do not
-have the reporting capability. Every selected outlet, warehouse, product,
+  have the reporting capability by default. Every selected outlet, warehouse, product,
 category, customer, supplier, and cashier ID is resolved server-side against the
 acting company before a query runs.
 
@@ -37,6 +38,25 @@ their scope and displayed outlet from their linked CRM invoice.
 - **Purchase returns**: approved return item quantity and minor-unit value only.
 - **Outlet and cashier performance**: completed POS sales count, net sales,
   discounts, and average order value for the authorised scope.
+- **Profitability**: combined POS and product-linked CRM revenue using immutable
+  sale-time cost snapshots. Free-text and unreliable historical items remain
+  revenue-only and lower the explicitly displayed cost-coverage percentage.
+
+## Owner Command Center
+
+The command center presents eight executive KPIs, previous-period comparisons,
+revenue versus gross-profit and sales-versus-purchase charts, GST position,
+receivable/payable rankings, product intelligence, outlet comparison, salesperson
+attribution, and deterministic management signals. It does not use an AI model.
+The chart granularity is daily up to 31 days, weekly up to 120 days, and monthly
+beyond that. Database work is aggregated to one point per company-local activity
+day; ranked lists are capped before rendering.
+
+Gross profit, product margin, and sale-time cost are visible only with
+`reports.profitability.view`. Users without that permission receive operational
+sales information and explicit unavailable profitability states. Current stock
+value has no previous-period change because the stock balance is a current snapshot,
+not a historical valuation ledger.
 
 The report screen uses mobile summary cards below the desktop breakpoint and a
 bounded horizontal table above it. Empty detail sources show an explicit
@@ -74,14 +94,17 @@ selected source.
 
 ## Honest limitations
 
-- Gross profit and margin are unavailable until the platform has a reliable
-  invoice-level cost snapshot. Current product cost is not used to invent a
-  historical profit figure.
-- Sales returns and refunds are unavailable because no sales-return/refund ledger
-  is present. Purchase returns are reported independently and reduce net purchases.
-- Historical stock valuation, slow/dead-stock classification, top-product/category
-  aggregation, payment-method split, trend/comparison cards, and charting await
-  explicit historical ledgers and an approved KPI model.
+- Gross profit and margin are unavailable for free-text CRM lines and historical
+  items without a reliable snapshot. Current product cost is never used to invent
+  historical profit.
+- POS returns use the Phase Q line ledger and original cost snapshots. Partial CRM
+  return/credit-note COGS reversal remains unavailable until a line-level CRM return
+  ledger exists.
+- Inventory value is current standard-cost valuation. Historical FIFO or weighted-
+  average stock valuation and period-over-period inventory movement are not claimed.
+- Slow-moving products currently mean the lowest positive sold quantity in the
+  selected period. Dead-stock analysis requires a separately approved inactivity
+  policy and historical inventory-age model.
 - Product, category, customer, supplier, and cashier menus are currently bounded
   to 100 active company records to keep the Blade filter form predictable. A
   server-backed typeahead is the next extension for larger catalogues; the report

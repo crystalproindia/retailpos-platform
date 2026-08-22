@@ -9,7 +9,7 @@ class ReportValueFormatter
         'amount', 'average_order_value', 'balance_due', 'cess', 'cost_of_goods_sold',
         'discount_impact_on_profit', 'discounts', 'gross_profit', 'gross_profit_before_discount', 'gross_sales', 'gross_total', 'igst', 'known_cost_net_sales', 'net_sales',
         'outstanding', 'paid', 'payments_received', 'purchase_total', 'return_value',
-        'return_impact', 'sales_returns', 'sgst', 'stock_value', 'tax', 'taxable_sales', 'total', 'unit_cost', 'value',
+        'return_impact', 'sales_returns', 'sgst', 'stock_value', 'tax', 'taxable_sales', 'total', 'total_discounts', 'unit_cost', 'value',
     ];
 
     /** @var array<int, string> */

@@ -5,16 +5,16 @@ namespace App\Services\Reports;
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Customers\Customer;
-use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\InventoryBrand;
+use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\StockLevel;
 use App\Models\Inventory\StockMovement;
 use App\Models\Inventory\Warehouse;
+use App\Models\Pos\PosReturn;
+use App\Models\Pos\PosReturnItem;
 use App\Models\Pos\PosSale;
 use App\Models\Pos\PosSaleItem;
-use App\Models\Pos\PosReturnItem;
-use App\Models\Pos\PosReturn;
 use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseReturnItem;
 use App\Models\Purchases\Supplier;
@@ -35,6 +35,27 @@ class RetailReportingService
     /** @param array<string, mixed> $filters */
     public function overview(User $user, array $filters): array
     {
+        $overview = $this->summary($user, $filters);
+        $scope = $overview['scope'];
+        $range = $overview['range'];
+        $context = $this->context($user, $filters);
+
+        $overview['reports']['sales']['rows'] = $this->salesRows($user, $scope, $range, $context);
+        $overview['reports']['purchases']['rows'] = $this->purchaseRows($user, $scope, $range, $context);
+        $overview['reports']['inventory']['rows'] = $this->stockRows($user, $scope, $context);
+        $overview['reports']['movements'] = $this->stockMovements($user, $scope, $range, $context);
+        $overview['reports']['gst']['rows'] = $this->gstRows($user, $scope, $range, $context);
+        $overview['reports']['payments']['rows'] = $this->paymentRows($user, $scope, $range, $context);
+        $overview['reports']['outstanding']['rows'] = $this->outstandingRows($user, $scope, $range, $context);
+        $overview['reports']['returns']['rows'] = $this->returnRows($user, $scope, $range, $context);
+        $overview['reports']['sales_returns']['rows'] = $this->salesReturnRows($user, $scope, $range, $context);
+
+        return $overview;
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function summary(User $user, array $filters): array
+    {
         $scope = $this->scope($user, $filters);
         $range = $this->range($user, $filters);
         $context = $this->context($user, $filters);
@@ -48,6 +69,26 @@ class RetailReportingService
         $outlets = $this->outletPerformance($user, $scope, $range, $context);
         $cashiers = $this->cashierPerformance($user, $scope, $range, $context);
         $netSalesAfterReturns = max(0, $sales['net_sales'] - $salesReturns['refund_total']);
+        $profitability = $user->can('reports.profitability.view')
+            ? $this->profitabilityReporting->report($user, $scope, $range, $context)
+            : null;
+
+        $reportData = [
+            'sales' => $sales + $invoices + ['returns_total' => $salesReturns['refund_total'], 'net_sales_after_returns' => $netSalesAfterReturns],
+            'purchases' => $purchases,
+            'inventory' => $stock,
+            'movements' => ['movement_count' => null, 'in_quantity' => null, 'out_quantity' => null],
+            'gst' => $this->gst($user, $scope, $range, $context),
+            'payments' => $payments,
+            'outstanding' => $invoices,
+            'returns' => $returns,
+            'sales_returns' => $salesReturns,
+            'outlets' => $outlets,
+            'cashiers' => $cashiers,
+        ];
+        if ($profitability !== null) {
+            $reportData['profitability'] = $profitability;
+        }
 
         return [
             'scope' => $scope,
@@ -65,20 +106,7 @@ class RetailReportingService
                 'stock_value' => $stock['value'],
                 'low_stock_count' => $stock['low_stock_count'],
             ],
-            'reports' => [
-                'sales' => $sales + $invoices + ['returns_total' => $salesReturns['refund_total'], 'net_sales_after_returns' => $netSalesAfterReturns, 'rows' => $this->salesRows($user, $scope, $range, $context)],
-                'purchases' => $purchases + ['rows' => $this->purchaseRows($user, $scope, $range, $context)],
-                'inventory' => $stock + ['rows' => $this->stockRows($user, $scope, $context)],
-                'movements' => $this->stockMovements($user, $scope, $range, $context),
-                'profitability' => $this->profitabilityReporting->report($user, $scope, $range, $context),
-                'gst' => $this->gst($user, $scope, $range, $context) + ['rows' => $this->gstRows($user, $scope, $range, $context)],
-                'payments' => $payments + ['rows' => $this->paymentRows($user, $scope, $range, $context)],
-                'outstanding' => $invoices + ['rows' => $this->outstandingRows($user, $scope, $range, $context)],
-                'returns' => $returns + ['rows' => $this->returnRows($user, $scope, $range, $context)],
-                'sales_returns' => $salesReturns + ['rows' => $this->salesReturnRows($user, $scope, $range, $context)],
-                'outlets' => $outlets,
-                'cashiers' => $cashiers,
-            ],
+            'reports' => $reportData,
         ];
     }
 
@@ -396,7 +424,9 @@ class RetailReportingService
     {
         return PosSaleItem::query()->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
             ->where('pos_sale_items.company_id', $user->company_id)->where('pos_sales.status', 'completed')
-            ->where(function (Builder $query): void { $query->whereNull('pos_sale_items.cost_snapshot_status')->orWhere('pos_sale_items.cost_snapshot_status', '!=', 'captured'); })
+            ->where(function (Builder $query): void {
+                $query->whereNull('pos_sale_items.cost_snapshot_status')->orWhere('pos_sale_items.cost_snapshot_status', '!=', 'captured');
+            })
             ->when($scope['ids'] !== null, fn (Builder $query) => $query->whereIn('pos_sales.branch_id', $scope['ids']))
             ->whereBetween('pos_sales.sold_at', $this->timestampRange($range))
             ->when($context['product_id'], fn (Builder $query, int $id) => $query->where('pos_sale_items.product_id', $id))
@@ -418,8 +448,8 @@ class RetailReportingService
     private function profitabilityGroups(Builder $items, array $dimensions, string $profitColumn): array
     {
         $columns = match ($dimensions[0]) {
-            'branch_id' => ["pos_sales.branch_id", "COALESCE(branches.name, 'Unassigned') as branch_name"],
-            'salesperson_id' => ["pos_sales.completed_by as salesperson_id", "COALESCE(users.name, 'Unassigned') as salesperson_name"],
+            'branch_id' => ['pos_sales.branch_id', "COALESCE(branches.name, 'Unassigned') as branch_name"],
+            'salesperson_id' => ['pos_sales.completed_by as salesperson_id', "COALESCE(users.name, 'Unassigned') as salesperson_name"],
             default => array_map(fn (string $dimension) => "pos_sale_items.{$dimension}", $dimensions),
         };
         $selects = implode(', ', $columns);
@@ -428,6 +458,7 @@ class RetailReportingService
             'salesperson_id' => "pos_sales.completed_by, COALESCE(users.name, 'Unassigned')",
             default => implode(', ', $columns),
         };
+
         return (clone $items)->selectRaw("{$selects}, COUNT(DISTINCT pos_sale_items.pos_sale_id) as invoice_count, COALESCE(SUM(pos_sale_items.quantity), 0) as quantity, COALESCE(SUM(pos_sale_items.net_sales_snapshot), 0) as net_sales, COALESCE(SUM(pos_sale_items.total_cost_snapshot), 0) as cost, COALESCE(SUM(pos_sale_items.{$profitColumn}), 0) as gross_profit, COALESCE(SUM(pos_sale_items.gross_sales_snapshot - pos_sale_items.net_sales_snapshot), 0) as discounts")
             ->groupByRaw($group)->orderByDesc('gross_profit')->limit(500)->get()
             ->map(function ($row) use ($dimensions): array {
@@ -440,6 +471,7 @@ class RetailReportingService
                     'branch_id' => $row->branch_name,
                     default => $row->salesperson_name,
                 };
+
                 return ['dimension' => $label, 'sku' => $row->sku ?? null, 'invoice_count' => (int) $row->invoice_count, 'quantity' => (string) $row->quantity, 'net_sales' => $netSales, 'cost' => $this->minor($row->cost), 'gross_profit' => $profit, 'margin_percent' => $this->margin($profit, $netSales), 'discounts' => $this->minor($row->discounts)];
             })->all();
     }

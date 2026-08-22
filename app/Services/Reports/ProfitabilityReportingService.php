@@ -2,8 +2,8 @@
 
 namespace App\Services\Reports;
 
-use App\Models\Crm\CrmInvoice;
 use App\Models\Pos\PosReturn;
+use App\Models\Pos\PosSale;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -60,6 +60,49 @@ class ProfitabilityReportingService
         ];
     }
 
+    /**
+     * @param  array{ids: array<int, int>|null, warehouse_id: int|null}  $scope
+     * @param  array{from: CarbonImmutable, to: CarbonImmutable, timezone: string}  $range
+     * @param  array<string, mixed>  $context
+     * @return array{granularity:string,points:array<int, array{key:string,label:string,net_sales:int,gross_profit:int}>}
+     */
+    public function trend(User $user, array $scope, array $range, array $context): array
+    {
+        $dateExpression = $this->activityDateExpression($range);
+        $daily = DB::query()->fromSub($this->rows($user, $scope, $range, $context), 'profitability_rows')
+            ->selectRaw("{$dateExpression} as activity_day, COALESCE(SUM(net_sales), 0) as net_sales, COALESCE(SUM(CASE WHEN cost_status IN ('captured', 'reconstructed') THEN gross_profit ELSE 0 END), 0) as gross_profit")
+            ->groupByRaw($dateExpression)
+            ->orderBy('activity_day')
+            ->get();
+
+        $days = $range['from']->diffInDays($range['to']);
+        $granularity = $days <= 31 ? 'daily' : ($days <= 120 ? 'weekly' : 'monthly');
+        $points = $daily->groupBy(function ($row) use ($granularity, $range): string {
+            $date = CarbonImmutable::parse($row->activity_day, $range['timezone']);
+
+            return match ($granularity) {
+                'weekly' => $date->startOfWeek()->toDateString(),
+                'monthly' => $date->startOfMonth()->toDateString(),
+                default => $date->toDateString(),
+            };
+        })->map(function ($rows, string $key) use ($granularity): array {
+            $date = CarbonImmutable::parse($key);
+
+            return [
+                'key' => $key,
+                'label' => match ($granularity) {
+                    'weekly' => 'Wk '.$date->format('d M'),
+                    'monthly' => $date->format('M Y'),
+                    default => $date->format('d M'),
+                },
+                'net_sales' => $rows->sum(fn ($row): int => $this->minor($row->net_sales)),
+                'gross_profit' => $rows->sum(fn ($row): int => $this->minor($row->gross_profit)),
+            ];
+        })->values()->all();
+
+        return ['granularity' => $granularity, 'points' => $points];
+    }
+
     /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array{from: CarbonImmutable, to: CarbonImmutable} $range @param array<string, mixed> $context */
     private function rows(User $user, array $scope, array $range, array $context): Builder
     {
@@ -87,7 +130,7 @@ class ProfitabilityReportingService
             ->whereBetween('sale.sold_at', [$range['from']->utc(), $range['to']->utc()]);
         $this->applySaleFilters($query, $scope, $context, 'sale', 'item');
 
-        return $query->selectRaw("'pos' as source, 'sale' as entry_type, item.company_id, item.pos_sale_id as document_id, ".$this->concat(["'pos:'", 'item.pos_sale_id'])." as document_key, sale.sale_number as document_number, sale.sold_at as document_date, COALESCE(sale.customer_name_snapshot, 'Walk-in') as customer_name, sale.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, sale.completed_by as salesperson_id, COALESCE(salesperson.name, 'Unassigned') as salesperson_name, item.product_id, item.product_name, item.sku, item.category_id, COALESCE(item.category_name_snapshot, 'Uncategorized') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, item.quantity as quantity_sold, 0 as quantity_returned, item.quantity as net_quantity, COALESCE(item.gross_sales_snapshot, item.gross_amount, 0) as gross_sales, COALESCE(item.discount_amount, 0) as discounts, 0 as return_sales, COALESCE(item.net_sales_snapshot, item.taxable_amount, 0) as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.total_cost_snapshot, 0) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.gross_profit_snapshot, 0) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
+        return $query->selectRaw("'pos' as source, 'sale' as entry_type, item.company_id, item.pos_sale_id as document_id, ".$this->concat(["'pos:'", 'item.pos_sale_id'])." as document_key, sale.sale_number as document_number, sale.sold_at as document_date, sale.sold_at as activity_date, COALESCE(sale.customer_name_snapshot, 'Walk-in') as customer_name, sale.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, sale.completed_by as salesperson_id, COALESCE(salesperson.name, 'Unassigned') as salesperson_name, item.product_id, item.product_name, item.sku, item.category_id, COALESCE(item.category_name_snapshot, 'Uncategorized') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, item.quantity as quantity_sold, 0 as quantity_returned, item.quantity as net_quantity, COALESCE(item.gross_sales_snapshot, item.gross_amount, 0) as gross_sales, COALESCE(item.discount_amount, 0) as discounts, 0 as return_sales, COALESCE(item.net_sales_snapshot, item.taxable_amount, 0) as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.total_cost_snapshot, 0) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.gross_profit_snapshot, 0) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
     }
 
     /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array{from: CarbonImmutable, to: CarbonImmutable} $range @param array<string, mixed> $context */
@@ -104,7 +147,7 @@ class ProfitabilityReportingService
             ->whereBetween('return_document.completed_at', [$range['from']->utc(), $range['to']->utc()]);
         $this->applySaleFilters($query, $scope, $context, 'sale', 'item');
 
-        return $query->selectRaw("'pos' as source, 'return' as entry_type, item.company_id, item.pos_sale_id as document_id, ".$this->concat(["'pos:'", 'item.pos_sale_id'])." as document_key, sale.sale_number as document_number, sale.sold_at as document_date, COALESCE(sale.customer_name_snapshot, 'Walk-in') as customer_name, sale.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, sale.completed_by as salesperson_id, COALESCE(salesperson.name, 'Unassigned') as salesperson_name, item.product_id, item.product_name, item.sku, item.category_id, COALESCE(item.category_name_snapshot, 'Uncategorized') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, 0 as quantity_sold, -return_item.return_quantity as quantity_returned, -return_item.return_quantity as net_quantity, -return_item.gross_adjustment as gross_sales, -return_item.discount_adjustment as discounts, -return_item.taxable_adjustment as return_sales, -return_item.taxable_adjustment as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN -(return_item.return_quantity * item.unit_cost_snapshot) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN -return_item.taxable_adjustment + (return_item.return_quantity * item.unit_cost_snapshot) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
+        return $query->selectRaw("'pos' as source, 'return' as entry_type, item.company_id, item.pos_sale_id as document_id, ".$this->concat(["'pos:'", 'item.pos_sale_id'])." as document_key, sale.sale_number as document_number, sale.sold_at as document_date, return_document.completed_at as activity_date, COALESCE(sale.customer_name_snapshot, 'Walk-in') as customer_name, sale.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, sale.completed_by as salesperson_id, COALESCE(salesperson.name, 'Unassigned') as salesperson_name, item.product_id, item.product_name, item.sku, item.category_id, COALESCE(item.category_name_snapshot, 'Uncategorized') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, 0 as quantity_sold, -return_item.return_quantity as quantity_returned, -return_item.return_quantity as net_quantity, -return_item.gross_adjustment as gross_sales, -return_item.discount_adjustment as discounts, -return_item.taxable_adjustment as return_sales, -return_item.taxable_adjustment as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN -(return_item.return_quantity * item.unit_cost_snapshot) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN -return_item.taxable_adjustment + (return_item.return_quantity * item.unit_cost_snapshot) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
     }
 
     /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array{from: CarbonImmutable, to: CarbonImmutable} $range @param array<string, mixed> $context */
@@ -133,7 +176,7 @@ class ProfitabilityReportingService
             $query->where('item.discount_amount', $context['discounted'] ? '>' : '=', 0);
         }
 
-        return $query->selectRaw("'crm' as source, 'sale' as entry_type, invoice.company_id, invoice.id as document_id, ".$this->concat(["'crm:'", 'invoice.id'])." as document_key, invoice.invoice_number as document_number, invoice.issue_date as document_date, COALESCE(invoice.billing_name, invoice.billing_company, 'Unassigned') as customer_name, invoice.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, NULL as salesperson_id, 'Unassigned' as salesperson_name, item.product_id, item.name as product_name, item.sku_snapshot as sku, item.category_id_snapshot as category_id, COALESCE(item.category_name_snapshot, 'Unclassified') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, item.quantity as quantity_sold, 0 as quantity_returned, item.quantity as net_quantity, COALESCE(item.gross_sales_snapshot, item.line_subtotal + item.discount_amount, 0) as gross_sales, COALESCE(item.discount_amount, 0) as discounts, 0 as return_sales, COALESCE(item.net_sales_snapshot, item.line_subtotal, 0) as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.total_cost_snapshot, 0) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.gross_profit_snapshot, 0) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
+        return $query->selectRaw("'crm' as source, 'sale' as entry_type, invoice.company_id, invoice.id as document_id, ".$this->concat(["'crm:'", 'invoice.id'])." as document_key, invoice.invoice_number as document_number, invoice.issue_date as document_date, invoice.issue_date as activity_date, COALESCE(invoice.billing_name, invoice.billing_company, 'Unassigned') as customer_name, invoice.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, NULL as salesperson_id, 'Unassigned' as salesperson_name, item.product_id, item.name as product_name, item.sku_snapshot as sku, item.category_id_snapshot as category_id, COALESCE(item.category_name_snapshot, 'Unclassified') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, item.quantity as quantity_sold, 0 as quantity_returned, item.quantity as net_quantity, COALESCE(item.gross_sales_snapshot, item.line_subtotal + item.discount_amount, 0) as gross_sales, COALESCE(item.discount_amount, 0) as discounts, 0 as return_sales, COALESCE(item.net_sales_snapshot, item.line_subtotal, 0) as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.total_cost_snapshot, 0) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.gross_profit_snapshot, 0) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
     }
 
     /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array<string, mixed> $context */
@@ -146,7 +189,7 @@ class ProfitabilityReportingService
             $query->whereExists(function (Builder $stock) use ($scope, $sale): void {
                 $stock->selectRaw('1')->from('stock_movements')
                     ->whereColumn('stock_movements.reference_id', "{$sale}.id")
-                    ->where('stock_movements.reference_type', \App\Models\Pos\PosSale::class)
+                    ->where('stock_movements.reference_type', PosSale::class)
                     ->where('stock_movements.movement_type', 'sale')
                     ->where('stock_movements.warehouse_id', $scope['warehouse_id']);
             });
@@ -220,6 +263,23 @@ class ProfitabilityReportingService
     private function concat(array $parts): string
     {
         return DB::getDriverName() === 'sqlite' ? implode(' || ', $parts) : 'CONCAT('.implode(', ', $parts).')';
+    }
+
+    /** @param array{from: CarbonImmutable, timezone: string} $range */
+    private function activityDateExpression(array $range): string
+    {
+        $offsetMinutes = $range['from']->utcOffset();
+        if (DB::getDriverName() === 'sqlite') {
+            $modifier = sprintf('%+d minutes', $offsetMinutes);
+
+            return "CASE WHEN source = 'crm' THEN DATE(activity_date) ELSE DATE(activity_date, '{$modifier}') END";
+        }
+
+        $sign = $offsetMinutes < 0 ? '-' : '+';
+        $absolute = abs($offsetMinutes);
+        $offset = sprintf('%s%02d:%02d', $sign, intdiv($absolute, 60), $absolute % 60);
+
+        return "CASE WHEN source = 'crm' THEN DATE(activity_date) ELSE DATE(CONVERT_TZ(activity_date, '+00:00', '{$offset}')) END";
     }
 
     private function minor(mixed $value): int

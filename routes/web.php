@@ -276,6 +276,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
     });
     Route::prefix('reports')->name('reports.')->middleware('can:crm.reports.view')->group(function (): void {
         Route::get('/', [ReportsController::class, 'index'])->name('index');
+        Route::get('executive/export', [ReportsController::class, 'exportExecutive'])->middleware('can:crm.reports.export')->name('executive.export');
         Route::get('{report}', [ReportsController::class, 'show'])->whereIn('report', ['sales', 'purchases', 'inventory', 'movements', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->name('show');
         Route::get('{report}/export', [ReportsController::class, 'export'])->whereIn('report', ['sales', 'purchases', 'inventory', 'movements', 'profitability', 'gst', 'payments', 'outstanding', 'returns', 'outlets', 'cashiers'])->middleware('can:crm.reports.export')->name('export');
     });

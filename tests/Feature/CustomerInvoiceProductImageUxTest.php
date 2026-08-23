@@ -210,7 +210,7 @@ class CustomerInvoiceProductImageUxTest extends TestCase
         $unit = $this->unit($manager);
 
         foreach (['png', 'jpg', 'webp'] as $index => $extension) {
-            $file = UploadedFile::fake()->image('product.'.$extension, 1200, 900);
+            $file = UploadedFile::fake()->image('product.'.$extension, 2400, 1800);
             $this->actingAs($manager)
                 ->post(route('inventory.products.store'), $this->productPayload($unit, $index + 1, ['product_image' => $file]))
                 ->assertRedirect();
@@ -221,6 +221,8 @@ class CustomerInvoiceProductImageUxTest extends TestCase
         foreach ($products as $product) {
             $this->assertStringStartsWith("companies/{$manager->company_id}/products/{$product->id}/", $product->image);
             Storage::disk('local')->assertExists($product->image);
+            [$primaryWidth, $primaryHeight] = getimagesize(Storage::disk('local')->path($product->image));
+            $this->assertLessThanOrEqual(1600, max($primaryWidth, $primaryHeight));
             $thumbnailPath = dirname($product->image).'/thumbnail-'.basename($product->image);
             Storage::disk('local')->assertExists($thumbnailPath);
             [$width, $height] = getimagesize(Storage::disk('local')->path($thumbnailPath));
@@ -266,13 +268,19 @@ class CustomerInvoiceProductImageUxTest extends TestCase
 
         $outside = $this->user();
         $this->actingAs($outside)->get(route('inventory.products.image', $product))->assertNotFound();
+        $this->actingAs($outside)->delete(route('inventory.products.image.destroy', $product))->assertNotFound();
         $sales = $this->user(UserRole::Sales, $manager->company, $manager->branch);
         $this->actingAs($sales)
-            ->put(route('inventory.products.update', $product), $this->productPayload($unit, 1, ['remove_image' => 1]))
+            ->delete(route('inventory.products.image.destroy', $product))
             ->assertForbidden();
 
         $this->actingAs($manager)
-            ->put(route('inventory.products.update', $product), $this->productPayload($unit, 1, ['remove_image' => 1]))
+            ->get(route('inventory.products.edit', $product))
+            ->assertOk()
+            ->assertSee('Remove Image')
+            ->assertSee(route('inventory.products.image.destroy', $product));
+        $this->actingAs($manager)
+            ->delete(route('inventory.products.image.destroy', $product))
             ->assertRedirect();
         $this->assertNull($product->refresh()->image);
         Storage::disk('local')->assertMissing($secondPath);
@@ -303,6 +311,11 @@ class CustomerInvoiceProductImageUxTest extends TestCase
         $this->actingAs($manager)->get(route('inventory.stock.availability', ['search' => 'Image Product']))->assertOk()->assertSee($thumbnailUrl);
         $this->actingAs($manager)->get(route('inventory.stock.product', $product))->assertOk()->assertSee($thumbnailUrl);
         $this->actingAs($manager)->get(route('pos.index'))->assertOk()->assertSee($thumbnailUrl);
+        $this->actingAs($manager)
+            ->getJson(route('pos.offline.bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('products.0.image', $thumbnailUrl);
+        $this->assertStringNotContainsString('companies/', (string) $this->actingAs($manager)->getJson(route('pos.offline.bootstrap'))->json('products.0.image'));
 
         $source = $this->warehouse($manager, 'IMAGE-SOURCE');
         $destination = $this->warehouse($manager, 'IMAGE-DEST');

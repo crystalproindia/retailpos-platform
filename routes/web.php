@@ -907,6 +907,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('products/create', [ProductController::class, 'create'])->middleware('can:inventory.products.create')->name('products.create');
         Route::post('products', [ProductController::class, 'store'])->middleware('can:inventory.products.create')->name('products.store');
         Route::get('products/{product}/image', [ProductController::class, 'image'])->whereNumber('product')->middleware('can:inventory.products.view')->name('products.image');
+        Route::delete('products/{product}/image', [ProductController::class, 'destroyImage'])->whereNumber('product')->middleware('can:inventory.products.image.manage')->name('products.image.destroy');
         Route::get('products/{product}', [ProductController::class, 'show'])->middleware('can:inventory.products.view')->name('products.show');
         Route::get('products/{product}/edit', [ProductController::class, 'edit'])->middleware('can:inventory.products.update')->name('products.edit');
         Route::put('products/{product}', [ProductController::class, 'update'])->middleware('can:inventory.products.update')->name('products.update');

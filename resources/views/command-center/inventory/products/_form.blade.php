@@ -98,8 +98,8 @@
                     <span>{{ $product->imageUrl() ? 'Replace Image' : 'Upload Image' }}</span>
                     <input type="file" name="product_image" accept="image/png,image/jpeg,image/webp" class="sr-only" data-product-image-input>
                 </label>
-                @if ($product->image)
-                    <label class="mt-3 flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"><input type="checkbox" name="remove_image" value="1" class="rounded border-slate-300 text-rose-600"><span>Remove current image</span></label>
+                @if ($product->exists && $product->image)
+                    <button type="button" class="mt-3 flex min-h-11 w-full items-center justify-center rounded-lg border border-rose-200 px-3 text-sm font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-200 dark:hover:bg-rose-950/30" data-confirm-trigger data-confirm-action="{{ route('inventory.products.image.destroy', $product) }}" data-confirm-method="DELETE" data-confirm-title="Remove product image?" data-confirm-message="The current image will be removed from this product. Product and stock data will not change." data-confirm-submit-label="Remove image">Remove Image</button>
                 @endif
                 @error('product_image')<p class="mt-2 text-sm text-rose-600">{{ $message }}</p>@enderror
             </section>

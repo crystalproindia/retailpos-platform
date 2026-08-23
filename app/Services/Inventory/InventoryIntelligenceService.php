@@ -2,6 +2,7 @@
 
 namespace App\Services\Inventory;
 
+use App\Models\Inventory\Product;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Outlets\OutletAccessService;
@@ -29,12 +30,17 @@ class InventoryIntelligenceService
         $warehouseIds = $this->authorizedWarehouseIds($user, $filters['warehouse_id'] ?? null, $filters['outlet_id'] ?? null);
         $range = $this->range($user, $period);
         $stock = $this->stockRows($user, $warehouseIds, $filters)->get();
+        $imageUrls = Product::query()
+            ->where('company_id', $user->company_id)
+            ->whereIn('id', $stock->pluck('product_id'))
+            ->get()
+            ->mapWithKeys(fn (Product $product): array => [$product->id => $product->imageUrl(true)]);
         $movement = $this->movementEvidence($user, $warehouseIds, $range['from'])->keyBy(fn ($row) => $row->warehouse_id.'-'.$row->product_id);
         $incoming = $this->incomingPurchaseQuantities($user, $warehouseIds)->keyBy(fn ($row) => $row->warehouse_id.'-'.$row->product_id);
         $suppliers = $this->supplierEvidence($user)->keyBy('product_id');
         $profitability = $this->profitabilityByProduct($user, $warehouseIds, $range, $filters);
 
-        $rows = $stock->map(function ($row) use ($movement, $incoming, $suppliers, $profitability, $period, $settings): array {
+        $rows = $stock->map(function ($row) use ($movement, $incoming, $suppliers, $profitability, $imageUrls, $period, $settings): array {
             $key = $row->warehouse_id.'-'.$row->product_id;
             $evidence = $movement->get($key);
             $available = (float) $row->quantity_available;
@@ -82,6 +88,7 @@ class InventoryIntelligenceService
             return [
                 'product_id' => (int) $row->product_id,
                 'product' => $row->product_name,
+                'image_url' => $imageUrls->get((int) $row->product_id),
                 'sku' => $row->sku,
                 'category' => $row->category_name ?: 'Uncategorized',
                 'brand' => $row->brand_name ?: 'Unbranded',
@@ -265,7 +272,7 @@ class InventoryIntelligenceService
                         $quantity = round(min($excess, $need), 3);
 
                         return [
-                            'product_id' => $target['product_id'], 'product' => $target['product'], 'sku' => $target['sku'],
+                            'product_id' => $target['product_id'], 'product' => $target['product'], 'sku' => $target['sku'], 'image_url' => $target['image_url'],
                             'source_warehouse_id' => $source['warehouse_id'], 'source_warehouse' => $source['warehouse'], 'source_stock' => $source['available'], 'source_safety_stock' => $sourceFloor,
                             'destination_warehouse_id' => $target['warehouse_id'], 'destination_warehouse' => $target['warehouse'], 'destination_stock' => $target['available'],
                             'suggested_quantity' => $quantity,

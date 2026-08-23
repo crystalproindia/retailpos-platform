@@ -94,4 +94,11 @@ class ProductController extends Controller
             $request->query('variant') === 'thumbnail',
         );
     }
+
+    public function destroyImage(Request $request, ProductRepository $products, ProductImageService $images, int $product): RedirectResponse
+    {
+        $images->remove($products->findForCompany($request->user()->company_id, $product, true), $request->user());
+
+        return back()->with('status', 'Product image removed.');
+    }
 }

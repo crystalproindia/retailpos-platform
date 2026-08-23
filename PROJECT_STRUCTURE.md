@@ -3228,3 +3228,20 @@ The additive `2026_08_14_010000_add_smart_purchase_automation_controls.php` migr
 `PurchaseRequestService` supports a draft-to-review flow, per-line partial approval, immutable approval logs, duplication, and conversion of only the approved unconverted quantities. `PurchaseOrderService` protects request conversion with a transaction and lock, supports supplier confirmation, and maintains the existing PO lifecycle. `GoodsReceiptService` posts only accepted quantities through `StockService::recordPurchaseReceipt`, is idempotent after posting, guards accepted quantity against the PO balance, and records tracked batches alongside the authoritative ledger movement. `PurchaseInvoiceMatchingService` deterministically compares supplier invoice lines to linked GRN and PO evidence and records open quantity, price, tax, product, and unreceived-item exceptions for an authorized human to resolve.
 
 No automatic purchasing approval, OCR posting, payment creation, WhatsApp/RCS integration, Google Calendar/Meet behavior, or autonomous stock action is introduced. OCR and supplier-message workflows remain extension boundaries after explicit provider approval.
+
+# Advanced Inventory Intelligence
+
+The Inventory module includes a deterministic management layer at `Inventory > Intelligence`.
+
+- `InventoryIntelligenceService` reads the existing `stock_levels`, `stock_movements`, purchasing, supplier-product, and immutable profitability sources. It does not create a second stock ledger.
+- Current stock value uses on-hand quantity and the existing authoritative product cost (`cost_price`, then `purchase_price`). It is intentionally separate from historical sale-time COGS snapshots.
+- Velocity is completed POS sale movement quantity less completed return movement quantity over a selectable 7, 30, 60, or 90 day window.
+- Slow, fast, dead, newly stocked, overstocked, and reorder classifications use visible tenant settings. Defaults are 120 dead-stock days, 30 new-stock grace days, 2 slow-mover units, 10 fast-mover units, and 0.25 fast-mover units per day.
+- Reorder quantities target configured maximum stock where available, subtract current available stock and authoritative open purchase quantities, and consider supplier lead time. Recommendations never create purchase documents automatically.
+- Transfer recommendations match excess authorized source stock to an authorized shortage for the same product. Source safety stock is preserved and the existing transfer form is only prefilled; normal review, approval, dispatch, and receipt controls remain authoritative.
+- Stock aging assigns each current product-location balance to its latest qualifying inbound stock movement. This is an operational approximation and is not represented as FIFO inventory-layer aging. Rows without reliable inbound evidence remain in an explicit `Unknown` bucket.
+- Product profitability signals consume immutable POS snapshots. Missing profitability remains unavailable and is never treated as zero margin.
+- UI and CSV exports share the same tenant-, outlet-, warehouse-, catalog-, supplier-, status-, aging-, and permission-scoped service. Detail queries are bounded to 500 grouped product-location rows and exports retain spreadsheet formula-injection protection.
+- The Owner Command Center exposes only low-stock count, dead-stock value, reorder value, and transfer-opportunity count, linking to the full intelligence workspace.
+
+Known limitation: aging is product-location movement-based rather than FIFO-layer based. Recommendations are rule-based decision support and never autonomous stock or purchasing actions.

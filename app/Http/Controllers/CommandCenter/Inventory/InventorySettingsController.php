@@ -33,6 +33,12 @@ class InventorySettingsController extends Controller
             'enable_transfer_packing' => ['nullable', 'boolean'],
             'large_adjustment_threshold' => ['nullable', 'numeric', 'min:0'],
             'barcode_price_source' => ['required', 'string', 'max:80'],
+            'dead_stock_days' => ['required', 'integer', 'min:30', 'max:730'],
+            'new_stock_grace_days' => ['required', 'integer', 'min:1', 'max:180'],
+            'slow_mover_max_units' => ['required', 'numeric', 'min:0', 'max:1000000'],
+            'fast_mover_min_units' => ['required', 'numeric', 'min:1', 'max:1000000'],
+            'fast_mover_min_daily_velocity' => ['required', 'numeric', 'min:0.001', 'max:1000000'],
+            'default_lead_time_days' => ['required', 'integer', 'min:1', 'max:365'],
         ]);
 
         foreach (['low_stock_notifications', 'allow_negative_stock_default', 'require_transfer_approval', 'enable_transfer_packing'] as $key) {

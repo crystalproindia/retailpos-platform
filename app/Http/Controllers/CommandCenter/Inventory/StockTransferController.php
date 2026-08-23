@@ -70,10 +70,28 @@ class StockTransferController extends Controller
     {
         $warehouses = $access->accessibleWarehouses($request->user());
         $warehouseIds = $warehouses->pluck('id');
+        $prefill = $request->validate([
+            'source_warehouse_id' => ['nullable', 'integer'],
+            'destination_warehouse_id' => ['nullable', 'integer', 'different:source_warehouse_id'],
+            'product_id' => ['nullable', 'integer'],
+            'quantity' => ['nullable', 'numeric', 'min:0.001'],
+        ]);
+        if (filled($prefill['source_warehouse_id'] ?? null) || filled($prefill['destination_warehouse_id'] ?? null)) {
+            abort_unless(
+                $warehouseIds->contains((int) ($prefill['source_warehouse_id'] ?? 0))
+                && $warehouseIds->contains((int) ($prefill['destination_warehouse_id'] ?? 0)),
+                403,
+            );
+        }
+        $prefillProduct = filled($prefill['product_id'] ?? null)
+            ? Product::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->findOrFail($prefill['product_id'])
+            : null;
 
         return view('command-center.inventory.transfers.create', [
             'warehouses' => $warehouses,
             'locations' => StockLocation::query()->where('company_id', $request->user()->company_id)->whereIn('warehouse_id', $warehouseIds)->where('is_active', true)->orderBy('code')->get(),
+            'prefill' => $prefill,
+            'prefillProduct' => $prefillProduct,
         ]);
     }
 

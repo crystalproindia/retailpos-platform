@@ -80,7 +80,7 @@ use App\Http\Controllers\CommandCenter\Inventory\ChannelProductMappingController
 use App\Http\Controllers\CommandCenter\Inventory\InventoryBrandController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryCategoryController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryDashboardController;
-use App\Http\Controllers\CommandCenter\Inventory\InventoryDecisionDashboardController;
+use App\Http\Controllers\CommandCenter\Inventory\InventoryIntelligenceController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryReportController;
 use App\Http\Controllers\CommandCenter\Inventory\InventorySettingsController;
 use App\Http\Controllers\CommandCenter\Inventory\InventoryTaxRateController;
@@ -899,7 +899,9 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
 
     Route::middleware(['role:administrator,manager,sales,staff', 'can:inventory.view'])->prefix('inventory')->name('inventory.')->group(function (): void {
         Route::get('/', InventoryDashboardController::class)->name('dashboard');
-        Route::get('decision-dashboard', InventoryDecisionDashboardController::class)->middleware('can:inventory.decision_dashboard.view')->name('decision-dashboard');
+        Route::get('decision-dashboard', [InventoryIntelligenceController::class, 'index'])->middleware('can:inventory.decision_dashboard.view')->name('decision-dashboard');
+        Route::get('intelligence', [InventoryIntelligenceController::class, 'index'])->middleware('can:inventory.decision_dashboard.view')->name('intelligence.index');
+        Route::get('intelligence/export/{dataset}', [InventoryIntelligenceController::class, 'export'])->middleware(['can:inventory.decision_dashboard.view', 'can:inventory.reports.export'])->name('intelligence.export');
 
         Route::get('products', [ProductController::class, 'index'])->middleware('can:inventory.products.view')->name('products.index');
         Route::get('products/create', [ProductController::class, 'create'])->middleware('can:inventory.products.create')->name('products.create');

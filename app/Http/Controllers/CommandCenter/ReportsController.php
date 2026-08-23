@@ -10,6 +10,7 @@ use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\Purchases\Supplier;
 use App\Models\User;
+use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Reports\ExecutiveReportingService;
 use App\Services\Reports\RetailReportingService;
@@ -22,12 +23,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
-    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets): View
+    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets, InventoryIntelligenceService $inventoryIntelligence): View
     {
         $filters = $this->executiveFilters($request);
         $executive = $executiveReports->dashboard($request->user(), $filters, $request->boolean('compare', true));
 
-        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive]);
+        $inventory = $request->user()->can('inventory.decision_dashboard.view')
+            ? $inventoryIntelligence->dashboard($request->user(), ['warehouse_id' => $filters['warehouse_id'] ?? null, 'outlet_id' => $filters['outlet_id'] ?? null, 'velocity_period' => 30])['cards']
+            : null;
+
+        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory]);
     }
 
     public function exportExecutive(Request $request, ExecutiveReportingService $reports, ReportValueFormatter $formatter): StreamedResponse

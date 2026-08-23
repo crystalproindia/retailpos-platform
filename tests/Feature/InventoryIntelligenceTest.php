@@ -17,7 +17,10 @@ use App\Models\Pos\PosSale;
 use App\Models\Pos\PosSaleItem;
 use App\Models\User;
 use App\Services\Inventory\InventoryIntelligenceService;
+use App\Services\Inventory\ProductImageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InventoryIntelligenceTest extends TestCase
@@ -176,6 +179,29 @@ class InventoryIntelligenceTest extends TestCase
         $this->actingAs($fixture['admin'])->get(route('inventory.intelligence.index'))->assertOk()->assertSee('Know what to buy, move, and review');
         $this->get(route('inventory.decision-dashboard'))->assertOk()->assertSee('Inventory Intelligence');
         $this->actingAs($staff)->get(route('inventory.intelligence.index'))->assertForbidden();
+    }
+
+    public function test_product_images_and_safe_placeholders_are_available_in_inventory_intelligence(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->fixture();
+        $withImage = $this->product($fixture, 'Picture Product', 'PICTURE-1');
+        $withoutImage = $this->product($fixture, 'Placeholder Product', 'PLACEHOLDER-1');
+        app(ProductImageService::class)->replace($withImage, $fixture['admin'], UploadedFile::fake()->image('picture.png', 800, 600));
+        $this->stock($fixture, $withImage, $fixture['warehouse_a'], 2, minimum: 5, maximum: 20);
+        $this->stock($fixture, $withoutImage, $fixture['warehouse_a'], 4, minimum: 5, maximum: 20);
+
+        $rows = $this->service($fixture['admin'])['rows']->keyBy('sku');
+        $thumbnailUrl = route('inventory.products.image', [$withImage, 'variant' => 'thumbnail']);
+
+        $this->assertSame($thumbnailUrl, $rows['PICTURE-1']['image_url']);
+        $this->assertNull($rows['PLACEHOLDER-1']['image_url']);
+        $this->actingAs($fixture['admin'])
+            ->get(route('inventory.intelligence.index'))
+            ->assertOk()
+            ->assertSee($thumbnailUrl)
+            ->assertSee('Picture Product')
+            ->assertSee('Placeholder Product');
     }
 
     public function test_transfer_recommendation_prefill_is_authorized_and_inventory_thresholds_are_configurable(): void

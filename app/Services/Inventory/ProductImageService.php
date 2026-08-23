@@ -13,6 +13,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductImageService
 {
+    private const PRIMARY_MAX_EDGE = 1600;
+
+    private const THUMBNAIL_MAX_EDGE = 320;
+
     public function __construct(private readonly AuditLogger $audit) {}
 
     public function replace(Product $product, User $user, UploadedFile $file): Product
@@ -25,12 +29,23 @@ class ProductImageService
             default => abort(422, 'Unsupported product image type.'),
         };
         $directory = "companies/{$product->company_id}/products/{$product->id}";
-        $path = $file->storeAs($directory, Str::uuid().'.'.$extension, 'local');
-        abort_unless(is_string($path), 500, 'Product image could not be stored.');
+        $path = $directory.'/'.Str::uuid().'.'.$extension;
         $thumbnailPath = $this->thumbnailPath($path);
 
         try {
-            $this->createThumbnail($path, $thumbnailPath, $extension);
+            $sourceBytes = $file->getContent();
+            $source = @imagecreatefromstring($sourceBytes);
+            abort_unless($source !== false, 422, 'Product image could not be decoded.');
+
+            try {
+                $primaryBytes = $this->resizeAndEncode($source, $extension, self::PRIMARY_MAX_EDGE);
+                $thumbnailBytes = $this->resizeAndEncode($source, $extension, self::THUMBNAIL_MAX_EDGE);
+            } finally {
+                unset($source);
+            }
+
+            abort_unless(Storage::disk('local')->put($path, $primaryBytes), 500, 'Product image could not be stored.');
+            abort_unless(Storage::disk('local')->put($thumbnailPath, $thumbnailBytes), 500, 'Product thumbnail could not be stored.');
         } catch (\Throwable $exception) {
             Storage::disk('local')->delete([$path, $thumbnailPath]);
 
@@ -47,6 +62,7 @@ class ProductImageService
             'company_id' => $product->company_id,
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize(),
+            'stored_size' => strlen($primaryBytes),
         ]);
 
         return $product->refresh();
@@ -95,36 +111,34 @@ class ProductImageService
         return dirname($path).'/thumbnail-'.basename($path);
     }
 
-    private function createThumbnail(string $sourcePath, string $thumbnailPath, string $extension): void
+    private function resizeAndEncode(\GdImage $source, string $extension, int $maxEdge): string
     {
         abort_unless(extension_loaded('gd'), 500, 'Product image processing is unavailable.');
-        $sourceBytes = Storage::disk('local')->get($sourcePath);
-        $source = @imagecreatefromstring($sourceBytes);
-        abort_unless($source !== false, 422, 'Product image could not be decoded.');
-
         $sourceWidth = imagesx($source);
         $sourceHeight = imagesy($source);
-        $scale = min(1, 320 / max($sourceWidth, $sourceHeight));
+        $scale = min(1, $maxEdge / max($sourceWidth, $sourceHeight));
         $width = max(1, (int) round($sourceWidth * $scale));
         $height = max(1, (int) round($sourceHeight * $scale));
-        $thumbnail = imagecreatetruecolor($width, $height);
-        abort_unless($thumbnail !== false, 500, 'Product thumbnail could not be prepared.');
+        $destination = imagecreatetruecolor($width, $height);
+        abort_unless($destination !== false, 500, 'Product image could not be prepared.');
 
         if (in_array($extension, ['png', 'webp'], true)) {
-            imagealphablending($thumbnail, false);
-            imagesavealpha($thumbnail, true);
-            $transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
-            imagefill($thumbnail, 0, 0, $transparent);
+            imagealphablending($destination, false);
+            imagesavealpha($destination, true);
+            $transparent = imagecolorallocatealpha($destination, 0, 0, 0, 127);
+            imagefill($destination, 0, 0, $transparent);
         }
-        imagecopyresampled($thumbnail, $source, 0, 0, 0, 0, $width, $height, $sourceWidth, $sourceHeight);
+        imagecopyresampled($destination, $source, 0, 0, 0, 0, $width, $height, $sourceWidth, $sourceHeight);
         ob_start();
         $written = match ($extension) {
-            'jpg' => imagejpeg($thumbnail, null, 82),
-            'png' => imagepng($thumbnail, null, 6),
-            'webp' => imagewebp($thumbnail, null, 82),
+            'jpg' => imagejpeg($destination, null, 85),
+            'png' => imagepng($destination, null, 6),
+            'webp' => imagewebp($destination, null, 85),
         };
         $bytes = ob_get_clean();
-        abort_unless($written && is_string($bytes), 500, 'Product thumbnail could not be encoded.');
-        abort_unless(Storage::disk('local')->put($thumbnailPath, $bytes), 500, 'Product thumbnail could not be stored.');
+        unset($destination);
+        abort_unless($written && is_string($bytes), 500, 'Product image could not be encoded.');
+
+        return $bytes;
     }
 }

@@ -3245,3 +3245,16 @@ The Inventory module includes a deterministic management layer at `Inventory > I
 - The Owner Command Center exposes only low-stock count, dead-stock value, reorder value, and transfer-opportunity count, linking to the full intelligence workspace.
 
 Known limitation: aging is product-location movement-based rather than FIFO-layer based. Recommendations are rule-based decision support and never autonomous stock or purchasing actions.
+
+# Product Catalog Images
+
+Products retain one optional primary image through the existing nullable `products.image` field. No gallery or duplicate media table is introduced.
+
+- `ProductImageService` decodes validated JPEG, PNG, or WEBP uploads with GD, writes a web-ready primary image capped at 1600 pixels on its longest edge, and creates a 320-pixel thumbnail without changing aspect ratio.
+- Images use generated filenames under the private `local` disk path `companies/{company}/products/{product}/`. Protected, tenant-scoped controller responses expose content without revealing filesystem paths.
+- Replacement writes and validates both new variants before updating the product. The previous owned files are deleted only after the surrounding database transaction commits.
+- Authorized managers can remove an image through a confirmed, dedicated action. Missing files and products without images render neutral light/dark placeholders.
+- Product lists, product detail/forms, stock lookup, transfers, POS search, offline POS bootstrap, and Inventory Intelligence use the protected thumbnail URL. Listing surfaces never load the full primary image.
+- Existing product create/update/view permissions remain authoritative, with `inventory.products.image.manage` controlling upload, replacement, and removal.
+
+The current phase intentionally supports one primary product image only. Private thumbnail responses require an authenticated, authorized RetailPOS session; offline synchronization stores the protected URL rather than a filesystem path and does not add binary offline-image replication.

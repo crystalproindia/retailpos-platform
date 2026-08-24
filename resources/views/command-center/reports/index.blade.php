@@ -45,6 +45,12 @@
         @endforeach
     </section>
 
+    @if($aiBrief)
+        <section class="rounded-lg border border-teal-200 bg-teal-50/60 p-5 shadow-sm dark:border-teal-900 dark:bg-teal-950/20 sm:p-6" aria-labelledby="ai-business-brief-heading">
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div class="min-w-0"><div class="flex items-center gap-2 text-teal-700 dark:text-teal-300"><x-icon name="ai" class="size-5" /><p class="text-xs font-semibold uppercase">AI Business Brief</p></div><h2 id="ai-business-brief-heading" class="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{{ $aiBrief['summary'] }}</h2><div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">@foreach(array_slice($aiBrief['facts'], 0, 4) as $fact)<div class="rounded-lg border border-white/80 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-900/80"><p class="text-xs text-slate-500">{{ $fact['label'] }}</p><p class="mt-1 break-words text-sm font-semibold text-slate-950 dark:text-white">{{ $fact['format'] === 'money' ? $money($fact['value']) : ($fact['value'] === null ? 'Unavailable' : number_format((float) $fact['value'], $fact['format'] === 'percent' ? 2 : 0).($fact['format'] === 'percent' ? '%' : '')) }}</p></div>@endforeach</div><p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ $aiBrief['coverage'] }}</p></div><a href="{{ route('ai.dashboard') }}" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-500/20 dark:bg-teal-300 dark:text-slate-950">Ask AI about this <span aria-hidden="true">→</span></a></div>
+        </section>
+    @endif
+
     @if($inventoryIntelligence)
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-semibold uppercase text-indigo-700 dark:text-indigo-300">Inventory intelligence</p><h2 class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Working-capital signals</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Rule-based stock decisions within your authorized warehouse scope.</p></div><a href="{{ route('inventory.intelligence.index', array_filter(['warehouse_id' => request('warehouse_id')])) }}" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Open intelligence →</a></div>

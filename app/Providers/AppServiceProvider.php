@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\Ai\AiProviderInterface;
 use App\Contracts\Crm\SalesMessageGeneratorInterface;
 use App\Enums\UserRole;
 use App\Models\Crm\CrmActivity;
@@ -13,6 +14,7 @@ use App\Policies\Crm\CrmActivityPolicy;
 use App\Policies\Crm\CrmCompanyPolicy;
 use App\Policies\Crm\CrmContactPolicy;
 use App\Policies\Crm\CrmLeadPolicy;
+use App\Services\Ai\OpenAiProvider;
 use App\Services\AuditLogger;
 use App\Services\Crm\TemplateSalesMessageGenerator;
 use Illuminate\Auth\Events\Login;
@@ -31,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(SalesMessageGeneratorInterface::class, TemplateSalesMessageGenerator::class);
+        $this->app->bind(AiProviderInterface::class, OpenAiProvider::class);
     }
 
     /**
@@ -58,6 +61,9 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('ai-forecast-run', fn ($request) => Limit::perMinute(3)
             ->by('ai-forecast-run:'.($request->user()?->id ?? $request->ip())));
+
+        RateLimiter::for('ai-assistant', fn ($request) => Limit::perMinute((int) config('ai.requests_per_minute', 10))
+            ->by('ai-assistant:'.($request->user()?->company_id ?? 'guest').':'.($request->user()?->id ?? $request->ip())));
 
         RateLimiter::for('workforce-invitation', fn ($request) => Limit::perMinute(3)
             ->by('workforce-invitation:'.($request->user()?->id ?? $request->ip())));

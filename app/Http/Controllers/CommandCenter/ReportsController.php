@@ -10,6 +10,7 @@ use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
 use App\Models\Purchases\Supplier;
 use App\Models\User;
+use App\Services\Ai\AiAssistantService;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Reports\ExecutiveReportingService;
@@ -23,7 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
-    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets, InventoryIntelligenceService $inventoryIntelligence): View
+    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets, InventoryIntelligenceService $inventoryIntelligence, AiAssistantService $assistant): View
     {
         $filters = $this->executiveFilters($request);
         $executive = $executiveReports->dashboard($request->user(), $filters, $request->boolean('compare', true));
@@ -32,7 +33,9 @@ class ReportsController extends Controller
             ? $inventoryIntelligence->dashboard($request->user(), ['warehouse_id' => $filters['warehouse_id'] ?? null, 'outlet_id' => $filters['outlet_id'] ?? null, 'velocity_period' => 30])['cards']
             : null;
 
-        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory]);
+        $aiBrief = $request->user()->can('ai.dashboard.view') ? $assistant->brief($request->user(), is_numeric($filters['outlet_id'] ?? null) ? (int) $filters['outlet_id'] : null) : null;
+
+        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory, 'aiBrief' => $aiBrief]);
     }
 
     public function exportExecutive(Request $request, ExecutiveReportingService $reports, ReportValueFormatter $formatter): StreamedResponse

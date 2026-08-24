@@ -3258,3 +3258,11 @@ Products retain one optional primary image through the existing nullable `produc
 - Existing product create/update/view permissions remain authoritative, with `inventory.products.image.manage` controlling upload, replacement, and removal.
 
 The current phase intentionally supports one primary product image only. Private thumbnail responses require an authenticated, authorized RetailPOS session; offline synchronization stores the protected URL rather than a filesystem path and does not add binary offline-image replication.
+
+# Friendly AI Intelligence Layer
+
+The `/ai` workspace now combines a deterministic business brief, attention prompts, approved natural-language intents, source drilldowns, and the existing forecast history. `AiAssistantService` coordinates controlled intent/date resolution, `BusinessIntelligenceContextService` reuses authoritative reporting and inventory services, and `AiProviderInterface` keeps optional model wording provider-neutral. Missing provider configuration never blocks deterministic answers.
+
+The additive `ai_assistant_interactions` table stores tenant/user/outlet scope, conversation identifier, selected intent, provider status, timing/usage metadata, date scope, and a one-way prompt digest. Raw prompts, responses, secrets, and API keys are not persisted. Immediate follow-up context is bounded and session-keyed by company and user.
+
+The Owner Command Center includes a compact permission-aware AI Business Brief. All assistant behavior remains read/advice-only; it cannot execute SQL or create, edit, delete, transfer, pay, refund, message, or otherwise mutate business records. See `docs/ai-intelligence-layer.md` for provider configuration, intent boundaries, sources, safeguards, and current limitations.

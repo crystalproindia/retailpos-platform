@@ -368,6 +368,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
 
     Route::prefix('ai')->name('ai.')->group(function (): void {
         Route::get('/', [AiForecastController::class, 'index'])->middleware('can:ai.dashboard.view')->name('dashboard');
+        Route::post('ask', [AiForecastController::class, 'ask'])->middleware(['can:ai.dashboard.view', 'throttle:ai-assistant'])->name('ask');
         Route::post('run', [AiForecastController::class, 'run'])->middleware(['can:ai.forecasts.run', 'throttle:ai-forecast-run'])->name('run');
         Route::post('insights/{insight}/review', [AiForecastController::class, 'review'])->middleware('can:ai.insights.review')->name('insights.review');
         Route::get('settings', [AiForecastController::class, 'settings'])->middleware('can:ai.settings.manage')->name('settings');

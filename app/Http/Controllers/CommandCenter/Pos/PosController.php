@@ -94,22 +94,34 @@ class PosController extends Controller
             ? PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $outlet->id)->where('is_active', true)->findOrFail($request->integer('register_id'))
             : null;
         $scan = trim($request->string('scan')->toString());
+        $favoriteIds = $catalog->favoriteIds($request->user(), $outlet->id);
         $products = $scan !== ''
             ? collect([$catalog->findByBarcodeOrSku($request->user()->company_id, $outlet->id, $scan, $register?->warehouse_id, $register?->stock_location_id)])->filter()
             : $catalog->search($request->user()->company_id, $outlet->id, $request->string('q')->toString(), $register?->warehouse_id, $register?->stock_location_id);
 
-        return response()->json(['products' => $products->map(fn ($product) => $this->productPayload($product))->values()]);
+        return response()->json(['products' => $products->map(fn ($product) => $this->productPayload($product) + ['favorite' => in_array($product->id, $favoriteIds, true)])->values()]);
     }
 
     public function customer(Request $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions, OutletAccessService $outlets): JsonResponse
     {
-        $request->validate(['mobile' => ['required', 'string', 'min:6', 'max:50']]);
-        $customer = $lookup->findByMobile($request->user()->company_id, (string) $request->mobile);
+        $data = $request->validate([
+            'mobile' => ['nullable', 'required_without:q', 'string', 'min:6', 'max:50'],
+            'q' => ['nullable', 'required_without:mobile', 'string', 'min:2', 'max:100'],
+        ]);
+        $customer = isset($data['mobile']) ? $lookup->findByMobile($request->user()->company_id, $data['mobile']) : null;
+        $matches = isset($data['q']) ? $lookup->search($request->user()->company_id, $data['q']) : collect();
         if (! $customer) {
-            return response()->json(['customer' => null, 'suggestions' => []]);
+            return response()->json(['customer' => null, 'customers' => $matches->map(fn (Customer $match) => $this->customerPayload($match))->values(), 'suggestions' => []]);
         }
 
-        return response()->json(['customer' => $this->customerPayload($customer), 'suggestions' => collect($suggestions->suggestions($customer, $outlets->current($request->user())->id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())]);
+        return response()->json(['customer' => $this->customerPayload($customer), 'customers' => [], 'suggestions' => collect($suggestions->suggestions($customer, $outlets->current($request->user())->id))->map(fn ($products) => $products->map(fn ($product) => $this->productPayload($product))->values())]);
+    }
+
+    public function toggleFavorite(Request $request, PosCatalogRepository $catalog, OutletAccessService $outlets, int $product): JsonResponse
+    {
+        $favorite = $catalog->toggleFavorite($request->user(), $outlets->current($request->user())->id, $product);
+
+        return response()->json(['product_id' => $product, 'favorite' => $favorite]);
     }
 
     public function quickCustomer(PosQuickCustomerRequest $request, PosCustomerLookupService $lookup, CustomerProductSuggestionService $suggestions, OutletAccessService $outlets): JsonResponse
@@ -192,6 +204,8 @@ class PosController extends Controller
         $openRegisters = PosRegister::query()->where('company_id', $request->user()->company_id)->where('branch_id', $outlet->id)->where('is_active', true)->whereNotNull('current_session_id')->orderBy('name')->get();
         $register = $openRegisters->first();
         $products = $catalog->search($request->user()->company_id, $outlet->id, $request->string('search')->toString(), $register?->warehouse_id, $register?->stock_location_id);
+        $favoriteProductIds = $catalog->favoriteIds($request->user(), $outlet->id);
+        $customerLookup = app(PosCustomerLookupService::class);
 
         return view('command-center.pos.index', [
             'products' => $products,
@@ -200,6 +214,8 @@ class PosController extends Controller
             'resumedSale' => $resumedSale,
             'posMode' => $mode,
             'popularProductIds' => $dashboard->popularProductIds($request->user()->company_id, $outlet->id),
+            'favoriteProductIds' => $favoriteProductIds,
+            'recentCustomers' => $customerLookup->recent($request->user()->company_id)->map(fn (Customer $customer) => $this->customerPayload($customer))->values(),
             'openRegisters' => $openRegisters,
         ]);
     }

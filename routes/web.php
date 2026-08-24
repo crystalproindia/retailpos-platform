@@ -614,6 +614,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
             Route::post('records/{record}/retry', [PosOfflineController::class, 'retry'])->whereNumber('record')->middleware(['role:administrator,manager', 'can:pos.offline.retry'])->name('records.retry');
         });
         Route::get('held', [PosController::class, 'heldBills'])->middleware('can:pos.hold')->name('held.index');
+        Route::post('favorites/{product}', [PosController::class, 'toggleFavorite'])->whereNumber('product')->name('favorites.toggle');
         Route::get('sales', [PosController::class, 'salesHistory'])->middleware('can:pos.sales.view')->name('sales.index');
         Route::get('returns', [PosReturnController::class, 'index'])->middleware('can:pos.returns.view')->name('returns.index');
         Route::get('returns/create', [PosReturnController::class, 'create'])->middleware('can:pos.returns.create')->name('returns.create');

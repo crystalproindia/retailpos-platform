@@ -841,10 +841,14 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentMode: 'cash',
         manualDiscount: 0,
         paymentAmount: 0,
+        paymentAmountTouched: false,
         splitPayments: [],
         categoryId: 'all',
         recentlyAdded: [],
         popularProductIds: parse(posApp.dataset.popularProducts, []),
+        favoriteProductIds: parse(posApp.dataset.favoriteProducts, []).map(Number),
+        recentCustomers: parse(posApp.dataset.recentCustomers, []),
+        customerMatches: [],
         isSubmitting: false,
         online: navigator.onLine,
         offlineSettings: {},
@@ -855,13 +859,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character]));
     const manualDiscount = () => Math.max(0, Number(state.manualDiscount || 0));
     const subtotal = () => state.cart.reduce((total, item) => total + Number(item.price) * Number(item.quantity), 0);
-    const total = () => Math.max(0, subtotal() - manualDiscount());
+    const lineDiscount = (item) => {
+        const gross = Number(item.price) * Number(item.quantity);
+        const value = Math.max(0, Number(item.discount_value || 0));
+
+        return Math.min(gross, item.discount_type === 'percentage' ? gross * value / 100 : value);
+    };
+    const discountTotal = () => manualDiscount() + state.cart.reduce((sum, item) => sum + lineDiscount(item), 0);
+    const total = () => Math.max(0, subtotal() - discountTotal());
     const splitPaid = () => state.splitPayments.reduce((sum, payment) => sum + Math.max(0, Number(payment.amount || 0)), 0);
     const paymentEntries = () => state.paymentMode === 'split'
         ? state.splitPayments.map((payment) => ({ method: payment.method, amount: Number(payment.amount || 0), reference: payment.reference || '' }))
         : [{ method: state.paymentMethod, amount: Number(state.paymentAmount || 0), reference: [...document.querySelectorAll('[data-pos-payment-reference]')].map((input) => input.value.trim()).find(Boolean) || '' }];
 
-    const productMarkup = (product) => `<button type="button" data-pos-product='${escapeHtml(JSON.stringify(product))}' class="pos-product-card pos-compact-product-card text-left"><span class="pos-compact-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" class="size-full object-cover">` : escapeHtml(product.name).slice(0, 1)}</span><span class="mt-2 block truncate text-sm font-semibold text-slate-900">${escapeHtml(product.name)}</span><span class="mt-0.5 block truncate text-xs text-slate-500">${escapeHtml(product.sku || '')}</span><span class="mt-2 flex items-center justify-between gap-2"><span class="text-sm font-bold text-teal-700">${money(product.price)}</span>${product.track_inventory ? `<span class="pos-stock-badge ${product.low_stock ? 'is-low' : ''}">${Number(product.available_stock || 0)}</span>` : ''}</span></button>`;
+    const productMarkup = (product) => {
+        const favorite = state.favoriteProductIds.includes(Number(product.id));
+
+        return `<article data-pos-product-shell class="pos-product-shell"><button type="button" data-pos-product='${escapeHtml(JSON.stringify({ ...product, favorite }))}' class="pos-product-card pos-compact-product-card text-left"><span class="pos-compact-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" class="size-full object-cover" loading="lazy" decoding="async">` : escapeHtml(product.name).slice(0, 1)}</span><span class="mt-2 block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">${escapeHtml(product.name)}</span><span class="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">${escapeHtml(product.sku || '')}</span><span class="mt-2 flex items-center justify-between gap-2"><span class="text-sm font-bold text-teal-700 dark:text-teal-300">${money(product.price)}</span>${product.track_inventory ? `<span class="pos-stock-badge ${product.low_stock ? 'is-low' : ''}">${Number(product.available_stock || 0)}</span>` : ''}</span></button><button type="button" data-pos-favorite="${product.id}" class="pos-favorite-button ${favorite ? 'is-favorite' : ''}" aria-label="${favorite ? 'Remove from' : 'Add to'} favorites" aria-pressed="${favorite}">★</button></article>`;
+    };
 
     const showFeedback = (message, type = 'success') => {
         document.querySelectorAll('[data-pos-feedback]').forEach((node) => {
@@ -901,11 +916,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const focusScanner = () => window.setTimeout(() => [...document.querySelectorAll('[data-pos-scanner]')].find((input) => input.offsetParent !== null)?.focus(), 30);
 
+    const favoriteButton = (product) => {
+        const favorite = state.favoriteProductIds.includes(Number(product.id));
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.posFavorite = product.id;
+        button.className = `pos-favorite-button ${favorite ? 'is-favorite' : ''}`;
+        button.setAttribute('aria-label', `${favorite ? 'Remove' : 'Add'} ${product.name} ${favorite ? 'from' : 'to'} favorites`);
+        button.setAttribute('aria-pressed', String(favorite));
+        button.textContent = '★';
+
+        return button;
+    };
+
+    const ensureProductShell = (button, product) => {
+        if (button.closest('[data-pos-product-shell]')) return;
+        const shell = document.createElement('article');
+        shell.dataset.posProductShell = '';
+        shell.className = 'pos-product-shell';
+        button.before(shell);
+        shell.append(button, favoriteButton(product));
+    };
+
+    const toggleFavorite = async (button) => {
+        if (!state.online) { showFeedback('Connect to update cashier favorites.', 'error'); return; }
+        const productId = Number(button.dataset.posFavorite);
+        button.disabled = true;
+        try {
+            const response = await fetch(`${posApp.dataset.favoriteUrl}/${productId}`, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf } });
+            if (!response.ok) throw new Error('Favorite update failed');
+            const payload = await response.json();
+            state.favoriteProductIds = payload.favorite
+                ? [...new Set([...state.favoriteProductIds, productId])]
+                : state.favoriteProductIds.filter((id) => id !== productId);
+            document.querySelectorAll(`[data-pos-favorite="${productId}"]`).forEach((favorite) => {
+                favorite.classList.toggle('is-favorite', payload.favorite);
+                favorite.setAttribute('aria-pressed', String(payload.favorite));
+            });
+            document.querySelectorAll('[data-pos-favorite-count]').forEach((count) => { count.textContent = state.favoriteProductIds.length; });
+            filterProducts();
+        } catch { showFeedback('Favorite could not be updated. Try again.', 'error'); }
+        finally { button.disabled = false; }
+    };
+
     const bindProducts = (scope = document) => {
         scope.querySelectorAll('[data-pos-product]').forEach((button) => {
+            const product = parse(button.dataset.posProduct, null);
+            ensureProductShell(button, product);
             if (button.dataset.posBound) return;
             button.dataset.posBound = 'true';
-            button.addEventListener('click', () => addProduct(parse(button.dataset.posProduct, null)));
+            button.addEventListener('click', () => addProduct(product));
+        });
+        scope.querySelectorAll('[data-pos-favorite]').forEach((button) => {
+            if (button.dataset.posBound) return;
+            button.dataset.posBound = 'true';
+            button.addEventListener('click', () => toggleFavorite(button));
         });
     };
 
@@ -921,7 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (existing) existing.quantity = Number(existing.quantity) + 1;
-        else state.cart.push({ ...product, quantity: 1 });
+        else state.cart.push({ ...product, quantity: 1, discount_type: 'fixed', discount_value: 0 });
         state.recentlyAdded = [Number(product.id), ...state.recentlyAdded.filter((id) => id !== Number(product.id))].slice(0, 12);
         render();
         document.querySelectorAll('[data-pos-product]').forEach((button) => {
@@ -957,11 +1022,60 @@ document.addEventListener('DOMContentLoaded', () => {
             button.dataset.posBound = 'true';
             button.addEventListener('click', () => { state.cart = state.cart.filter((item) => Number(item.id) !== Number(button.dataset.posRemove)); render(); focusScanner(); });
         });
+        scope.querySelectorAll('[data-pos-quantity-input]').forEach((input) => {
+            if (input.dataset.posBound) return;
+            input.dataset.posBound = 'true';
+            input.addEventListener('change', () => {
+                const item = state.cart.find((cartItem) => Number(cartItem.id) === Number(input.dataset.posQuantityInput));
+                if (!item) return;
+                const requested = Math.max(0, Number(input.value || 0));
+                if (item.track_inventory && Number(item.available_stock) > 0 && requested > Number(item.available_stock)) {
+                    showFeedback(`Only ${item.available_stock} ${item.name} available.`, 'error');
+                    input.value = item.quantity;
+                    return;
+                }
+                item.quantity = requested;
+                if (item.quantity <= 0) state.cart = state.cart.filter((cartItem) => Number(cartItem.id) !== Number(item.id));
+                render();
+            });
+        });
+        scope.querySelectorAll('[data-pos-line-discount]').forEach((input) => {
+            if (input.dataset.posBound) return;
+            input.dataset.posBound = 'true';
+            input.addEventListener('change', () => {
+                const item = state.cart.find((cartItem) => Number(cartItem.id) === Number(input.dataset.posLineDiscount));
+                if (!item) return;
+                const gross = Number(item.price) * Number(item.quantity);
+                item.discount_type = 'fixed';
+                item.discount_value = Math.min(gross, Math.max(0, Number(input.value || 0)));
+                render();
+            });
+        });
     };
 
     const customerMarkup = (customer) => {
         if (!customer) return '';
-        return `<div class="rounded-lg border border-teal-100 bg-teal-50 p-3"><div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-900">${escapeHtml(customer.name)}</p><p class="mt-1 text-xs text-slate-600">${escapeHtml(customer.group || 'Customer')} · ${escapeHtml(customer.mobile || '')}</p></div><span class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-teal-700">${escapeHtml(customer.loyalty_points)} pts</span></div><div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600"><span>Wallet ${money(customer.wallet_balance)}</span><span>Last ${escapeHtml(customer.last_purchase_at || 'None')}</span><span>Birthday ${escapeHtml(customer.birthday || '—')}</span><span class="truncate">${escapeHtml(customer.retention_note || '')}</span></div></div>`;
+        return `<div class="pos-selected-customer"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate font-semibold text-slate-900 dark:text-slate-100">${escapeHtml(customer.name)}</p><p class="mt-1 truncate text-xs text-slate-600 dark:text-slate-300">${escapeHtml(customer.group || 'Customer')} · ${escapeHtml(customer.mobile || '')}</p></div><div class="flex shrink-0 items-center gap-1"><span class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-teal-700 dark:bg-slate-900 dark:text-teal-300">${escapeHtml(customer.loyalty_points)} pts</span><button type="button" data-pos-clear-customer class="pos-customer-clear" aria-label="Clear selected customer">×</button></div></div><div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300"><span>Wallet ${money(customer.wallet_balance)}</span><span>Last ${escapeHtml(customer.last_purchase_at || 'None')}</span><span>Birthday ${escapeHtml(customer.birthday || '—')}</span><span class="truncate">${escapeHtml(customer.retention_note || '')}</span></div></div>`;
+    };
+
+    const customerResultsMarkup = (customers) => customers.length
+        ? `<div class="pos-customer-results"><p class="px-3 pb-2 text-xs font-semibold uppercase text-slate-400">${state.customerMatches.length ? 'Matches' : 'Recent customers'}</p>${customers.map((customer) => `<button type="button" data-pos-select-customer="${escapeHtml(customer.mobile || '')}" class="pos-customer-result"><span class="min-w-0"><b>${escapeHtml(customer.name)}</b><small>${escapeHtml(customer.group || 'Customer')} · ${escapeHtml(customer.mobile || '')}</small></span><span>Choose</span></button>`).join('')}</div>`
+        : '';
+
+    const bindCustomerActions = () => {
+        document.querySelectorAll('[data-pos-clear-customer]').forEach((button) => {
+            if (button.dataset.posBound) return;
+            button.dataset.posBound = 'true';
+            button.addEventListener('click', () => { state.customer = null; state.suggestions = {}; state.customerMatches = []; document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => { input.value = ''; }); render(); focusScanner(); });
+        });
+        document.querySelectorAll('[data-pos-select-customer]').forEach((button) => {
+            if (button.dataset.posBound) return;
+            button.dataset.posBound = 'true';
+            button.addEventListener('click', () => {
+                document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => { input.value = button.dataset.posSelectCustomer; });
+                lookupCustomer();
+            });
+        });
     };
 
     const quickCustomerMarkup = () => `<div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><p class="text-sm font-medium">New customer</p><div class="mt-2 flex gap-2"><input data-pos-quick-name placeholder="Name" class="min-w-0 flex-1"><button type="button" data-pos-quick-save class="rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white">Add</button></div></div>`;
@@ -977,6 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!state.online) {
                     state.customer = { id: null, name: name || 'Offline customer', mobile, group: 'Pending sync', loyalty_points: 0, wallet_balance: 0, last_purchase_at: null, retention_note: 'Customer will be created or merged during sync.' };
                     state.suggestions = {};
+                    state.customerMatches = [];
                     render();
                     showFeedback('Customer saved with this offline bill and will be synchronized later.');
                     return;
@@ -986,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const payload = await response.json();
                 state.customer = payload.customer;
                 state.suggestions = payload.suggestions || {};
+                state.customerMatches = [];
                 render();
                 showFeedback(`${payload.customer.name} added as a customer.`);
             });
@@ -1001,9 +1117,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const render = () => {
         const sub = subtotal();
-        const discount = manualDiscount();
+        const discount = discountTotal();
         const finalTotal = total();
-        const cartMarkup = state.cart.map((item) => `<div class="rounded-xl border border-slate-100 bg-white p-3 shadow-sm"><div class="flex items-start gap-3"><span class="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">${escapeHtml(item.name).slice(0, 1)}</span><div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-900">${escapeHtml(item.name)}</p><p class="mt-0.5 truncate text-xs text-slate-500">${escapeHtml(item.sku || '')} · ${money(item.price)} each</p></div><button type="button" data-pos-remove="${item.id}" class="grid size-7 place-items-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label="Remove ${escapeHtml(item.name)}">×</button></div><div class="mt-2 flex items-center justify-between"><div class="flex items-center gap-1"><button type="button" data-pos-quantity="-1" data-product-id="${item.id}" class="grid size-8 place-items-center rounded-md bg-slate-100 text-slate-600" aria-label="Reduce quantity">−</button><span class="w-8 text-center text-sm font-bold">${item.quantity}</span><button type="button" data-pos-quantity="1" data-product-id="${item.id}" class="grid size-8 place-items-center rounded-md bg-slate-100 text-slate-600" aria-label="Increase quantity">+</button></div><div class="text-right"><p class="text-xs text-slate-400">Tax 0.00</p><p class="text-sm font-bold text-slate-900">${money(Number(item.price) * Number(item.quantity))}</p></div></div></div>`).join('');
+        const cartMarkup = state.cart.map((item) => {
+            const gross = Number(item.price) * Number(item.quantity);
+            const net = Math.max(0, gross - lineDiscount(item));
+            const visual = item.image ? `<img src="${escapeHtml(item.image)}" alt="" loading="lazy" decoding="async">` : escapeHtml(item.name).slice(0, 1);
+
+            return `<article class="pos-cart-line"><div class="flex items-start gap-3"><span class="pos-cart-thumbnail">${visual}</span><div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">${escapeHtml(item.name)}</p><p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">${escapeHtml(item.sku || '')} · ${money(item.price)} each</p></div><button type="button" data-pos-remove="${item.id}" class="pos-cart-remove" aria-label="Remove ${escapeHtml(item.name)}">×</button></div><div class="pos-cart-line-controls"><div><span class="pos-cart-field-label">Quantity</span><div class="mt-1 flex items-center gap-1"><button type="button" data-pos-quantity="-1" data-product-id="${item.id}" class="pos-quantity-button" aria-label="Reduce quantity">−</button><input data-pos-quantity-input="${item.id}" type="number" min="0.001" step="0.001" value="${item.quantity}" class="pos-quantity-input" aria-label="Quantity for ${escapeHtml(item.name)}"><button type="button" data-pos-quantity="1" data-product-id="${item.id}" class="pos-quantity-button" aria-label="Increase quantity">+</button></div></div><label class="min-w-0"><span class="pos-cart-field-label">Discount</span><input data-pos-line-discount="${item.id}" type="number" min="0" max="${gross}" step="0.01" value="${Number(item.discount_value || 0)}" class="pos-line-discount" aria-label="Discount for ${escapeHtml(item.name)}"></label><div class="pb-1 text-right"><p class="text-xs text-slate-400">Line total</p><p class="text-sm font-bold text-slate-900 dark:text-slate-100">${money(net)}</p></div></div></article>`;
+        }).join('');
         document.querySelectorAll('[data-pos-cart-items]').forEach((node) => { node.innerHTML = cartMarkup; });
         document.querySelectorAll('[data-pos-empty-cart]').forEach((node) => node.classList.toggle('hidden', state.cart.length > 0));
         document.querySelectorAll('[data-pos-subtotal]').forEach((node) => { node.textContent = money(sub); });
@@ -1011,9 +1133,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-pos-total]').forEach((node) => { node.textContent = money(finalTotal); });
         document.querySelectorAll('[data-pos-cart-count]').forEach((node) => { node.textContent = `${state.cart.reduce((count, item) => count + Number(item.quantity), 0)} items`; });
         document.querySelectorAll('[data-pos-customer-card]').forEach((node) => { node.innerHTML = customerMarkup(state.customer); });
-        document.querySelectorAll('[data-pos-quick-customer]').forEach((node) => { node.classList.toggle('hidden', Boolean(state.customer)); node.innerHTML = state.customer ? '' : quickCustomerMarkup(); });
+        document.querySelectorAll('[data-pos-customer-results]').forEach((node) => {
+            const customers = state.customerMatches.length ? state.customerMatches : (!state.customer ? state.recentCustomers : []);
+            node.innerHTML = customerResultsMarkup(customers);
+            node.classList.toggle('hidden', !customers.length);
+        });
+        const customerTerm = [...document.querySelectorAll('[data-pos-customer-mobile]')].map((input) => input.value.trim()).find(Boolean) || '';
+        const canQuickCreate = !state.customer && !state.customerMatches.length && !/[a-z]/i.test(customerTerm) && customerTerm.replace(/\D/g, '').length >= 6;
+        document.querySelectorAll('[data-pos-quick-customer]').forEach((node) => { node.classList.toggle('hidden', !canQuickCreate); node.innerHTML = canQuickCreate ? quickCustomerMarkup() : ''; });
         document.querySelectorAll('[data-pos-suggestions]').forEach((node) => { node.innerHTML = suggestionMarkup(); });
-        if (!state.paymentAmount) state.paymentAmount = money(finalTotal);
+        if (!state.paymentAmountTouched) state.paymentAmount = money(finalTotal);
         document.querySelectorAll('[data-pos-payment-amount]').forEach((node) => { if (document.activeElement !== node) node.value = state.paymentAmount; });
         const isSplit = state.paymentMode === 'split';
         const paid = isSplit ? splitPaid() : Math.max(0, Number(state.paymentAmount || 0));
@@ -1030,7 +1159,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-pos-payment-mode-note]').forEach((node) => { node.textContent = modeNotes[state.paymentMode] || modeNotes.cash; });
         document.querySelectorAll('[data-pos-wallet-context]').forEach((node) => { node.classList.remove('hidden'); node.textContent = state.customer ? `Wallet balance: ${money(state.customer.wallet_balance)}. Wallet settlement and credit due are not enabled in this phase.` : 'Select a customer to use wallet or credit payment foundations.'; });
         document.querySelectorAll('[data-pos-checkout]').forEach((button) => { button.textContent = state.isSubmitting ? 'Saving payment…' : (isSplit ? 'Accept split payment' : `Accept ${state.paymentMethod}`); button.disabled = state.isSubmitting; });
-        bindCartActions(); bindProducts(); bindQuickCustomer(); bindSplitActions();
+        document.querySelectorAll('[data-pos-pay-label]').forEach((label) => { label.textContent = `Pay ${money(finalTotal)}`; });
+        bindCartActions(); bindProducts(); bindQuickCustomer(); bindSplitActions(); bindCustomerActions();
     };
 
     const splitRowsMarkup = () => state.splitPayments.map((payment, index) => `<div class="pos-split-row"><select data-pos-split-method="${index}" aria-label="Payment method"><option value="cash" ${payment.method === 'cash' ? 'selected' : ''}>Cash</option><option value="card" ${payment.method === 'card' ? 'selected' : ''}>Card</option><option value="upi" ${payment.method === 'upi' ? 'selected' : ''}>UPI</option></select><input data-pos-split-amount="${index}" type="number" min="0" step="0.01" value="${escapeHtml(payment.amount)}" aria-label="Payment amount"><input data-pos-split-reference="${index}" value="${escapeHtml(payment.reference || '')}" placeholder="Reference" aria-label="Payment reference"><button type="button" data-pos-remove-split="${index}" class="pos-split-remove" aria-label="Remove payment">×</button></div>`).join('');
@@ -1046,20 +1176,23 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-pos-products] [data-pos-product], [data-pos-products-mobile] [data-pos-product]').forEach((node) => {
             const product = parse(node.dataset.posProduct, {});
             const visible = state.categoryId === 'all'
+                || (state.categoryId === 'favorites' && state.favoriteProductIds.includes(Number(product.id)))
                 || (state.categoryId === 'low-stock' && product.low_stock)
                 || (state.categoryId === 'recent' && state.recentlyAdded.includes(Number(product.id)))
                 || (state.categoryId === 'popular' && state.popularProductIds.includes(Number(product.id)))
                 || (state.categoryId === 'offers' && false)
                 || String(product.category_id) === String(state.categoryId);
-            node.classList.toggle('hidden', !visible);
+            (node.closest('[data-pos-product-shell]') || node).classList.toggle('hidden', !visible);
         });
         document.querySelectorAll('[data-pos-empty-products]').forEach((empty) => {
             const grid = empty.previousElementSibling;
-            const visibleProducts = grid?.querySelectorAll?.('[data-pos-product]:not(.hidden)').length || 0;
+            const visibleProducts = grid?.querySelectorAll?.('[data-pos-product-shell]:not(.hidden)').length || 0;
             empty.classList.toggle('hidden', visibleProducts > 0);
         });
     };
 
+    let searchTimer;
+    let searchRequest;
     const searchProducts = async (value) => {
         if (!state.online) {
             const products = await offlineStore.products(value);
@@ -1073,8 +1206,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (value) url.searchParams.set('q', value);
         const registerId = [...document.querySelectorAll('[data-pos-register]')].map((input) => input.value).find(Boolean);
         if (registerId) url.searchParams.set('register_id', registerId);
-        const response = await fetch(url, { headers: { Accept: 'application/json' } });
-        if (!response.ok) return;
+        searchRequest?.abort();
+        searchRequest = new AbortController();
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: searchRequest.signal }).catch(() => null);
+        if (!response?.ok) return;
         const payload = await response.json();
         const markup = payload.products.map(productMarkup).join('');
         document.querySelectorAll('[data-pos-products], [data-pos-products-mobile]').forEach((node) => { node.innerHTML = markup; });
@@ -1083,16 +1218,30 @@ document.addEventListener('DOMContentLoaded', () => {
         filterProducts();
     };
 
+    const queueProductSearch = (value) => {
+        window.clearTimeout(searchTimer);
+        if (value.trim()) {
+            state.categoryId = 'all';
+            document.querySelectorAll('[data-pos-category]').forEach((category) => category.classList.toggle('is-active', category.dataset.posCategory === 'all'));
+        }
+        document.querySelectorAll('[data-pos-scanner]').forEach((input) => { if (input.value !== value) input.value = value; });
+        document.querySelectorAll('[data-pos-clear-search]').forEach((button) => button.classList.toggle('hidden', !value));
+        searchTimer = window.setTimeout(() => searchProducts(value), 140);
+    };
+
     const lookupCustomer = async () => {
-        const mobile = [...document.querySelectorAll('[data-pos-customer-mobile]')].map((input) => input.value.trim()).find(Boolean);
-        if (!mobile) return;
-        document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => { input.value = mobile; });
-        const url = new URL(posApp.dataset.customerUrl, window.location.origin); url.searchParams.set('mobile', mobile);
+        const term = [...document.querySelectorAll('[data-pos-customer-mobile]')].map((input) => input.value.trim()).find(Boolean);
+        if (!term) { state.customerMatches = []; render(); return; }
+        document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => { input.value = term; });
+        const phoneLike = !/[a-z]/i.test(term) && term.replace(/\D/g, '').length >= 6;
+        const url = new URL(posApp.dataset.customerUrl, window.location.origin);
+        url.searchParams.set(phoneLike ? 'mobile' : 'q', term);
         if (!state.online) {
-            state.customer = await offlineStore.customer(mobile);
+            state.customer = phoneLike ? await offlineStore.customer(term) : null;
             state.suggestions = {};
+            state.customerMatches = [];
             render();
-            showFeedback(state.customer ? `${state.customer.name} selected from offline cache.` : 'No cached customer found. A new customer can be synced later.', state.customer ? 'success' : 'error');
+            showFeedback(state.customer ? `${state.customer.name} selected from offline cache.` : 'Offline customer lookup currently requires a mobile number.', state.customer ? 'success' : 'error');
             return;
         }
         document.querySelectorAll('[data-pos-customer-loading]').forEach((node) => node.classList.remove('hidden'));
@@ -1101,9 +1250,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!response.ok) { showFeedback('Customer lookup is unavailable. Try again.', 'error'); return; }
         const payload = await response.json();
         state.customer = payload.customer;
+        state.customerMatches = payload.customers || [];
         state.suggestions = payload.suggestions || {};
         render();
-        showFeedback(payload.customer ? `${payload.customer.name} selected.` : 'No customer found. Add them in one step.');
+        if (payload.customer) showFeedback(`${payload.customer.name} selected.`);
+        else if (state.customerMatches.length) showFeedback(`${state.customerMatches.length} customer${state.customerMatches.length === 1 ? '' : 's'} found.`);
+        else showFeedback(phoneLike ? 'No customer found. Add them in one step.' : 'No matching customer found.', 'error');
     };
 
     const submitSale = async (action) => {
@@ -1119,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let offlineSuccess = paymentModal?.querySelector('[data-pos-offline-success]');
             if (!offlineSuccess && paymentModal) { paymentModal.querySelector('header')?.insertAdjacentHTML('afterend', '<p data-pos-offline-success class="mx-1 mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800"></p>'); offlineSuccess = paymentModal.querySelector('[data-pos-offline-success]'); }
             if (offlineSuccess) { offlineSuccess.textContent = `Bill ${offlineReference} saved offline. It is pending sync and will receive an official bill number after sync.`; offlineSuccess.classList.remove('hidden'); }
-            state.cart = []; state.customer = null; state.suggestions = {}; state.paymentAmount = 0; state.splitPayments = []; state.isSubmitting = false;
+            state.cart = []; state.customer = null; state.suggestions = {}; state.paymentAmount = 0; state.paymentAmountTouched = false; state.splitPayments = []; state.isSubmitting = false;
             render(); await updateConnectivity();
             return;
         }
@@ -1133,13 +1285,20 @@ document.addEventListener('DOMContentLoaded', () => {
         append('manual_discount_amount', manualDiscount());
         append('held_sale_id', posApp.dataset.resumedSaleId || '');
         append('coupon_code', document.querySelector('[data-pos-coupon]')?.value || '');
-        append('notes', [...document.querySelectorAll('[data-pos-notes]')].map((input) => input.value.trim()).find(Boolean) || '');
-        state.cart.forEach((item, index) => { append(`items[${index}][product_id]`, item.id); append(`items[${index}][quantity]`, item.quantity); append(`items[${index}][unit_price]`, item.price); });
+        const notes = action === 'hold'
+            ? document.querySelector('[data-pos-hold-note]')?.value.trim()
+            : [...document.querySelectorAll('[data-pos-notes]')].map((input) => input.value.trim()).find(Boolean);
+        append('notes', notes || '');
+        state.cart.forEach((item, index) => { append(`items[${index}][product_id]`, item.id); append(`items[${index}][quantity]`, item.quantity); append(`items[${index}][unit_price]`, item.price); append(`items[${index}][discount_type]`, item.discount_type || 'fixed'); append(`items[${index}][discount_value]`, item.discount_value || 0); });
         if (action === 'checkout') { state.isSubmitting = true; append('completion_key', state.completionKey); render(); paymentEntries().forEach((payment, index) => { append(`payments[${index}][method]`, payment.method); append(`payments[${index}][amount]`, payment.amount); append(`payments[${index}][reference]`, payment.reference); }); }
         form.submit();
     };
 
     const paymentModal = document.querySelector('[data-pos-payment-modal]');
+    const holdPanel = document.querySelector('[data-pos-hold-panel]');
+    const heldPanel = document.querySelector('[data-pos-held-panel]');
+    const shortcutsPanel = document.querySelector('[data-pos-shortcuts-panel]');
+    let panelTrigger = null;
     const showPaymentError = (message) => document.querySelectorAll('[data-pos-payment-error]').forEach((node) => { node.textContent = message; node.classList.remove('hidden'); });
     const clearPaymentError = () => document.querySelectorAll('[data-pos-payment-error]').forEach((node) => node.classList.add('hidden'));
     const openPayment = () => {
@@ -1150,7 +1309,20 @@ document.addEventListener('DOMContentLoaded', () => {
         render();
         window.setTimeout(() => [...document.querySelectorAll('[data-pos-payment-amount]')].find((input) => input.offsetParent !== null)?.focus(), 50);
     };
-    const closePayment = () => { paymentModal?.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
+    const closePayment = () => { paymentModal?.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); focusScanner(); };
+    const openPanel = (panel, trigger = document.activeElement) => {
+        if (!panel) return;
+        panelTrigger = trigger;
+        panel.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        window.setTimeout(() => panel.querySelector('a, button:not(.pos-modal-backdrop)')?.focus(), 30);
+    };
+    const closePanels = () => {
+        document.querySelectorAll('[data-pos-hold-panel], [data-pos-held-panel], [data-pos-shortcuts-panel]').forEach((panel) => panel.classList.add('hidden'));
+        document.body.classList.remove('overflow-hidden');
+        panelTrigger?.focus?.();
+        panelTrigger = null;
+    };
 
     const scanProduct = async (input) => {
         const code = input.value.trim();
@@ -1171,21 +1343,92 @@ document.addEventListener('DOMContentLoaded', () => {
         showFeedback('No active product matches this barcode or SKU.', 'error');
     };
 
+    const setupPosControls = () => {
+        document.querySelectorAll('[data-pos-scanner]').forEach((input) => {
+            input.placeholder = 'Scan barcode or search name, SKU or code';
+            if (!input.parentElement?.querySelector('[data-pos-clear-search]')) {
+                const clear = document.createElement('button');
+                clear.type = 'button';
+                clear.dataset.posClearSearch = '';
+                clear.className = 'pos-search-clear hidden';
+                clear.setAttribute('aria-label', 'Clear product search');
+                clear.textContent = '×';
+                input.parentElement?.append(clear);
+                input.classList.add('pr-11');
+            }
+        });
+        document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => {
+            input.placeholder = 'Customer name or mobile';
+            input.removeAttribute('inputmode');
+            const lookup = input.closest('.pos-customer-lookup') || input.parentElement?.parentElement;
+            if (lookup && !lookup.querySelector('[data-pos-customer-results]')) {
+                const results = document.createElement('div');
+                results.dataset.posCustomerResults = '';
+                results.className = 'mt-2 hidden';
+                lookup.querySelector('[data-pos-customer-loading]')?.after(results);
+            }
+        });
+        document.querySelectorAll('[data-pos-categories]').forEach((categories) => {
+            if (categories.querySelector('[data-pos-category="favorites"]')) return;
+            const favorite = document.createElement('button');
+            favorite.type = 'button';
+            favorite.dataset.posCategory = 'favorites';
+            favorite.className = 'pos-category';
+            favorite.innerHTML = 'Favorites <span data-pos-favorite-count class="ml-1">'+state.favoriteProductIds.length+'</span>';
+            categories.querySelector('[data-pos-category="all"]')?.after(favorite);
+        });
+        document.querySelectorAll('[data-pos-open-payment].pos-checkout-action').forEach((button) => {
+            if (button.querySelector('[data-pos-pay-label]')) return;
+            button.innerHTML = '<span data-pos-pay-label>Pay 0.00</span><span aria-hidden="true">→</span>';
+            button.title = 'Pay (F9)';
+        });
+        const more = document.querySelector('[data-pos-mobile-pane="more"] .space-y-2');
+        if (more && !more.querySelector('[data-pos-open-shortcuts]')) {
+            more.insertAdjacentHTML('afterbegin', '<button type="button" data-pos-open-shortcuts class="pos-more-row w-full"><span>Keyboard shortcuts</span><b>?</b></button><button type="button" data-pos-open-held class="pos-more-row w-full"><span>Held sales</span><b>F6</b></button>');
+        }
+    };
+
+    setupPosControls();
+
+    const visibleProductButtons = () => [...document.querySelectorAll('[data-pos-product-shell]:not(.hidden) [data-pos-product]')]
+        .filter((button) => button.offsetParent !== null);
+
     document.querySelectorAll('[data-pos-scanner]').forEach((input) => {
-        input.addEventListener('input', () => searchProducts(input.value));
-        input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); scanProduct(input); } });
+        input.addEventListener('input', () => queueProductSearch(input.value));
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); visibleProductButtons()[0]?.focus(); }
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const visible = visibleProductButtons();
+                if (visible.length === 1 && input.value.trim()) addProduct(parse(visible[0].dataset.posProduct, null));
+                else scanProduct(input);
+            }
+        });
     });
+    document.querySelectorAll('[data-pos-clear-search]').forEach((button) => button.addEventListener('click', () => { queueProductSearch(''); focusScanner(); }));
     document.querySelectorAll('[data-pos-search]').forEach((button) => button.addEventListener('click', focusScanner));
     document.querySelectorAll('[data-pos-register]').forEach((select) => select.addEventListener('change', () => searchProducts('')));
     document.querySelectorAll('[data-pos-customer-search]').forEach((button) => button.addEventListener('click', lookupCustomer));
+    document.querySelectorAll('[data-pos-customer-mobile]').forEach((input) => {
+        input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); lookupCustomer(); } });
+        input.addEventListener('focus', () => { if (!input.value.trim() && !state.customer) { state.customerMatches = []; render(); } });
+    });
     document.querySelectorAll('[data-pos-clear]').forEach((button) => button.addEventListener('click', () => { state.cart = []; render(); }));
     document.querySelectorAll('[data-pos-discount]').forEach((input) => input.addEventListener('input', () => { state.manualDiscount = input.value; document.querySelectorAll('[data-pos-discount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
-    document.querySelectorAll('[data-pos-payment-amount]').forEach((input) => input.addEventListener('input', () => { state.paymentAmount = input.value; document.querySelectorAll('[data-pos-payment-amount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
-    document.querySelectorAll('[data-payment-method]').forEach((button) => button.addEventListener('click', () => { state.paymentMethod = button.dataset.paymentMethod; state.paymentMode = state.paymentMethod; if (state.paymentMethod === 'cash') state.paymentAmount = money(total()); clearPaymentError(); render(); }));
-    document.querySelectorAll('[data-pos-hold]').forEach((button) => button.addEventListener('click', () => submitSale('hold')));
+    document.querySelectorAll('[data-pos-payment-amount]').forEach((input) => input.addEventListener('input', () => { state.paymentAmount = input.value; state.paymentAmountTouched = true; document.querySelectorAll('[data-pos-payment-amount]').forEach((other) => { if (other !== input) other.value = input.value; }); render(); }));
+    document.querySelectorAll('[data-payment-method]').forEach((button) => button.addEventListener('click', () => { state.paymentMethod = button.dataset.paymentMethod; state.paymentMode = state.paymentMethod; state.paymentAmountTouched = false; if (state.paymentMethod === 'cash') state.paymentAmount = money(total()); clearPaymentError(); render(); }));
+    document.querySelectorAll('[data-pos-hold]').forEach((button) => button.addEventListener('click', () => {
+        if (!state.cart.length) { showFeedback('Add a product before holding the sale.', 'error'); return; }
+        openPanel(holdPanel, button);
+    }));
+    document.querySelector('[data-pos-confirm-hold]')?.addEventListener('click', () => submitSale('hold'));
     document.querySelectorAll('[data-pos-checkout]').forEach((button) => button.addEventListener('click', () => { if (state.isSubmitting) return; const due = total(); const paid = state.paymentMode === 'split' ? splitPaid() : Number(state.paymentAmount || 0); if (state.paymentMode === 'split' && Math.abs(paid - due) > 0.009) { showPaymentError(`Split payments must equal ${money(due)}.`); return; } if (state.paymentMode !== 'split' && paid < due) { showPaymentError('Amount received must cover the total due.'); return; } if (['upi', 'card'].includes(state.paymentMode) && Math.abs(paid - due) > 0.009) { showPaymentError(`${state.paymentMode.toUpperCase()} amount must match the total due.`); return; } submitSale('checkout'); }));
     document.querySelectorAll('[data-pos-open-payment]').forEach((button) => button.addEventListener('click', openPayment));
     document.querySelectorAll('[data-pos-close-payment]').forEach((button) => button.addEventListener('click', closePayment));
+    document.querySelectorAll('[data-pos-open-held]').forEach((button) => button.addEventListener('click', () => openPanel(heldPanel, button)));
+    document.querySelectorAll('[data-pos-open-shortcuts]').forEach((button) => button.addEventListener('click', () => openPanel(shortcutsPanel, button)));
+    document.querySelectorAll('[data-pos-close-panel]').forEach((button) => button.addEventListener('click', closePanels));
+    document.querySelectorAll(`a[href="${window.location.origin}/pos/held"], a[href="/pos/held"]`).forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); openPanel(heldPanel, link); }));
     document.querySelectorAll('[data-pos-open-cart]').forEach((button) => button.addEventListener('click', () => document.querySelector('[data-pos-cart-drawer]')?.classList.remove('hidden')));
     document.querySelectorAll('[data-pos-close-cart]').forEach((button) => button.addEventListener('click', () => document.querySelector('[data-pos-cart-drawer]')?.classList.add('hidden')));
     document.querySelectorAll('[data-pos-mobile-tab]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-pos-mobile-tab]').forEach((tab) => tab.classList.toggle('is-active', tab === button)); document.querySelectorAll('[data-pos-mobile-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.posMobilePane !== button.dataset.posMobileTab)); }));
@@ -1198,18 +1441,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-pos-wallet-foundation], [data-pos-credit-foundation]').forEach((button) => button.addEventListener('click', () => foundationNotice(state.customer ? 'This settlement option is a future POS foundation.' : 'Select a customer before using this payment foundation.', 'error')));
     document.querySelectorAll('[data-pos-split-payment]').forEach((button) => button.addEventListener('click', () => { state.paymentMode = 'split'; if (!state.splitPayments.length) state.splitPayments = [{ method: 'cash', amount: money(total()), reference: '' }]; clearPaymentError(); render(); }));
     document.querySelectorAll('[data-pos-add-split]').forEach((button) => button.addEventListener('click', () => { if (state.splitPayments.length < 4) { state.splitPayments.push({ method: 'upi', amount: 0, reference: '' }); render(); } }));
-    document.querySelectorAll('[data-pos-quick-amount]').forEach((button) => button.addEventListener('click', () => { const value = button.dataset.posQuickAmount; state.paymentAmount = value === 'exact' ? money(total()) : value === 'round' ? money(Math.ceil(total() / 100) * 100) : value; render(); }));
+    document.querySelectorAll('[data-pos-quick-amount]').forEach((button) => button.addEventListener('click', () => { const value = button.dataset.posQuickAmount; state.paymentAmount = value === 'exact' ? money(total()) : value === 'round' ? money(Math.ceil(total() / 100) * 100) : value; state.paymentAmountTouched = true; render(); }));
     document.querySelectorAll('[data-pos-payment-amount], [data-pos-payment-reference]').forEach((input) => input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); document.querySelector('[data-pos-checkout]')?.click(); } }));
     document.querySelectorAll('[data-pos-fullscreen]').forEach((button) => button.addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen?.(); } catch { showFeedback('Fullscreen is not available in this browser.', 'error'); } }));
     document.querySelectorAll('[data-pos-sync]').forEach((button) => button.addEventListener('click', syncOfflineBills));
     window.addEventListener('online', async () => { state.online = true; await refreshOfflineBootstrap(); await syncOfflineBills(); await updateConnectivity('Online restored. Checking pending offline bills…'); });
     window.addEventListener('offline', async () => { state.online = false; await updateConnectivity('Offline mode active. Bills will be saved locally and synced later.'); });
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'F2' || (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName))) { event.preventDefault(); focusScanner(); }
-        if (event.key === 'F4') { event.preventDefault(); [...document.querySelectorAll('[data-pos-customer-mobile]')].find((input) => input.offsetParent !== null)?.focus(); }
-        if (event.key === 'F8') { event.preventDefault(); submitSale('hold'); }
-        if (event.key === 'F9') { event.preventDefault(); openPayment(); }
-        if (event.key === 'Escape') { if (paymentModal && !paymentModal.classList.contains('hidden')) closePayment(); else { document.querySelectorAll('[data-pos-mobile-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.posMobilePane !== 'products')); document.querySelectorAll('[data-pos-mobile-tab]').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.posMobileTab === 'products')); } }
+        const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+        if (!isTyping && (event.key === 'F2' || event.key === '/')) { event.preventDefault(); focusScanner(); }
+        if (!isTyping && event.key === 'F4') { event.preventDefault(); [...document.querySelectorAll('[data-pos-customer-mobile]')].find((input) => input.offsetParent !== null)?.focus(); }
+        if (!isTyping && event.key === 'F6') { event.preventDefault(); openPanel(heldPanel); }
+        if (!isTyping && event.key === 'F8') { event.preventDefault(); [...document.querySelectorAll('[data-pos-discount]')].find((input) => input.offsetParent !== null)?.focus(); }
+        if (!isTyping && event.key === 'F9') { event.preventDefault(); openPayment(); }
+        if (event.key === 'Escape') {
+            if (paymentModal && !paymentModal.classList.contains('hidden')) closePayment();
+            else if ([holdPanel, heldPanel, shortcutsPanel].some((panel) => panel && !panel.classList.contains('hidden'))) closePanels();
+            else { document.querySelectorAll('[data-pos-mobile-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.posMobilePane !== 'products')); document.querySelectorAll('[data-pos-mobile-tab]').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.posMobileTab === 'products')); }
+        }
     });
     const clock = () => document.querySelectorAll('[data-pos-clock]').forEach((node) => { node.textContent = new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date()); });
     clock(); window.setInterval(clock, 30000);

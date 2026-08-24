@@ -5,6 +5,7 @@ namespace App\Services\Pos;
 use App\Models\Customers\Customer;
 use App\Models\User;
 use App\Services\Customers\CustomerService;
+use Illuminate\Support\Collection;
 
 class PosCustomerLookupService
 {
@@ -19,9 +20,51 @@ class PosCustomerLookupService
             ->where('company_id', $companyId)
             ->where(function ($query) use ($mobile, $digits): void {
                 $query->where('phone', $mobile)->orWhere('whatsapp', $mobile);
-                if ($digits !== '' && $digits !== $mobile) $query->orWhere('phone', 'like', "%{$digits}%")->orWhere('whatsapp', 'like', "%{$digits}%");
+                if ($digits !== '' && $digits !== $mobile) {
+                    $query->orWhere('phone', 'like', "%{$digits}%")->orWhere('whatsapp', 'like', "%{$digits}%");
+                }
             })
             ->first();
+    }
+
+    /** @return Collection<int, Customer> */
+    public function search(int $companyId, string $term): Collection
+    {
+        $term = trim($term);
+        $digits = preg_replace('/\D+/', '', $term);
+
+        return Customer::query()
+            ->with(['groups.group', 'loyaltyAccount', 'insight'])
+            ->where('company_id', $companyId)
+            ->where('status', 'active')
+            ->where(function ($query) use ($term, $digits): void {
+                $query->where('display_name', 'like', "%{$term}%")
+                    ->orWhere('first_name', 'like', "%{$term}%")
+                    ->orWhere('last_name', 'like', "%{$term}%")
+                    ->orWhere('phone', 'like', "%{$term}%")
+                    ->orWhere('whatsapp', 'like', "%{$term}%");
+                if ($digits !== '' && $digits !== $term) {
+                    $query->orWhere('phone', 'like', "%{$digits}%")
+                        ->orWhere('whatsapp', 'like', "%{$digits}%");
+                }
+            })
+            ->orderByDesc('last_purchase_at')
+            ->orderBy('display_name')
+            ->limit(8)
+            ->get();
+    }
+
+    /** @return Collection<int, Customer> */
+    public function recent(int $companyId): Collection
+    {
+        return Customer::query()
+            ->with(['groups.group', 'loyaltyAccount', 'insight'])
+            ->where('company_id', $companyId)
+            ->where('status', 'active')
+            ->whereNotNull('last_purchase_at')
+            ->latest('last_purchase_at')
+            ->limit(5)
+            ->get();
     }
 
     /** @param array<string, mixed> $data */

@@ -37,6 +37,13 @@
         <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ $executive['scope']['label'] }} · {{ $executive['range']['from']->format('d M Y') }} to {{ $executive['range']['to']->format('d M Y') }} · {{ $executive['range']['timezone'] }}@if($executive['comparison_label']) · compared with {{ $executive['comparison_label'] }}@endif</p>
     </header>
 
+    @if($attentionAlerts->isNotEmpty())
+        <section class="rounded-lg border border-amber-200 bg-amber-50/60 p-5 shadow-sm dark:border-amber-900 dark:bg-amber-950/20 sm:p-6" aria-labelledby="owner-attention-alerts">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">Live notifications</p><h2 id="owner-attention-alerts" class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Alerts requiring attention</h2><p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Unread automation signals within your authorized scope.</p></div><a href="{{ route('notifications.index', ['status' => 'unread']) }}" class="text-sm font-semibold text-amber-800 dark:text-amber-200">Open Notification Center →</a></div>
+            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">@foreach($attentionAlerts as $alert)<a href="{{ $alert->data['action_url'] ?? route('notifications.index') }}" class="rounded-lg border border-amber-200 bg-white/80 p-3 transition hover:border-amber-400 hover:shadow-sm dark:border-amber-900 dark:bg-slate-900/80"><p class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ $alert->data['title'] ?? 'Business alert' }}</p><p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{{ $alert->data['message'] ?? '' }}</p></a>@endforeach</div>
+        </section>
+    @endif
+
     <section aria-label="Executive key performance indicators" class="grid auto-cols-[minmax(10.75rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4 2xl:grid-cols-8">
         @foreach($executive['kpis'] as $kpi)
             @php($url = $kpi['report'] ? route($kpi['route'], [$kpi['report']] + $query) : route($kpi['route'], $query))

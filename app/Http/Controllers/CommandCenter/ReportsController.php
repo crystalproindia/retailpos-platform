@@ -35,7 +35,11 @@ class ReportsController extends Controller
 
         $aiBrief = $request->user()->can('ai.dashboard.view') ? $assistant->brief($request->user(), is_numeric($filters['outlet_id'] ?? null) ? (int) $filters['outlet_id'] : null) : null;
 
-        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory, 'aiBrief' => $aiBrief]);
+        $attentionAlerts = $request->user()->unreadNotifications()
+            ->whereIn('data->metadata->category', ['inventory', 'receivable', 'quotation', 'proforma', 'purchasing'])
+            ->latest()->limit(5)->get();
+
+        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory, 'aiBrief' => $aiBrief, 'attentionAlerts' => $attentionAlerts]);
     }
 
     public function exportExecutive(Request $request, ExecutiveReportingService $reports, ReportValueFormatter $formatter): StreamedResponse

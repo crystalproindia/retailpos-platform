@@ -2,6 +2,7 @@
     $items = [
         ['label' => 'Inbox', 'route' => 'notifications.index', 'ability' => 'notifications.manage_own'],
         ['label' => 'Preferences', 'route' => 'notifications.preferences.index', 'ability' => 'notifications.preferences.manage_own'],
+        ['label' => 'Automation', 'route' => 'notifications.automation.edit', 'ability' => 'automation.manage'],
         ['label' => 'Event Log', 'route' => 'notifications.events.index', 'ability' => 'notifications.events.view'],
         ['label' => 'Delivery Log', 'route' => 'notifications.deliveries.index', 'ability' => 'notifications.deliveries.view'],
         ['label' => 'Webhooks', 'route' => 'notifications.webhooks.index', 'ability' => 'notifications.webhooks.view'],

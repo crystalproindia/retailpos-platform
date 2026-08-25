@@ -16,6 +16,7 @@ class NotificationInboxRepository
         return $user->notifications()
             ->when(($filters['status'] ?? null) === 'unread', fn ($query) => $query->whereNull('read_at'))
             ->when(($filters['status'] ?? null) === 'read', fn ($query) => $query->whereNotNull('read_at'))
+            ->when($filters['category'] ?? null, fn ($query, string $category) => $query->where('data->metadata->category', $category))
             ->when($filters['search'] ?? null, function ($query, string $search): void {
                 $query->where(function ($query) use ($search): void {
                     $query->where('data->title', 'like', "%{$search}%")

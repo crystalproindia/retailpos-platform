@@ -102,6 +102,7 @@ use App\Http\Controllers\CommandCenter\ModuleController;
 use App\Http\Controllers\CommandCenter\NavigationPreferenceController;
 use App\Http\Controllers\CommandCenter\Notifications\DeliveryLogController;
 use App\Http\Controllers\CommandCenter\Notifications\EventLogController;
+use App\Http\Controllers\CommandCenter\Notifications\NotificationAutomationController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationInboxController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationPreferenceController;
 use App\Http\Controllers\CommandCenter\Notifications\NotificationTemplateController;
@@ -871,6 +872,9 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('preferences', [NotificationPreferenceController::class, 'index'])->middleware('can:notifications.preferences.manage_own')->name('preferences.index');
         Route::put('preferences', [NotificationPreferenceController::class, 'update'])->middleware('can:notifications.preferences.manage_own')->name('preferences.update');
         Route::post('preferences/reset', [NotificationPreferenceController::class, 'reset'])->middleware('can:notifications.preferences.manage_own')->name('preferences.reset');
+
+        Route::get('automation', [NotificationAutomationController::class, 'edit'])->middleware('can:automation.manage')->name('automation.edit');
+        Route::put('automation', [NotificationAutomationController::class, 'update'])->middleware('can:automation.manage')->name('automation.update');
 
         Route::get('events', EventLogController::class)->middleware('can:notifications.events.view')->name('events.index');
         Route::get('deliveries', DeliveryLogController::class)->middleware('can:notifications.deliveries.view')->name('deliveries.index');

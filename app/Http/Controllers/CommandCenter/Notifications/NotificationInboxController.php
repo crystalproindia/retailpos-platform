@@ -14,7 +14,7 @@ class NotificationInboxController extends Controller
     public function index(Request $request, NotificationInboxRepository $notificationRepository): View
     {
         return view('command-center.notifications.inbox.index', [
-            'notifications' => $notificationRepository->paginateForUser($request->user(), $request->only(['status', 'search'])),
+            'notifications' => $notificationRepository->paginateForUser($request->user(), $request->only(['status', 'category', 'search'])),
             'unreadCount' => $request->user()->unreadNotifications()->count(),
         ]);
     }

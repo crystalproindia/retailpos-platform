@@ -7,8 +7,8 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmCompany;
 use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmCustomer;
-use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmInvoiceReminderSetting;
+use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmQuotation;
 use App\Models\Customers\Customer;
 use App\Models\Customers\CustomerGroup;
@@ -17,20 +17,21 @@ use App\Models\Inventory\InventoryBrand;
 use App\Models\Inventory\InventoryCategory;
 use App\Models\Inventory\Product;
 use App\Models\Inventory\Warehouse;
+use App\Models\Pos\PosSale;
+use App\Models\Promotions\PromotionCampaign;
+use App\Models\Promotions\PromotionRule;
+use App\Models\Promotions\PromotionSettings;
 use App\Models\Purchases\GoodsReceipt;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\Purchases\PurchaseRequest;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\Purchases\Supplier;
-use App\Models\Promotions\PromotionCampaign;
-use App\Models\Promotions\PromotionRule;
-use App\Models\Promotions\PromotionSettings;
-use App\Models\Pos\PosSale;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['name', 'legal_name', 'trade_name', 'company_logo_path', 'invoice_logo_path', 'authorized_signature_path', 'authorized_signatory_name', 'authorized_signatory_designation', 'tax_id', 'email', 'phone', 'address', 'city', 'state', 'country', 'postal_code', 'timezone', 'currency', 'tax_registration_type', 'industry', 'billing_contact_name', 'billing_contact_email', 'is_active'])]
 class Company extends Model
@@ -208,6 +209,11 @@ class Company extends Model
     public function invoiceReminderSettings(): HasMany
     {
         return $this->hasMany(CrmInvoiceReminderSetting::class);
+    }
+
+    public function notificationAutomationSetting(): HasOne
+    {
+        return $this->hasOne(NotificationAutomationSetting::class);
     }
 
     public function saasResellerAssignments(): HasMany

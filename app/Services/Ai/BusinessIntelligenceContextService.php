@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Models\Crm\CrmLead;
 use App\Models\Customers\Customer;
+use App\Models\NotificationConditionState;
 use App\Models\User;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Outlets\OutletAccessService;
@@ -67,14 +68,27 @@ class BusinessIntelligenceContextService
                 'fact_count' => 4,
                 'scope' => $scope,
             ],
-            default => $this->businessContext($summary, $executive, $period, $scope),
+            default => $this->businessContext($summary, $executive, $period, $scope, $user, $filters),
         };
     }
 
-    private function businessContext(array $summary, ?array $executive, array $period, string $scope): array
+    private function businessContext(array $summary, ?array $executive, array $period, string $scope, User $user, array $filters): array
     {
         $profit = $summary['reports']['profitability'] ?? null;
         $insights = collect($executive['insights'] ?? [])->take(3);
+        $alerts = NotificationConditionState::query()
+            ->where('company_id', $user->company_id)
+            ->where('is_active', true)
+            ->when(isset($filters['outlet_id']) && is_numeric($filters['outlet_id']), fn ($query) => $query->where(fn ($scope) => $scope->whereNull('branch_id')->orWhere('branch_id', (int) $filters['outlet_id'])))
+            ->when(! $this->outlets->hasCompanyWideAccess($user), fn ($query) => $query->where(fn ($scope) => $scope->whereNull('branch_id')->orWhereIn('branch_id', $this->outlets->accessibleOutlets($user)->modelKeys())))
+            ->orderByDesc('last_detected_at')->limit(3)->get();
+        $alertRecommendations = collect($alerts->map(fn (NotificationConditionState $state): string => match ($state->condition_type) {
+            'inventory_stock' => 'Review the active inventory alert before replenishing or transferring stock.',
+            'receivable' => 'Review the active receivable reminder and its current remaining balance.',
+            'quotation', 'proforma' => 'Review the expiring sales document while it is still actionable.',
+            'purchasing' => 'Review the purchase attention item before creating or changing an order.',
+            default => 'Review the active Notification Center item.',
+        })->all());
 
         return [
             'title' => 'Your business for '.$period['label'],
@@ -85,11 +99,11 @@ class BusinessIntelligenceContextService
                 $this->fact('Outstanding receivables', $summary['metrics']['outstanding_receivables'], 'money'),
                 $this->fact('Low-stock products', $summary['metrics']['low_stock_count'], 'number'),
             ],
-            'recommendations' => $insights->pluck('message')->filter()->values()->all() ?: ['Keep recording sales and stock movements so RetailPOS can surface stronger comparisons.'],
+            'recommendations' => $alertRecommendations->concat($insights->pluck('message'))->filter()->unique()->take(3)->values()->all() ?: ['Keep recording sales and stock movements so RetailPOS can surface stronger comparisons.'],
             'coverage' => $profit === null ? 'Sales and operations are included. Profitability is hidden because this account does not have profitability access.' : ((int) ($profit['unavailable_cost_item_count'] ?? 0) > 0 ? 'Some revenue has unavailable cost, so total profit coverage is incomplete.' : 'Profit figures use immutable sale-time cost snapshots.'),
             'sources' => [$this->source('Owner Command Center', 'reports.index'), $this->source('Sales report', 'reports.show', ['report' => 'sales'])],
             'followups' => ['How are sales today?', 'What should I reorder?', 'Which products are selling well?'],
-            'fact_count' => 4 + $insights->count(),
+            'fact_count' => 4 + $insights->count() + $alerts->count(),
             'scope' => $scope,
         ];
     }

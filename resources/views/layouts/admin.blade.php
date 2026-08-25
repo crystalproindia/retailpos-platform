@@ -191,7 +191,7 @@
                                         <span class="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-teal-500 px-1 text-[0.62rem] font-bold leading-none text-white">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
                                     @endif
                                 </button>
-                                <div id="notifications-menu" class="absolute right-0 z-30 mt-2 hidden w-[calc(100vw-2rem)] max-w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                                <div id="notifications-menu" class="fixed top-16 right-4 z-30 hidden w-[calc(100vw-2rem)] max-w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-lg sm:absolute sm:top-auto sm:right-0 sm:mt-2 dark:border-slate-800 dark:bg-slate-900">
                                     <div class="flex items-center justify-between px-3 py-2">
                                         <p class="text-sm font-semibold text-slate-950 dark:text-white">Notifications</p>
                                         <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-teal-700 hover:text-teal-900 dark:text-teal-300">View all</a>

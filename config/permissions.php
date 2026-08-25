@@ -333,6 +333,7 @@ return [
         'notifications.webhooks.manage' => $administratorRoles,
         'notifications.webhooks.retry' => $notificationManagementRoles,
         'notifications.settings.manage' => $administratorRoles,
+        'automation.manage' => $administratorRoles,
         'operations.view' => $operationsManagementRoles,
         'operations.health.view' => $operationsManagementRoles,
         'operations.queue.view' => $operationsManagementRoles,

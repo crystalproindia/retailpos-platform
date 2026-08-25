@@ -52,7 +52,7 @@ class SidebarNavigationInventoryTest extends TestCase
             'settings' => ['invoice-designs', 'sales-document-numbering', 'invoice-reminders'],
             'integrations' => [],
             'operations' => ['operations-health', 'operations-queue', 'operations-failed-jobs', 'operations-schedule', 'operations-notification-deliveries', 'operations-webhooks', 'operations-event-logs', 'operations-application'],
-            'notifications' => ['notification-inbox', 'notification-preferences', 'notification-event-log', 'notification-webhooks', 'notification-delivery-log'],
+            'notifications' => ['notification-inbox', 'notification-preferences', 'notification-automation', 'notification-event-log', 'notification-webhooks', 'notification-delivery-log'],
             'audit-logs' => [],
         ], $inventory);
     }

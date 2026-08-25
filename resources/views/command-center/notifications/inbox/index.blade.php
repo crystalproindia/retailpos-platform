@@ -23,12 +23,18 @@
                 </form>
             </div>
 
-            <form method="GET" action="{{ route('notifications.index') }}" class="mt-5 grid gap-3 md:grid-cols-[1fr_160px_auto]">
+            <form method="GET" action="{{ route('notifications.index') }}" class="mt-5 grid gap-3 md:grid-cols-[1fr_150px_170px_auto]">
                 <input name="search" value="{{ request('search') }}" placeholder="Search notification text" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                 <select name="status" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
                     <option value="">All statuses</option>
                     <option value="unread" @selected(request('status') === 'unread')>Unread</option>
                     <option value="read" @selected(request('status') === 'read')>Read</option>
+                </select>
+                <select name="category" class="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    <option value="">All categories</option>
+                    @foreach(['inventory' => 'Inventory', 'receivable' => 'Payments', 'quotation' => 'Quotations', 'proforma' => 'Proformas', 'purchasing' => 'Purchases', 'owner_summary' => 'Owner summaries', 'system' => 'System'] as $value => $label)
+                        <option value="{{ $value }}" @selected(request('category') === $value)>{{ $label }}</option>
+                    @endforeach
                 </select>
                 <button class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Filter</button>
             </form>
@@ -48,7 +54,7 @@
                                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ str($notification->data['severity'] ?? 'info')->headline() }}</span>
                                 </div>
                                 <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ $notification->data['message'] ?? 'Open Command Center for details.' }}</p>
-                                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ $notification->created_at->diffForHumans() }} · {{ $notification->data['event_key'] ?? 'event' }}</p>
+                                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ $notification->created_at->diffForHumans() }} · {{ str($notification->data['metadata']['category'] ?? $notification->data['event_key'] ?? 'Notification')->replace('_', ' ')->headline() }}</p>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
                                 @if (! empty($notification->data['action_url']))
@@ -67,7 +73,7 @@
                         </div>
                     </article>
                 @empty
-                    <div class="px-5 py-12 text-center text-sm text-slate-500 dark:text-slate-400">No notifications match the current filters.</div>
+                    <div class="px-5 py-14 text-center"><span class="mx-auto grid size-12 place-items-center rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300"><x-icon name="bell" class="size-6" /></span><p class="mt-4 font-semibold text-slate-950 dark:text-white">You're all caught up</p><p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nothing needs your attention for these filters.</p></div>
                 @endforelse
             </div>
             <div class="border-t border-slate-200 px-5 py-4 dark:border-slate-800">{{ $notifications->links() }}</div>

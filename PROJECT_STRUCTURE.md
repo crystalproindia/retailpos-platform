@@ -3274,3 +3274,15 @@ CRM invoice returns use additive `crm_invoice_returns` and `crm_invoice_return_i
 Credit notes reduce invoice receivables through `credited_total` while preserving original invoice totals and payment history. Any amount beyond the current receivable is recorded as customer credit/refund due; no cash, card, UPI, bank, wallet, or gateway refund is fabricated. CRM restocking is allowed only when an authoritative original `CrmInvoice` sale movement identifies the warehouse and stock location. Finalized reversals flow through the existing profitability, GST, sales-return, Owner Command Center, Inventory Intelligence, and deterministic AI reporting providers.
 
 This ledger applies only to returns finalized after its migration. Historical cancellations are not converted into returns. Existing document-level adjustments are not proportionally reversed because CRM invoices do not store an authoritative line allocation for those adjustments.
+
+# Notifications & Automation Phase 1
+
+The existing Laravel notification inbox, `notification_deliveries` ledger, event catalog, queue worker, and company SMTP configuration remain the delivery foundation. Phase 1 adds `notification_automation_settings` for tenant-owned policy and `notification_condition_states` for recoverable business conditions. It does not create a parallel stock, receivable, quotation, proforma, purchasing, reporting, or email calculation path.
+
+`NotificationAutomationEvaluator` reads the authoritative Inventory Intelligence, CRM invoice balance, quotation/proforma status, purchase-order, and Owner Command Center providers. `AutomationNotificationService` owns activation, recovery, recurrence, recipient delivery, and deterministic per-recipient/per-channel idempotency. An unchanged active condition is silent; a recovered condition can notify on a later recurrence; a materially different stage receives its own bounded alert. Source scans are capped and the scheduled command processes a bounded company batch.
+
+Internal recipients are tenant scoped. Administrators receive company alerts; managers receive only alerts for outlets available through `OutletAccessService`. Every action link still passes through the target module's normal route authorization. In-app delivery remains available when SMTP is disabled or fails. Internal email is opt-in, and customer payment email is a separate explicit opt-in that uses the invoice's current post-payment/post-credit balance and existing company SMTP lifecycle.
+
+The Notification Center supports category filtering, read/unread actions, a responsive bell dropdown, and a friendly all-caught-up state. Administrators manage company rules at `Notifications > Notifications & Automation`; configuration changes use the existing audit logger. The Owner Command Center can surface unread authorized alert cards, while deterministic AI context can summarize active condition categories without inventing facts.
+
+WhatsApp is intentionally inactive. Existing channel abstractions remain the future extension point, but Phase 1 adds no provider, credentials, API calls, customer campaign, or automatic WhatsApp delivery.

@@ -30,6 +30,11 @@
                     @endif
                     <a href="{{ route('sales.invoices.print', $invoice) }}" target="_blank" rel="noopener" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Print</a>
                     <a href="{{ route('sales.invoices.pdf', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Download PDF</a>
+                    @can('sales.returns.create')
+                        @if(!in_array($invoice->status?->value, ['draft', 'cancelled', 'void'], true) && $invoice->return_status !== 'full')
+                            <a href="{{ route('sales.invoices.returns.create', $invoice) }}" class="rounded-lg border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950/30">Create Return / Credit Note</a>
+                        @endif
+                    @endcan
                     @if (! $invoice->status?->isEditable() && $invoice->billing_email)
                         @if ($latestInvoiceDelivery && in_array($latestInvoiceDelivery->status, ['temporarily_failed', 'permanently_failed'], true))
                             <form method="POST" action="{{ route('sales.invoices.email-deliveries.resend', [$invoice, $latestInvoiceDelivery]) }}">@csrf<button class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Resend invoice email</button></form>
@@ -82,6 +87,11 @@
         </section>
 
         <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-col gap-3 border-b border-slate-200 p-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="font-semibold text-slate-950 dark:text-white">Returns &amp; Credit Notes</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Finalized credits preserve the original invoice and do not automatically create a cash refund.</p></div>@if((float) $invoice->credited_total > 0)<span class="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-200">{{ $invoice->currency }} {{ number_format((float) $invoice->credited_total, 2) }} credited</span>@endif</div>
+            <div class="divide-y divide-slate-100 dark:divide-slate-800">@forelse($invoice->returns as $credit)<a href="{{ route('sales.credit-notes.show', $credit) }}" class="grid gap-2 p-5 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/50 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"><div><p class="font-semibold text-teal-700 dark:text-teal-300">{{ $credit->credit_note_number }}</p><p class="mt-1 text-xs text-slate-500">{{ $credit->issue_date->format('d M Y') }} · {{ $credit->items->sum('return_quantity') }} units · by {{ $credit->creator?->name ?? 'System' }}</p></div><span class="w-fit rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Finalized</span><span class="font-semibold text-slate-950 dark:text-white">{{ $credit->currency }} {{ number_format((float) $credit->credit_total, 2) }}</span></a>@empty<div class="p-8 text-sm text-slate-500 dark:text-slate-400">No returns or credit notes have been recorded.</div>@endforelse</div>
+        </section>
+
+        <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 p-5 dark:border-slate-800"><h2 class="font-semibold text-slate-950 dark:text-white">Invoice email delivery history</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Safe delivery progress for this invoice. A sent email is not treated as delivered until a trusted provider event confirms it.</p></div>
             <div class="divide-y divide-slate-100 dark:divide-slate-800">
                 @forelse ($invoice->invoiceEmailDeliveries as $delivery)
@@ -127,6 +137,7 @@
                     <div class="flex justify-between"><span>Adjustment</span><span>{{ $invoice->currency }} {{ number_format((float) $invoice->adjustment_total, 2) }}</span></div>
                     <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold dark:border-slate-700"><span>Total</span><span>{{ $invoice->currency }} {{ number_format((float) $invoice->grand_total, 2) }}</span></div>
                     <div class="flex justify-between text-teal-700 dark:text-teal-300"><span>Paid</span><span>{{ $invoice->currency }} {{ number_format((float) $invoice->amount_paid, 2) }}</span></div>
+                    @if((float) $invoice->credited_total > 0)<div class="flex justify-between text-amber-700 dark:text-amber-300"><span>Credit notes</span><span>{{ $invoice->currency }} {{ number_format((float) $invoice->credited_total, 2) }}</span></div>@endif
                     <div class="flex justify-between font-semibold text-rose-700 dark:text-rose-300"><span>Balance</span><span>{{ $invoice->currency }} {{ number_format((float) $invoice->balance_due, 2) }}</span></div>
                 </div>
             </article>

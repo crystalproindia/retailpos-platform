@@ -243,6 +243,9 @@ class InvoiceService
     public function cancel(CrmInvoice $invoice, User $user): CrmInvoice
     {
         $this->assertMutationAccess($invoice, $user);
+        if ($invoice->returns()->exists()) {
+            throw ValidationException::withMessages(['invoice' => 'An invoice with a finalized credit note cannot be cancelled. The original invoice and credit history must remain intact.']);
+        }
         if ($invoice->amount_paid > 0) {
             throw ValidationException::withMessages(['invoice' => 'An invoice with payments cannot be cancelled without reversing its payments.']);
         }
@@ -257,7 +260,9 @@ class InvoiceService
         if (in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
             return $invoice;
         }
-        $status = $invoice->balance_due <= 0 ? InvoiceStatus::Paid : ($invoice->amount_paid > 0 ? InvoiceStatus::PartiallyPaid : ($invoice->due_date?->isPast() ? InvoiceStatus::Overdue : $invoice->status));
+        $status = $invoice->return_status === 'full'
+            ? InvoiceStatus::Credited
+            : ($invoice->balance_due <= 0 ? InvoiceStatus::Paid : ($invoice->amount_paid > 0 ? InvoiceStatus::PartiallyPaid : ($invoice->due_date?->isPast() ? InvoiceStatus::Overdue : $invoice->status)));
         $invoice->update(['status' => $status, 'paid_at' => $status === InvoiceStatus::Paid ? ($invoice->paid_at ?? now()) : null, 'updated_by' => $user?->id ?? $invoice->updated_by]);
 
         return $invoice->refresh();
@@ -309,8 +314,16 @@ class InvoiceService
             InvoicePaymentStatus::Pending->value,
         ])->get()->sum(fn (CrmInvoicePayment $payment) => $this->cents((string) $payment->amount));
         $totalCents = $this->cents((string) $invoice->grand_total);
-        $invoice->update(['amount_paid' => $this->decimal($paidCents), 'balance_due' => $this->decimal(max(0, $totalCents - $paidCents)), 'updated_by' => $user->id]);
+        $creditedCents = $this->cents((string) ($invoice->credited_total ?? '0'));
+        $invoice->update(['amount_paid' => $this->decimal($paidCents), 'balance_due' => $this->decimal(max(0, $totalCents - $creditedCents - $paidCents)), 'updated_by' => $user->id]);
         $this->refreshStatus($invoice->refresh(), $user);
+    }
+
+    public function refreshFinancialBalance(CrmInvoice $invoice, User $user): CrmInvoice
+    {
+        $this->refreshBalance($invoice, $user);
+
+        return $invoice->refresh();
     }
 
     private function findInvoiceForUpdate(int $invoiceId, User $user): CrmInvoice

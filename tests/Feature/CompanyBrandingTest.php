@@ -135,7 +135,7 @@ class CompanyBrandingTest extends TestCase
         }
 
         $receiptMarkup = $this->actingAs($manager)->get(route('pos.receipts.show', $sale))->assertOk()->getContent();
-        $this->assertStringContainsString($manager->company->name, $receiptMarkup);
+        $this->assertStringContainsString($manager->company->name, html_entity_decode($receiptMarkup, ENT_QUOTES, 'UTF-8'));
         $this->assertNotEmpty(app(PosReceiptPdfService::class)->document($sale->fresh(), null)->output());
 
         $other = $this->manager();

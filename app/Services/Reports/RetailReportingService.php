@@ -4,6 +4,7 @@ namespace App\Services\Reports;
 
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
+use App\Models\Crm\CrmInvoiceReturn;
 use App\Models\Customers\Customer;
 use App\Models\Inventory\InventoryBrand;
 use App\Models\Inventory\InventoryCategory;
@@ -68,13 +69,13 @@ class RetailReportingService
         $stock = $this->stock($user, $scope, $context);
         $outlets = $this->outletPerformance($user, $scope, $range, $context);
         $cashiers = $this->cashierPerformance($user, $scope, $range, $context);
-        $netSalesAfterReturns = max(0, $sales['net_sales'] - $salesReturns['refund_total']);
+        $netSalesAfterReturns = max(0, $sales['net_sales'] - $salesReturns['pos_refund_total']);
         $profitability = $user->can('reports.profitability.view')
             ? $this->profitabilityReporting->report($user, $scope, $range, $context)
             : null;
 
         $reportData = [
-            'sales' => $sales + $invoices + ['returns_total' => $salesReturns['refund_total'], 'net_sales_after_returns' => $netSalesAfterReturns],
+            'sales' => $sales + $invoices + ['returns_total' => $salesReturns['combined_total'], 'net_sales_after_returns' => $netSalesAfterReturns],
             'purchases' => $purchases,
             'inventory' => $stock,
             'movements' => ['movement_count' => null, 'in_quantity' => null, 'out_quantity' => null],
@@ -102,7 +103,7 @@ class RetailReportingService
                 'payments_received' => $payments['received'],
                 'outstanding_receivables' => $invoices['outstanding'],
                 'return_value' => $returns['value'],
-                'sales_return_value' => $salesReturns['refund_total'],
+                'sales_return_value' => $salesReturns['combined_total'],
                 'stock_value' => $stock['value'],
                 'low_stock_count' => $stock['low_stock_count'],
             ],
@@ -283,7 +284,13 @@ class RetailReportingService
             ->whereBetween('completed_at', $this->timestampRange($range))
             ->when($context['customer_id'] ?? null, fn (Builder $returns, $customerId) => $returns->where('customer_id', $customerId));
 
-        return ['refund_total' => $this->minor((clone $query)->sum('refund_total')), 'store_credit_total' => $this->minor((clone $query)->sum('store_credit_total')), 'tax_adjustment_total' => $this->minor((clone $query)->sum('tax_adjustment_total')), 'exchange_payable_total' => $this->minor((clone $query)->sum('exchange_payable_total')), 'exchange_refund_total' => $this->minor((clone $query)->sum('exchange_refund_total')), 'count' => (clone $query)->count(), 'notice' => 'Completed POS returns only. Manual refund records are operational records; no payment-gateway action is implied.'];
+        $posTotal = $this->minor((clone $query)->sum('refund_total'));
+        $crm = $this->branchScope(CrmInvoiceReturn::query()->where('company_id', $user->company_id)->where('status', CrmInvoiceReturn::STATUS_FINALIZED), $scope['ids'])
+            ->whereDate('issue_date', '>=', $range['from']->toDateString())->whereDate('issue_date', '<=', $range['to']->toDateString())
+            ->when($context['customer_id'] ?? null, fn (Builder $returns, $customerId) => $returns->where('customer_id', $customerId));
+        $crmTotal = $this->minor((clone $crm)->sum('credit_total'));
+
+        return ['refund_total' => $posTotal, 'pos_refund_total' => $posTotal, 'crm_credit_total' => $crmTotal, 'combined_total' => $posTotal + $crmTotal, 'store_credit_total' => $this->minor((clone $query)->sum('store_credit_total')), 'tax_adjustment_total' => $this->minor((clone $query)->sum('tax_adjustment_total')) + $this->minor((clone $crm)->sum('tax_total')), 'exchange_payable_total' => $this->minor((clone $query)->sum('exchange_payable_total')), 'exchange_refund_total' => $this->minor((clone $query)->sum('exchange_refund_total')), 'count' => (clone $query)->count() + (clone $crm)->count(), 'notice' => 'Completed POS returns and finalized CRM credit notes are included. A credit note does not imply that a payment refund occurred.'];
     }
 
     private function stock(User $user, array $scope, array $context): array
@@ -481,8 +488,10 @@ class RetailReportingService
         $query = $this->invoiceFilters($this->branchScope(CrmInvoice::query()->where('company_id', $user->company_id), $scope['ids']), $context)
             ->whereDate('issue_date', '>=', $range['from']->toDateString())
             ->whereDate('issue_date', '<=', $range['to']->toDateString());
+        $credits = $this->branchScope(CrmInvoiceReturn::query()->where('company_id', $user->company_id)->where('status', CrmInvoiceReturn::STATUS_FINALIZED), $scope['ids'])
+            ->whereDate('issue_date', '>=', $range['from']->toDateString())->whereDate('issue_date', '<=', $range['to']->toDateString());
 
-        return ['taxable_sales' => $this->minor((clone $query)->sum('taxable_total')), 'cgst' => $this->minor((clone $query)->sum('cgst_total')), 'sgst' => $this->minor((clone $query)->sum('sgst_total')), 'igst' => $this->minor((clone $query)->sum('igst_total')), 'cess' => $this->minor((clone $query)->sum('cess_total')), 'incomplete_count' => (clone $query)->whereNull('place_of_supply_state_code')->count(), 'notice' => 'Preparation aid only. Review incomplete GSTIN, place-of-supply, and HSN/SAC data before filing.'];
+        return ['taxable_sales' => $this->minor((clone $query)->sum('taxable_total')) - $this->minor((clone $credits)->sum('taxable_total')), 'cgst' => $this->minor((clone $query)->sum('cgst_total')) - $this->minor((clone $credits)->sum('cgst_total')), 'sgst' => $this->minor((clone $query)->sum('sgst_total')) - $this->minor((clone $credits)->sum('sgst_total')), 'igst' => $this->minor((clone $query)->sum('igst_total')) - $this->minor((clone $credits)->sum('igst_total')), 'cess' => $this->minor((clone $query)->sum('cess_total')) - $this->minor((clone $credits)->sum('cess_total')), 'credit_note_count' => (clone $credits)->count(), 'incomplete_count' => (clone $query)->whereNull('place_of_supply_state_code')->count(), 'notice' => 'Finalized CRM credit notes reduce outward taxable value and GST from original snapshots. Review incomplete GSTIN, place-of-supply, and HSN/SAC data before filing.'];
     }
 
     private function salesRows(User $user, array $scope, array $range, array $context): array
@@ -563,12 +572,19 @@ class RetailReportingService
 
     private function salesReturnRows(User $user, array $scope, array $range, array $context): array
     {
-        return $this->branchScope(PosReturn::query()->where('company_id', $user->company_id)->where('status', PosReturn::STATUS_COMPLETED), $scope['ids'])
+        $pos = $this->branchScope(PosReturn::query()->where('company_id', $user->company_id)->where('status', PosReturn::STATUS_COMPLETED), $scope['ids'])
             ->whereBetween('completed_at', $this->timestampRange($range))
             ->when($context['customer_id'] ?? null, fn (Builder $returns, $customerId) => $returns->where('customer_id', $customerId))
             ->with(['branch:id,name', 'customer:id,display_name', 'originalSale:id,sale_number,receipt_number'])
             ->latest('completed_at')->limit(500)->get()
             ->map(fn (PosReturn $return) => ['date' => $return->completed_at?->setTimezone($range['timezone'])->toDateString(), 'return_number' => $return->return_number, 'credit_note' => $return->credit_note_number, 'original_sale' => $return->originalSale?->receipt_number ?: $return->originalSale?->sale_number, 'customer' => $return->customer?->display_name ?: 'Walk-in', 'outlet' => $return->branch?->name, 'refund_total' => $this->minor($return->refund_total), 'store_credit_total' => $this->minor($return->store_credit_total), 'tax_adjustment_total' => $this->minor($return->tax_adjustment_total), 'status' => $return->status])->all();
+        $crm = $this->branchScope(CrmInvoiceReturn::query()->where('company_id', $user->company_id)->where('status', CrmInvoiceReturn::STATUS_FINALIZED), $scope['ids'])
+            ->whereDate('issue_date', '>=', $range['from']->toDateString())->whereDate('issue_date', '<=', $range['to']->toDateString())
+            ->when($context['customer_id'] ?? null, fn (Builder $returns, $customerId) => $returns->where('customer_id', $customerId))
+            ->with(['branch:id,name', 'invoice:id,invoice_number'])->latest('finalized_at')->limit(500)->get()
+            ->map(fn (CrmInvoiceReturn $return) => ['date' => $return->issue_date->toDateString(), 'return_number' => $return->credit_note_number, 'credit_note' => $return->credit_note_number, 'original_sale' => $return->invoice?->invoice_number, 'customer' => $return->customer_company_snapshot ?: $return->customer_name_snapshot ?: 'Unassigned', 'outlet' => $return->branch?->name, 'refund_total' => $this->minor($return->credit_total), 'store_credit_total' => $this->minor($return->customer_credit_due), 'tax_adjustment_total' => $this->minor($return->tax_total), 'status' => $return->status])->all();
+
+        return collect($pos)->concat($crm)->sortByDesc('date')->values()->take(500)->all();
     }
 
     private function outletPerformance(User $user, array $scope, array $range, array $context): array

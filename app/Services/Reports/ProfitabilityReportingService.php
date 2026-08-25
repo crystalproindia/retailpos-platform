@@ -48,7 +48,7 @@ class ProfitabilityReportingService
             'captured_item_count' => (int) $summary->captured_item_count,
             'reconstructed_item_count' => (int) $summary->reconstructed_item_count,
             'unavailable_cost_item_count' => (int) $summary->unavailable_cost_item_count,
-            'notice' => 'POS and CRM profitability uses immutable sale-time snapshots. Free-text CRM lines and historical items without verified cost remain revenue-only and are excluded from COGS, profit, and margin. Completed POS returns reverse the original sale-time classification. Cancelled CRM invoices are excluded; CRM partial return and credit-note COGS reversal is not yet supported.',
+            'notice' => 'POS and CRM profitability uses immutable sale-time snapshots. Finalized POS returns and CRM credit notes reverse original revenue and cost evidence. Free-text and historical items without verified cost remain transparent as unavailable.',
             // The CSV uses the same normalized invoice rollup as the primary report table.
             'rows' => $invoiceRows,
             'invoice_rows' => $invoiceRows,
@@ -107,7 +107,8 @@ class ProfitabilityReportingService
     private function rows(User $user, array $scope, array $range, array $context): Builder
     {
         if (($context['source'] ?? null) === 'crm') {
-            return $this->crmInvoices($user, $scope, $range, $context);
+            return $this->crmInvoices($user, $scope, $range, $context)
+                ->unionAll($this->crmReturns($user, $scope, $range, $context));
         }
         if (($context['source'] ?? null) === 'pos') {
             return $this->posSales($user, $scope, $range, $context)
@@ -116,7 +117,8 @@ class ProfitabilityReportingService
 
         return $this->posSales($user, $scope, $range, $context)
             ->unionAll($this->posReturns($user, $scope, $range, $context))
-            ->unionAll($this->crmInvoices($user, $scope, $range, $context));
+            ->unionAll($this->crmInvoices($user, $scope, $range, $context))
+            ->unionAll($this->crmReturns($user, $scope, $range, $context));
     }
 
     /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array{from: CarbonImmutable, to: CarbonImmutable} $range @param array<string, mixed> $context */
@@ -177,6 +179,36 @@ class ProfitabilityReportingService
         }
 
         return $query->selectRaw("'crm' as source, 'sale' as entry_type, invoice.company_id, invoice.id as document_id, ".$this->concat(["'crm:'", 'invoice.id'])." as document_key, invoice.invoice_number as document_number, invoice.issue_date as document_date, invoice.issue_date as activity_date, COALESCE(invoice.billing_name, invoice.billing_company, 'Unassigned') as customer_name, invoice.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, NULL as salesperson_id, 'Unassigned' as salesperson_name, item.product_id, item.name as product_name, item.sku_snapshot as sku, item.category_id_snapshot as category_id, COALESCE(item.category_name_snapshot, 'Unclassified') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, item.quantity as quantity_sold, 0 as quantity_returned, item.quantity as net_quantity, COALESCE(item.gross_sales_snapshot, item.line_subtotal + item.discount_amount, 0) as gross_sales, COALESCE(item.discount_amount, 0) as discounts, 0 as return_sales, COALESCE(item.net_sales_snapshot, item.line_subtotal, 0) as net_sales, item.unit_cost_snapshot, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.total_cost_snapshot, 0) ELSE 0 END as cogs, CASE WHEN item.cost_snapshot_status IN ('captured', 'reconstructed') THEN COALESCE(item.gross_profit_snapshot, 0) ELSE 0 END as gross_profit, COALESCE(item.cost_snapshot_status, 'unavailable') as cost_status, COALESCE(item.cost_snapshot_method, 'unavailable') as cost_provenance");
+    }
+
+    /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array{from: CarbonImmutable, to: CarbonImmutable} $range @param array<string, mixed> $context */
+    private function crmReturns(User $user, array $scope, array $range, array $context): Builder
+    {
+        $query = DB::table('crm_invoice_return_items as return_item')
+            ->join('crm_invoice_returns as return_document', 'return_document.id', '=', 'return_item.crm_invoice_return_id')
+            ->join('crm_invoice_items as item', 'item.id', '=', 'return_item.original_invoice_item_id')
+            ->join('crm_invoices as invoice', 'invoice.id', '=', 'item.invoice_id')
+            ->leftJoin('branches as outlet', 'outlet.id', '=', 'invoice.branch_id')
+            ->where('return_document.company_id', $user->company_id)->where('return_document.status', 'finalized')
+            ->whereDate('return_document.issue_date', '>=', $range['from']->toDateString())
+            ->whereDate('return_document.issue_date', '<=', $range['to']->toDateString());
+        if ($scope['ids'] !== null) {
+            $query->whereIn('return_document.branch_id', $scope['ids']);
+        }
+        foreach (['product_id', 'category_id', 'brand_id'] as $filter) {
+            if ($context[$filter] ?? null) {
+                $column = $filter === 'product_id' ? 'return_item.product_id' : ($filter === 'category_id' ? 'item.category_id_snapshot' : 'item.brand_id_snapshot');
+                $query->where($column, $context[$filter]);
+            }
+        }
+        if ($context['customer_id'] ?? null) {
+            $query->where('return_document.customer_id', $context['customer_id']);
+        }
+        if (($context['discounted'] ?? null) !== null) {
+            $query->where('return_item.discount_reversal', $context['discounted'] ? '>' : '=', 0);
+        }
+
+        return $query->selectRaw("'crm' as source, 'return' as entry_type, return_document.company_id, invoice.id as document_id, ".$this->concat(["'crm:'", 'invoice.id'])." as document_key, invoice.invoice_number as document_number, invoice.issue_date as document_date, return_document.issue_date as activity_date, COALESCE(return_document.customer_name_snapshot, return_document.customer_company_snapshot, 'Unassigned') as customer_name, return_document.branch_id as outlet_id, COALESCE(outlet.name, 'Unassigned') as outlet_name, NULL as salesperson_id, 'Unassigned' as salesperson_name, return_item.product_id, return_item.product_name_snapshot as product_name, return_item.sku_snapshot as sku, item.category_id_snapshot as category_id, COALESCE(item.category_name_snapshot, 'Unclassified') as category_name, item.brand_id_snapshot as brand_id, COALESCE(item.brand_name_snapshot, 'Unbranded') as brand_name, 0 as quantity_sold, -return_item.return_quantity as quantity_returned, -return_item.return_quantity as net_quantity, -return_item.gross_reversal as gross_sales, -return_item.discount_reversal as discounts, -return_item.taxable_reversal as return_sales, -return_item.taxable_reversal as net_sales, return_item.unit_cost_snapshot, CASE WHEN return_item.cost_status IN ('captured', 'reconstructed') THEN -return_item.cogs_reversal ELSE 0 END as cogs, CASE WHEN return_item.cost_status IN ('captured', 'reconstructed') THEN -return_item.gross_profit_reversal ELSE 0 END as gross_profit, return_item.cost_status, CASE WHEN return_item.cost_status IN ('captured', 'reconstructed') THEN 'original_crm_invoice_snapshot' ELSE 'unavailable' END as cost_provenance");
     }
 
     /** @param array{ids: array<int, int>|null, warehouse_id: int|null} $scope @param array<string, mixed> $context */

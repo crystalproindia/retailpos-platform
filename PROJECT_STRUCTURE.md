@@ -3266,3 +3266,11 @@ The `/ai` workspace now combines a deterministic business brief, attention promp
 The additive `ai_assistant_interactions` table stores tenant/user/outlet scope, conversation identifier, selected intent, provider status, timing/usage metadata, date scope, and a one-way prompt digest. Raw prompts, responses, secrets, and API keys are not persisted. Immediate follow-up context is bounded and session-keyed by company and user.
 
 The Owner Command Center includes a compact permission-aware AI Business Brief. All assistant behavior remains read/advice-only; it cannot execute SQL or create, edit, delete, transfer, pay, refund, message, or otherwise mutate business records. See `docs/ai-intelligence-layer.md` for provider configuration, intent boundaries, sources, safeguards, and current limitations.
+
+# CRM Returns & Credit Notes
+
+CRM invoice returns use additive `crm_invoice_returns` and `crm_invoice_return_items` ledgers. Every finalized line references its original invoice item and snapshots proportional gross value, discount, taxable value, GST components, credit amount, original cost evidence, COGS reversal, profitability reversal, and inventory disposition. `CrmInvoiceReturnService` locks the invoice and source lines, enforces cumulative quantities, assigns tenant/outlet/financial-year credit-note numbers, and finalizes the entire financial and optional stock effect atomically.
+
+Credit notes reduce invoice receivables through `credited_total` while preserving original invoice totals and payment history. Any amount beyond the current receivable is recorded as customer credit/refund due; no cash, card, UPI, bank, wallet, or gateway refund is fabricated. CRM restocking is allowed only when an authoritative original `CrmInvoice` sale movement identifies the warehouse and stock location. Finalized reversals flow through the existing profitability, GST, sales-return, Owner Command Center, Inventory Intelligence, and deterministic AI reporting providers.
+
+This ledger applies only to returns finalized after its migration. Historical cancellations are not converted into returns. Existing document-level adjustments are not proportionally reversed because CRM invoices do not store an authoritative line allocation for those adjustments.

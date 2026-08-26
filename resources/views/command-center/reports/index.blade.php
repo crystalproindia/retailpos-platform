@@ -85,13 +85,15 @@
     </section>
 
     <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">Working capital</p><h2 class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Financial position</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open customer and supplier balances within the selected authorized period.</p></div><div class="flex gap-4 text-sm"><a href="{{ $reportUrl('outstanding') }}" class="font-semibold text-teal-700 dark:text-teal-300">Receivables →</a><a href="{{ route('purchases.reports.index') }}" class="font-semibold text-teal-700 dark:text-teal-300">Payables →</a></div></div>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">Working capital</p><h2 class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Financial position</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open customer and supplier balances within the selected authorized period.</p></div><div class="flex gap-4 text-sm"><a href="{{ route('finance.receivables.index') }}" class="font-semibold text-teal-700 dark:text-teal-300">Receivables →</a><a href="{{ route('finance.payables.index') }}" class="font-semibold text-teal-700 dark:text-teal-300">Payables →</a></div></div>
         <dl class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             @foreach([
                 ['Receivables', $executive['financial']['receivables'], 'bg-sky-500'],
                 ['Overdue receivables', $executive['financial']['overdue_receivables'], 'bg-amber-500'],
                 ['Payables', $executive['financial']['payables'], 'bg-violet-500'],
                 ['Overdue payables', $executive['financial']['overdue_payables'], 'bg-rose-500'],
+                ['Customer credits', $executive['financial']['customer_credits'], 'bg-emerald-500'],
+                ['Refund due', $executive['financial']['refund_due'], 'bg-cyan-500'],
             ] as [$label, $value, $tone])
                 <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50"><div class="mb-3 h-1.5 w-10 rounded-full {{ $tone }}"></div><dt class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{{ $label }}</dt><dd class="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{{ $money($value) }}</dd></div>
             @endforeach

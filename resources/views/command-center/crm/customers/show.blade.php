@@ -28,6 +28,9 @@
                 <span class="inline-flex w-fit rounded-full bg-sky-100 px-3 py-1.5 text-sm font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-200">{{ $customer->status?->label() }}</span>
             </div>
         </section>
+        @if($financeSummary)
+            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="font-semibold text-slate-950 dark:text-white">Finance</h2><p class="mt-1 text-sm text-slate-500">Authoritative invoice, payment and credit position.</p></div><div class="flex gap-2"><a href="{{ route('finance.customer-statements.show',$customer) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold dark:border-slate-700">View statement</a>@can('finance.payments.allocate')<a href="{{ route('finance.customer-payments.create',['customer_id'=>$customer->id]) }}" class="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Record payment</a>@endcan</div></div><div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">@foreach([['Outstanding',$financeSummary['outstanding']],['Overdue',$financeSummary['overdue']],['Available credit',$financeSummary['available_credit']],['Available limit',$financeSummary['available_limit']]] as [$label,$value])<div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-semibold uppercase text-slate-500">{{ $label }}</p><p class="mt-2 text-lg font-semibold">{{ $value === null ? 'Unlimited' : '₹'.number_format($value/100,2) }}</p></div>@endforeach</div><p class="mt-4 text-sm text-slate-500">Refund due remains separate from customer credit and is never paid automatically.</p></section>
+        @endif
         <div class="flex flex-wrap justify-end gap-3">
             @can('crm.quotations.create')
                 @if ($customer->lead)

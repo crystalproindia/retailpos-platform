@@ -72,6 +72,7 @@ use App\Http\Controllers\CommandCenter\Customers\CustomerLoyaltyController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerSettingsController;
 use App\Http\Controllers\CommandCenter\Customers\CustomerWalletController;
 use App\Http\Controllers\CommandCenter\DashboardController;
+use App\Http\Controllers\CommandCenter\Finance\FinanceController;
 use App\Http\Controllers\CommandCenter\Free365OnboardingController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailDeliveryLogController;
 use App\Http\Controllers\CommandCenter\Integrations\EmailIntegrationController;
@@ -245,6 +246,25 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
     Route::get('navigation/customize', [NavigationPreferenceController::class, 'edit'])->name('navigation.preferences.edit');
     Route::put('navigation/customize', [NavigationPreferenceController::class, 'update'])->name('navigation.preferences.update');
     Route::post('navigation/customize/reset', [NavigationPreferenceController::class, 'reset'])->name('navigation.preferences.reset');
+    Route::middleware('role:administrator,manager')->prefix('finance')->name('finance.')->group(function (): void {
+        Route::get('receivables', [FinanceController::class, 'receivables'])->middleware('can:finance.receivables.view')->name('receivables.index');
+        Route::get('receivables.csv', [FinanceController::class, 'receivablesCsv'])->middleware('can:finance.exports')->name('receivables.csv');
+        Route::get('payables', [FinanceController::class, 'payables'])->middleware('can:finance.payables.view')->name('payables.index');
+        Route::get('payables.csv', [FinanceController::class, 'payablesCsv'])->middleware('can:finance.exports')->name('payables.csv');
+        Route::get('customers/{customer}/statement', [FinanceController::class, 'customerStatement'])->middleware('can:finance.statements.view')->name('customer-statements.show');
+        Route::get('customers/{customer}/statement.pdf', [FinanceController::class, 'customerPdf'])->middleware('can:finance.statements.view')->name('customer-statements.pdf');
+        Route::get('customers/{customer}/statement.csv', [FinanceController::class, 'customerCsv'])->middleware('can:finance.exports')->name('customer-statements.csv');
+        Route::get('suppliers/{supplier}/statement', [FinanceController::class, 'supplierStatement'])->middleware('can:finance.statements.view')->name('supplier-statements.show');
+        Route::get('suppliers/{supplier}/statement.pdf', [FinanceController::class, 'supplierPdf'])->middleware('can:finance.statements.view')->name('supplier-statements.pdf');
+        Route::get('suppliers/{supplier}/statement.csv', [FinanceController::class, 'supplierCsv'])->middleware('can:finance.exports')->name('supplier-statements.csv');
+        Route::get('customer-payments/create', [FinanceController::class, 'paymentCreate'])->middleware('can:finance.payments.allocate')->name('customer-payments.create');
+        Route::post('customer-payments', [FinanceController::class, 'paymentStore'])->middleware(['can:finance.payments.allocate', 'throttle:30,1'])->name('customer-payments.store');
+        Route::post('customer-payments/{payment}/allocations', [FinanceController::class, 'allocatePayment'])->middleware(['can:finance.payments.allocate', 'throttle:30,1'])->name('customer-payments.allocations.store');
+        Route::post('customer-credits/apply', [FinanceController::class, 'applyCredit'])->middleware(['can:finance.payments.allocate', 'throttle:30,1'])->name('customer-credits.apply');
+        Route::put('customers/{customer}/credit-limit', [FinanceController::class, 'updateCreditLimit'])->middleware('can:finance.credit-limits.manage')->name('customer-credit-limits.update');
+        Route::get('reconciliation', [FinanceController::class, 'reconciliation'])->middleware('can:finance.reconciliation.manage')->name('reconciliation.index');
+        Route::post('reconciliation', [FinanceController::class, 'reconcile'])->middleware('can:finance.reconciliation.manage')->name('reconciliation.store');
+    });
     Route::prefix('attendance')->name('attendance.')->middleware('can:attendance.view_own')->group(function (): void {
         Route::get('me', [AttendanceController::class, 'self'])->name('self');
         Route::post('check-in', [AttendanceController::class, 'checkIn'])->middleware('can:attendance.check_in')->name('check-in');

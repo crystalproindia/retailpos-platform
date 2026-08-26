@@ -26,7 +26,15 @@
                         @can('sales.invoices.update')
                             <a href="{{ route('sales.invoices.edit', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Edit draft</a>
                         @endcan
-                        <form method="POST" action="{{ route('sales.invoices.issue', $invoice) }}">@csrf<button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Issue invoice</button></form>
+                        @php($creditLimitExceeded = $invoice->customer?->credit_limit !== null && (($financeSummary['net_exposure'] / 100) + (float) $invoice->grand_total) > (float) $invoice->customer->credit_limit)
+                        <form method="POST" action="{{ route('sales.invoices.issue', $invoice) }}" class="contents">@csrf
+                            @if($creditLimitExceeded)
+                                @can('finance.credit-limits.override')
+                                    <input type="hidden" name="credit_limit_override" value="1"><input name="credit_limit_override_reason" required minlength="5" aria-label="Credit limit override reason" placeholder="Override reason" class="w-44 rounded-lg border-amber-300 text-sm dark:border-amber-800 dark:bg-slate-950">
+                                @endcan
+                            @endif
+                            <button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Issue invoice</button>
+                        </form>
                     @endif
                     <a href="{{ route('sales.invoices.print', $invoice) }}" target="_blank" rel="noopener" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Print</a>
                     <a href="{{ route('sales.invoices.pdf', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Download PDF</a>
@@ -85,6 +93,10 @@
                 </div>
             @endif
         </section>
+
+        @if($invoice->status?->isEditable() && $creditLimitExceeded)
+            <section class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p class="font-semibold">Credit limit review required</p><p class="mt-1">Limit: {{ $invoice->currency }} {{ number_format((float)$invoice->customer->credit_limit,2) }} · Current net exposure: {{ $invoice->currency }} {{ number_format($financeSummary['net_exposure']/100,2) }} · Projected: {{ $invoice->currency }} {{ number_format(($financeSummary['net_exposure']/100)+(float)$invoice->grand_total,2) }}.</p>@cannot('finance.credit-limits.override')<p class="mt-2">Ask an authorized manager to review this invoice.</p>@endcannot @error('credit_limit')<p class="mt-2 font-semibold">{{ $message }}</p>@enderror @error('credit_limit_override_reason')<p class="mt-2 font-semibold">{{ $message }}</p>@enderror</section>
+        @endif
 
         <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col gap-3 border-b border-slate-200 p-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="font-semibold text-slate-950 dark:text-white">Returns &amp; Credit Notes</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Finalized credits preserve the original invoice and do not automatically create a cash refund.</p></div>@if((float) $invoice->credited_total > 0)<span class="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-200">{{ $invoice->currency }} {{ number_format((float) $invoice->credited_total, 2) }} credited</span>@endif</div>

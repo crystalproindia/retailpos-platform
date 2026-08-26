@@ -3,9 +3,8 @@
 namespace App\Http\Controllers\CommandCenter\Purchases;
 
 use App\Http\Controllers\Controller;
-use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\Supplier;
-use App\Models\Purchases\SupplierPayment;
+use App\Services\Finance\PayableService;
 use App\Services\Purchases\SupplierPayableService;
 use App\Services\Purchases\SupplierPaymentService;
 use Illuminate\Http\RedirectResponse;
@@ -15,33 +14,41 @@ use Illuminate\View\View;
 
 class SupplierPaymentController extends Controller
 {
-    public function index(Request $request, SupplierPayableService $payables): View
+    public function index(Request $request, SupplierPayableService $payables, PayableService $finance): View
     {
-        return view('command-center.purchases.payments.index', ['payments' => SupplierPayment::query()->with('supplier')->where('company_id', $request->user()->company_id)->latest('payment_date')->paginate(20), 'payable' => $payables->summary($request->user()->company_id)]);
+        return view('command-center.purchases.payments.index', ['payments' => $finance->paymentQuery($request->user())->with('supplier')->latest('payment_date')->paginate(20), 'payable' => $payables->summary($request->user()->company_id)]);
     }
-    public function create(Request $request): View
+
+    public function create(Request $request, PayableService $finance): View
     {
         $companyId = $request->user()->company_id;
-        return view('command-center.purchases.payments.create', ['suppliers' => Supplier::query()->where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get(['id', 'name']), 'invoices' => PurchaseInvoice::query()->with('supplier')->where('company_id', $companyId)->whereIn('status', ['approved', 'partially_paid', 'overdue'])->where('outstanding_total', '>', 0)->orderBy('due_date')->get()]);
+
+        return view('command-center.purchases.payments.create', ['suppliers' => Supplier::query()->where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get(['id', 'name']), 'invoices' => $finance->openQuery($request->user())->with('supplier')->orderBy('due_date')->limit(100)->get()]);
     }
+
     public function store(Request $request, SupplierPaymentService $service): RedirectResponse
     {
         $data = $this->validated($request);
         $data['allocations'] = collect($data['allocations'] ?? [])->filter(fn (array $allocation): bool => ! empty($allocation['amount']))->values()->all();
         $payment = $service->record($request->user(), $data);
+
         return redirect()->route('purchases.payments.show', $payment)->with('status', 'Supplier payment recorded.');
     }
-    public function show(Request $request, int $supplierPayment): View
+
+    public function show(Request $request, PayableService $finance, int $supplierPayment): View
     {
-        return view('command-center.purchases.payments.show', ['payment' => SupplierPayment::query()->with(['supplier', 'allocations.invoice'])->where('company_id', $request->user()->company_id)->findOrFail($supplierPayment)]);
+        return view('command-center.purchases.payments.show', ['payment' => $finance->paymentQuery($request->user())->with(['supplier', 'allocations.invoice'])->findOrFail($supplierPayment)]);
     }
-    public function reverse(Request $request, SupplierPaymentService $service, int $supplierPayment): RedirectResponse
+
+    public function reverse(Request $request, SupplierPaymentService $service, PayableService $finance, int $supplierPayment): RedirectResponse
     {
         $request->validate(['reason' => ['required', 'string', 'max:1000']]);
-        $payment = SupplierPayment::query()->where('company_id', $request->user()->company_id)->findOrFail($supplierPayment);
+        $payment = $finance->paymentQuery($request->user())->findOrFail($supplierPayment);
         $service->reverse($payment, $request->user(), $request->string('reason')->toString());
+
         return back()->with('status', 'Supplier payment reversed.');
     }
+
     /** @return array<string,mixed> */
     private function validated(Request $request): array
     {

@@ -31,7 +31,7 @@ class SidebarNavigationInventoryTest extends TestCase
             'purchases' => ['purchase-dashboard', 'supplier-dashboard', 'suppliers', 'supplier-contacts', 'supplier-products', 'supplier-ratings', 'purchase-requests', 'purchase-orders', 'goods-receipts', 'purchase-returns', 'pending-approvals', 'reorder-to-purchase', 'purchase-settings', 'purchase-invoices', 'supplier-payments', 'purchase-reports', 'purchase-input-gst'],
             'projects' => [],
             'support' => [],
-            'finance' => [],
+            'finance' => ['finance-receivables', 'finance-payables', 'finance-reconciliation'],
             'expenses' => [],
             'tasks' => ['tasks-today', 'tasks-personal', 'tasks-work', 'tasks-team', 'tasks-rules'],
             'workforce' => ['workforce-dashboard', 'workforce-employees', 'users', 'roles'],

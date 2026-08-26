@@ -4,9 +4,11 @@ namespace App\Services\Purchases;
 
 use App\Models\Purchases\PurchaseApprovalLog;
 use App\Models\Purchases\PurchaseInvoice;
+use App\Models\Purchases\Supplier;
 use App\Models\Purchases\SupplierPayment;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,6 +17,7 @@ class SupplierPaymentService
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly PurchaseNumberService $numbers,
+        private readonly OutletAccessService $outlets,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -32,10 +35,14 @@ class SupplierPaymentService
             if ($amount <= 0) {
                 throw ValidationException::withMessages(['amount' => 'Payment amount must be greater than zero.']);
             }
+            Supplier::query()->where('company_id', $user->company_id)->findOrFail($data['supplier_id']);
+            $branchId = (int) ($data['branch_id'] ?? $user->branch_id);
+            $branch = $user->company->branches()->findOrFail($branchId);
+            abort_unless($this->outlets->canAccess($user, $branch), 403);
             $payment = SupplierPayment::create([
                 'company_id' => $user->company_id,
                 'supplier_id' => $data['supplier_id'],
-                'branch_id' => $data['branch_id'] ?? $user->branch_id,
+                'branch_id' => $branch->id,
                 'payment_number' => $this->numbers->next($user->company_id, 'payment'),
                 'idempotency_key' => $data['idempotency_key'] ?? null,
                 'payment_date' => $data['payment_date'],
@@ -62,7 +69,8 @@ class SupplierPaymentService
     public function allocate(SupplierPayment $payment, User $user, array $allocations): SupplierPayment
     {
         return DB::transaction(function () use ($payment, $user, $allocations): SupplierPayment {
-            $payment = SupplierPayment::query()->lockForUpdate()->findOrFail($payment->id);
+            $payment = SupplierPayment::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($payment->id);
+            $this->assertPaymentAccess($payment, $user);
             if ($payment->status === 'reversed') {
                 throw ValidationException::withMessages(['payment' => 'A reversed payment cannot be allocated.']);
             }
@@ -73,6 +81,12 @@ class SupplierPaymentService
                     throw ValidationException::withMessages(['allocations' => 'An allocation exceeds the available payment amount.']);
                 }
                 $invoice = PurchaseInvoice::query()->where('company_id', $payment->company_id)->lockForUpdate()->findOrFail($allocation['purchase_invoice_id']);
+                if ($invoice->branch_id !== null) {
+                    $branch = $invoice->branch()->firstOrFail();
+                    abort_unless($this->outlets->canAccess($user, $branch), 403);
+                } else {
+                    abort_unless($this->outlets->hasCompanyWideAccess($user), 403);
+                }
                 if ($invoice->supplier_id !== $payment->supplier_id || ! in_array($invoice->status, ['approved', 'partially_paid', 'overdue'], true)) {
                     throw ValidationException::withMessages(['allocations' => 'Payments can only be allocated to approved invoices for the same supplier.']);
                 }
@@ -87,6 +101,7 @@ class SupplierPaymentService
                 $available -= $amount;
             }
             $payment->update(['unallocated_amount' => $this->decimal($available)]);
+
             return $payment->refresh();
         });
     }
@@ -94,7 +109,8 @@ class SupplierPaymentService
     public function reverse(SupplierPayment $payment, User $user, string $reason): SupplierPayment
     {
         return DB::transaction(function () use ($payment, $user, $reason): SupplierPayment {
-            $payment = SupplierPayment::query()->with('allocations')->lockForUpdate()->findOrFail($payment->id);
+            $payment = SupplierPayment::query()->where('company_id', $user->company_id)->with('allocations')->lockForUpdate()->findOrFail($payment->id);
+            $this->assertPaymentAccess($payment, $user);
             if ($payment->status === 'reversed') {
                 return $payment;
             }
@@ -109,6 +125,7 @@ class SupplierPaymentService
             $payment->update(['status' => 'reversed', 'unallocated_amount' => '0.00', 'reversed_by' => $user->id, 'reversed_at' => now(), 'reversal_reason' => $reason]);
             PurchaseApprovalLog::create(['company_id' => $payment->company_id, 'approvable_type' => SupplierPayment::class, 'approvable_id' => $payment->id, 'action' => 'reversed', 'from_status' => 'recorded', 'to_status' => 'reversed', 'user_id' => $user->id, 'comments' => $reason]);
             $this->audit->record('supplier.payment.reversed', $payment, 'Supplier payment reversed.');
+
             return $payment->refresh();
         });
     }
@@ -127,6 +144,17 @@ class SupplierPaymentService
         }
 
         return $negative ? -$paise : $paise;
+    }
+
+    private function assertPaymentAccess(SupplierPayment $payment, User $user): void
+    {
+        if ($payment->branch_id === null) {
+            abort_unless($this->outlets->hasCompanyWideAccess($user), 403);
+
+            return;
+        }
+        $branch = $user->company->branches()->findOrFail($payment->branch_id);
+        abort_unless($this->outlets->canAccess($user, $branch), 403);
     }
 
     private function decimal(int $paise): string

@@ -5,6 +5,7 @@ namespace App\Models\Crm;
 use App\Enums\Crm\InvoiceStatus;
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Finance\CrmInvoicePaymentAllocation;
 use App\Models\NotificationDelivery;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -81,6 +82,11 @@ class CrmInvoice extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(CrmInvoicePayment::class, 'invoice_id')->latest('payment_date');
+    }
+
+    public function paymentAllocations(): HasMany
+    {
+        return $this->hasMany(CrmInvoicePaymentAllocation::class, 'invoice_id');
     }
 
     public function returns(): HasMany

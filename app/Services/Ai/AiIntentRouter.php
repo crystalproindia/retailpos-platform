@@ -4,7 +4,7 @@ namespace App\Services\Ai;
 
 class AiIntentRouter
 {
-    public const INTENTS = ['business_summary', 'sales_summary', 'sales_comparison', 'profitability', 'inventory', 'reorder', 'slow_stock', 'outlet_comparison', 'product_performance', 'customer_insight', 'crm_followup'];
+    public const INTENTS = ['business_summary', 'sales_summary', 'sales_comparison', 'profitability', 'finance', 'inventory', 'reorder', 'slow_stock', 'outlet_comparison', 'product_performance', 'customer_insight', 'crm_followup'];
 
     public function route(string $question, ?string $previousIntent = null): string
     {
@@ -18,6 +18,7 @@ class AiIntentRouter
             str_contains($value, 'reorder'), str_contains($value, 'running low') => 'reorder',
             str_contains($value, 'slow'), str_contains($value, 'dead stock'), str_contains($value, 'not moving') => 'slow_stock',
             str_contains($value, 'profit'), str_contains($value, 'margin'), str_contains($value, 'discount') => 'profitability',
+            str_contains($value, 'owe us'), str_contains($value, 'owe supplier'), str_contains($value, 'receivable'), str_contains($value, 'payable'), str_contains($value, 'overdue customer'), str_contains($value, 'available credit'), str_contains($value, 'payment need attention') => 'finance',
             str_contains($value, 'inventory'), str_contains($value, 'stock value') => 'inventory',
             str_contains($value, 'outlet') => 'outlet_comparison',
             str_contains($value, 'product'), str_contains($value, 'best selling'), str_contains($value, 'selling well') => 'product_performance',

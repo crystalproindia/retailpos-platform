@@ -6,6 +6,8 @@ use App\Models\Crm\CrmLead;
 use App\Models\Customers\Customer;
 use App\Models\NotificationConditionState;
 use App\Models\User;
+use App\Services\Finance\PayableService;
+use App\Services\Finance\ReceivableService;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Reports\ExecutiveReportingService;
@@ -18,6 +20,8 @@ class BusinessIntelligenceContextService
         private readonly ExecutiveReportingService $executive,
         private readonly InventoryIntelligenceService $inventory,
         private readonly OutletAccessService $outlets,
+        private readonly ReceivableService $receivables,
+        private readonly PayableService $payables,
     ) {}
 
     /** @param array{label:string,date_from:string,date_to:string} $period @return array<string, mixed> */
@@ -32,8 +36,46 @@ class BusinessIntelligenceContextService
             'inventory', 'reorder', 'slow_stock' => $this->inventory($user, $intent, $filters, $period),
             'crm_followup' => $this->crm($user, $period),
             'customer_insight' => $this->customers($user, $period),
+            'finance' => $this->finance($user, $filters, $period),
             default => $this->reporting($user, $intent, $filters, $period),
         };
+    }
+
+    /** @param array<string,mixed> $filters @param array{label:string,date_from:string,date_to:string} $period */
+    private function finance(User $user, array $filters, array $period): array
+    {
+        if (! $user->can('finance.receivables.view') && ! $user->can('finance.payables.view')) {
+            return $this->unavailable('Finance insights are not available for this account.', $period, 'Authorized scope');
+        }
+        $financeFilters = ['from' => $period['date_from'], 'to' => $period['date_to'], 'outlet_id' => $filters['outlet_id'] ?? null];
+        $receivables = $user->can('finance.receivables.view') ? $this->receivables->snapshot($user, $financeFilters) : null;
+        $payables = $user->can('finance.payables.view') ? $this->payables->snapshot($user, $financeFilters) : null;
+        $top = collect($receivables['customers'] ?? [])->first();
+
+        return [
+            'title' => 'Finance position for '.$period['label'],
+            'summary' => 'These figures come from authorized invoice, payment, credit-note, and supplier-payment records.',
+            'facts' => array_values(array_filter([
+                $receivables ? $this->fact('Customers owe', $receivables['metrics']['outstanding'], 'money') : null,
+                $receivables ? $this->fact('Overdue receivables', $receivables['metrics']['overdue'], 'money') : null,
+                $payables ? $this->fact('Owed to suppliers', $payables['metrics']['payable'], 'money') : null,
+                $payables ? $this->fact('Overdue payables', $payables['metrics']['overdue'], 'money') : null,
+                $receivables ? $this->fact('Available customer credit', $receivables['metrics']['customer_credits'], 'money') : null,
+                $top ? $this->fact('Largest visible receivable: '.$top['name'], $top['outstanding'], 'money') : null,
+            ])),
+            'recommendations' => array_values(array_filter([
+                ($receivables['metrics']['overdue'] ?? 0) > 0 ? 'Review overdue customers and the exact remaining invoice balances.' : null,
+                ($payables['metrics']['overdue'] ?? 0) > 0 ? 'Review overdue supplier bills before recording another allocation.' : null,
+            ])) ?: ['No overdue finance item needs attention in the selected authorized period.'],
+            'coverage' => 'Read-only deterministic finance data; no payment, allocation, or credit action was performed.',
+            'sources' => array_values(array_filter([
+                $receivables ? $this->source('Receivables', 'finance.receivables.index') : null,
+                $payables ? $this->source('Payables', 'finance.payables.index') : null,
+            ])),
+            'followups' => ['How much is overdue?', 'Who owes us the most?', 'How much do we owe suppliers?'],
+            'fact_count' => 5 + ($top ? 1 : 0),
+            'scope' => 'Authorized finance scope',
+        ];
     }
 
     /** @return array<string, mixed> */

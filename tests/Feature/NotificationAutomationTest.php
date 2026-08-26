@@ -78,9 +78,10 @@ class NotificationAutomationTest extends TestCase
     {
         [$company, $branch, $admin] = $this->companyFixture();
         $settings = $this->settings($company, ['payment_overdue_days' => [1, 7, 30]]);
-        $due = $this->invoice($company, $branch, $admin, 'INV-DUE', '485.00', InvoiceStatus::PartiallyPaid, today()->subDays(7));
-        $this->invoice($company, $branch, $admin, 'INV-PAID', '0.00', InvoiceStatus::Paid, today()->subDays(8));
-        $this->invoice($company, $branch, $admin, 'INV-CANCELLED', '900.00', InvoiceStatus::Cancelled, today()->subDays(8));
+        $companyToday = now($company->timezone)->startOfDay();
+        $due = $this->invoice($company, $branch, $admin, 'INV-DUE', '485.00', InvoiceStatus::PartiallyPaid, $companyToday->copy()->subDays(7));
+        $this->invoice($company, $branch, $admin, 'INV-PAID', '0.00', InvoiceStatus::Paid, $companyToday->copy()->subDays(8));
+        $this->invoice($company, $branch, $admin, 'INV-CANCELLED', '900.00', InvoiceStatus::Cancelled, $companyToday->copy()->subDays(8));
 
         app(NotificationAutomationEvaluator::class)->evaluate($company);
 

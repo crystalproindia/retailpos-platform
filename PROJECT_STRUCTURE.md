@@ -3275,6 +3275,12 @@ Credit notes reduce invoice receivables through `credited_total` while preservin
 
 This ledger applies only to returns finalized after its migration. Historical cancellations are not converted into returns. Existing document-level adjustments are not proportionally reversed because CRM invoices do not store an authoritative line allocation for those adjustments.
 
+# Customer and Vendor Finance
+
+The Command Center Finance module provides Receivables, Payables, customer and supplier statements, payment allocation, customer-credit allocation, credit limits, and internal reconciliation. `ReceivableService` and `PayableService` are the shared authorized read paths for the UI, exports, Owner Command Center, notification automation, and deterministic AI context.
+
+The additive migration `2026_08_28_010000_create_customer_vendor_finance_foundation.php` extends customers and CRM payments and creates `crm_invoice_payment_allocations`, `crm_customer_credit_allocations`, and `finance_reconciliations`. Existing invoice/payment/credit-note and purchase/payment records remain authoritative; no shadow invoice or payable total is stored. See `docs/customer-vendor-finance.md` for allocation rules, tenant/outlet security, migration operations, and explicit refund/purchase-return limitations.
+
 # Notifications & Automation Phase 1
 
 The existing Laravel notification inbox, `notification_deliveries` ledger, event catalog, queue worker, and company SMTP configuration remain the delivery foundation. Phase 1 adds `notification_automation_settings` for tenant-owned policy and `notification_condition_states` for recoverable business conditions. It does not create a parallel stock, receivable, quotation, proforma, purchasing, reporting, or email calculation path.

@@ -10,11 +10,14 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmInvoicePayment;
 use App\Models\Crm\CrmQuotation;
+use App\Models\Finance\CrmInvoicePaymentAllocation;
 use App\Models\Inventory\Product;
 use App\Models\User;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Services\AuditLogger;
 use App\Services\Branding\CompanyBrandingService;
+use App\Services\Finance\CreditLimitService;
+use App\Services\Finance\FinanceBalanceService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Saas\UsageService;
 use Illuminate\Support\Arr;
@@ -32,6 +35,8 @@ class InvoiceService
         private readonly DocumentTaxModeService $taxModes,
         private readonly CompanyBrandingService $branding,
         private readonly SalesDocumentPresentationService $presentations,
+        private readonly FinanceBalanceService $financeBalances,
+        private readonly CreditLimitService $creditLimits,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -98,13 +103,14 @@ class InvoiceService
         return $invoice;
     }
 
-    public function issue(CrmInvoice $invoice, User $user): CrmInvoice
+    public function issue(CrmInvoice $invoice, User $user, bool $creditLimitOverride = false, ?string $overrideReason = null): CrmInvoice
     {
-        return DB::transaction(function () use ($invoice, $user): CrmInvoice {
+        return DB::transaction(function () use ($invoice, $user, $creditLimitOverride, $overrideReason): CrmInvoice {
             $invoice = CrmInvoice::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($invoice->id);
             $this->assertMutationAccess($invoice, $user);
             $this->ensureDraft($invoice);
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
+            $this->creditLimits->assertCanIssue($invoice, $user, $creditLimitOverride, $overrideReason);
             $invoice->update(['status' => InvoiceStatus::Issued, 'issue_date' => $invoice->issue_date ?? today(), 'updated_by' => $user->id]);
             $this->audit->record('crm.invoice.issued', $invoice, 'Invoice issued', ['company_id' => $invoice->company_id]);
 
@@ -191,9 +197,19 @@ class InvoiceService
             }
             $payment = $invoice->payments()->create(Arr::only($data, ['amount', 'currency', 'payment_date', 'payment_method', 'transaction_reference', 'bank_name', 'cheque_number', 'notes', 'status']) + [
                 'company_id' => $invoice->company_id, 'branch_id' => $invoice->branch_id, 'payment_reference' => $this->nextPaymentReference($invoice->company_id),
+                'customer_id' => $invoice->customer_id, 'allocated_amount' => $data['amount'], 'unallocated_amount' => '0.00',
                 'receipt_number' => $this->nextReceiptNumber($invoice->company_id), 'recorded_by' => $user->id,
                 'cleared_by' => ($data['status'] ?? 'recorded') === 'cleared' ? $user->id : null,
                 'cleared_at' => ($data['status'] ?? 'recorded') === 'cleared' ? now() : null, 'idempotency_key' => $key,
+            ]);
+            CrmInvoicePaymentAllocation::create([
+                'company_id' => $invoice->company_id,
+                'branch_id' => $invoice->branch_id,
+                'payment_id' => $payment->id,
+                'invoice_id' => $invoice->id,
+                'amount' => $payment->amount,
+                'idempotency_key' => hash('sha256', 'direct|'.$payment->id.'|'.$invoice->id),
+                'created_by' => $user->id,
             ]);
             $this->refreshBalance($invoice, $user);
             $this->recordActivity($invoice, $user, 'Payment '.$payment->receipt_number.' recorded for '.$invoice->currency.' '.$payment->amount.'.');
@@ -211,7 +227,7 @@ class InvoiceService
                 throw ValidationException::withMessages(['payment' => 'This payment has already been reversed.']);
             }
             $payment->update(['status' => InvoicePaymentStatus::Reversed, 'reversed_by' => $user->id, 'reversed_at' => now(), 'reversal_reason' => $reason]);
-            $this->refreshBalance($this->findInvoiceForUpdate($payment->invoice_id, $user), $user);
+            $this->refreshAllocatedInvoices($payment, $user);
             $this->audit->record('crm.invoice.payment_reversed', $payment, 'Invoice payment reversed', ['company_id' => $payment->company_id, 'invoice_id' => $payment->invoice_id]);
 
             return $payment->refresh();
@@ -230,7 +246,7 @@ class InvoiceService
                 'cleared_by' => $user->id,
                 'cleared_at' => now(),
             ]);
-            $this->refreshBalance($this->findInvoiceForUpdate($payment->invoice_id, $user), $user);
+            $this->refreshAllocatedInvoices($payment, $user);
             $this->audit->record('crm.invoice.payment_cleared', $payment, 'Invoice payment cleared', [
                 'company_id' => $payment->company_id,
                 'invoice_id' => $payment->invoice_id,
@@ -295,7 +311,7 @@ class InvoiceService
             $taxTotal += $tax;
             $cost = $item['snapshot_unit_cost_cents'] ?? null;
             $totalCost = $cost === null ? null : intdiv($quantityMilli * $cost + 500, 1000);
-            $normalized[] = ['product_id'=>$item['product_id'] ?? null,'category_id_snapshot'=>$item['category_id_snapshot'] ?? null,'brand_id_snapshot'=>$item['brand_id_snapshot'] ?? null,'name'=>$item['name'],'sku_snapshot'=>$item['sku_snapshot'] ?? null,'category_name_snapshot'=>$item['category_name_snapshot'] ?? null,'brand_name_snapshot'=>$item['brand_name_snapshot'] ?? null,'description'=>$item['description'] ?? null,'quantity'=>$this->decimal($quantityMilli,3),'unit'=>$item['unit'] ?? 'unit','unit_price'=>$this->decimal($priceCents),'unit_cost_snapshot'=>$cost === null ? null : $this->decimal($cost),'total_cost_snapshot'=>$totalCost === null ? null : $this->decimal($totalCost),'gross_sales_snapshot'=>$this->decimal($gross),'net_sales_snapshot'=>$this->decimal($lineSubtotal),'gross_profit_before_discount'=>$totalCost === null ? null : $this->decimal($gross-$totalCost),'gross_profit_snapshot'=>$totalCost === null ? null : $this->decimal($lineSubtotal-$totalCost),'gross_margin_percent_snapshot'=>$totalCost === null ? null : $this->margin($lineSubtotal-$totalCost,$lineSubtotal),'cost_snapshot_method'=>$cost === null ? null : 'standard_cost','cost_snapshot_status'=>$cost === null ? 'unavailable' : 'captured','discount_type'=>$discountType,'discount_value'=>$discountType === 'percentage' ? $this->decimal($this->milli((string)$discountValue),3) : $this->decimal($this->cents((string)$discountValue)),'discount_amount'=>$this->decimal($discount),'tax_rate'=>$this->decimal($taxRateMilli,3),'tax_amount'=>$this->decimal($tax),'line_subtotal'=>$this->decimal($lineSubtotal),'line_total'=>$this->decimal($lineSubtotal+$tax),'sort_order'=>$index+1];
+            $normalized[] = ['product_id' => $item['product_id'] ?? null, 'category_id_snapshot' => $item['category_id_snapshot'] ?? null, 'brand_id_snapshot' => $item['brand_id_snapshot'] ?? null, 'name' => $item['name'], 'sku_snapshot' => $item['sku_snapshot'] ?? null, 'category_name_snapshot' => $item['category_name_snapshot'] ?? null, 'brand_name_snapshot' => $item['brand_name_snapshot'] ?? null, 'description' => $item['description'] ?? null, 'quantity' => $this->decimal($quantityMilli, 3), 'unit' => $item['unit'] ?? 'unit', 'unit_price' => $this->decimal($priceCents), 'unit_cost_snapshot' => $cost === null ? null : $this->decimal($cost), 'total_cost_snapshot' => $totalCost === null ? null : $this->decimal($totalCost), 'gross_sales_snapshot' => $this->decimal($gross), 'net_sales_snapshot' => $this->decimal($lineSubtotal), 'gross_profit_before_discount' => $totalCost === null ? null : $this->decimal($gross - $totalCost), 'gross_profit_snapshot' => $totalCost === null ? null : $this->decimal($lineSubtotal - $totalCost), 'gross_margin_percent_snapshot' => $totalCost === null ? null : $this->margin($lineSubtotal - $totalCost, $lineSubtotal), 'cost_snapshot_method' => $cost === null ? null : 'standard_cost', 'cost_snapshot_status' => $cost === null ? 'unavailable' : 'captured', 'discount_type' => $discountType, 'discount_value' => $discountType === 'percentage' ? $this->decimal($this->milli((string) $discountValue), 3) : $this->decimal($this->cents((string) $discountValue)), 'discount_amount' => $this->decimal($discount), 'tax_rate' => $this->decimal($taxRateMilli, 3), 'tax_amount' => $this->decimal($tax), 'line_subtotal' => $this->decimal($lineSubtotal), 'line_total' => $this->decimal($lineSubtotal + $tax), 'sort_order' => $index + 1];
         }
         $adjustmentCents = $this->cents((string) $adjustment);
         $grandTotal = $subtotal - $discountTotal + $taxTotal + $adjustmentCents;
@@ -308,15 +324,7 @@ class InvoiceService
 
     private function refreshBalance(CrmInvoice $invoice, User $user): void
     {
-        $paidCents = (int) $invoice->payments()->whereNotIn('status', [
-            InvoicePaymentStatus::Reversed->value,
-            InvoicePaymentStatus::Failed->value,
-            InvoicePaymentStatus::Pending->value,
-        ])->get()->sum(fn (CrmInvoicePayment $payment) => $this->cents((string) $payment->amount));
-        $totalCents = $this->cents((string) $invoice->grand_total);
-        $creditedCents = $this->cents((string) ($invoice->credited_total ?? '0'));
-        $invoice->update(['amount_paid' => $this->decimal($paidCents), 'balance_due' => $this->decimal(max(0, $totalCents - $creditedCents - $paidCents)), 'updated_by' => $user->id]);
-        $this->refreshStatus($invoice->refresh(), $user);
+        $this->financeBalances->refreshInvoice($invoice, $user->id);
     }
 
     public function refreshFinancialBalance(CrmInvoice $invoice, User $user): CrmInvoice
@@ -337,9 +345,21 @@ class InvoiceService
     private function findPaymentForUpdate(int $paymentId, User $user): CrmInvoicePayment
     {
         $payment = CrmInvoicePayment::query()->where('company_id', $user->company_id)->lockForUpdate()->findOrFail($paymentId);
-        $this->assertMutationAccess($payment->invoice()->firstOrFail(), $user);
+        if ($payment->branch_id === null) {
+            abort_unless($this->outlets->hasCompanyWideAccess($user), 403);
+        } else {
+            $branch = $payment->branch()->first();
+            abort_unless($branch && $this->outlets->canAccess($user, $branch), 403);
+        }
 
         return $payment;
+    }
+
+    private function refreshAllocatedInvoices(CrmInvoicePayment $payment, User $user): void
+    {
+        $payment->allocations()->with('invoice')->get()->each(function (CrmInvoicePaymentAllocation $allocation) use ($user): void {
+            $this->refreshBalance($this->findInvoiceForUpdate($allocation->invoice_id, $user), $user);
+        });
     }
 
     private function assertMutationAccess(CrmInvoice $invoice, User $user): void
@@ -406,16 +426,30 @@ class InvoiceService
     private function profitabilityItems(User $user, array $items): array
     {
         $ids = collect($items)->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
-        $products = Product::query()->with(['category:id,name','brand:id,name'])->where('company_id',$user->company_id)->whereIn('id',$ids)->lockForUpdate()->get()->keyBy('id');
+        $products = Product::query()->with(['category:id,name', 'brand:id,name'])->where('company_id', $user->company_id)->whereIn('id', $ids)->lockForUpdate()->get()->keyBy('id');
+
         return collect($items)->map(function (array $item) use ($products): array {
-            if (empty($item['product_id'])) return $item;
-            $product = $products->get((int)$item['product_id']);
-            if (! $product) throw ValidationException::withMessages(['items'=>'The selected product is unavailable.']);
-            return array_replace($item, ['product_id'=>$product->id,'name'=>$product->name,'snapshot_unit_cost_cents'=>$this->cents((string)($product->cost_price ?? '0.00')),'sku_snapshot'=>$product->sku,'category_id_snapshot'=>$product->category_id,'category_name_snapshot'=>$product->category?->name,'brand_id_snapshot'=>$product->brand_id,'brand_name_snapshot'=>$product->brand?->name]);
+            if (empty($item['product_id'])) {
+                return $item;
+            }
+            $product = $products->get((int) $item['product_id']);
+            if (! $product) {
+                throw ValidationException::withMessages(['items' => 'The selected product is unavailable.']);
+            }
+
+            return array_replace($item, ['product_id' => $product->id, 'name' => $product->name, 'snapshot_unit_cost_cents' => $this->cents((string) ($product->cost_price ?? '0.00')), 'sku_snapshot' => $product->sku, 'category_id_snapshot' => $product->category_id, 'category_name_snapshot' => $product->category?->name, 'brand_id_snapshot' => $product->brand_id, 'brand_name_snapshot' => $product->brand?->name]);
         })->all();
     }
 
-    private function margin(int $profit, int $sales): string { if ($sales === 0) return '0.0000'; $scaled=intdiv(abs($profit)*1000000+intdiv(abs($sales),2),abs($sales)); $scaled=$profit<0?- $scaled:$scaled; return intdiv($scaled,10000).'.'.str_pad((string)abs($scaled%10000),4,'0',STR_PAD_LEFT); }
+    private function margin(int $profit, int $sales): string
+    {
+        if ($sales === 0) {
+            return '0.0000';
+        } $scaled = intdiv(abs($profit) * 1000000 + intdiv(abs($sales), 2), abs($sales));
+        $scaled = $profit < 0 ? -$scaled : $scaled;
+
+        return intdiv($scaled, 10000).'.'.str_pad((string) abs($scaled % 10000), 4, '0', STR_PAD_LEFT);
+    }
 
     private function milli(string $value): int
     {

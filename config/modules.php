@@ -984,10 +984,10 @@ return [
         ],
         'finance' => [
             'name' => 'Finance',
-            'description' => 'Finance module foundation.',
+            'description' => 'Customer receivables, supplier payables, statements, and reconciliation.',
             'icon' => 'finance',
-            'route' => 'modules.show',
-            'route_params' => ['module' => 'finance'],
+            'route' => 'finance.receivables.index',
+            'route_params' => [],
             'sort_order' => 300,
             'category' => 'Finance',
             'enabled' => true,
@@ -996,6 +996,15 @@ return [
             'badge' => null,
             'license_key' => null,
             'parent_id' => null,
+        ],
+        'finance-receivables' => [
+            'name' => 'Receivables', 'description' => 'Customer outstanding balances and aging.', 'icon' => 'orders', 'route' => 'finance.receivables.index', 'route_params' => [], 'sort_order' => 301, 'category' => 'Finance', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'finance.receivables.view', 'badge' => null, 'license_key' => null, 'parent_id' => 'finance',
+        ],
+        'finance-payables' => [
+            'name' => 'Payables', 'description' => 'Supplier bills and payable aging.', 'icon' => 'purchases', 'route' => 'finance.payables.index', 'route_params' => [], 'sort_order' => 302, 'category' => 'Finance', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'finance.payables.view', 'badge' => null, 'license_key' => null, 'parent_id' => 'finance',
+        ],
+        'finance-reconciliation' => [
+            'name' => 'Reconciliation', 'description' => 'Review unallocated customer and supplier payments.', 'icon' => 'check-circle', 'route' => 'finance.reconciliation.index', 'route_params' => [], 'sort_order' => 303, 'category' => 'Finance', 'enabled' => true, 'visible_in_sidebar' => true, 'roles' => $managementRoles, 'permission' => 'finance.reconciliation.manage', 'badge' => null, 'license_key' => null, 'parent_id' => 'finance',
         ],
         'expenses' => [
             'name' => 'Expenses',

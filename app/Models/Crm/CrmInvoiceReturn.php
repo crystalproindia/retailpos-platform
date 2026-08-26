@@ -4,6 +4,7 @@ namespace App\Models\Crm;
 
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Finance\CustomerCreditAllocation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -50,6 +51,11 @@ class CrmInvoiceReturn extends Model
     public function items(): HasMany
     {
         return $this->hasMany(CrmInvoiceReturnItem::class)->orderBy('id');
+    }
+
+    public function creditAllocations(): HasMany
+    {
+        return $this->hasMany(CustomerCreditAllocation::class, 'crm_invoice_return_id');
     }
 
     public function creator(): BelongsTo

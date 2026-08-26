@@ -8,10 +8,10 @@ use App\Http\Requests\Crm\QuickCreateCrmCustomerRequest;
 use App\Http\Requests\Crm\SendInvoiceReminderRequest;
 use App\Http\Requests\Crm\StoreInvoicePaymentRequest;
 use App\Http\Requests\Crm\StoreInvoiceRequest;
+use App\Models\Inventory\Product;
 use App\Repositories\Crm\CrmCustomerRepository;
 use App\Repositories\Crm\InvoiceRepository;
 use App\Repositories\Crm\QuotationRepository;
-use App\Models\Inventory\Product;
 use App\Services\Crm\CrmCustomerService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceReminderService;
@@ -19,6 +19,7 @@ use App\Services\Crm\InvoiceReminderSettingsService;
 use App\Services\Crm\InvoiceService;
 use App\Services\Crm\InvoiceShareService;
 use App\Services\Crm\PublicInvoiceService;
+use App\Services\Finance\ReceivableService;
 use App\Services\Notifications\EmailDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -77,7 +78,8 @@ class InvoiceController extends Controller
         $term = trim($data['q']);
         $products = Product::query()->where('company_id', $request->user()->company_id)->where('is_active', true)->where('status', Product::STATUS_ACTIVE)
             ->where(fn ($query) => $query->where('name', 'like', "%{$term}%")->orWhere('sku', 'like', "%{$term}%")->orWhere('barcode', 'like', "%{$term}%"))
-            ->orderBy('name')->limit(20)->get(['id','name','sku','selling_price']);
+            ->orderBy('name')->limit(20)->get(['id', 'name', 'sku', 'selling_price']);
+
         return response()->json(['products' => $products]);
     }
 
@@ -128,17 +130,18 @@ class InvoiceController extends Controller
         return redirect()->route('sales.invoices.show', $record)->with('status', 'Draft invoice updated.');
     }
 
-    public function show(Request $request, InvoiceRepository $invoices, InvoiceService $service, InvoiceReminderSettingsService $reminderSettings, int $invoice): View
+    public function show(Request $request, InvoiceRepository $invoices, InvoiceService $service, InvoiceReminderSettingsService $reminderSettings, ReceivableService $receivables, int $invoice): View
     {
         $record = $service->refreshStatus($invoices->find($request->user(), $invoice));
         $setting = $reminderSettings->ensure($request->user()->company);
 
-        return view('command-center.crm.invoices.show', ['invoice' => $record->load(['items.returnItems.crmInvoiceReturn', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']), 'reminderRules' => $setting->rules->where('enabled', true)]);
+        return view('command-center.crm.invoices.show', ['invoice' => $record->load(['items.returnItems.crmInvoiceReturn', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'customer', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null]);
     }
 
     public function issue(Request $request, InvoiceRepository $invoices, InvoiceService $service, int $invoice): RedirectResponse
     {
-        $service->issue($invoices->find($request->user(), $invoice), $request->user());
+        $data = $request->validate(['credit_limit_override' => ['nullable', 'boolean'], 'credit_limit_override_reason' => ['nullable', 'string', 'max:1000']]);
+        $service->issue($invoices->find($request->user(), $invoice), $request->user(), $request->boolean('credit_limit_override'), $data['credit_limit_override_reason'] ?? null);
 
         return back()->with('status', 'Invoice issued.');
     }

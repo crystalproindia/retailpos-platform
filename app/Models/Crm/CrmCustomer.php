@@ -6,6 +6,7 @@ use App\Enums\Crm\CrmCustomerStatus;
 use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\Concerns\Auditable;
+use App\Models\Finance\CustomerCreditAllocation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['company_id', 'lead_id', 'quotation_id', 'customer_code', 'company_name', 'display_name', 'business_type', 'email', 'phone', 'country', 'state', 'city', 'billing_address', 'tax_number', 'number_of_stores', 'status', 'source', 'notes', 'converted_at', 'created_by', 'updated_by'])]
+#[Fillable(['company_id', 'lead_id', 'quotation_id', 'customer_code', 'company_name', 'display_name', 'business_type', 'email', 'phone', 'country', 'state', 'city', 'billing_address', 'tax_number', 'credit_limit', 'credit_terms_days', 'number_of_stores', 'status', 'source', 'notes', 'converted_at', 'created_by', 'updated_by'])]
 class CrmCustomer extends Model
 {
     use Auditable;
@@ -25,6 +26,8 @@ class CrmCustomer extends Model
             'status' => CrmCustomerStatus::class,
             'converted_at' => 'datetime',
             'number_of_stores' => 'integer',
+            'credit_limit' => 'decimal:2',
+            'credit_terms_days' => 'integer',
         ];
     }
 
@@ -56,6 +59,11 @@ class CrmCustomer extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(CrmInvoice::class, 'customer_id')->latest('created_at');
+    }
+
+    public function creditAllocations(): HasMany
+    {
+        return $this->hasMany(CustomerCreditAllocation::class, 'customer_id');
     }
 
     public function onboardings(): HasMany

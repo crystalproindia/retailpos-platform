@@ -2,7 +2,6 @@
 
 namespace App\Services\Notifications;
 
-use App\Enums\Crm\InvoiceStatus;
 use App\Enums\Crm\ProformaStatus;
 use App\Enums\Crm\QuotationStatus;
 use App\Enums\Purchases\PurchaseOrderStatus;
@@ -13,6 +12,8 @@ use App\Models\Crm\CrmProformaInvoice;
 use App\Models\Crm\CrmQuotation;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\User;
+use App\Services\Finance\PayableService;
+use App\Services\Finance\ReceivableService;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Reports\ExecutiveReportingService;
 use Carbon\CarbonImmutable;
@@ -26,6 +27,8 @@ class NotificationAutomationEvaluator
         private readonly AutomationNotificationService $notifications,
         private readonly InventoryIntelligenceService $inventory,
         private readonly ExecutiveReportingService $executive,
+        private readonly ReceivableService $receivables,
+        private readonly PayableService $payables,
     ) {}
 
     /** @return array<string, array{created:int,recovered:int}> */
@@ -45,7 +48,7 @@ class NotificationAutomationEvaluator
 
         $results = [];
         $results['inventory_stock'] = $this->notifications->sync($company, $setting, 'inventory_stock', $this->inventoryConditions($administrator, $setting));
-        $results['receivable'] = $this->notifications->sync($company, $setting, 'receivable', $this->receivableConditions($company, $setting));
+        $results['receivable'] = $this->notifications->sync($company, $setting, 'receivable', $this->receivableConditions($administrator, $setting));
         $results['quotation'] = $this->notifications->sync($company, $setting, 'quotation', $this->quotationConditions($company, $setting));
         $results['proforma'] = $this->notifications->sync($company, $setting, 'proforma', $this->proformaConditions($company, $setting));
         $results['purchasing'] = $this->notifications->sync($company, $setting, 'purchasing', $this->purchaseConditions($administrator, $setting));
@@ -93,20 +96,17 @@ class NotificationAutomationEvaluator
         return $conditions;
     }
 
-    private function receivableConditions(Company $company, $setting): array
+    private function receivableConditions(User $administrator, $setting): array
     {
         if (! $setting->payment_reminders_enabled) {
             return [];
         }
 
-        $today = CarbonImmutable::now($this->timezone($company, $setting))->startOfDay();
+        $today = CarbonImmutable::now($this->timezone($administrator->company, $setting))->startOfDay();
         $before = collect($setting->payment_before_due_days ?: [3])->map(fn ($day) => (int) $day)->filter(fn ($day) => $day > 0)->unique()->sortDesc();
         $overdue = collect($setting->payment_overdue_days ?: [1, 7, 30])->map(fn ($day) => (int) $day)->filter(fn ($day) => $day > 0)->unique()->sort();
 
-        return CrmInvoice::query()
-            ->where('company_id', $company->id)
-            ->where('balance_due', '>', 0)
-            ->whereNotIn('status', [InvoiceStatus::Draft->value, InvoiceStatus::Paid->value, InvoiceStatus::Credited->value, InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value])
+        return $this->receivables->openQuery($administrator)
             ->whereNotNull('due_date')
             ->where(fn ($query) => $query->whereNull('do_not_remind_before')->orWhereDate('do_not_remind_before', '<=', $today->toDateString()))
             ->orderBy('due_date')->limit(self::SOURCE_LIMIT)->get()
@@ -227,6 +227,19 @@ class NotificationAutomationEvaluator
                     'message' => $order->po_number.' is '.$late.' day'.($late === 1 ? '' : 's').' past its expected delivery date.',
                     'action_url' => route('purchases.orders.show', $order), 'action_label' => 'Open Purchase Order',
                     'context' => ['po_number' => $order->po_number, 'days_overdue' => $late],
+                ];
+            });
+
+        $this->payables->openQuery($administrator)->with('supplier')->whereNotNull('due_date')->whereDate('due_date', '<=', $today)
+            ->orderBy('due_date')->limit(100)->get()->each(function ($invoice) use (&$conditions, $today): void {
+                $late = CarbonImmutable::parse($invoice->due_date)->diffInDays(CarbonImmutable::parse($today));
+                $conditions[] = [
+                    'subject_type' => $invoice->getMorphClass(), 'subject_id' => $invoice->id, 'branch_id' => $invoice->branch_id,
+                    'stage' => $late > 0 ? 'payable_overdue' : 'payable_due_today', 'severity' => $late > 0 ? 'important' : 'attention',
+                    'category' => 'purchasing', 'icon' => 'finance', 'title' => $late > 0 ? 'A supplier payment is overdue' : 'A supplier payment is due today',
+                    'message' => ($invoice->supplier?->name ?: 'Supplier').' is owed '.$this->money($invoice->outstanding_total).($late > 0 ? ' and the bill is '.$late.' day'.($late === 1 ? '' : 's').' overdue.' : ' today.'),
+                    'action_url' => route('purchases.invoices.show', $invoice), 'action_label' => 'Open Supplier Bill',
+                    'context' => ['invoice_number' => $invoice->invoice_number, 'balance_due' => (string) $invoice->outstanding_total, 'days_overdue' => $late],
                 ];
             });
 

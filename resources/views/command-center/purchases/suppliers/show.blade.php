@@ -9,6 +9,10 @@
 @section('content')
     @include('command-center.purchases.partials.nav')
 
+    @if($financeSummary)
+        <section class="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="font-semibold text-slate-950 dark:text-white">Supplier finance</h2><p class="mt-1 text-sm text-slate-500">Approved bills and recorded payment allocations.</p></div><a href="{{ route('finance.supplier-statements.show',$supplier) }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold dark:border-slate-700">View statement</a></div><div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">@foreach([['Purchases',$financeSummary['total_purchases']],['Paid',$financeSummary['total_paid']],['Outstanding',$financeSummary['outstanding']],['Advance',$financeSummary['supplier_credit']]] as [$label,$value])<div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800"><p class="text-xs font-semibold uppercase text-slate-500">{{ $label }}</p><p class="mt-2 text-lg font-semibold">₹{{ number_format($value/100,2) }}</p></div>@endforeach</div></section>
+    @endif
+
     <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
             <p class="text-sm text-slate-500 dark:text-slate-400">{{ str($supplier->supplier_type->value)->headline() }} · {{ $supplier->email ?: 'No email' }}</p>

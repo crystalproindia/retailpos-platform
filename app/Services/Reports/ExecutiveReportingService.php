@@ -3,12 +3,13 @@
 namespace App\Services\Reports;
 
 use App\Models\Branch;
-use App\Models\Crm\CrmInvoice;
 use App\Models\Pos\PosReturn;
 use App\Models\Pos\PosSale;
 use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\User;
+use App\Services\Finance\PayableService;
+use App\Services\Finance\ReceivableService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -19,6 +20,8 @@ class ExecutiveReportingService
     public function __construct(
         private readonly RetailReportingService $reports,
         private readonly ProfitabilityReportingService $profitability,
+        private readonly ReceivableService $receivables,
+        private readonly PayableService $payables,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -38,7 +41,7 @@ class ExecutiveReportingService
         $outlets = $this->outletRows($user, $current, $profit);
         $salespeople = $this->salespersonRows($current, $profit);
         $products = $this->productRows($profit);
-        $financial = $this->financialPosition($user, $current);
+        $financial = $this->financialPosition($user, $current, $filters);
 
         return [
             'scope' => $current['scope'],
@@ -128,43 +131,22 @@ class ExecutiveReportingService
     }
 
     /** @return array{customers:array<int,array<string,mixed>>,suppliers:array<int,array<string,mixed>>,receivables:int,payables:int,overdue_receivables:int,overdue_payables:int} */
-    private function financialPosition(User $user, array $summary): array
+    private function financialPosition(User $user, array $summary, array $filters): array
     {
-        $scope = $summary['scope'];
         $range = $summary['range'];
-        $invoiceQuery = CrmInvoice::query()
-            ->where('crm_invoices.company_id', $user->company_id)
-            ->whereNotIn('crm_invoices.status', ['cancelled', 'void'])
-            ->where('crm_invoices.balance_due', '>', 0)
-            ->when($scope['ids'] !== null, fn (Builder $query) => $query->whereIn('crm_invoices.branch_id', $scope['ids']))
-            ->whereDate('crm_invoices.issue_date', '>=', $range['from']->toDateString())
-            ->whereDate('crm_invoices.issue_date', '<=', $range['to']->toDateString());
-        $customers = (clone $invoiceQuery)
-            ->selectRaw("COALESCE(NULLIF(billing_company, ''), NULLIF(billing_name, ''), 'Unassigned') as name, COUNT(*) as document_count, SUM(balance_due) as outstanding")
-            ->groupBy('name')->orderByDesc('outstanding')->limit(5)->get()
-            ->map(fn ($row): array => ['name' => $row->name, 'document_count' => (int) $row->document_count, 'outstanding' => $this->minor($row->outstanding)])->all();
-
-        $purchaseQuery = PurchaseInvoice::query()
-            ->where('purchase_invoices.company_id', $user->company_id)
-            ->whereNotIn('purchase_invoices.status', ['cancelled', 'draft'])
-            ->where('purchase_invoices.outstanding_total', '>', 0)
-            ->when($scope['ids'] !== null, fn (Builder $query) => $query->whereIn('purchase_invoices.branch_id', $scope['ids']))
-            ->when($scope['warehouse_id'], fn (Builder $query, int $warehouseId) => $query->where('purchase_invoices.warehouse_id', $warehouseId))
-            ->whereDate('purchase_invoices.supplier_invoice_date', '>=', $range['from']->toDateString())
-            ->whereDate('purchase_invoices.supplier_invoice_date', '<=', $range['to']->toDateString());
-        $suppliers = (clone $purchaseQuery)
-            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_invoices.supplier_id')
-            ->selectRaw("COALESCE(suppliers.name, 'Unassigned') as name, COUNT(*) as document_count, SUM(purchase_invoices.outstanding_total) as outstanding")
-            ->groupBy('suppliers.id', 'suppliers.name')->orderByDesc('outstanding')->limit(5)->get()
-            ->map(fn ($row): array => ['name' => $row->name, 'document_count' => (int) $row->document_count, 'outstanding' => $this->minor($row->outstanding)])->all();
+        $financeFilters = ['from' => $range['from']->toDateString(), 'to' => $range['to']->toDateString(), 'outlet_id' => $filters['outlet_id'] ?? null];
+        $receivables = $this->receivables->snapshot($user, $financeFilters, $range['to']->startOfDay());
+        $payables = $this->payables->snapshot($user, $financeFilters, $range['to']->startOfDay());
 
         return [
-            'customers' => $customers,
-            'suppliers' => $suppliers,
-            'receivables' => (int) $summary['reports']['outstanding']['outstanding'],
-            'payables' => (int) $summary['reports']['purchases']['outstanding'],
-            'overdue_receivables' => $this->minor((clone $invoiceQuery)->whereDate('due_date', '<', $range['to']->toDateString())->sum('balance_due')),
-            'overdue_payables' => $this->minor((clone $purchaseQuery)->whereDate('due_date', '<', $range['to']->toDateString())->sum('outstanding_total')),
+            'customers' => $receivables['customers'],
+            'suppliers' => $payables['suppliers'],
+            'receivables' => $receivables['metrics']['outstanding'],
+            'payables' => $payables['metrics']['payable'],
+            'overdue_receivables' => $receivables['metrics']['overdue'],
+            'overdue_payables' => $payables['metrics']['overdue'],
+            'customer_credits' => $receivables['metrics']['customer_credits'],
+            'refund_due' => 0,
         ];
     }
 

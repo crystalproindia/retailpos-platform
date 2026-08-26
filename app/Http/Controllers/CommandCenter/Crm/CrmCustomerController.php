@@ -15,6 +15,7 @@ use App\Repositories\Crm\InvoiceRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
 use App\Services\Crm\CrmCustomerConversionService;
+use App\Services\Finance\ReceivableService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -31,7 +32,7 @@ class CrmCustomerController extends Controller
         ]);
     }
 
-    public function show(Request $request, CrmCustomerRepository $customers, CrmSupportTicketRepository $supportTickets, InvoiceRepository $invoices, int $customer): View
+    public function show(Request $request, CrmCustomerRepository $customers, CrmSupportTicketRepository $supportTickets, InvoiceRepository $invoices, ReceivableService $receivables, int $customer): View
     {
         $record = $customers->findForUser($request->user(), $customer);
 
@@ -42,6 +43,9 @@ class CrmCustomerController extends Controller
                 : null,
             'commercialHistory' => $request->user()->can('sales.invoices.view')
                 ? $invoices->customerHistory($request->user(), $record->id)
+                : null,
+            'financeSummary' => $request->user()->can('finance.receivables.view')
+                ? $receivables->customerSummary($request->user(), $record)
                 : null,
         ]);
     }

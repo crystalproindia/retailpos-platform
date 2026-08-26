@@ -8,6 +8,7 @@ use App\Models\Purchases\Supplier;
 use App\Repositories\Inventory\InventoryLookupRepository;
 use App\Repositories\Inventory\ProductRepository;
 use App\Repositories\Purchases\SupplierRepository;
+use App\Services\Finance\PayableService;
 use App\Services\Purchases\SupplierScoreService;
 use App\Services\Purchases\SupplierService;
 use Illuminate\Http\RedirectResponse;
@@ -40,12 +41,15 @@ class SupplierController extends Controller
         return redirect()->route('purchases.suppliers.show', $supplier)->with('status', 'Supplier created.');
     }
 
-    public function show(Request $request, SupplierRepository $suppliers, ProductRepository $products, InventoryLookupRepository $lookups, int $supplier): View
+    public function show(Request $request, SupplierRepository $suppliers, ProductRepository $products, InventoryLookupRepository $lookups, PayableService $payables, int $supplier): View
     {
+        $record = $suppliers->findForCompany($request->user()->company_id, $supplier, true);
+
         return view('command-center.purchases.suppliers.show', [
-            'supplier' => $suppliers->findForCompany($request->user()->company_id, $supplier, true),
+            'supplier' => $record,
             'products' => $products->activeForCompany($request->user()->company_id),
             'taxRates' => $lookups->formOptions($request->user()->company_id)['taxRates'],
+            'financeSummary' => $request->user()->can('finance.payables.view') ? $payables->supplierSummary($request->user(), $record) : null,
         ]);
     }
 

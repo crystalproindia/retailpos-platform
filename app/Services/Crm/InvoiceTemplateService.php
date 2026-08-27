@@ -198,7 +198,7 @@ class InvoiceTemplateService
             'signature' => $this->branding->signatureForPath($invoice->signature_path_snapshot, $invoice->signatory_name_snapshot, $invoice->signatory_designation_snapshot),
             'payment_details' => $presentation['payment_details'],
             'watermark' => $presentation['watermark'],
-            'document_title' => $presentation['document_title'],
+            'document_title' => $presentation['document_title'].((int) $invoice->amendment_version > 1 ? ' · AMENDED · VERSION '.$invoice->amendment_version : ''),
         ];
     }
 

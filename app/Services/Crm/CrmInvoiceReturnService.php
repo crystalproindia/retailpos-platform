@@ -237,6 +237,15 @@ class CrmInvoiceReturnService
             return null;
         }
 
+        $linked = StockMovement::query()
+            ->where('company_id', $invoice->company_id)
+            ->where('crm_invoice_item_id', $item->id)
+            ->where('movement_type', 'sale')
+            ->first();
+        if ($linked) {
+            return $linked;
+        }
+
         return StockMovement::query()->where('company_id', $invoice->company_id)->where('reference_type', CrmInvoice::class)
             ->where('reference_id', $invoice->id)->where('product_id', $item->product_id)->where('movement_type', 'sale')->latest('id')->first();
     }

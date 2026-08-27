@@ -52,6 +52,7 @@ use App\Http\Controllers\CommandCenter\Crm\CrmSupportTicketController;
 use App\Http\Controllers\CommandCenter\Crm\CustomerPortalAccessController as CrmCustomerPortalAccessController;
 use App\Http\Controllers\CommandCenter\Crm\DemoScheduleController;
 use App\Http\Controllers\CommandCenter\Crm\FollowUpController;
+use App\Http\Controllers\CommandCenter\Crm\InvoiceAmendmentController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceReminderSettingsController;
 use App\Http\Controllers\CommandCenter\Crm\InvoiceTemplateController;
@@ -563,6 +564,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::post('invoices/reminders/settings/restore-defaults', [InvoiceReminderSettingsController::class, 'restore'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings.restore');
         Route::get('invoices/customers/search', [InvoiceController::class, 'customers'])->middleware('can:sales.invoices.create')->name('invoices.customers.search');
         Route::get('invoices/products/search', [InvoiceController::class, 'products'])->middleware('can:sales.invoices.create')->name('invoices.products.search');
+        Route::get('invoices/amendments/products/search', [InvoiceController::class, 'products'])->middleware('can:sales.invoices.amend')->name('invoices.amendments.products.search');
         Route::post('invoices/customers', [InvoiceController::class, 'quickCustomer'])->middleware(['can:sales.invoices.create', 'can:crm.customers.create', 'throttle:20,1'])->name('invoices.customers.store');
         Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('can:sales.invoices.create')->name('invoices.create');
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware('can:sales.invoices.create')->name('invoices.store');
@@ -572,6 +574,8 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('quotations/{quotation}/invoices/create', [InvoiceController::class, 'createFromQuotation'])->middleware('can:sales.invoices.create')->name('invoices.create-from-quotation');
         Route::post('quotations/{quotation}/invoices', [InvoiceController::class, 'storeFromQuotation'])->middleware('can:sales.invoices.create')->name('invoices.store-from-quotation');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('can:sales.invoices.view')->name('invoices.show');
+        Route::get('invoices/{invoice}/amend', [InvoiceAmendmentController::class, 'create'])->middleware('can:sales.invoices.amend')->name('invoices.amendments.create');
+        Route::post('invoices/{invoice}/amendments', [InvoiceAmendmentController::class, 'store'])->middleware(['can:sales.invoices.amend', 'throttle:10,1'])->name('invoices.amendments.store');
         Route::get('invoices/{invoice}/returns/create', [CrmInvoiceReturnController::class, 'create'])->middleware('can:sales.returns.create')->name('invoices.returns.create');
         Route::post('invoices/{invoice}/returns', [CrmInvoiceReturnController::class, 'store'])->middleware(['can:sales.returns.finalize', 'throttle:10,1'])->name('invoices.returns.store');
         Route::get('credit-notes/{return}', [CrmInvoiceReturnController::class, 'show'])->middleware('can:sales.returns.view')->name('credit-notes.show');

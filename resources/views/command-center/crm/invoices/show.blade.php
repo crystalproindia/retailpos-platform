@@ -14,6 +14,7 @@
                     <div class="flex flex-wrap items-center gap-3">
                         <p class="text-sm font-semibold text-teal-700 dark:text-teal-300">{{ $invoice->invoice_number }}</p>
                         <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ $invoice->isOverdue() ? 'Overdue' : $invoice->status?->label() }}</span>
+                        @if((int) $invoice->amendment_version > 1)<span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-200">Amended · Version {{ $invoice->amendment_version }}</span>@endif
                     </div>
                     <h1 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $invoice->billing_company ?: $invoice->billing_name }}</h1>
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Due {{ $invoice->due_date?->format('d M Y') ?? 'not set' }} · {{ $invoice->currency }} {{ number_format((float) $invoice->balance_due, 2) }} outstanding</p>
@@ -36,6 +37,11 @@
                             <button class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-300 dark:text-slate-950">Issue invoice</button>
                         </form>
                     @endif
+                    @can('sales.invoices.amend')
+                        @if(in_array($invoice->status?->value, ['issued', 'sent', 'viewed', 'partially_paid', 'paid', 'overdue'], true) && $invoice->return_status !== 'full')
+                            <a href="{{ route('sales.invoices.amendments.create', $invoice) }}" class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 dark:bg-violet-400 dark:text-slate-950 dark:hover:bg-violet-300">Amend invoice</a>
+                        @endif
+                    @endcan
                     <a href="{{ route('sales.invoices.print', $invoice) }}" target="_blank" rel="noopener" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Print</a>
                     <a href="{{ route('sales.invoices.pdf', $invoice) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Download PDF</a>
                     @can('sales.returns.create')
@@ -96,6 +102,20 @@
 
         @if($invoice->status?->isEditable() && $creditLimitExceeded)
             <section class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p class="font-semibold">Credit limit review required</p><p class="mt-1">Limit: {{ $invoice->currency }} {{ number_format((float)$invoice->customer->credit_limit,2) }} · Current net exposure: {{ $invoice->currency }} {{ number_format($financeSummary['net_exposure']/100,2) }} · Projected: {{ $invoice->currency }} {{ number_format(($financeSummary['net_exposure']/100)+(float)$invoice->grand_total,2) }}.</p>@cannot('finance.credit-limits.override')<p class="mt-2">Ask an authorized manager to review this invoice.</p>@endcannot @error('credit_limit')<p class="mt-2 font-semibold">{{ $message }}</p>@enderror @error('credit_limit_override_reason')<p class="mt-2 font-semibold">{{ $message }}</p>@enderror</section>
+        @endif
+
+        @if($invoice->amendments->isNotEmpty())
+            <section class="overflow-hidden rounded-lg border border-violet-200 bg-white shadow-sm dark:border-violet-900 dark:bg-slate-900">
+                <div class="border-b border-violet-100 bg-violet-50/70 p-5 dark:border-violet-900 dark:bg-violet-950/25"><h2 class="font-semibold text-slate-950 dark:text-white">Amendment History</h2><p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Confirmed additions are permanent. Corrections to original lines use a return or credit note.</p></div>
+                <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @foreach($invoice->amendments as $amendment)
+                        <article class="p-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="font-semibold text-slate-950 dark:text-white">Version {{ $amendment->version_to }} · {{ $amendment->finalized_at->format('d M Y, H:i') }}</p><p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ $amendment->reason }}</p><p class="mt-1 text-xs text-slate-500">Confirmed by {{ $amendment->creator?->name ?? 'System' }}</p></div><div class="text-left sm:text-right"><p class="text-sm font-semibold text-violet-700 dark:text-violet-300">+ {{ $invoice->currency }} {{ number_format((float) $amendment->amount_added, 2) }}</p><p class="mt-1 text-xs text-slate-500">Updated total {{ $invoice->currency }} {{ number_format((float) $amendment->amount_after, 2) }}</p></div></div>
+                            <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">@foreach($amendment->items as $item)<div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800"><p class="font-medium text-slate-950 dark:text-white">{{ $item->name_snapshot }}</p><p class="mt-1 text-xs text-slate-500">{{ $item->quantity_snapshot }} × {{ $invoice->currency }} {{ number_format((float) $item->unit_price_snapshot, 2) }} · Tax {{ $invoice->currency }} {{ number_format((float) $item->tax_snapshot, 2) }}</p></div>@endforeach</div>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
         @endif
 
         <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

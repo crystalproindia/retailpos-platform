@@ -135,7 +135,7 @@ class InvoiceController extends Controller
         $record = $service->refreshStatus($invoices->find($request->user(), $invoice));
         $setting = $reminderSettings->ensure($request->user()->company);
 
-        return view('command-center.crm.invoices.show', ['invoice' => $record->load(['items.returnItems.crmInvoiceReturn', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'customer', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null]);
+        return view('command-center.crm.invoices.show', ['invoice' => $record->load(['items.returnItems.crmInvoiceReturn', 'amendments.items', 'amendments.creator', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'customer', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null]);
     }
 
     public function issue(Request $request, InvoiceRepository $invoices, InvoiceService $service, int $invoice): RedirectResponse

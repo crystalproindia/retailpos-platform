@@ -228,6 +228,19 @@ class StockService
         return $this->recordExternalMovement($user, $data, 'purchase_return', 'out');
     }
 
+    /** @param array<string, mixed> $data */
+    public function recordSale(User $user, array $data): StockMovement
+    {
+        if (! empty($data['crm_invoice_item_id'])) {
+            $existing = StockMovement::query()->where('crm_invoice_item_id', $data['crm_invoice_item_id'])->first();
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        return $this->recordExternalMovement($user, $data, 'sale', 'out');
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -259,6 +272,7 @@ class StockService
                 'inventory_batch_id' => $data['inventory_batch_id'] ?? null,
                 'inventory_serial_number_id' => $data['inventory_serial_number_id'] ?? null,
                 'product_id' => $product->id,
+                'crm_invoice_item_id' => $data['crm_invoice_item_id'] ?? null,
                 'movement_type' => $movementType,
                 'direction' => $direction,
                 'quantity' => $quantity,

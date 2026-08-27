@@ -263,6 +263,7 @@ return [
         'sales.invoices.view' => $crmUserRoles,
         'sales.invoices.create' => $crmUserRoles,
         'sales.invoices.update' => $crmManagementRoles,
+        'sales.invoices.amend' => $crmManagementRoles,
         'sales.invoices.issue' => $crmUserRoles,
         'sales.invoices.send' => $crmUserRoles,
         'sales.invoices.cancel' => $crmManagementRoles,

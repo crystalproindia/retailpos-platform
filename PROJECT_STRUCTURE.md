@@ -3292,3 +3292,9 @@ Internal recipients are tenant scoped. Administrators receive company alerts; ma
 The Notification Center supports category filtering, read/unread actions, a responsive bell dropdown, and a friendly all-caught-up state. Administrators manage company rules at `Notifications > Notifications & Automation`; configuration changes use the existing audit logger. The Owner Command Center can surface unread authorized alert cards, while deterministic AI context can summarize active condition categories without inventing facts.
 
 WhatsApp is intentionally inactive. Existing channel abstractions remain the future extension point, but Phase 1 adds no provider, credentials, API calls, customer campaign, or automatic WhatsApp delivery.
+
+# Sales Invoice Amendments
+
+Issued CRM invoices use an additive amendment ledger rather than reopening the draft editor. `InvoiceAmendmentService` locks and version-checks the invoice, reuses invoice/tax/cost calculations, creates ordinary returnable invoice lines, posts explicit item-linked stock movements for tracked products, refreshes the existing finance balance, and records one audit event inside a single transaction. Tenant-scoped idempotency prevents duplicate retries.
+
+The additive `2026_08_29_010000_create_crm_invoice_amendments.php` migration creates `crm_invoice_amendments` and `crm_invoice_amendment_items`, adds version metadata to invoices, links added invoice items to their amendment, and links CRM product sale movements to the exact invoice item. Draft editing, historical invoice lines, payments, credit notes, and original snapshots remain unchanged. See `docs/sales-invoice-amendments.md` for lifecycle, security, calculation, stock, return, PDF, and limitation details.

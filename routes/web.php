@@ -576,6 +576,8 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('can:sales.invoices.view')->name('invoices.show');
         Route::get('invoices/{invoice}/amend', [InvoiceAmendmentController::class, 'create'])->middleware('can:sales.invoices.amend')->name('invoices.amendments.create');
         Route::post('invoices/{invoice}/amendments', [InvoiceAmendmentController::class, 'store'])->middleware(['can:sales.invoices.amend', 'throttle:10,1'])->name('invoices.amendments.store');
+        Route::get('invoices/{invoice}/amendments/overall-discount/preview', [InvoiceAmendmentController::class, 'overallDiscountPreview'])->middleware('can:sales.invoices.amend')->name('invoices.amendments.overall-discount.preview');
+        Route::post('invoices/{invoice}/amendments/overall-discount', [InvoiceAmendmentController::class, 'storeOverallDiscount'])->middleware(['can:sales.invoices.amend', 'throttle:10,1'])->name('invoices.amendments.overall-discount.store');
         Route::get('invoices/{invoice}/returns/create', [CrmInvoiceReturnController::class, 'create'])->middleware('can:sales.returns.create')->name('invoices.returns.create');
         Route::post('invoices/{invoice}/returns', [CrmInvoiceReturnController::class, 'store'])->middleware(['can:sales.returns.finalize', 'throttle:10,1'])->name('invoices.returns.store');
         Route::get('credit-notes/{return}', [CrmInvoiceReturnController::class, 'show'])->middleware('can:sales.returns.view')->name('credit-notes.show');

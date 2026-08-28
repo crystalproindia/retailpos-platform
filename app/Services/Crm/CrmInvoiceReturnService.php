@@ -170,7 +170,21 @@ class CrmInvoiceReturnService
             if ($restock && ! $this->originalStockMovement($invoice, $item)) {
                 throw ValidationException::withMessages(['items' => "{$item->name} cannot be restocked because the original invoice has no authoritative stock movement."]);
             }
-            $proRate = fn (string $field, int $fallback = 0): int => $this->proRated($this->minor((string) ($item->{$field} ?? $fallback)), $original, $previous, $returning);
+            $allocations = DB::table('crm_invoice_amendment_allocations')->where('invoice_item_id', $item->id)
+                ->selectRaw('COALESCE(SUM(taxable_discount), 0) as taxable_discount, COALESCE(SUM(tax_reduction), 0) as tax_reduction, COALESCE(SUM(cgst_reduction), 0) as cgst_reduction, COALESCE(SUM(sgst_reduction), 0) as sgst_reduction, COALESCE(SUM(igst_reduction), 0) as igst_reduction, COALESCE(SUM(cess_reduction), 0) as cess_reduction, COALESCE(SUM(total_reduction), 0) as total_reduction')->first();
+            $effective = [
+                'gross_sales_snapshot' => $this->minor((string) ($item->gross_sales_snapshot ?? ($item->line_subtotal + $item->discount_amount))),
+                'discount_amount' => $this->minor((string) $item->discount_amount) + $this->minor($allocations->taxable_discount),
+                'net_sales_snapshot' => $this->minor((string) ($item->net_sales_snapshot ?? $item->line_subtotal)) - $this->minor($allocations->taxable_discount),
+                'tax_amount' => $this->minor((string) $item->tax_amount) - $this->minor($allocations->tax_reduction),
+                'cgst_amount' => $this->minor((string) $item->cgst_amount) - $this->minor($allocations->cgst_reduction),
+                'sgst_amount' => $this->minor((string) $item->sgst_amount) - $this->minor($allocations->sgst_reduction),
+                'igst_amount' => $this->minor((string) $item->igst_amount) - $this->minor($allocations->igst_reduction),
+                'cess_amount' => $this->minor((string) $item->cess_amount) - $this->minor($allocations->cess_reduction),
+                'line_total' => $this->minor((string) $item->line_total) - $this->minor($allocations->total_reduction),
+                'total_cost_snapshot' => $this->minor((string) ($item->total_cost_snapshot ?? '0.00')),
+            ];
+            $proRate = fn (string $field, int $fallback = 0): int => $this->proRated($effective[$field] ?? $this->minor((string) ($item->{$field} ?? $fallback)), $original, $previous, $returning);
             $gross = $proRate('gross_sales_snapshot', $this->minor((string) $item->line_subtotal) + $this->minor((string) $item->discount_amount));
             $discount = $proRate('discount_amount');
             $taxable = $proRate('net_sales_snapshot', $this->minor((string) $item->line_subtotal));

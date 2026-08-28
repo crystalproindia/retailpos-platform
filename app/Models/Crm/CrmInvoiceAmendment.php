@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['company_id', 'branch_id', 'invoice_id', 'version_from', 'version_to', 'reason', 'amount_before', 'subtotal_added', 'discount_added', 'taxable_added', 'tax_added', 'cgst_added', 'sgst_added', 'igst_added', 'cess_added', 'amount_added', 'amount_after', 'idempotency_key', 'created_by', 'finalized_by', 'finalized_at'])]
+#[Fillable(['company_id', 'branch_id', 'invoice_id', 'amendment_type', 'version_from', 'version_to', 'reason', 'discount_type', 'discount_value', 'amount_before', 'subtotal_added', 'discount_added', 'taxable_added', 'tax_added', 'cgst_added', 'sgst_added', 'igst_added', 'cess_added', 'amount_added', 'amount_after', 'idempotency_key', 'created_by', 'finalized_by', 'finalized_at'])]
 class CrmInvoiceAmendment extends Model
 {
     protected function casts(): array
@@ -19,7 +19,7 @@ class CrmInvoiceAmendment extends Model
             'amount_before' => 'decimal:2', 'subtotal_added' => 'decimal:2', 'discount_added' => 'decimal:2',
             'taxable_added' => 'decimal:2', 'tax_added' => 'decimal:2', 'cgst_added' => 'decimal:2',
             'sgst_added' => 'decimal:2', 'igst_added' => 'decimal:2', 'cess_added' => 'decimal:2',
-            'amount_added' => 'decimal:2', 'amount_after' => 'decimal:2', 'finalized_at' => 'datetime',
+            'amount_added' => 'decimal:2', 'amount_after' => 'decimal:2', 'discount_value' => 'decimal:3', 'finalized_at' => 'datetime',
         ];
     }
 
@@ -52,4 +52,6 @@ class CrmInvoiceAmendment extends Model
     {
         return $this->hasMany(CrmInvoiceAmendmentItem::class, 'amendment_id');
     }
+
+    public function allocations(): HasMany { return $this->hasMany(CrmInvoiceAmendmentAllocation::class, 'amendment_id'); }
 }

@@ -253,6 +253,50 @@ class SalesInvoiceAmendmentTest extends TestCase
         $this->assertSame(15900, collect($context['facts'])->firstWhere('label', 'Customers owe')['value']);
     }
 
+    public function test_overall_discount_is_immutable_allocated_and_composes_with_additions(): void
+    {
+        $fixture = $this->fixture();
+        $key = (string) Str::uuid();
+        $discount = $this->overallDiscount($fixture, 'percentage', '10.000', $key);
+        $invoice = $fixture['invoice']->fresh();
+        $this->assertSame('10.00', $invoice->overall_discount_total);
+        $this->assertSame('10.00', $invoice->discount_total);
+        $this->assertSame('90.00', $invoice->taxable_total);
+        $this->assertSame('90.00', $invoice->grand_total);
+        $this->assertSame('-10.00', $discount->amount_added);
+        $this->assertSame('overall_discount', $discount->amendment_type);
+        $this->assertSame('10.00', $discount->allocations()->sole()->taxable_discount);
+        $this->assertSame('100.00', $fixture['original']->fresh()->line_subtotal);
+
+        $duplicate = $this->overallDiscount($fixture, 'percentage', '10.000', $key, 1);
+        $this->assertSame($discount->id, $duplicate->id);
+        $addition = $this->amend($fixture, $this->serviceLine(), expectedVersion: 2);
+        $this->assertSame('149.00', $fixture['invoice']->fresh()->grand_total);
+        $this->assertSame(3, $addition->version_to);
+        $this->assertDatabaseCount('crm_invoice_amendment_allocations', 1);
+    }
+
+    public function test_overall_discount_updates_profitability_and_future_credit_notes_using_effective_line_values(): void
+    {
+        $fixture = $this->fixture();
+        $this->amend($fixture, $this->productLine($fixture), warehouseId: $fixture['warehouse']->id);
+        $this->overallDiscount($fixture, 'fixed', '30.00', expectedVersion: 2);
+        $report = app(RetailReportingService::class)->summary($fixture['manager'], ['outlet_id' => $fixture['branch']->id, 'date_from' => today()->toDateString(), 'date_to' => today()->toDateString(), 'source' => 'crm']);
+        $this->assertSame(17000, $report['reports']['profitability']['net_sales']);
+        $this->assertSame(2500, $report['reports']['profitability']['gross_profit']);
+        $credit = app(CrmInvoiceReturnService::class)->finalize($fixture['manager'], $fixture['invoice']->id, ['idempotency_key' => (string) Str::uuid(), 'reason_code' => 'customer_return', 'items' => [['invoice_item_id' => $fixture['original']->id, 'return_quantity' => '1.000', 'restock' => false]]]);
+        $this->assertSame('85.00', $credit->credit_total);
+        $this->assertSame('15.00', $credit->discount_total);
+        $this->actingAs($fixture['manager'])->get(route('sales.invoices.pdf', $fixture['invoice']->fresh()))->assertOk();
+        $this->assertStringContainsString('Overall discount', view('pdf.crm-invoice', ['invoice' => $fixture['invoice']->fresh()->load(['company', 'items']), 'render' => app(InvoiceTemplateService::class)->renderData($fixture['invoice']->fresh())])->render());
+    }
+
+    /** @param array<string, mixed> $fixture */
+    private function overallDiscount(array $fixture, string $type, string $value, ?string $key = null, int $expectedVersion = 1): CrmInvoiceAmendment
+    {
+        return app(InvoiceAmendmentService::class)->finalizeOverallDiscount($fixture['manager'], $fixture['invoice']->id, ['expected_version' => $expectedVersion, 'idempotency_key' => $key ?? (string) Str::uuid(), 'reason' => 'Commercial approval for invoice-wide discount', 'discount_type' => $type, 'discount_value' => $value]);
+    }
+
     /** @return array<string, mixed> */
     private function fixture(InvoiceStatus $status = InvoiceStatus::Issued): array
     {

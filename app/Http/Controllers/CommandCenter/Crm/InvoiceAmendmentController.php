@@ -4,6 +4,7 @@ namespace App\Http\Controllers\CommandCenter\Crm;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\StoreInvoiceAmendmentRequest;
+use App\Http\Requests\Crm\StoreInvoiceOverallDiscountRequest;
 use App\Repositories\Crm\InvoiceRepository;
 use App\Services\Crm\InvoiceAmendmentService;
 use App\Services\Inventory\InventoryLocationAccessService;
@@ -30,5 +31,19 @@ class InvoiceAmendmentController extends Controller
 
         return redirect()->route('sales.invoices.show', $amendment->invoice_id)
             ->with('status', 'Invoice amendment confirmed. Version '.$amendment->version_to.' is now authoritative.');
+    }
+
+    public function storeOverallDiscount(StoreInvoiceOverallDiscountRequest $request, InvoiceAmendmentService $amendments, int $invoice): RedirectResponse
+    {
+        $amendment = $amendments->finalizeOverallDiscount($request->user(), $invoice, $request->validated());
+        return redirect()->route('sales.invoices.show', $amendment->invoice_id)
+            ->with('status', 'Overall invoice discount confirmed. Version '.$amendment->version_to.' is now authoritative.');
+    }
+
+    public function overallDiscountPreview(Request $request, InvoiceRepository $invoices, InvoiceAmendmentService $amendments, int $invoice): \Illuminate\Http\JsonResponse
+    {
+        $record = $invoices->find($request->user(), $invoice); $amendments->assertEligible($record, $request->user());
+        $data = $request->validate(['discount_type' => ['required', 'in:percentage,fixed'], 'discount_value' => ['required', 'numeric', 'gt:0']]);
+        return response()->json($amendments->overallDiscountPreview($record, $record->items()->get(), $data['discount_type'], $data['discount_value']));
     }
 }

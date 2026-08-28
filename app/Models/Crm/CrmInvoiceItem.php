@@ -29,4 +29,6 @@ class CrmInvoiceItem extends Model
     {
         return $this->hasMany(CrmInvoiceReturnItem::class, 'original_invoice_item_id');
     }
+
+    public function amendmentAllocations(): HasMany { return $this->hasMany(CrmInvoiceAmendmentAllocation::class, 'invoice_item_id'); }
 }

@@ -16,6 +16,7 @@ use App\Services\Crm\CrmCustomerService;
 use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceReminderService;
 use App\Services\Crm\InvoiceReminderSettingsService;
+use App\Services\Crm\InvoiceReceivableSummaryService;
 use App\Services\Crm\InvoiceService;
 use App\Services\Crm\InvoiceShareService;
 use App\Services\Crm\PublicInvoiceService;
@@ -130,12 +131,13 @@ class InvoiceController extends Controller
         return redirect()->route('sales.invoices.show', $record)->with('status', 'Draft invoice updated.');
     }
 
-    public function show(Request $request, InvoiceRepository $invoices, InvoiceService $service, InvoiceReminderSettingsService $reminderSettings, ReceivableService $receivables, int $invoice): View
+    public function show(Request $request, InvoiceRepository $invoices, InvoiceService $service, InvoiceReminderSettingsService $reminderSettings, ReceivableService $receivables, InvoiceReceivableSummaryService $receivableSummary, int $invoice): View
     {
         $record = $service->refreshStatus($invoices->find($request->user(), $invoice));
         $setting = $reminderSettings->ensure($request->user()->company);
 
-        return view('command-center.crm.invoices.show', ['invoice' => $record->load(['items.returnItems.crmInvoiceReturn', 'amendments.items', 'amendments.creator', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'customer', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null]);
+        $record->load(['items.returnItems.crmInvoiceReturn', 'amendments.items', 'amendments.creator', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'customer', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']);
+        return view('command-center.crm.invoices.show', ['invoice' => $record, 'receivable' => $receivableSummary->forInvoice($record), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null]);
     }
 
     public function issue(Request $request, InvoiceRepository $invoices, InvoiceService $service, int $invoice): RedirectResponse
@@ -150,7 +152,8 @@ class InvoiceController extends Controller
     {
         $payment = $service->recordPayment($invoices->find($request->user(), $invoice), $request->user(), $request->validated());
 
-        return back()->with('status', 'Payment '.$payment->receipt_number.' recorded.');
+        $updated = $invoices->find($request->user(), $invoice);
+        return back()->with('status', 'Payment recorded successfully. '.$updated->currency.' '.number_format((float) $payment->amount, 2).' received. Remaining balance: '.$updated->currency.' '.number_format((float) max(0, $updated->balance_due), 2).'.');
     }
 
     public function clear(Request $request, InvoiceRepository $invoices, InvoiceService $service, int $invoice, int $payment): RedirectResponse
@@ -187,7 +190,7 @@ class InvoiceController extends Controller
     {
         $record = $invoices->find($request->user(), $invoice);
 
-        return $pdf->document($record)->download($pdf->filename($record));
+        return $pdf->premiumCustomerDocument($record)->download($pdf->filename($record));
     }
 
     public function receipt(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, int $invoice, int $payment): Response

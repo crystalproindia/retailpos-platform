@@ -17,6 +17,7 @@ use App\Repositories\Crm\CrmCustomerRepository;
 use App\Services\AuditLogger;
 use App\Services\Branding\CompanyBrandingService;
 use App\Services\Finance\CreditLimitService;
+use App\Services\Finance\CrmPaymentNumberService;
 use App\Services\Finance\FinanceBalanceService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Saas\UsageService;
@@ -37,6 +38,7 @@ class InvoiceService
         private readonly SalesDocumentPresentationService $presentations,
         private readonly FinanceBalanceService $financeBalances,
         private readonly CreditLimitService $creditLimits,
+        private readonly CrmPaymentNumberService $paymentNumbers,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -196,9 +198,9 @@ class InvoiceService
                 return $existing;
             }
             $payment = $invoice->payments()->create(Arr::only($data, ['amount', 'currency', 'payment_date', 'payment_method', 'transaction_reference', 'bank_name', 'cheque_number', 'notes', 'status']) + [
-                'company_id' => $invoice->company_id, 'branch_id' => $invoice->branch_id, 'payment_reference' => $this->nextPaymentReference($invoice->company_id),
+                'company_id' => $invoice->company_id, 'branch_id' => $invoice->branch_id, 'payment_reference' => $this->paymentNumbers->nextPaymentReference($invoice->company_id),
                 'customer_id' => $invoice->customer_id, 'allocated_amount' => $data['amount'], 'unallocated_amount' => '0.00',
-                'receipt_number' => $this->nextReceiptNumber($invoice->company_id), 'recorded_by' => $user->id,
+                'receipt_number' => $this->paymentNumbers->nextReceiptNumber(), 'recorded_by' => $user->id,
                 'cleared_by' => ($data['status'] ?? 'recorded') === 'cleared' ? $user->id : null,
                 'cleared_at' => ($data['status'] ?? 'recorded') === 'cleared' ? now() : null, 'idempotency_key' => $key,
             ]);
@@ -406,16 +408,6 @@ class InvoiceService
             'signatory_name_snapshot' => $show ? $signature['name'] : null,
             'signatory_designation_snapshot' => $show ? $signature['designation'] : null,
         ];
-    }
-
-    private function nextPaymentReference(int $companyId): string
-    {
-        return 'RPOS-PAY-'.now()->format('Y').'-'.str_pad((string) (CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1), 5, '0', STR_PAD_LEFT);
-    }
-
-    private function nextReceiptNumber(int $companyId): string
-    {
-        return 'RPOS-RCPT-'.now()->format('Y').'-'.str_pad((string) (CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1), 5, '0', STR_PAD_LEFT);
     }
 
     private function recordActivity(CrmInvoice $invoice, User $user, string $subject): void

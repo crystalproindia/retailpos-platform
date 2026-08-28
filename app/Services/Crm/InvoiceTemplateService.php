@@ -23,6 +23,7 @@ class InvoiceTemplateService
         'corporate_split', 'premium_business', 'commercial_services', 'consultation_minimal', 'client_billing_modern', 'freelancer_blue',
         'creative_studio', 'licensing_premium', 'publishing_royalty', 'construction_blue', 'contractor_red', 'medical_consultation',
         'catering_modern', 'rental_orange', 'a5_consultation', 'a5_creative', 'thermal_80_service', 'thermal_58_retail',
+        'retailpos_premium_blue', 'executive_navy_receivable', 'modern_minimal_receivable', 'professional_indigo_receivable', 'emerald_finance_receivable', 'slate_professional_receivable', 'royal_blue_services_receivable', 'warm_corporate_receivable', 'compact_ledger_pro_receivable',
     ];
 
     /** @return array<string,array<string,mixed>> */
@@ -34,6 +35,8 @@ class InvoiceTemplateService
     public function __construct(
         private readonly InvoiceBalancePresentationService $balances,
         private readonly InvoicePaymentQrService $paymentQr,
+        private readonly InvoiceReceivableSummaryService $receivables,
+        private readonly InvoiceAmountInWordsService $amountInWords,
         private readonly CompanyBrandingService $branding,
         private readonly SalesDocumentPresentationService $presentations,
         private readonly InvoiceWatermarkService $watermarks,
@@ -191,6 +194,8 @@ class InvoiceTemplateService
             'item_chunks' => $items->chunk(50),
             'tax_rows' => array_values($rows),
             'balance' => $balance,
+            'receivable' => $this->receivables->forInvoice($invoice),
+            'amount_in_words' => $this->amountInWords->format($invoice->currency, $invoice->grand_total),
             'payment_qr_uri' => $paymentQr['payload'] ?? null,
             'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null,
             'branding' => $this->brandingFor($invoice->company, $setting),

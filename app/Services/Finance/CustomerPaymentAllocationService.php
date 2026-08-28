@@ -17,6 +17,7 @@ class CustomerPaymentAllocationService
         private readonly ReceivableService $receivables,
         private readonly FinanceBalanceService $balances,
         private readonly AuditLogger $audit,
+        private readonly CrmPaymentNumberService $paymentNumbers,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -39,8 +40,8 @@ class CustomerPaymentAllocationService
                 'branch_id' => $user->branch_id,
                 'invoice_id' => null,
                 'customer_id' => $customer->id,
-                'payment_reference' => $this->nextReference($user->company_id, 'RPOS-PAY'),
-                'receipt_number' => $this->nextReference($user->company_id, 'RPOS-RCPT'),
+                'payment_reference' => $this->paymentNumbers->nextPaymentReference($user->company_id),
+                'receipt_number' => $this->paymentNumbers->nextReceiptNumber(),
                 'amount' => FinanceAmount::decimal($amount),
                 'allocated_amount' => '0.00',
                 'unallocated_amount' => FinanceAmount::decimal($amount),
@@ -120,10 +121,4 @@ class CustomerPaymentAllocationService
         return $result;
     }
 
-    private function nextReference(int $companyId, string $prefix): string
-    {
-        $number = CrmInvoicePayment::query()->where('company_id', $companyId)->lockForUpdate()->count() + 1;
-
-        return $prefix.'-'.now()->format('Y').'-'.str_pad((string) $number, 5, '0', STR_PAD_LEFT);
-    }
 }

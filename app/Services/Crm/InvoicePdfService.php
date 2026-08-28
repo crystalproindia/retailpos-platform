@@ -27,6 +27,24 @@ class InvoicePdfService
         return $this->applyPaper($document, $render, $invoice);
     }
 
+    /**
+     * Render the dedicated customer-facing A4 document used by Sales Invoice
+     * downloads. Print, preview, and compact document formats deliberately
+     * continue to use the selected invoice template.
+     */
+    public function premiumCustomerDocument(CrmInvoice $invoice): DompdfDocument
+    {
+        $render = $this->templates->renderData($invoice->loadMissing(['company', 'items', 'opportunity', 'quotation']), [
+            'paper_format' => 'a4',
+            'orientation' => 'portrait',
+        ]);
+
+        return Pdf::loadView('invoice-templates.premium-customer-download', [
+            'invoice' => $invoice,
+            'render' => $render,
+        ])->setPaper('a4', 'portrait');
+    }
+
     /** @return array{contents: string, filename: string, mime: string} */
     public function attachment(CrmInvoice $invoice): array
     {

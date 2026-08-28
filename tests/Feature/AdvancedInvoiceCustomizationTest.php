@@ -104,7 +104,7 @@ class AdvancedInvoiceCustomizationTest extends TestCase
         $registry = app(InvoiceTemplateRegistry::class);
         $definitions = $registry->all();
 
-        $this->assertCount(44, $definitions);
+        $this->assertCount(53, $definitions);
         $this->assertSame(array_keys($definitions), array_unique(array_keys($definitions)));
         $catalogSignatures = [];
         foreach ($definitions as $definition) {
@@ -170,7 +170,9 @@ class AdvancedInvoiceCustomizationTest extends TestCase
             $this->assertStringNotContainsString('GSTIN', $body, $key);
             $this->assertStringNotContainsString('GST summary', $body, $key);
 
-            if (str_starts_with($definition['view'], 'invoice-templates.layouts.')) {
+            if (str_starts_with($definition['view'], 'invoice-templates.layouts.premium.')) {
+                $this->assertStringContainsString('layout-', $markup, $key);
+            } elseif (str_starts_with($definition['view'], 'invoice-templates.layouts.')) {
                 $this->assertStringContainsString('variant-'.$definition['variant'], $markup, $key);
             }
 
@@ -185,7 +187,7 @@ class AdvancedInvoiceCustomizationTest extends TestCase
             }
         }
 
-        $this->assertCount(44, array_unique($fingerprints));
+        $this->assertCount(53, array_unique($fingerprints));
     }
 
     public function test_document_numbering_settings_are_tenant_isolated_and_reject_unsafe_prefixes(): void

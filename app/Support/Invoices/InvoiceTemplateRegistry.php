@@ -6,6 +6,23 @@ class InvoiceTemplateRegistry
 {
     public const FORMATS = ['a4', 'a5', 'thermal_80', 'thermal_58'];
 
+    /**
+     * Customer downloads intentionally support a curated A4-only set. Print
+     * settings retain their wider A4, A5, and thermal catalogue.
+     */
+    public const DOWNLOAD_PDF_KEYS = [
+        'retailpos_premium_blue',
+        'executive_navy_receivable',
+        'modern_minimal_receivable',
+        'professional_indigo_receivable',
+        'emerald_finance_receivable',
+        'slate_professional_receivable',
+        'royal_blue_services_receivable',
+        'warm_corporate_receivable',
+        'compact_ledger_pro_receivable',
+        'structured_gst_grid',
+    ];
+
     /** @return array<string,array<string,mixed>> */
     public function all(): array
     {
@@ -102,6 +119,31 @@ class InvoiceTemplateRegistry
     public function defaultFor(string $format): string
     {
         return array_key_first($this->forFormat($format)) ?? 'structured_gst_grid';
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    public function downloadPdfDesigns(): array
+    {
+        $all = $this->all();
+        $designs = [];
+
+        foreach (self::DOWNLOAD_PDF_KEYS as $key) {
+            if (($all[$key]['paper_format'] ?? null) === 'a4') {
+                $designs[$key] = $all[$key];
+            }
+        }
+
+        return $designs;
+    }
+
+    public function isDownloadPdfDesign(string $key): bool
+    {
+        return array_key_exists($key, $this->downloadPdfDesigns());
+    }
+
+    public function defaultDownloadPdfDesign(): string
+    {
+        return 'retailpos_premium_blue';
     }
 
     /** @return list<string> */

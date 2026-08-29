@@ -557,6 +557,7 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('invoices/designs', [InvoiceTemplateController::class, 'index'])->middleware('can:sales.invoices.view')->name('invoices.templates.index');
         Route::put('invoices/designs', [InvoiceTemplateController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.templates.update');
         Route::get('invoices/designs/preview/{invoice}', [InvoiceTemplateController::class, 'preview'])->middleware('can:sales.invoices.view')->name('invoices.templates.preview');
+        Route::get('invoices/designs/download-preview/{invoice}', [InvoiceTemplateController::class, 'downloadPreview'])->middleware('can:sales.invoices.view')->name('invoices.templates.download-preview');
         Route::get('invoices/document-settings', [SalesDocumentSettingsController::class, 'index'])->middleware('can:sales.invoices.update')->name('invoices.document-settings.index');
         Route::put('invoices/document-settings', [SalesDocumentSettingsController::class, 'update'])->middleware('can:sales.invoices.update')->name('invoices.document-settings.update');
         Route::get('invoices/reminders/settings', [InvoiceReminderSettingsController::class, 'index'])->middleware('can:sales.reminders.manage')->name('invoices.reminders.settings');

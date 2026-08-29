@@ -45,6 +45,29 @@ class InvoicePdfService
         ])->setPaper('a4', 'portrait');
     }
 
+    /**
+     * Customer downloads use the tenant's dedicated A4 design preference.
+     * Printing and public document paths deliberately continue to use the
+     * independent print-template setting.
+     */
+    public function downloadDocument(CrmInvoice $invoice, ?string $design = null): DompdfDocument
+    {
+        $design ??= $this->templates->downloadPdfDesign($invoice->company);
+        if (! $this->registry->isDownloadPdfDesign($design)) {
+            $design = $this->registry->defaultDownloadPdfDesign();
+        }
+
+        if ($design === 'retailpos_premium_blue') {
+            return $this->premiumCustomerDocument($invoice);
+        }
+
+        return $this->document($invoice, [
+            'template_key' => $design,
+            'paper_format' => 'a4',
+            'orientation' => 'portrait',
+        ]);
+    }
+
     /** @return array{contents: string, filename: string, mime: string} */
     public function attachment(CrmInvoice $invoice): array
     {

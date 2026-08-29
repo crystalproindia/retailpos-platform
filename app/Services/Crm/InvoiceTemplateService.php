@@ -26,6 +26,8 @@ class InvoiceTemplateService
         'retailpos_premium_blue', 'executive_navy_receivable', 'modern_minimal_receivable', 'professional_indigo_receivable', 'emerald_finance_receivable', 'slate_professional_receivable', 'royal_blue_services_receivable', 'warm_corporate_receivable', 'compact_ledger_pro_receivable',
     ];
 
+    public const DOWNLOAD_PDF_KEYS = InvoiceTemplateRegistry::DOWNLOAD_PDF_KEYS;
+
     /** @return array<string,array<string,mixed>> */
     public function definitions(): array
     {
@@ -49,8 +51,24 @@ class InvoiceTemplateService
         return InvoiceTemplateSetting::firstOrCreate(['company_id' => $company->id], [
             'paper_format' => 'a4',
             'gst_presentation' => 'detailed',
+            'download_pdf_design' => $this->registry->defaultDownloadPdfDesign(),
             'options' => $this->defaultOptions(),
         ])->refresh();
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    public function downloadDefinitions(): array
+    {
+        return $this->registry->downloadPdfDesigns();
+    }
+
+    public function downloadPdfDesign(Company $company): string
+    {
+        $design = (string) $this->setting($company)->download_pdf_design;
+
+        return $this->registry->isDownloadPdfDesign($design)
+            ? $design
+            : $this->registry->defaultDownloadPdfDesign();
     }
 
     /** @return array{data_uri: ?string, source: ?string, show_logo: bool, logo_position: string, logo_size: string, show_company_name: bool} */
@@ -92,10 +110,16 @@ class InvoiceTemplateService
         $previousWatermark = $setting->watermark_path;
         $newWatermark = $watermark ? $this->watermarks->store($watermark, $company->id) : null;
 
+        $downloadPdfDesign = (string) ($data['download_pdf_design'] ?? $setting->download_pdf_design);
+        if (! $this->registry->isDownloadPdfDesign($downloadPdfDesign)) {
+            $downloadPdfDesign = $this->registry->defaultDownloadPdfDesign();
+        }
+
         try {
-            DB::transaction(function () use ($setting, $data, $user, $company, $templateKey, $paperFormat, $orientation, $newWatermark, $removeWatermark, $previousWatermark): void {
+            DB::transaction(function () use ($setting, $data, $user, $company, $templateKey, $paperFormat, $orientation, $downloadPdfDesign, $newWatermark, $removeWatermark, $previousWatermark): void {
                 $setting->update([
                     'template_key' => $templateKey,
+                    'download_pdf_design' => $downloadPdfDesign,
                     'paper_format' => $paperFormat,
                     'brand_color' => $data['brand_color'],
                     'copy_label' => $data['copy_label'],
@@ -123,6 +147,7 @@ class InvoiceTemplateService
                 $this->audit->record('crm.invoice_template.updated', $setting, 'Invoice template settings updated.', [
                     'company_id' => $company->id,
                     'template_key' => $setting->template_key,
+                    'download_pdf_design' => $setting->download_pdf_design,
                     'paper_format' => $setting->paper_format,
                     'payment_details_configured' => (bool) $setting->account_number || (bool) $setting->upi_id || (bool) $setting->payment_url,
                     'watermark_enabled' => $setting->watermark_enabled,

@@ -30,6 +30,7 @@ class InvoiceTemplateController extends Controller
         return view('command-center.crm.invoices.templates', [
             'setting' => $setting,
             'templates' => $templates->definitions(),
+            'downloadTemplates' => $templates->downloadDefinitions(),
             'formats' => InvoiceTemplateRegistry::FORMATS,
             'defaults' => $templates->defaultOptions(),
             'previewInvoice' => $previewInvoice,
@@ -51,6 +52,19 @@ class InvoiceTemplateController extends Controller
         $settings['_preview_live_presentation'] = true;
 
         return $pdf->document($record, $settings)->stream($pdf->filename($record));
+    }
+
+    public function downloadPreview(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, int $invoice): Response
+    {
+        $record = $invoice === 0
+            ? $this->sampleInvoice($request->user()->company)
+            : $invoices->find($request->user(), $invoice);
+        $data = $request->validate([
+            'download_pdf_design' => ['nullable', 'in:'.implode(',', InvoiceTemplateService::DOWNLOAD_PDF_KEYS)],
+        ]);
+        $design = (string) ($data['download_pdf_design'] ?? '');
+
+        return $pdf->downloadDocument($record, $design ?: null)->stream($pdf->filename($record));
     }
 
     public function update(Request $request, InvoiceTemplateService $templates, InvoicePaymentQrService $paymentQr): RedirectResponse
@@ -75,6 +89,7 @@ class InvoiceTemplateController extends Controller
     {
         $rules = [
             'template_key' => [$requireTemplate ? 'required' : 'nullable', 'in:'.implode(',', InvoiceTemplateService::KEYS)],
+            'download_pdf_design' => ['nullable', 'in:'.implode(',', InvoiceTemplateService::DOWNLOAD_PDF_KEYS)],
             // Existing integrations submitted only a template key. The service
             // safely derives its paper format from the registry in that case.
             'paper_format' => ['nullable', 'in:a4,a5,thermal_80,thermal_58'],

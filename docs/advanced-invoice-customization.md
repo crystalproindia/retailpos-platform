@@ -36,6 +36,17 @@ it and limits payment details to a compact UPI, payment-link, or account-number
 line. Replaced files remain while a historical document snapshot references
 them.
 
+Customer-facing Sales Invoice downloads have a separate tenant-scoped A4
+design preference. It is intentionally independent of the print template
+setting, which continues to control standard print, public, A5, and thermal
+output. The supported download designs are Premium Blue, Executive Navy,
+Modern Minimal, Professional Indigo, Emerald Finance, Slate Professional,
+Royal Blue Services, Warm Corporate, Compact Ledger Pro, and Classic GST.
+Invalid or retired stored values safely fall back to Premium Blue. The download
+design is a current presentation preference rather than a financial snapshot:
+it never changes invoice totals, GST, payment records, document numbering, or
+the immutable business-data snapshots already stored with an invoice.
+
 It preserves existing document numbers, GST records, payments, purchasing,
 stock, and Phase S behaviour. A prefix change applies only to the next number
 issued for that tenant and document type. It does not rewrite history.

@@ -190,7 +190,7 @@ class InvoiceController extends Controller
     {
         $record = $invoices->find($request->user(), $invoice);
 
-        return $pdf->premiumCustomerDocument($record)->download($pdf->filename($record));
+        return $pdf->downloadDocument($record)->download($pdf->filename($record));
     }
 
     public function receipt(Request $request, InvoiceRepository $invoices, InvoicePdfService $pdf, int $invoice, int $payment): Response

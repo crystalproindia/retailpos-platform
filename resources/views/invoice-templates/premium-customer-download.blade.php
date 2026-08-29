@@ -11,6 +11,8 @@
         @page { margin: 8mm; }
         body { color:#17223a; font-family:DejaVu Sans; font-size:8.4px; line-height:1.38; }
         table { border-collapse:collapse; width:100%; } th,td { vertical-align:top; } .right { text-align:right; }
+        .invoice-watermark { height:38%; left:15%; opacity:{{ data_get($render, 'watermark.opacity', 0.12) }}; pointer-events:none; position:fixed; text-align:center; top:31%; width:70%; z-index:0; }
+        .invoice-watermark img { display:inline-block; height:100%; max-width:100%; object-fit:contain; }
         .muted { color:#5b6b84; font-size:7.6px; } .accent { color:#1760d3; }
         .top-rule { background:#0c2d5c; height:2px; margin:-8mm -8mm 12px; }
         .header { padding-bottom:14px; } .company-name { color:#071631; font-size:20px; font-weight:bold; line-height:1.05; }

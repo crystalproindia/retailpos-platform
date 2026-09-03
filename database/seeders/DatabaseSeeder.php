@@ -108,6 +108,7 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Notifications\PlatformNotification;
+use App\Services\Finance\ExpenseCategoryProvisioner;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Notifications\DatabaseNotification;
@@ -135,6 +136,8 @@ class DatabaseSeeder extends Seeder
                 'is_active' => true,
             ],
         );
+
+        app(ExpenseCategoryProvisioner::class)->provision($company);
 
         $branch = Branch::updateOrCreate(
             [

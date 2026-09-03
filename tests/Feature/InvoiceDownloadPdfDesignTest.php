@@ -149,6 +149,32 @@ class InvoiceDownloadPdfDesignTest extends TestCase
         $this->assertSame(1, preg_match_all('/\\/Type\\s*\\/Page(?!s)/', $pdf));
     }
 
+    public function test_premium_blue_signature_uses_one_fixed_width_centered_block(): void
+    {
+        [$user, $invoice] = $this->invoice('Signature');
+        Storage::fake('local');
+        $signature = UploadedFile::fake()->image('signature.png', 160, 60);
+        Storage::disk('local')->put('companies/'.$user->company_id.'/branding/signature.png', file_get_contents($signature->getRealPath()));
+        $invoice->update([
+            'show_authorized_signature' => true,
+            'signature_path_snapshot' => 'companies/'.$user->company_id.'/branding/signature.png',
+            'signatory_name_snapshot' => 'Dinesh Kumar',
+            'signatory_designation_snapshot' => 'Authorized Person',
+        ]);
+
+        $fresh = $invoice->fresh()->load(['company', 'items']);
+        $markup = view('invoice-templates.premium-customer-download', [
+            'invoice' => $fresh,
+            'render' => app(InvoiceTemplateService::class)->renderData($fresh, ['paper_format' => 'a4', 'orientation' => 'portrait']),
+        ])->render();
+
+        $this->assertStringContainsString('class="signature-block"', $markup);
+        $this->assertStringContainsString('width="150" align="right"', $markup);
+        $this->assertStringContainsString('class="signature-image"', $markup);
+        $this->assertStringContainsString('class="signature-line"', $markup);
+        $this->assertStringNotContainsString('margin:7px 0 3px auto', $markup);
+    }
+
     /** @return array{User,CrmInvoice} */
     private function invoice(string $prefix, int $lineCount = 1): array
     {

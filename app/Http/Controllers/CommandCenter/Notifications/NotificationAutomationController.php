@@ -30,6 +30,7 @@ class NotificationAutomationController extends Controller
             'low_stock_enabled', 'out_of_stock_enabled', 'reorder_enabled', 'payment_reminders_enabled',
             'customer_payment_emails_enabled', 'quotation_expiry_enabled', 'proforma_expiry_enabled',
             'purchase_reminders_enabled', 'internal_email_enabled', 'daily_summary_enabled', 'weekly_summary_enabled',
+            'monthly_expense_summary_enabled', 'monthly_profit_and_loss_summary_enabled',
         ] as $boolean) {
             $data[$boolean] = $request->boolean($boolean);
         }

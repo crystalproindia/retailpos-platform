@@ -8,6 +8,7 @@ use App\Models\Pos\PosSale;
 use App\Models\Purchases\PurchaseInvoice;
 use App\Models\Purchases\PurchaseReturn;
 use App\Models\User;
+use App\Services\Finance\ProfitAndLossInsightService;
 use App\Services\Finance\PayableService;
 use App\Services\Finance\ReceivableService;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,7 @@ class ExecutiveReportingService
         private readonly ProfitabilityReportingService $profitability,
         private readonly ReceivableService $receivables,
         private readonly PayableService $payables,
+        private readonly ProfitAndLossInsightService $profitAndLoss,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -42,6 +44,14 @@ class ExecutiveReportingService
         $salespeople = $this->salespersonRows($current, $profit);
         $products = $this->productRows($profit);
         $financial = $this->financialPosition($user, $current, $filters);
+        $profitAndLoss = $user->can('finance.profit_and_loss.view')
+            ? $this->profitAndLoss->summary(
+                $user,
+                $current['scope'],
+                $current['range'],
+                $previous ? $previous['range'] : null,
+            )
+            : null;
 
         return [
             'scope' => $current['scope'],
@@ -54,11 +64,12 @@ class ExecutiveReportingService
                 'operations' => $operationsTrend,
             ],
             'financial' => $financial,
+            'profit_and_loss' => $profitAndLoss,
             'gst' => $gst,
             'products' => $products,
             'outlets' => $outlets,
             'salespeople' => $salespeople,
-            'insights' => $this->insights($current, $profit, $gst, $products, $outlets, $financial),
+            'insights' => $this->insights($current, $profit, $gst, $products, $outlets, $financial, $profitAndLoss),
             'profitability_available' => $profit !== null,
             'profitability_complete' => $profit !== null && (int) $profit['unavailable_cost_item_count'] === 0,
         ];
@@ -215,7 +226,7 @@ class ExecutiveReportingService
     }
 
     /** @return array<int, array{tone:string,title:string,message:string,route:string,report:?string}> */
-    private function insights(array $summary, ?array $profit, array $gst, array $products, array $outlets, array $financial): array
+    private function insights(array $summary, ?array $profit, array $gst, array $products, array $outlets, array $financial, ?array $profitAndLoss): array
     {
         $insights = [];
         if ($profit && (float) $profit['revenue_cost_coverage_percent'] < 90) {
@@ -239,6 +250,10 @@ class ExecutiveReportingService
         }
         if ($products['slow'] !== []) {
             $insights[] = $this->insight('neutral', 'Slow-moving stock is visible', count($products['slow']).' low-velocity product(s) are ready for inventory review.', 'reports.show', 'profitability');
+        }
+        if ($profitAndLoss && ($profitAndLoss['top_operating_expense']['amount'] ?? 0) > 0) {
+            $top = $profitAndLoss['top_operating_expense'];
+            $insights[] = $this->insight('neutral', 'Largest operating expense: '.$top['category'], $this->money((int) $top['amount']).' is the largest operating expense in the selected period.', 'finance.profit-and-loss.index', null);
         }
 
         return array_slice($insights, 0, 4);

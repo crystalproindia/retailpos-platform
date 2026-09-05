@@ -13,6 +13,8 @@ use App\Models\Crm\CrmQuotation;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\User;
 use App\Services\Finance\PayableService;
+use App\Services\Finance\FinancialPeriodResolver;
+use App\Services\Finance\ProfitAndLossInsightService;
 use App\Services\Finance\ReceivableService;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Reports\ExecutiveReportingService;
@@ -29,6 +31,8 @@ class NotificationAutomationEvaluator
         private readonly ExecutiveReportingService $executive,
         private readonly ReceivableService $receivables,
         private readonly PayableService $payables,
+        private readonly FinancialPeriodResolver $periods,
+        private readonly ProfitAndLossInsightService $profitAndLoss,
     ) {}
 
     /** @return array<string, array{created:int,recovered:int}> */
@@ -53,6 +57,8 @@ class NotificationAutomationEvaluator
         $results['proforma'] = $this->notifications->sync($company, $setting, 'proforma', $this->proformaConditions($company, $setting));
         $results['purchasing'] = $this->notifications->sync($company, $setting, 'purchasing', $this->purchaseConditions($administrator, $setting));
         $results['owner_summary'] = $this->notifications->sync($company, $setting, 'owner_summary', $this->ownerSummaryConditions($administrator, $setting));
+        $results['monthly_expense_summary'] = $this->notifications->sync($company, $setting, 'monthly_expense_summary', $this->monthlySummaryConditions($administrator, $setting, false));
+        $results['monthly_profit_and_loss_summary'] = $this->notifications->sync($company, $setting, 'monthly_profit_and_loss_summary', $this->monthlySummaryConditions($administrator, $setting, true));
 
         return $results;
     }
@@ -280,6 +286,70 @@ class NotificationAutomationEvaluator
                 'Gross profit' => $profit === null ? 'Cost coverage unavailable' : $this->minorMoney((int) $profit),
                 'Receivables' => $this->minorMoney($receivables),
             ],
+        ]];
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function monthlySummaryConditions(User $administrator, $setting, bool $includeProfitAndLoss): array
+    {
+        $enabled = $includeProfitAndLoss
+            ? $setting->monthly_profit_and_loss_summary_enabled
+            : $setting->monthly_expense_summary_enabled;
+        $timezone = $this->timezone($administrator->company, $setting);
+        $now = CarbonImmutable::now($timezone);
+        $scheduled = CarbonImmutable::parse($now->toDateString().' '.$setting->summary_time, $timezone);
+
+        if (! $enabled || $now->day !== 1 || $now->format('H') !== $scheduled->format('H')) {
+            return [];
+        }
+
+        $range = $this->periods->resolve($administrator->company, ['period' => 'last_month'], $now);
+        $previousRange = $this->periods->resolve($administrator->company, [
+            'period' => 'custom',
+            'date_from' => $range['from']->subMonthNoOverflow()->startOfMonth()->toDateString(),
+            'date_to' => $range['from']->subMonthNoOverflow()->endOfMonth()->toDateString(),
+        ], $now);
+        $pnl = $this->profitAndLoss->summary($administrator, [
+            'ids' => null,
+            'warehouse_id' => null,
+            'label' => 'Company / Consolidated',
+        ], $range, $previousRange);
+        $report = $pnl['report'];
+        $top = $pnl['top_operating_expense'];
+        $periodKey = $range['from']->format('Ym');
+        $category = $includeProfitAndLoss ? 'profit_and_loss_summary' : 'expense_summary';
+        $title = $includeProfitAndLoss ? 'Your monthly profit & loss summary' : 'Your monthly expense summary';
+        $message = $includeProfitAndLoss
+            ? 'Net sales were '.$this->minorMoney($report['net_sales']).', operating expenses were '.$this->minorMoney($report['operating_expenses']).', and net profit was '.$this->minorMoney($report['net_profit']).'.'
+            : 'Operating expenses were '.$this->minorMoney($report['operating_expenses']).' against '.$this->minorMoney($report['net_sales']).' in net sales.';
+
+        return [[
+            'subject_type' => $administrator->company->getMorphClass(),
+            'subject_id' => $administrator->company_id,
+            'branch_id' => null,
+            'stage' => 'month_'.$periodKey,
+            'severity' => 'info',
+            'category' => $category,
+            'icon' => 'finance',
+            'title' => $title,
+            'message' => $message,
+            'action_url' => route('finance.profit-and-loss.index', ['period' => 'last_month', 'outlet_id' => 'all']),
+            'action_label' => 'Open Profit & Loss',
+            'administrators_only' => true,
+            'context' => [
+                'period_from' => $range['from']->toDateString(),
+                'period_to' => $range['to']->toDateString(),
+                'net_sales_minor' => $report['net_sales'],
+                'operating_expenses_minor' => $report['operating_expenses'],
+                'net_profit_minor' => $report['net_profit'],
+                'top_operating_expense' => $top['category'] ?? null,
+            ],
+            'email_details' => array_filter([
+                'Net sales' => $this->minorMoney($report['net_sales']),
+                'Operating expenses' => $this->minorMoney($report['operating_expenses']),
+                'Net profit' => $includeProfitAndLoss ? $this->minorMoney($report['net_profit']) : null,
+                'Top operating expense' => $top ? $top['category'].' · '.$this->minorMoney($top['amount']) : null,
+            ]),
         ]];
     }
 

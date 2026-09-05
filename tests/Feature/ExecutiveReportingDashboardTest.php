@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Company;
+use App\Models\Finance\ExpenseCategory;
+use App\Services\Finance\ExpenseLedgerService;
 use App\Services\Reports\ExecutiveReportingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -136,6 +138,40 @@ class ExecutiveReportingDashboardTest extends TestCase
         $this->assertStringNotContainsString('<polyline', $single);
         $this->assertStringContainsString('<polyline', $multi);
         $this->assertStringNotContainsString('Single-period result', $multi);
+    }
+
+    public function test_owner_command_center_uses_the_authoritative_profit_and_loss_result(): void
+    {
+        $fixture = $this->fixture();
+        $category = ExpenseCategory::create([
+            'company_id' => $fixture['company']->id,
+            'name' => 'Owner dashboard rent',
+            'classification' => ExpenseCategory::OPERATING_EXPENSE,
+            'is_active' => true,
+        ]);
+        $expense = app(ExpenseLedgerService::class)->createDraft($fixture['administrator'], [
+            'branch_id' => $fixture['outlet']->id,
+            'expense_category_id' => $category->id,
+            'transaction_date' => today()->toDateString(),
+            'amount' => '20.00',
+            'payee' => 'Owner dashboard landlord',
+            'description' => 'Authoritative P&L integration fixture',
+        ]);
+        app(ExpenseLedgerService::class)->post($expense, $fixture['administrator']);
+
+        $dashboard = app(ExecutiveReportingService::class)->dashboard($fixture['administrator'], [
+            'outlet_id' => 'all',
+            'date_from' => today()->toDateString(),
+            'date_to' => today()->toDateString(),
+        ]);
+
+        $this->assertSame(9000, $dashboard['profit_and_loss']['metrics']['net_sales']);
+        $this->assertSame(3000, $dashboard['profit_and_loss']['metrics']['gross_profit']);
+        $this->assertSame(2000, $dashboard['profit_and_loss']['metrics']['operating_expenses']);
+        $this->assertSame(1000, $dashboard['profit_and_loss']['metrics']['net_profit']);
+        $this->assertSame('Owner dashboard rent', $dashboard['profit_and_loss']['top_operating_expense']['category']);
+        $this->actingAs($fixture['administrator'])->get('/reports?outlet_id=all&date_from='.today()->toDateString().'&date_to='.today()->toDateString())
+            ->assertOk()->assertSee('Profit &amp; loss snapshot', false)->assertSee('Owner dashboard rent');
     }
 
     /** @return array<string, mixed> */

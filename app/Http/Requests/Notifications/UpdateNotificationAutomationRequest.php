@@ -29,6 +29,8 @@ class UpdateNotificationAutomationRequest extends FormRequest
             'internal_email_enabled' => ['nullable', 'boolean'],
             'daily_summary_enabled' => ['nullable', 'boolean'],
             'weekly_summary_enabled' => ['nullable', 'boolean'],
+            'monthly_expense_summary_enabled' => ['nullable', 'boolean'],
+            'monthly_profit_and_loss_summary_enabled' => ['nullable', 'boolean'],
             'summary_time' => ['required', 'date_format:H:i'],
             'timezone' => ['required', 'string', Rule::in(timezone_identifiers_list())],
         ];

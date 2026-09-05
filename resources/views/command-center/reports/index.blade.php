@@ -44,13 +44,32 @@
         </section>
     @endif
 
-    <section aria-label="Executive key performance indicators" class="grid auto-cols-[minmax(10.75rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4 2xl:grid-cols-8">
+    <section aria-label="Executive key performance indicators" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
         @foreach($executive['kpis'] as $kpi)
             @php($url = $kpi['report'] ? route($kpi['route'], [$kpi['report']] + $query) : route($kpi['route'], $query))
             @php($change = $kpi['change'])
             <a href="{{ $url }}" class="min-h-40 rounded-lg border border-t-4 border-slate-200 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 {{ $accentClasses[$kpi['accent']] }}"><div class="flex min-h-8 items-start justify-between gap-2"><p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{{ $kpi['label'] }}</p>@if($kpi['sparkline'])<x-reports.sparkline :values="$kpi['sparkline']" :tone="$kpi['accent']" class="shrink-0" />@endif</div><p class="mt-4 break-words text-xl font-semibold text-slate-950 dark:text-white">{{ $metric($kpi) }}</p><p class="mt-3 text-xs font-medium {{ $change === null ? 'text-slate-400' : ((float) $change >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300') }}">{{ $change === null ? ($executive['compare'] ? 'No comparable baseline' : 'Comparison off') : (((float) $change >= 0 ? '↑ ' : '↓ ').number_format(abs((float) $change), 1).($kpi['change_unit'] === 'points' ? ' pts' : '%').' vs previous') }}</p></a>
         @endforeach
     </section>
+
+    @if($executive['profit_and_loss'])
+        @php($pnl = $executive['profit_and_loss'])
+        <section class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/20 sm:p-6" aria-labelledby="owner-profit-and-loss">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-300">Authoritative finance</p><h2 id="owner-profit-and-loss" class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Profit &amp; loss snapshot</h2><p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Sales, cost, and expense results from the same finance report used for CSV and PDF output.</p></div><a href="{{ route('finance.profit-and-loss.index', array_filter(['outlet_id' => request('outlet_id'), 'period' => 'custom', 'date_from' => $executive['range']['from']->toDateString(), 'date_to' => $executive['range']['to']->toDateString()])) }}" class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Open P&amp;L →</a></div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                @foreach([
+                    ['Net Sales', $pnl['metrics']['net_sales'], $pnl['changes']['net_sales'] ?? null, 'teal'],
+                    ['Gross Profit', $pnl['metrics']['gross_profit'], null, 'emerald'],
+                    ['Operating Expenses', $pnl['metrics']['operating_expenses'], $pnl['changes']['operating_expenses'] ?? null, 'amber'],
+                    ['Net Profit', $pnl['metrics']['net_profit'], $pnl['changes']['net_profit'] ?? null, 'violet'],
+                ] as [$label, $value, $change, $tone])
+                    <div class="rounded-lg border border-white/80 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-900/80"><p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{{ $label }}</p><p class="mt-2 text-xl font-semibold {{ $value >= 0 ? 'text-slate-950 dark:text-white' : 'text-rose-700 dark:text-rose-300' }}">{{ $money($value) }}</p><p class="mt-2 text-xs {{ $change === null ? 'text-slate-500 dark:text-slate-400' : ($change >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300') }}">{{ $change === null ? 'No comparable baseline' : (($change >= 0 ? '↑ ' : '↓ ').number_format(abs($change), 1).'% vs previous') }}</p></div>
+                @endforeach
+            </div>
+            <div class="mt-4 flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300 sm:flex-row sm:flex-wrap sm:gap-x-6"><span>Gross margin <strong class="text-slate-950 dark:text-white">{{ $pnl['metrics']['gross_margin_percent'] === null ? '—' : number_format($pnl['metrics']['gross_margin_percent'], 2).'%' }}</strong></span><span>Net margin <strong class="text-slate-950 dark:text-white">{{ $pnl['metrics']['net_margin_percent'] === null ? '—' : number_format($pnl['metrics']['net_margin_percent'], 2).'%' }}</strong></span><span>Expenses / net sales <strong class="text-slate-950 dark:text-white">{{ $pnl['metrics']['operating_expense_ratio_percent'] === null ? '—' : number_format($pnl['metrics']['operating_expense_ratio_percent'], 2).'%' }}</strong></span>@if($pnl['top_operating_expense'])<span>Top operating expense <strong class="text-slate-950 dark:text-white">{{ $pnl['top_operating_expense']['category'] }} · {{ $money($pnl['top_operating_expense']['amount']) }}</strong></span>@endif</div>
+            @if($pnl['has_unallocated_company_expenses'])<p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">Outlet profit excludes unallocated company-wide expenses.</p>@endif
+        </section>
+    @endif
 
     @if($aiBrief)
         <section class="rounded-lg border border-teal-200 bg-teal-50/60 p-5 shadow-sm dark:border-teal-900 dark:bg-teal-950/20 sm:p-6" aria-labelledby="ai-business-brief-heading">

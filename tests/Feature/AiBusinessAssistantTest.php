@@ -8,6 +8,8 @@ use App\Models\Ai\AiAssistantInteraction;
 use App\Models\Branch;
 use App\Models\BranchUserAssignment;
 use App\Models\Company;
+use App\Models\Finance\ExpenseCategory;
+use App\Models\Finance\ExpenseTransaction;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmLeadStatus;
 use App\Models\Customers\Customer;
@@ -15,6 +17,7 @@ use App\Models\User;
 use App\Services\Ai\AiAssistantService;
 use App\Services\Ai\AiDateRangeResolver;
 use App\Services\Ai\AiIntentRouter;
+use App\Services\Finance\ExpenseLedgerService;
 use App\Services\Reports\RetailReportingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -266,6 +269,33 @@ class AiBusinessAssistantTest extends TestCase
 
         $this->assertSame(1999, $before['metrics']['net_sales']);
         $this->assertSame($before['metrics'], $after['metrics']);
+    }
+
+    public function test_business_brief_reads_authoritative_profit_and_loss_without_financial_writes(): void
+    {
+        [$company, $outlet, $admin] = $this->account();
+        $category = ExpenseCategory::create([
+            'company_id' => $company->id,
+            'name' => 'AI operating expense',
+            'classification' => ExpenseCategory::OPERATING_EXPENSE,
+            'is_active' => true,
+        ]);
+        $expense = app(ExpenseLedgerService::class)->createDraft($admin, [
+            'branch_id' => $outlet->id,
+            'expense_category_id' => $category->id,
+            'transaction_date' => today()->toDateString(),
+            'amount' => '25.00',
+            'payee' => 'AI review vendor',
+            'description' => 'Read-only AI P&L fixture',
+        ]);
+        app(ExpenseLedgerService::class)->post($expense, $admin);
+
+        $brief = app(AiAssistantService::class)->brief($admin, $outlet->id);
+
+        $this->assertSame(2500, collect($brief['facts'])->firstWhere('label', 'Operating expenses')['value']);
+        $this->assertSame(-2500, collect($brief['facts'])->firstWhere('label', 'Net profit')['value']);
+        $this->assertStringContainsString('authoritative finance report', strtolower($brief['coverage']));
+        $this->assertSame(ExpenseTransaction::POSTED, $expense->fresh()->status);
     }
 
     public function test_inventory_and_reorder_intents_use_deterministic_inventory_intelligence(): void

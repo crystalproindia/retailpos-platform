@@ -168,11 +168,18 @@ class NotificationAutomationTest extends TestCase
 
         $this->actingAs($admin)->get(route('notifications.automation.edit'))->assertOk()->assertSee('WhatsApp')->assertSee('Planned');
         $this->actingAs($manager)->get(route('notifications.automation.edit'))->assertForbidden();
-        $this->actingAs($admin)->put(route('notifications.automation.update'), $this->settingsPayload(['daily_summary_enabled' => '1', 'customer_payment_emails_enabled' => '1']))->assertRedirect();
+        $this->actingAs($admin)->put(route('notifications.automation.update'), $this->settingsPayload([
+            'daily_summary_enabled' => '1',
+            'customer_payment_emails_enabled' => '1',
+            'monthly_expense_summary_enabled' => '1',
+            'monthly_profit_and_loss_summary_enabled' => '1',
+        ]))->assertRedirect();
 
         $updated = NotificationAutomationSetting::where('company_id', $company->id)->firstOrFail();
         $this->assertTrue($updated->daily_summary_enabled);
         $this->assertTrue($updated->customer_payment_emails_enabled);
+        $this->assertTrue($updated->monthly_expense_summary_enabled);
+        $this->assertTrue($updated->monthly_profit_and_loss_summary_enabled);
         $this->assertTrue($otherSettings->fresh()->daily_summary_enabled);
         $this->assertDatabaseMissing('notification_preferences', ['whatsapp_enabled' => true]);
     }
@@ -226,6 +233,33 @@ class NotificationAutomationTest extends TestCase
         $this->assertStringContainsString('Net sales are', $summary->first()->data['message']);
         $this->assertSame(0, $manager->notifications()->where('data->metadata->category', 'owner_summary')->count());
         $this->assertSame(1, NotificationConditionState::where('condition_type', 'owner_summary')->count());
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_monthly_finance_summaries_are_opt_in_admin_only_and_idempotent(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-01 08:15:00', 'Asia/Kolkata'));
+        [$company, $branch, $admin] = $this->companyFixture();
+        $manager = User::factory()->for($company)->create(['branch_id' => $branch->id, 'role' => UserRole::Manager]);
+        $this->settings($company, [
+            'monthly_expense_summary_enabled' => true,
+            'monthly_profit_and_loss_summary_enabled' => true,
+            'summary_time' => '08:00',
+            'internal_email_enabled' => false,
+        ]);
+
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+
+        $summary = $admin->notifications()->where('data->metadata->category', 'profit_and_loss_summary')->get();
+        $expenseSummary = $admin->notifications()->where('data->metadata->category', 'expense_summary')->get();
+        $this->assertCount(1, $summary);
+        $this->assertCount(1, $expenseSummary);
+        $this->assertStringContainsString('monthly profit & loss summary', strtolower($summary->first()->data['title']));
+        $this->assertSame(0, $manager->notifications()->where('data->metadata->category', 'profit_and_loss_summary')->count());
+        $this->assertSame(0, $manager->notifications()->where('data->metadata->category', 'expense_summary')->count());
+        $this->assertSame(1, NotificationConditionState::where('condition_type', 'monthly_profit_and_loss_summary')->count());
+        $this->assertSame(1, NotificationConditionState::where('condition_type', 'monthly_expense_summary')->count());
         CarbonImmutable::setTestNow();
     }
 

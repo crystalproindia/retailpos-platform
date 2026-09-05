@@ -7,6 +7,7 @@ use App\Models\Customers\Customer;
 use App\Models\NotificationConditionState;
 use App\Models\User;
 use App\Services\Finance\PayableService;
+use App\Services\Finance\ProfitAndLossInsightService;
 use App\Services\Finance\ReceivableService;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Outlets\OutletAccessService;
@@ -22,6 +23,7 @@ class BusinessIntelligenceContextService
         private readonly OutletAccessService $outlets,
         private readonly ReceivableService $receivables,
         private readonly PayableService $payables,
+        private readonly ProfitAndLossInsightService $profitAndLoss,
     ) {}
 
     /** @param array{label:string,date_from:string,date_to:string} $period @return array<string, mixed> */
@@ -117,6 +119,9 @@ class BusinessIntelligenceContextService
     private function businessContext(array $summary, ?array $executive, array $period, string $scope, User $user, array $filters): array
     {
         $profit = $summary['reports']['profitability'] ?? null;
+        $pnl = $user->can('finance.profit_and_loss.view')
+            ? $this->profitAndLoss->summary($user, $summary['scope'], $summary['range'], $this->previousRange($summary['range']))
+            : null;
         $insights = collect($executive['insights'] ?? [])->take(3);
         $alerts = NotificationConditionState::query()
             ->where('company_id', $user->company_id)
@@ -135,19 +140,49 @@ class BusinessIntelligenceContextService
         return [
             'title' => 'Your business for '.$period['label'],
             'summary' => $summary['metrics']['invoice_count'] ? 'Here is a clear snapshot from your authorized RetailPOS data.' : 'There is not enough completed sales activity for a meaningful trend yet.',
-            'facts' => [
+            'facts' => collect([
                 $this->fact('Net sales', $summary['metrics']['net_sales'], 'money'),
                 $this->fact('Gross profit', $profit['gross_profit'] ?? null, 'money'),
+                $pnl ? $this->fact('Operating expenses', $pnl['metrics']['operating_expenses'], 'money') : null,
+                $pnl ? $this->fact('Net profit', $pnl['metrics']['net_profit'], 'money') : null,
                 $this->fact('Outstanding receivables', $summary['metrics']['outstanding_receivables'], 'money'),
                 $this->fact('Low-stock products', $summary['metrics']['low_stock_count'], 'number'),
-            ],
-            'recommendations' => $alertRecommendations->concat($insights->pluck('message'))->filter()->unique()->take(3)->values()->all() ?: ['Keep recording sales and stock movements so RetailPOS can surface stronger comparisons.'],
-            'coverage' => $profit === null ? 'Sales and operations are included. Profitability is hidden because this account does not have profitability access.' : ((int) ($profit['unavailable_cost_item_count'] ?? 0) > 0 ? 'Some revenue has unavailable cost, so total profit coverage is incomplete.' : 'Profit figures use immutable sale-time cost snapshots.'),
-            'sources' => [$this->source('Owner Command Center', 'reports.index'), $this->source('Sales report', 'reports.show', ['report' => 'sales'])],
+            ])->filter()->values()->all(),
+            'recommendations' => $alertRecommendations->concat($insights->pluck('message'))->concat($this->pnlRecommendations($pnl))->filter()->unique()->take(3)->values()->all() ?: ['Keep recording sales and stock movements so RetailPOS can surface stronger comparisons.'],
+            'coverage' => $pnl ? 'Read-only P&L results use the authoritative finance report for this authorized scope.' : ($profit === null ? 'Sales and operations are included. Profitability is hidden because this account does not have profitability access.' : ((int) ($profit['unavailable_cost_item_count'] ?? 0) > 0 ? 'Some revenue has unavailable cost, so total profit coverage is incomplete.' : 'Profit figures use immutable sale-time cost snapshots.')),
+            'sources' => array_values(array_filter([$this->source('Owner Command Center', 'reports.index'), $this->source('Sales report', 'reports.show', ['report' => 'sales']), $pnl ? $this->source('Profit & Loss', 'finance.profit-and-loss.index') : null])),
             'followups' => ['How are sales today?', 'What should I reorder?', 'Which products are selling well?'],
-            'fact_count' => 4 + $insights->count() + $alerts->count(),
+            'fact_count' => 4 + ($pnl ? 2 : 0) + $insights->count() + $alerts->count(),
             'scope' => $scope,
         ];
+    }
+
+    /** @return array{from:\Carbon\CarbonImmutable,to:\Carbon\CarbonImmutable,timezone:string} */
+    private function previousRange(array $range): array
+    {
+        $days = $range['from']->diffInDays($range['to']) + 1;
+        $to = $range['from']->subDay();
+
+        return ['from' => $to->subDays($days - 1)->startOfDay(), 'to' => $to->endOfDay(), 'timezone' => $range['timezone']];
+    }
+
+    /** @return array<int,string> */
+    private function pnlRecommendations(?array $pnl): array
+    {
+        if (! $pnl) {
+            return [];
+        }
+
+        $netProfitChange = $pnl['changes']['net_profit'] ?? null;
+        $expenseChange = $pnl['changes']['operating_expenses'] ?? null;
+        $salesChange = $pnl['changes']['net_sales'] ?? null;
+        $top = $pnl['top_operating_expense'] ?? null;
+
+        return array_values(array_filter([
+            $netProfitChange !== null && $netProfitChange <= -10 ? 'Net profit declined materially from the previous matching period. Review the P&L before changing prices or spend.' : null,
+            $expenseChange !== null && $salesChange !== null && $expenseChange > $salesChange + 10 ? 'Operating expenses grew faster than net sales. Review the largest operating expense category.' : null,
+            $top ? $top['category'].' is the largest operating expense in this period.' : null,
+        ]));
     }
 
     private function profitabilityContext(?array $profit, array $sales, array $period, string $scope): array

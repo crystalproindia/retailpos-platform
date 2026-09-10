@@ -11,6 +11,8 @@
         ['label' => 'Companies', 'route' => 'crm.companies.index'],
         ['label' => 'Contacts', 'route' => 'crm.contacts.index'],
         ['label' => 'Pipeline', 'route' => 'crm.pipeline.index'],
+        ['label' => 'Pipeline Analytics', 'route' => 'crm.pipeline-analytics.index'],
+        ['label' => 'Salesperson Performance', 'route' => 'crm.salesperson-performance.index'],
         ['label' => 'Opportunities', 'route' => 'sales.opportunities.index'],
         ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
         ['label' => 'Activities', 'route' => 'crm.activities.index'],

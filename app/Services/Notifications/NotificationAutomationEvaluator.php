@@ -4,12 +4,14 @@ namespace App\Services\Notifications;
 
 use App\Enums\Crm\ProformaStatus;
 use App\Enums\Crm\QuotationStatus;
+use App\Enums\Crm\LeadPriority;
 use App\Enums\Purchases\PurchaseOrderStatus;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\Crm\CrmInvoice;
 use App\Models\Crm\CrmProformaInvoice;
 use App\Models\Crm\CrmQuotation;
+use App\Models\Crm\CrmLead;
 use App\Models\Purchases\PurchaseOrder;
 use App\Models\User;
 use App\Services\Finance\PayableService;
@@ -17,6 +19,8 @@ use App\Services\Finance\FinancialPeriodResolver;
 use App\Services\Finance\ProfitAndLossInsightService;
 use App\Services\Finance\ReceivableService;
 use App\Services\Inventory\InventoryIntelligenceService;
+use App\Services\Crm\CrmPipelineAnalyticsService;
+use App\Repositories\Crm\LeadRepository;
 use App\Services\Reports\ExecutiveReportingService;
 use Carbon\CarbonImmutable;
 
@@ -33,6 +37,8 @@ class NotificationAutomationEvaluator
         private readonly PayableService $payables,
         private readonly FinancialPeriodResolver $periods,
         private readonly ProfitAndLossInsightService $profitAndLoss,
+        private readonly LeadRepository $leads,
+        private readonly CrmPipelineAnalyticsService $crm,
     ) {}
 
     /** @return array<string, array{created:int,recovered:int}> */
@@ -55,6 +61,9 @@ class NotificationAutomationEvaluator
         $results['receivable'] = $this->notifications->sync($company, $setting, 'receivable', $this->receivableConditions($administrator, $setting));
         $results['quotation'] = $this->notifications->sync($company, $setting, 'quotation', $this->quotationConditions($company, $setting));
         $results['proforma'] = $this->notifications->sync($company, $setting, 'proforma', $this->proformaConditions($company, $setting));
+        $results['crm_overdue_follow_up'] = $this->notifications->sync($company, $setting, 'crm_overdue_follow_up', $this->crmOverdueFollowUpConditions($administrator, $setting));
+        $results['crm_stalled_high_priority'] = $this->notifications->sync($company, $setting, 'crm_stalled_high_priority', $this->crmStalledHighPriorityConditions($administrator, $setting));
+        $results['crm_follow_up_digest'] = $this->notifications->sync($company, $setting, 'crm_follow_up_digest', $this->crmFollowUpDigestConditions($administrator, $setting));
         $results['purchasing'] = $this->notifications->sync($company, $setting, 'purchasing', $this->purchaseConditions($administrator, $setting));
         $results['owner_summary'] = $this->notifications->sync($company, $setting, 'owner_summary', $this->ownerSummaryConditions($administrator, $setting));
         $results['monthly_expense_summary'] = $this->notifications->sync($company, $setting, 'monthly_expense_summary', $this->monthlySummaryConditions($administrator, $setting, false));
@@ -199,6 +208,106 @@ class NotificationAutomationEvaluator
                 amount: $proforma->balance_amount,
                 routeName: 'crm.proformas.show',
             ))->filter()->values()->all();
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function crmOverdueFollowUpConditions(User $administrator, $setting): array
+    {
+        if (! $setting->crm_overdue_follow_up_enabled) {
+            return [];
+        }
+
+        $timezone = $this->timezone($administrator->company, $setting);
+
+        return $this->crmOverdueLeads($administrator, $timezone)->map(function (CrmLead $lead) use ($timezone): array {
+            $due = CarbonImmutable::parse($lead->next_follow_up_at->toDateTimeString(), $timezone);
+            $days = max(0, $due->startOfDay()->diffInDays(CarbonImmutable::now($timezone)->startOfDay()));
+
+            return [
+                'subject_type' => $lead->getMorphClass(), 'subject_id' => $lead->id, 'branch_id' => $lead->branch_id,
+                'stage' => 'overdue_follow_up', 'severity' => $lead->priority === LeadPriority::Urgent ? 'important' : 'attention',
+                'category' => 'crm', 'icon' => 'users', 'title' => 'A CRM follow-up is overdue',
+                'message' => ($lead->title ?: 'A lead').' needs follow-up'.($days ? " and is {$days} day".($days === 1 ? '' : 's').' overdue.' : '.'),
+                'action_url' => route('crm.leads.show', $lead), 'action_label' => 'Open Lead',
+                'context' => ['lead_id' => $lead->id, 'priority' => $lead->priority?->value ?? $lead->priority, 'next_follow_up_at' => $lead->next_follow_up_at->toIso8601String()],
+            ];
+        })->all();
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function crmStalledHighPriorityConditions(User $administrator, $setting): array
+    {
+        if (! $setting->crm_stalled_high_priority_enabled) {
+            return [];
+        }
+
+        return $this->crmStalledHighPriorityLeads($administrator)->map(function (array $row): array {
+            /** @var CrmLead $lead */
+            $lead = $row['lead'];
+
+            return [
+                'subject_type' => $lead->getMorphClass(), 'subject_id' => $lead->id, 'branch_id' => $lead->branch_id,
+                'stage' => 'stalled_high_priority', 'severity' => 'important', 'category' => 'crm', 'icon' => 'users',
+                'title' => 'A high-priority CRM lead is stalled',
+                'message' => ($lead->title ?: 'A lead').' needs attention: '.$row['reason'].'.',
+                'action_url' => route('crm.leads.show', $lead), 'action_label' => 'Open Lead',
+                'context' => ['lead_id' => $lead->id, 'priority' => $lead->priority?->value ?? $lead->priority, 'reason' => $row['reason'], 'stalled_days' => $row['stalled_days']],
+            ];
+        })->all();
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function crmFollowUpDigestConditions(User $administrator, $setting): array
+    {
+        if (! $setting->crm_follow_up_digest_enabled) {
+            return [];
+        }
+
+        $timezone = $this->timezone($administrator->company, $setting);
+        $now = CarbonImmutable::now($timezone);
+        $scheduled = CarbonImmutable::parse($now->toDateString().' '.$setting->summary_time, $timezone);
+        $daily = $setting->daily_summary_enabled && $now->format('H') === $scheduled->format('H');
+        $weekly = ! $daily && $setting->weekly_summary_enabled && $now->isMonday() && $now->format('H') === $scheduled->format('H');
+        if (! $daily && ! $weekly) {
+            return [];
+        }
+
+        $overdue = $this->crmOverdueLeads($administrator, $timezone)->count();
+        $stalled = $this->crmStalledHighPriorityLeads($administrator)->count();
+        if ($overdue === 0 && $stalled === 0) {
+            return [];
+        }
+        $period = $daily ? 'daily' : 'weekly';
+
+        return [[
+            'subject_type' => $administrator->company->getMorphClass(), 'subject_id' => $administrator->company_id,
+            'branch_id' => null, 'stage' => $period.'_'.$now->format('Ymd'), 'severity' => $stalled ? 'important' : 'attention',
+            'category' => 'crm', 'icon' => 'users', 'title' => 'Your CRM follow-up '.$period.' digest',
+            'message' => "{$overdue} overdue follow-up".($overdue === 1 ? '' : 's')." and {$stalled} stalled high-priority lead".($stalled === 1 ? '' : 's').' need attention.',
+            'action_url' => route('crm.pipeline-analytics.index'), 'action_label' => 'Open CRM Pipeline', 'administrators_only' => true,
+            'context' => ['overdue_follow_ups' => $overdue, 'stalled_high_priority_leads' => $stalled, 'period' => $period],
+            'email_details' => ['Overdue follow-ups' => $overdue, 'Stalled high-priority leads' => $stalled],
+        ]];
+    }
+
+    /** @return \Illuminate\Support\Collection<int,CrmLead> */
+    private function crmOverdueLeads(User $administrator, string $timezone): \Illuminate\Support\Collection
+    {
+        return $this->leads->queryForUser($administrator)
+            ->with('status')
+            ->whereNotNull('next_follow_up_at')
+            ->where('next_follow_up_at', '<', CarbonImmutable::now($timezone))
+            ->orderBy('next_follow_up_at')->limit(self::SOURCE_LIMIT)->get()
+            ->filter(fn (CrmLead $lead): bool => ! in_array($lead->status?->stage_type?->value ?? $lead->status?->stage_type, ['won', 'lost', 'spam'], true))
+            ->values();
+    }
+
+    /** @return \Illuminate\Support\Collection<int,array<string,mixed>> */
+    private function crmStalledHighPriorityLeads(User $administrator): \Illuminate\Support\Collection
+    {
+        return $this->crm->stalledLeads($administrator)
+            ->filter(fn (array $row): bool => in_array($row['lead']->priority?->value ?? $row['lead']->priority, [LeadPriority::High->value, LeadPriority::Urgent->value], true))
+            ->values();
     }
 
     private function purchaseConditions(User $administrator, $setting): array

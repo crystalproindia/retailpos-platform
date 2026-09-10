@@ -52,15 +52,17 @@ class ActivityRepository
     /**
      * @return Collection<int, CrmActivity>
      */
-    public function followUpsForUser(User $user, bool $overdueOnly = false): Collection
+    public function followUpsForUser(User $user, string $mode = 'upcoming'): Collection
     {
         return $this->queryForUser($user)
             ->leftJoin('crm_leads', 'crm_leads.id', '=', 'crm_activities.crm_lead_id')
             ->select('crm_activities.*')
             ->whereIn('type', ['follow_up', 'call', 'meeting', 'task'])
-            ->whereNull('completed_at')
-            ->whereNull('cancelled_at')
-            ->when($overdueOnly, fn (Builder $query) => $query->where('scheduled_at', '<', now()))
+            ->when($mode === 'completed', fn (Builder $query) => $query->whereNotNull('completed_at'))
+            ->when($mode !== 'completed', fn (Builder $query) => $query->whereNull('completed_at')->whereNull('cancelled_at'))
+            ->when($mode === 'overdue', fn (Builder $query) => $query->where('scheduled_at', '<', now()))
+            ->when($mode === 'today', fn (Builder $query) => $query->whereDate('scheduled_at', today()))
+            ->when($mode === 'upcoming', fn (Builder $query) => $query->where('scheduled_at', '>=', now()->startOfDay()))
             ->orderByRaw('CASE WHEN crm_activities.scheduled_at < ? THEN 0 ELSE 1 END', [now()])
             ->orderByDesc('crm_leads.follow_up_urgency_rating')
             ->orderByDesc('crm_leads.buying_interest_rating')

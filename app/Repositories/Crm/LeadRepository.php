@@ -11,12 +11,15 @@ use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmTag;
 use App\Models\Crm\DemoSchedule;
 use App\Models\User;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class LeadRepository
 {
+    public function __construct(private readonly OutletAccessService $outlets) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -180,9 +183,30 @@ class LeadRepository
 
     private function baseQueryForUser(User $user, bool $withTrashed = false): Builder
     {
+        $outletIds = $this->outlets->accessibleOutlets($user)->pluck('id');
+        $hasCompanyWideAccess = $this->outlets->hasCompanyWideAccess($user);
+
         return CrmLead::query()
             ->where('company_id', $user->company_id)
             ->when($withTrashed, fn (Builder $query) => $query->withTrashed())
+            ->where(function (Builder $query) use ($user, $outletIds, $hasCompanyWideAccess): void {
+                $query->whereIn('branch_id', $outletIds);
+
+                if ($hasCompanyWideAccess) {
+                    $query->orWhereNull('branch_id');
+
+                    return;
+                }
+
+                // Legacy branchless leads are visible only through an explicit
+                // existing relationship; NULL never grants outlet-wide access.
+                $query->orWhere(function (Builder $legacy) use ($user): void {
+                    $legacy->whereNull('branch_id')
+                        ->where(fn (Builder $ownership) => $ownership
+                            ->where('assigned_user_id', $user->id)
+                            ->orWhere('created_by', $user->id));
+                });
+            })
             ->when($this->isSales($user), function (Builder $query) use ($user): void {
                 $query->where(function (Builder $query) use ($user): void {
                     $query->where('assigned_user_id', $user->id)

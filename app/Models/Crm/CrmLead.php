@@ -92,6 +92,11 @@ class CrmLead extends Model
         return $this->hasMany(CrmActivity::class, 'crm_lead_id')->latest('scheduled_at');
     }
 
+    public function stageHistory(): HasMany
+    {
+        return $this->hasMany(CrmLeadStageHistory::class, 'lead_id')->latest('occurred_at');
+    }
+
     public function tasks(): MorphMany
     {
         return $this->morphMany(Task::class, 'related')->latest('due_at');

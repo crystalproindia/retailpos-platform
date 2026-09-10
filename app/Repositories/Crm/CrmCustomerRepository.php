@@ -6,12 +6,15 @@ use App\Enums\Crm\CrmCustomerStatus;
 use App\Enums\UserRole;
 use App\Models\Crm\CrmCustomer;
 use App\Models\User;
+use App\Services\Outlets\OutletAccessService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class CrmCustomerRepository
 {
+    public function __construct(private readonly OutletAccessService $outlets) {}
+
     /** @param array<string, mixed> $filters */
     public function paginateForUser(User $user, array $filters = []): LengthAwarePaginator
     {
@@ -97,8 +100,20 @@ class CrmCustomerRepository
 
     private function queryForUser(User $user): Builder
     {
+        $outletIds = $this->outlets->accessibleOutlets($user, false)->pluck('id');
+        $hasCompanyWideAccess = $this->outlets->hasCompanyWideAccess($user);
+
         return CrmCustomer::query()
             ->where('company_id', $user->company_id)
+            // A converted customer inherits the outlet boundary of its source
+            // lead.  Pre-outlet customer records have no trustworthy outlet
+            // attribute, so retain their established tenant-wide semantics.
+            ->when(! $hasCompanyWideAccess, fn (Builder $query) => $query->where(function (Builder $scope) use ($user, $outletIds): void {
+                $scope->whereHas('lead', function (Builder $lead) use ($user, $outletIds): void {
+                    $lead->whereIn('branch_id', $outletIds)
+                        ->orWhere(fn (Builder $legacy) => $legacy->whereNull('branch_id')->where(fn (Builder $owner) => $owner->where('assigned_user_id', $user->id)->orWhere('created_by', $user->id)));
+                })->orWhereNull('lead_id');
+            }))
             ->when($this->isSales($user), fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
                 ->where('created_by', $user->id)
                 ->orWhereHas('lead', fn (Builder $lead) => $lead->where('assigned_user_id', $user->id))));

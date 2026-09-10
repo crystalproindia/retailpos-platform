@@ -346,6 +346,22 @@ class AiBusinessAssistantTest extends TestCase
         $this->assertSame('Follow Up Business', $followups['facts'][0]['label']);
     }
 
+    public function test_ai_crm_context_respects_the_authenticated_outlet_scope(): void
+    {
+        [$company, $outlet, $manager] = $this->account(UserRole::Manager);
+        $otherOutlet = $this->reportBranch($company, 'AI hidden CRM outlet');
+        $status = CrmLeadStatus::create(['company_id' => $company->id, 'name' => 'New', 'slug' => 'ai-crm-new', 'stage_type' => 'new', 'is_active' => true]);
+        CrmLead::create(['company_id' => $company->id, 'branch_id' => $outlet->id, 'status_id' => $status->id, 'title' => 'Visible CRM follow-up', 'priority' => 'high', 'next_follow_up_at' => now()->subHour(), 'created_by' => $manager->id]);
+        CrmLead::create(['company_id' => $company->id, 'branch_id' => $otherOutlet->id, 'status_id' => $status->id, 'title' => 'Hidden CRM follow-up', 'priority' => 'urgent', 'next_follow_up_at' => now()->subHour(), 'created_by' => $manager->id]);
+
+        $answer = $this->ask($manager, 'Which leads need follow-up?');
+
+        $labels = collect($answer['facts'])->pluck('label')->join('|');
+        $this->assertStringContainsString('Visible CRM follow-up', $labels);
+        $this->assertStringNotContainsString('Hidden CRM follow-up', $labels);
+        $this->assertSame(1, collect($answer['facts'])->firstWhere('label', 'Overdue follow-ups')['value']);
+    }
+
     public function test_new_tenant_receives_clear_empty_state_instead_of_invented_figures(): void
     {
         [, , $admin] = $this->account();

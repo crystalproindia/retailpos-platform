@@ -45,6 +45,9 @@ use App\Http\Controllers\CommandCenter\Crm\ContactController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCompanyController;
 use App\Http\Controllers\CommandCenter\Crm\CrmCustomerController;
 use App\Http\Controllers\CommandCenter\Crm\CrmDashboardController;
+use App\Http\Controllers\CommandCenter\Crm\CrmPipelineAnalyticsController;
+use App\Http\Controllers\CommandCenter\Crm\CrmAnalyticsExportController;
+use App\Http\Controllers\CommandCenter\Crm\CrmSalespersonPerformanceController;
 use App\Http\Controllers\CommandCenter\Crm\CrmInvoiceReturnController;
 use App\Http\Controllers\CommandCenter\Crm\CrmOnboardingController;
 use App\Http\Controllers\CommandCenter\Crm\CrmReportController;
@@ -445,6 +448,9 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         });
 
         Route::get('reports', [CrmReportController::class, 'index'])->middleware('can:crm.reports.view')->name('reports.index');
+        Route::get('pipeline-analytics', CrmPipelineAnalyticsController::class)->middleware('can:crm.reports.view')->name('pipeline-analytics.index');
+        Route::get('analytics/export/{export}', CrmAnalyticsExportController::class)->whereIn('export', ['pipeline', 'funnel', 'lost-reasons', 'salesperson-performance'])->middleware('can:crm.reports.export')->name('analytics.export');
+        Route::get('salesperson-performance', CrmSalespersonPerformanceController::class)->middleware('can:crm.reports.view')->name('salesperson-performance.index');
         Route::get('reports/executive', [CrmReportController::class, 'executive'])->middleware('can:crm.reports.executive')->name('reports.executive');
         Route::get('reports/visualization', [CrmReportController::class, 'visualization'])->middleware('can:crm.reports.view')->name('reports.visualization');
         Route::get('reports/{report}', [CrmReportController::class, 'show'])->whereIn('report', ['sales', 'payments', 'onboarding', 'support', 'customers'])->middleware('can:crm.reports.view')->name('reports.show');

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'company_id', 'low_stock_enabled', 'out_of_stock_enabled', 'reorder_enabled',
     'payment_reminders_enabled', 'payment_before_due_days', 'payment_overdue_days',
     'customer_payment_emails_enabled', 'quotation_expiry_enabled', 'proforma_expiry_enabled',
+    'crm_overdue_follow_up_enabled', 'crm_stalled_high_priority_enabled', 'crm_follow_up_digest_enabled',
     'document_expiry_notice_days', 'purchase_reminders_enabled', 'internal_email_enabled',
     'daily_summary_enabled', 'weekly_summary_enabled', 'monthly_expense_summary_enabled', 'monthly_profit_and_loss_summary_enabled', 'summary_time', 'timezone', 'updated_by',
 ])]
@@ -27,6 +28,9 @@ class NotificationAutomationSetting extends Model
             'customer_payment_emails_enabled' => 'boolean',
             'quotation_expiry_enabled' => 'boolean',
             'proforma_expiry_enabled' => 'boolean',
+            'crm_overdue_follow_up_enabled' => 'boolean',
+            'crm_stalled_high_priority_enabled' => 'boolean',
+            'crm_follow_up_digest_enabled' => 'boolean',
             'purchase_reminders_enabled' => 'boolean',
             'internal_email_enabled' => 'boolean',
             'daily_summary_enabled' => 'boolean',

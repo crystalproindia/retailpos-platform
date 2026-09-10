@@ -24,6 +24,7 @@ class LeadService
         private readonly AuditLogger $auditLogger,
         private readonly DomainEventDispatcher $domainEvents,
         private readonly CrmLeadScoringService $leadScoring,
+        private readonly LeadStageTransitionService $stageTransitions,
     ) {}
 
     /**
@@ -82,10 +83,8 @@ class LeadService
         $originalFollowUpAt = $lead->next_follow_up_at?->toDateTimeString();
         $originalConversationRatings = $this->conversationRatings($lead);
         $payload = $this->payload($data);
-
-        if (array_key_exists('status_id', $payload) && (int) $payload['status_id'] !== (int) $originalStatusId) {
-            $payload += $this->lifecycleTimestamps((int) $payload['status_id'], $lead);
-        }
+        $requestedStatusId = $payload['status_id'] ?? null;
+        unset($payload['status_id']);
 
         $lead->update($payload);
         $this->syncTags($lead, $data['tag_ids'] ?? null);
@@ -94,22 +93,12 @@ class LeadService
         ]);
         $this->recordConversationAssessmentChange($lead, $user, $originalConversationRatings);
 
-        if (isset($payload['status_id']) && (int) $payload['status_id'] !== (int) $originalStatusId) {
-            $this->auditLogger->record('crm.lead.status_changed', $lead, 'CRM lead status changed', [
-                'from_status_id' => $originalStatusId,
-                'to_status_id' => $payload['status_id'],
-                'changed_by' => $user->id,
+        if ($requestedStatusId && (int) $requestedStatusId !== (int) $originalStatusId) {
+            $lead = $this->stageTransitions->transition($lead, (int) $requestedStatusId, $user, 'crm.lead.status_changed', false, [
+                'lost_reason' => $data['lost_reason'] ?? null,
+                'lost_note' => $data['lost_note'] ?? null,
+                'idempotency_key' => $data['stage_transition_key'] ?? null,
             ]);
-            $this->domainEvents->dispatch(new LeadStatusChanged(
-                companyId: $lead->company_id,
-                actorId: $user->id,
-                aggregateType: CrmLead::class,
-                aggregateId: $lead->id,
-                payload: $this->eventPayload($lead, [
-                    'from_status_id' => $originalStatusId,
-                    'to_status_id' => $payload['status_id'],
-                ]),
-            ));
         }
 
         if (array_key_exists('assigned_user_id', $payload) && (int) $payload['assigned_user_id'] !== (int) $originalAssigneeId) {
@@ -161,27 +150,7 @@ class LeadService
 
     public function updateStatus(CrmLead $lead, int $statusId, User $user): CrmLead
     {
-        $oldStatusId = $lead->status_id;
-        $lead->update(['status_id' => $statusId] + $this->lifecycleTimestamps($statusId, $lead));
-
-        $this->auditLogger->record('crm.lead.status_changed', $lead, 'CRM lead status changed', [
-            'from_status_id' => $oldStatusId,
-            'to_status_id' => $statusId,
-            'changed_by' => $user->id,
-        ]);
-        $this->domainEvents->dispatch(new LeadStatusChanged(
-            companyId: $lead->company_id,
-            actorId: $user->id,
-            aggregateType: CrmLead::class,
-            aggregateId: $lead->id,
-            payload: $this->eventPayload($lead, [
-                'from_status_id' => $oldStatusId,
-                'to_status_id' => $statusId,
-            ]),
-        ));
-        $this->leadScoring->refresh($lead, $user);
-
-        return $lead->refresh()->load('status');
+        return $this->stageTransitions->transition($lead, $statusId, $user);
     }
 
     public function assign(CrmLead $lead, int $assignedUserId, User $user): CrmLead

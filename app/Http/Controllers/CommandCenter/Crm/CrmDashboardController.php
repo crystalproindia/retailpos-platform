@@ -11,12 +11,13 @@ use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
 use App\Repositories\Crm\ProformaRepository;
 use App\Services\Crm\CrmLeadScoringService;
+use App\Services\Crm\CrmPipelineAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CrmDashboardController extends Controller
 {
-    public function __invoke(Request $request, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, QuotationRepository $quotationRepository, CrmCustomerRepository $customerRepository, ProformaRepository $proformas, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CrmLeadScoringService $leadScoring): View
+    public function __invoke(Request $request, LeadRepository $leadRepository, DemoScheduleRepository $demoScheduleRepository, QuotationRepository $quotationRepository, CrmCustomerRepository $customerRepository, ProformaRepository $proformas, CrmOnboardingRepository $onboardings, CrmSupportTicketRepository $supportTickets, CrmLeadScoringService $leadScoring, CrmPipelineAnalyticsService $pipelineAnalytics): View
     {
         return view('command-center.crm.dashboard', [
             'metrics' => $leadRepository->dashboardMetrics($request->user()),
@@ -28,6 +29,7 @@ class CrmDashboardController extends Controller
             'onboardingMetrics' => $request->user()->can('crm.onboarding.view') ? $onboardings->dashboard($request->user()) : null,
             'supportMetrics' => $request->user()->can('crm.support.view') ? $supportTickets->dashboard($request->user()) : null,
             'aiInsights' => $leadScoring->dashboardInsights($request->user()),
+            'pipelineAnalytics' => $pipelineAnalytics->summary($request->user()),
         ]);
     }
 }

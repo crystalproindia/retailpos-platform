@@ -19,6 +19,9 @@ class TransitionLeadStatusRequest extends FormRequest
     {
         return [
             'status_id' => ['required', Rule::exists('crm_lead_statuses', 'id')->where('company_id', $this->user()?->company_id)->where('is_active', true)],
+            'lost_reason' => ['nullable', 'string', 'max:255'],
+            'lost_note' => ['nullable', 'string', 'max:2000'],
+            'stage_transition_key' => ['nullable', 'uuid'],
         ];
     }
 }

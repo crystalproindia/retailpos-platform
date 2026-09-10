@@ -44,6 +44,10 @@
         </section>
     @endif
 
+    @if($crmSummary && $crmForecast)
+        <section class="rounded-lg border border-sky-200 bg-sky-50/50 p-5 shadow-sm dark:border-sky-900 dark:bg-sky-950/20 sm:p-6"><div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-semibold uppercase text-sky-700 dark:text-sky-300">CRM signals</p><h2 class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Pipeline and follow-up health</h2><p class="mt-1 text-sm text-slate-600 dark:text-slate-300">The CRM analytics read model keeps realized sales separate from open pipeline and forecast estimates.</p></div><a href="{{ route('crm.pipeline-analytics.index') }}" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Open CRM analytics →</a></div><div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">@foreach([['Open Pipeline','₹'.number_format($crmForecast['open_pipeline_value'],2)],['Weighted Forecast','₹'.number_format($crmForecast['weighted_forecast'],2).' estimate'],['Actual Sales','₹'.number_format($crmForecast['actual_sales_value'],2)],['Conversion Rate',$crmSummary['win_rate'] === null ? '—' : $crmSummary['win_rate'].'%'],['Overdue Follow-ups',$crmOverdue],['Top Lost Reason',$crmSummary['lost_reasons'][0]['reason'] ?? 'None recorded']] as [$label,$value])<div class="rounded-lg border border-white/80 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-900/80"><p class="text-xs font-semibold uppercase text-slate-500">{{ $label }}</p><p class="mt-2 break-words text-lg font-semibold text-slate-950 dark:text-white">{{ $value }}</p></div>@endforeach</div></section>
+    @endif
+
     <section aria-label="Executive key performance indicators" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
         @foreach($executive['kpis'] as $kpi)
             @php($url = $kpi['report'] ? route($kpi['route'], [$kpi['report']] + $query) : route($kpi['route'], $query))

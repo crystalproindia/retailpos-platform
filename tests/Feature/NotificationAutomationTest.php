@@ -123,6 +123,55 @@ class NotificationAutomationTest extends TestCase
         $this->assertTrue($notifications->contains(fn ($item) => $item->data['aggregate_id'] === $proforma->id && $item->data['metadata']['category'] === 'proforma'));
     }
 
+    public function test_opted_in_crm_alerts_are_deduplicated_and_recipient_scoped_by_outlet(): void
+    {
+        [$company, $branch, $admin] = $this->companyFixture();
+        $otherBranch = Branch::factory()->for($company)->create();
+        $manager = User::factory()->for($company)->create(['branch_id' => $branch->id, 'role' => UserRole::Manager]);
+        $outside = User::factory()->for($company)->create(['branch_id' => $otherBranch->id, 'role' => UserRole::Manager]);
+        BranchUserAssignment::create(['company_id' => $company->id, 'branch_id' => $branch->id, 'user_id' => $manager->id, 'is_active' => true, 'is_default' => true, 'assigned_by' => $admin->id]);
+        BranchUserAssignment::create(['company_id' => $company->id, 'branch_id' => $otherBranch->id, 'user_id' => $outside->id, 'is_active' => true, 'is_default' => true, 'assigned_by' => $admin->id]);
+        $lead = $this->lead($company, $branch, $admin);
+        $lead->update(['priority' => LeadPriority::High, 'next_follow_up_at' => now()->subDay(), 'created_at' => now()->subDays(20), 'updated_at' => now()->subDays(20)]);
+
+        // New CRM notification preferences are default-off, so merely having
+        // old CRM work cannot create a new alert stream after an upgrade.
+        $this->settings($company);
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+        $this->assertDatabaseMissing('notification_condition_states', ['condition_type' => 'crm_overdue_follow_up']);
+
+        $this->settings($company, [
+            'crm_overdue_follow_up_enabled' => true,
+            'crm_stalled_high_priority_enabled' => true,
+        ]);
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+
+        $this->assertSame(2, $admin->notifications()->where('data->metadata->category', 'crm')->count());
+        $this->assertSame(2, $manager->notifications()->where('data->metadata->category', 'crm')->count());
+        $this->assertSame(0, $outside->notifications()->where('data->metadata->category', 'crm')->count());
+        $this->assertSame(2, NotificationConditionState::whereIn('condition_type', ['crm_overdue_follow_up', 'crm_stalled_high_priority'])->count());
+        $this->assertSame(4, NotificationDelivery::where('channel', 'database')->where('event_key', 'like', 'automation.crm_%')->count());
+    }
+
+    public function test_crm_follow_up_digest_is_low_noise_administrator_only_and_reuses_the_scheduler(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-07 08:00:00', 'Asia/Kolkata'));
+        [$company, $branch, $admin] = $this->companyFixture();
+        $manager = User::factory()->for($company)->create(['branch_id' => $branch->id, 'role' => UserRole::Manager]);
+        $lead = $this->lead($company, $branch, $admin);
+        $lead->update(['priority' => LeadPriority::Urgent, 'next_follow_up_at' => now()->subDay(), 'created_at' => now()->subDays(20), 'updated_at' => now()->subDays(20)]);
+        $this->settings($company, ['crm_follow_up_digest_enabled' => true, 'daily_summary_enabled' => true, 'summary_time' => '08:00']);
+
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+        app(NotificationAutomationEvaluator::class)->evaluate($company);
+
+        $this->assertSame(1, $admin->notifications()->where('data->metadata->category', 'crm')->count());
+        $this->assertSame(0, $manager->notifications()->where('data->metadata->category', 'crm')->count());
+        $this->assertDatabaseHas('notification_condition_states', ['condition_type' => 'crm_follow_up_digest', 'stage' => 'daily_20260907']);
+        CarbonImmutable::setTestNow();
+    }
+
     public function test_email_not_configured_preserves_in_app_alert_and_records_safe_skip_once(): void
     {
         Bus::fake();

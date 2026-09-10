@@ -11,6 +11,7 @@ use App\Services\Finance\ProfitAndLossInsightService;
 use App\Services\Finance\ReceivableService;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Outlets\OutletAccessService;
+use App\Services\Crm\CrmPipelineAnalyticsService;
 use App\Services\Reports\ExecutiveReportingService;
 use App\Services\Reports\RetailReportingService;
 
@@ -24,6 +25,7 @@ class BusinessIntelligenceContextService
         private readonly ReceivableService $receivables,
         private readonly PayableService $payables,
         private readonly ProfitAndLossInsightService $profitAndLoss,
+        private readonly CrmPipelineAnalyticsService $crmAnalytics,
     ) {}
 
     /** @param array{label:string,date_from:string,date_to:string} $period @return array<string, mixed> */
@@ -36,7 +38,7 @@ class BusinessIntelligenceContextService
 
         return match ($intent) {
             'inventory', 'reorder', 'slow_stock' => $this->inventory($user, $intent, $filters, $period),
-            'crm_followup' => $this->crm($user, $period),
+            'crm_followup' => $this->crm($user, $period, $outletId),
             'customer_insight' => $this->customers($user, $period),
             'finance' => $this->finance($user, $filters, $period),
             default => $this->reporting($user, $intent, $filters, $period),
@@ -298,23 +300,25 @@ class BusinessIntelligenceContextService
         ];
     }
 
-    private function crm(User $user, array $period): array
+    private function crm(User $user, array $period, ?int $outletId): array
     {
-        $query = CrmLead::query()->where('company_id', $user->company_id)->whereNull('won_at')->whereNull('lost_at');
-        if (! $this->outlets->hasCompanyWideAccess($user)) {
-            $query->whereIn('branch_id', $this->outlets->accessibleOutlets($user)->modelKeys());
-        }
-        $leads = $query->whereNotNull('next_follow_up_at')->where('next_follow_up_at', '<=', now()->endOfDay())->with('assignedUser')->orderBy('next_follow_up_at')->limit(8)->get();
+        $filters = ['from' => $period['date_from'], 'to' => $period['date_to'], 'branch_id' => $outletId];
+        $summary = $this->crmAnalytics->summary($user, $filters);
+        $forecast = $this->crmAnalytics->forecast($user, $filters);
+        $stalled = $this->crmAnalytics->stalledLeads($user, $filters)->filter(fn (array $row) => ($row['stage']->value ?? null) === 'contacted')->count();
+        $leadQuery = app(\App\Repositories\Crm\LeadRepository::class)->queryForUser($user);
+        $leads = (clone $leadQuery)->whereNotNull('next_follow_up_at')->where('next_follow_up_at', '<=', now()->endOfDay())->with('assignedUser')->orderBy('next_follow_up_at')->limit(8)->get();
+        $overdue = $leads->count();
 
         return [
             'title' => 'CRM follow-ups',
-            'summary' => $leads->isEmpty() ? 'No due lead follow-ups are visible for your authorized scope.' : $leads->count().' lead follow-up(s) are due or overdue.',
-            'facts' => $leads->map(fn (CrmLead $lead) => $this->fact($lead->business_name ?: $lead->contact_name ?: $lead->title, $lead->next_follow_up_at?->format('d M, H:i'), 'text'))->all(),
-            'recommendations' => $leads->take(3)->map(fn (CrmLead $lead) => 'Review '.($lead->business_name ?: $lead->contact_name ?: $lead->title).' before contacting them.')->all(),
-            'coverage' => 'Only open leads with a recorded due follow-up in your authorized outlets are included.',
-            'sources' => [$this->source('Leads', 'crm.leads.index')],
+            'summary' => $overdue ? "{$overdue} due or overdue follow-up(s) need review." : 'No due lead follow-ups are visible for your authorized scope.',
+            'facts' => $leads->map(fn (CrmLead $lead) => $this->fact($lead->business_name ?: $lead->contact_name ?: $lead->title, $lead->next_follow_up_at?->format('d M, H:i'), 'text'))->concat([$this->fact('Overdue follow-ups', $overdue, 'number'), $this->fact('Stalled qualified leads', $stalled, 'number'), $this->fact('Conversion rate', $summary['win_rate'], 'percent'), $this->fact('Actual sales', $forecast['actual_sales_value'], 'money'), $this->fact('Weighted forecast', $forecast['weighted_forecast'], 'money'), $this->fact('Open pipeline', $forecast['open_pipeline_value'], 'money')])->values()->all(),
+            'recommendations' => $overdue ? ['Review overdue follow-ups before changing forecast assumptions.'] : ['Keep activities current to maintain CRM forecast coverage.'],
+            'coverage' => 'Read-only normalized CRM facts from the same authorized analytics contract used by CRM screens.',
+            'sources' => [$this->source('Pipeline Analytics', 'crm.pipeline-analytics.index'), $this->source('Follow-ups', 'crm.followups.index')],
             'followups' => ['Which leads are overdue?', 'Show promising leads', 'How are sales today?'],
-            'fact_count' => $leads->count(),
+            'fact_count' => $leads->count() + 6,
             'scope' => 'Authorized CRM outlets',
         ];
     }

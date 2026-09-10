@@ -40,6 +40,7 @@ class PipelineController extends Controller
             $leadRepository->findForUser($request->user(), $lead),
             (int) $request->validated('status_id'),
             $request->user(),
+            $request->validated(),
         );
 
         return back()->with('status', 'CRM pipeline updated.');
@@ -51,6 +52,7 @@ class PipelineController extends Controller
             $leadRepository->findForUser($request->user(), $lead),
             PipelineStage::from($request->string('target_stage')->value()),
             $request->user(),
+            $request->validated(),
         );
 
         if ($request->expectsJson()) {

@@ -38,12 +38,9 @@
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach ([
                 ['label' => 'Total Leads', 'value' => $metrics['total_leads']],
-                ['label' => 'New Leads', 'value' => $metrics['new_leads']],
-                ['label' => 'Qualified Leads', 'value' => $metrics['qualified_leads']],
-                ['label' => 'Demo Scheduled', 'value' => $metrics['demo_scheduled']],
-                ['label' => 'Won Leads', 'value' => $metrics['won_leads']],
-                ['label' => 'Lost Leads', 'value' => $metrics['lost_leads']],
-                ['label' => 'Pipeline Value', 'value' => '₹'.number_format((float) $metrics['pipeline_value'], 0)],
+                ['label' => 'Open Pipeline', 'value' => '₹'.number_format((float) $metrics['pipeline_value'], 0)],
+                ['label' => 'Weighted Forecast', 'value' => '₹'.number_format((float) $pipelineAnalytics['forecast_weighted_value'], 0)],
+                ['label' => 'Conversion Rate', 'value' => $pipelineAnalytics['win_rate'] === null ? '—' : number_format($pipelineAnalytics['win_rate'], 1).'%'],
                 ['label' => 'Overdue Follow-ups', 'value' => $metrics['overdue_followups']],
             ] as $card)
                 <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -51,6 +48,14 @@
                     <p class="mt-3 text-3xl font-semibold text-slate-950 dark:text-white">{{ $card['value'] }}</p>
                 </article>
             @endforeach
+        </section>
+
+        <section class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-3"><div><h2 class="text-base font-semibold text-slate-950 dark:text-white">Pipeline funnel</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Current authorized pipeline by stage.</p></div><a href="{{ route('crm.pipeline.index') }}" class="text-sm font-semibold text-teal-700 dark:text-teal-300">Open pipeline</a></div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">@foreach($pipelineAnalytics['stage_counts'] as $stage => $count)<div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-950"><p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">{{ str($stage)->replace('_', ' ')->headline() }}</p><p class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $count }}</p></div>@endforeach</div>
+            </article>
+            <article class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"><h2 class="text-base font-semibold text-slate-950 dark:text-white">Loss signals</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Immutable reasons from recorded lead transitions.</p><div class="mt-5 space-y-3">@forelse($pipelineAnalytics['lost_reasons'] as $reason)<div class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3 dark:border-slate-800"><span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $reason['reason'] }}</span><span class="text-sm font-semibold text-slate-950 dark:text-white">{{ $reason['count'] }}</span></div>@empty<p class="rounded-lg border border-dashed border-slate-300 px-4 py-7 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No recorded loss reasons in this view.</p>@endforelse</div></article>
         </section>
 
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

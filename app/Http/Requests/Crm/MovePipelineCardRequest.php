@@ -20,6 +20,9 @@ class MovePipelineCardRequest extends FormRequest
     {
         return [
             'target_stage' => ['required', Rule::enum(PipelineStage::class)],
+            'lost_reason' => ['nullable', 'string', 'max:255'],
+            'lost_note' => ['nullable', 'string', 'max:2000'],
+            'stage_transition_key' => ['nullable', 'uuid'],
         ];
     }
 }

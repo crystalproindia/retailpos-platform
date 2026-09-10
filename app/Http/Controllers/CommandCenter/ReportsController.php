@@ -12,6 +12,7 @@ use App\Models\Purchases\Supplier;
 use App\Models\User;
 use App\Services\Ai\AiAssistantService;
 use App\Services\Inventory\InventoryIntelligenceService;
+use App\Services\Crm\CrmPipelineAnalyticsService;
 use App\Services\Outlets\OutletAccessService;
 use App\Services\Reports\ExecutiveReportingService;
 use App\Services\Reports\RetailReportingService;
@@ -24,7 +25,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
-    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets, InventoryIntelligenceService $inventoryIntelligence, AiAssistantService $assistant): View
+    public function index(Request $request, RetailReportingService $reports, ExecutiveReportingService $executiveReports, OutletAccessService $outlets, InventoryIntelligenceService $inventoryIntelligence, AiAssistantService $assistant, CrmPipelineAnalyticsService $crmAnalytics): View
     {
         $filters = $this->executiveFilters($request);
         $executive = $executiveReports->dashboard($request->user(), $filters, $request->boolean('compare', true));
@@ -39,7 +40,13 @@ class ReportsController extends Controller
             ->whereIn('data->metadata->category', ['inventory', 'receivable', 'quotation', 'proforma', 'purchasing'])
             ->latest()->limit(5)->get();
 
-        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory, 'aiBrief' => $aiBrief, 'attentionAlerts' => $attentionAlerts]);
+        $crmFilters = ['from' => $executive['range']['from']->toDateString(), 'to' => $executive['range']['to']->toDateString()];
+        if (is_numeric($filters['outlet_id'] ?? null)) $crmFilters['branch_id'] = (int) $filters['outlet_id'];
+        $crmSummary = $request->user()->can('crm.reports.view') ? $crmAnalytics->summary($request->user(), $crmFilters) : null;
+        $crmForecast = $request->user()->can('crm.reports.view') ? $crmAnalytics->forecast($request->user(), $crmFilters) : null;
+        $crmOverdue = $request->user()->can('crm.reports.view') ? app(\App\Repositories\Crm\LeadRepository::class)->queryForUser($request->user())->whereNotNull('next_follow_up_at')->where('next_follow_up_at', '<=', now())->count() : null;
+
+        return view('command-center.reports.index', $this->payload($request, $reports, $outlets, null, ['scope' => $executive['scope'], 'range' => $executive['range']]) + ['executive' => $executive, 'inventoryIntelligence' => $inventory, 'aiBrief' => $aiBrief, 'attentionAlerts' => $attentionAlerts, 'crmSummary' => $crmSummary, 'crmForecast' => $crmForecast, 'crmOverdue' => $crmOverdue]);
     }
 
     public function exportExecutive(Request $request, ExecutiveReportingService $reports, ReportValueFormatter $formatter): StreamedResponse

@@ -67,6 +67,15 @@
                         </div>
                     </section>
 
+                    <section class="rounded-lg border border-slate-200 p-5 dark:border-slate-800" aria-labelledby="automation-crm">
+                        <div class="flex items-center gap-3"><span class="grid size-10 place-items-center rounded-lg bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"><x-icon name="users" class="size-5" /></span><div><h2 id="automation-crm" class="font-semibold text-slate-950 dark:text-white">CRM follow-through</h2><p class="text-sm text-slate-500 dark:text-slate-400">Optional, scope-aware prompts for commercial work that needs attention.</p></div></div>
+                        <div class="mt-5 space-y-4">
+                            @foreach ([['crm_overdue_follow_up_enabled','Overdue follow-ups','One alert per overdue lead until it is completed, rescheduled, or recovered.'],['crm_stalled_high_priority_enabled','Stalled high-priority leads','Only high and urgent leads with a shared stalled-lead signal.'],['crm_follow_up_digest_enabled','Follow-up digest','A low-noise administrator digest at the enabled daily or weekly summary time.']] as [$name,$label,$help])
+                                <label class="flex items-start gap-3 rounded-lg border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-900 dark:bg-violet-950/20"><input type="checkbox" name="{{ $name }}" value="1" @checked(old($name, $setting->{$name})) class="{{ $toggle }}"><span><span class="block text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $label }}</span><span class="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">{{ $help }} Off by default.</span></span></label>
+                            @endforeach
+                        </div>
+                    </section>
+
                     <section class="rounded-lg border border-slate-200 p-5 dark:border-slate-800" aria-labelledby="automation-owner">
                         <div class="flex items-center gap-3"><span class="grid size-10 place-items-center rounded-lg bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"><x-icon name="analytics" class="size-5" /></span><div><h2 id="automation-owner" class="font-semibold text-slate-950 dark:text-white">Owner summary</h2><p class="text-sm text-slate-500 dark:text-slate-400">A deterministic snapshot that works without AI.</p></div></div>
                         <div class="mt-5 space-y-4">

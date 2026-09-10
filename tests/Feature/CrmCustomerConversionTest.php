@@ -14,6 +14,8 @@ use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmLeadSource;
 use App\Models\Crm\CrmLeadStatus;
 use App\Models\Crm\CrmQuotation;
+use App\Models\Crm\CrmProformaInvoice;
+use App\Models\Crm\CrmInvoice;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -141,6 +143,34 @@ class CrmCustomerConversionTest extends TestCase
             ->assertSee('Active Customers')
             ->assertSee('Latest CRM Customers')
             ->assertSee($customer->customer_code);
+    }
+
+    public function test_customer_360_and_its_nested_commercial_documents_cannot_cross_an_outlet_boundary(): void
+    {
+        $manager = $this->user(UserRole::Manager);
+        $otherOutlet = Branch::factory()->for($manager->company)->create();
+        $lead = $this->lead($manager, $manager, ['branch_id' => $otherOutlet->id, 'title' => 'Other outlet journey']);
+        $customer = CrmCustomer::create([
+            'company_id' => $manager->company_id, 'lead_id' => $lead->id, 'customer_code' => 'OUTLET-360',
+            'company_name' => 'Other Outlet Customer', 'display_name' => 'Other Outlet Customer', 'created_by' => $manager->id,
+        ]);
+        $quotation = $this->quotation($manager, $lead, QuotationStatus::Sent);
+        $proforma = CrmProformaInvoice::create([
+            'company_id' => $manager->company_id, 'customer_id' => $customer->id, 'lead_id' => $lead->id, 'quotation_id' => $quotation->id,
+            'proforma_number' => 'PI-OUTLET-360', 'title' => 'Restricted proforma', 'currency' => 'INR', 'grand_total' => 1000, 'balance_amount' => 1000,
+            'invoice_date' => today(), 'due_date' => today()->addWeek(), 'status' => 'sent', 'created_by' => $manager->id,
+        ]);
+        $invoice = CrmInvoice::create([
+            'company_id' => $manager->company_id, 'branch_id' => $otherOutlet->id, 'customer_id' => $customer->id, 'lead_id' => $lead->id,
+            'invoice_number' => 'INV-OUTLET-360', 'currency' => 'INR', 'grand_total' => 1000, 'balance_due' => 1000,
+            'status' => 'issued', 'issue_date' => today(), 'created_by' => $manager->id,
+        ]);
+
+        $this->actingAs($manager)->get('/crm/customers?search=Other+Outlet')->assertOk()->assertDontSee('Other Outlet Customer');
+        $this->actingAs($manager)->get("/crm/customers/{$customer->id}")->assertNotFound();
+        $this->actingAs($manager)->get("/crm/quotations/{$quotation->id}")->assertNotFound();
+        $this->actingAs($manager)->get("/crm/proforma-invoices/{$proforma->id}")->assertNotFound();
+        $this->actingAs($manager)->get("/sales/invoices/{$invoice->id}")->assertNotFound();
     }
 
     /** @param array<string, mixed> $overrides

@@ -59,6 +59,8 @@ class StoreLeadRequest extends FormRequest
             'next_follow_up_at' => ['nullable', 'date'],
             'last_contacted_at' => ['nullable', 'date'],
             'lost_reason' => ['nullable', 'string', 'max:255'],
+            'lost_note' => ['nullable', 'string', 'max:2000'],
+            'stage_transition_key' => ['nullable', 'uuid'],
             'description' => ['nullable', 'string'],
             'metadata' => ['nullable', 'array'],
             'tag_ids' => ['nullable', 'array'],

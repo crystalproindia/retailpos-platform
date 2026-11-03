@@ -120,6 +120,7 @@ class InvoiceController extends Controller
         abort_unless($record->status?->isEditable(), 422);
         $customerId = (int) $request->old('customer_id');
         $customer = $customerId > 0 ? $customers->findForUser($request->user(), $customerId) : $record->customer;
+        $customer?->loadMissing('billingProfiles');
 
         return view('command-center.crm.invoices.form', ['quotation' => null, 'invoice' => $record, 'selectedCustomer' => $customer]);
     }
@@ -267,6 +268,20 @@ class InvoiceController extends Controller
             'country' => $customer->country,
             'business_type' => $customer->business_type,
             'outstanding' => $outstanding,
+            'billing_profiles' => $customer->billingProfiles->where('status', 'active')->map(fn ($profile): array => [
+                'id' => $profile->id,
+                'name' => $profile->profile_name,
+                'primary' => $profile->is_primary,
+                'legal_name' => $profile->legal_name,
+                'trade_name' => $profile->trade_name,
+                'tax_number' => $profile->tax_number,
+                'billing_address' => $profile->billing_address,
+                'email' => $profile->email,
+                'phone' => $profile->phone,
+                'country' => $profile->country,
+                'city' => $profile->city,
+                'state' => $profile->state,
+            ])->values(),
         ];
     }
 }

@@ -6,7 +6,9 @@ use App\Enums\Crm\CrmCustomerStatus;
 use App\Enums\Crm\QuotationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\StoreCrmCustomerConversionRequest;
+use App\Http\Requests\Crm\StoreCustomerBillingProfileRequest;
 use App\Models\Crm\CrmCustomer;
+use App\Models\Crm\CrmCustomerBillingProfile;
 use App\Models\Crm\CrmLead;
 use App\Models\Crm\CrmQuotation;
 use App\Repositories\Crm\CrmCustomerRepository;
@@ -15,6 +17,7 @@ use App\Repositories\Crm\InvoiceRepository;
 use App\Repositories\Crm\LeadRepository;
 use App\Repositories\Crm\QuotationRepository;
 use App\Services\Crm\CrmCustomerConversionService;
+use App\Services\Crm\CustomerBillingProfileService;
 use App\Services\Finance\ReceivableService;
 use App\Services\Crm\Customer360Service;
 use Illuminate\Http\RedirectResponse;
@@ -50,6 +53,56 @@ class CrmCustomerController extends Controller
                 : null,
             'customer360' => $customer360->forCustomer($request->user(), $record),
         ]);
+    }
+
+    public function createBillingProfile(Request $request, CrmCustomerRepository $customers, int $customer): View
+    {
+        return view('command-center.crm.customers.billing-profiles.form', [
+            'customer' => $customers->findForUser($request->user(), $customer),
+            'profile' => new CrmCustomerBillingProfile(['status' => 'active']),
+        ]);
+    }
+
+    public function storeBillingProfile(StoreCustomerBillingProfileRequest $request, CrmCustomerRepository $customers, CustomerBillingProfileService $profiles, int $customer): RedirectResponse
+    {
+        $record = $customers->findForUser($request->user(), $customer);
+        $profiles->create($record, $request->user(), $request->validated());
+
+        return redirect()->route('crm.customers.show', $record)->with('status', 'Billing profile added.');
+    }
+
+    public function editBillingProfile(Request $request, CrmCustomerRepository $customers, int $customer, int $profile): View
+    {
+        $record = $customers->findForUser($request->user(), $customer);
+
+        return view('command-center.crm.customers.billing-profiles.form', [
+            'customer' => $record,
+            'profile' => $record->billingProfiles()->findOrFail($profile),
+        ]);
+    }
+
+    public function updateBillingProfile(StoreCustomerBillingProfileRequest $request, CrmCustomerRepository $customers, CustomerBillingProfileService $profiles, int $customer, int $profile): RedirectResponse
+    {
+        $record = $customers->findForUser($request->user(), $customer);
+        $profiles->update($record, $record->billingProfiles()->findOrFail($profile), $request->user(), $request->validated());
+
+        return redirect()->route('crm.customers.show', $record)->with('status', 'Billing profile updated.');
+    }
+
+    public function primaryBillingProfile(Request $request, CrmCustomerRepository $customers, CustomerBillingProfileService $profiles, int $customer, int $profile): RedirectResponse
+    {
+        $record = $customers->findForUser($request->user(), $customer);
+        $profiles->setPrimary($record, $record->billingProfiles()->findOrFail($profile), $request->user());
+
+        return back()->with('status', 'Primary billing profile updated.');
+    }
+
+    public function disableBillingProfile(Request $request, CrmCustomerRepository $customers, CustomerBillingProfileService $profiles, int $customer, int $profile): RedirectResponse
+    {
+        $record = $customers->findForUser($request->user(), $customer);
+        $profiles->disable($record, $record->billingProfiles()->findOrFail($profile), $request->user());
+
+        return back()->with('status', 'Billing profile disabled. Historical invoices retain their saved snapshot.');
     }
 
     public function createForLead(Request $request, LeadRepository $leads, int $lead): View

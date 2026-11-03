@@ -30,6 +30,13 @@
                     'country' => $selectedCustomer->country,
                     'business_type' => $selectedCustomer->business_type,
                     'outstanding' => null,
+                    'billing_profiles' => $selectedCustomer->billingProfiles->where('status', 'active')->map(fn ($profile) => [
+                        'id' => $profile->id, 'name' => $profile->profile_name, 'primary' => $profile->is_primary,
+                        'legal_name' => $profile->legal_name, 'trade_name' => $profile->trade_name, 'tax_number' => $profile->tax_number,
+                        'billing_address' => $profile->billing_address, 'email' => $profile->email, 'phone' => $profile->phone,
+                        'country' => $profile->country, 'city' => $profile->city, 'state' => $profile->state,
+                    ])->values(),
+                    'billing_profile_id' => $invoice?->billing_profile_id,
                 ] : null;
             @endphp
             <form method="POST" action="{{ $invoice ? route('sales.invoices.update', $invoice) : route('sales.invoices.store') }}" class="space-y-6" data-product-search-url="{{ route('sales.invoices.products.search') }}">
@@ -54,23 +61,31 @@
                             <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p data-customer-name class="truncate font-semibold text-slate-950 dark:text-white"></p><p data-customer-company class="mt-1 truncate text-sm text-slate-500"></p></div><span class="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800 dark:bg-teal-950 dark:text-teal-200">Selected</span></div>
                             <div class="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 dark:text-slate-300"><p data-customer-phone></p><p data-customer-tax></p><p data-customer-address class="sm:col-span-2"></p><p data-customer-outstanding class="font-semibold text-amber-700 dark:text-amber-300"></p></div>
                         </div>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <label class="text-sm font-medium">Bill as
+                                <select name="billing_profile_id" data-billing-profile class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900"><option value="">Use customer billing details</option></select>
+                            </label>
+                            <p data-billing-profile-context class="self-end pb-2 text-xs text-slate-500 dark:text-slate-400">Choose a customer to use one of its active billing identities.</p>
+                        </div>
                         <p data-customer-feedback class="mt-2 hidden text-sm" role="status" aria-live="polite"></p>
                     </div>
-                    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div data-billing-identity-fields class="mt-6 grid gap-4 sm:grid-cols-2">
                         <label class="text-sm font-medium">Billing name<input name="billing_name" value="{{ old('billing_name', $invoice?->billing_name ?? $selectedCustomer?->display_name) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Company<input name="billing_company" value="{{ old('billing_company', $invoice?->billing_company ?? $selectedCustomer?->company_name) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Email<input name="billing_email" type="email" value="{{ old('billing_email', $invoice?->billing_email ?? $selectedCustomer?->email) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Phone<input name="billing_phone" value="{{ old('billing_phone', $invoice?->billing_phone ?? $selectedCustomer?->phone) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="text-sm font-medium">Customer tax number<input name="customer_tax_number" value="{{ old('customer_tax_number', $invoice?->customer_tax_number ?? $selectedCustomer?->tax_number) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
+                        <label class="sm:col-span-2 text-sm font-medium">Billing address<textarea name="billing_address" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('billing_address', $invoice?->billing_address ?? $selectedCustomer?->billing_address) }}</textarea></label>
+                    </div>
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
                         <label class="text-sm font-medium">Currency<input name="currency" required maxlength="3" value="{{ old('currency', $invoice?->currency ?? 'INR') }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Due date<input name="due_date" type="date" value="{{ old('due_date', $invoice?->due_date?->toDateString()) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
-                        <label class="text-sm font-medium">Customer tax number<input name="customer_tax_number" value="{{ old('customer_tax_number', $invoice?->customer_tax_number ?? $selectedCustomer?->tax_number) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                         <label class="text-sm font-medium">Place of supply<input name="place_of_supply" value="{{ old('place_of_supply', $invoice?->place_of_supply) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5"></label>
                     </div>
                     @php($taxMode = old('tax_mode', $invoice?->tax_mode ?? 'gst'))
                     <section class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950" data-tax-mode>
                         <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-semibold text-slate-950 dark:text-white">Tax mode</h2><p class="mt-1 text-sm text-slate-500">The saved document decides tax calculations. No-GST sets all line taxes to zero on the server when your GST Settings permit it.</p></div><div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"><label><input class="sr-only" type="radio" name="tax_mode" value="gst" @checked($taxMode === 'gst')><span class="block rounded-md px-4 py-2 text-sm font-semibold has-[:checked]:bg-slate-950 has-[:checked]:text-white">GST</span></label><label><input class="sr-only" type="radio" name="tax_mode" value="no_gst" @checked($taxMode === 'no_gst')><span class="block rounded-md px-4 py-2 text-sm font-semibold has-[:checked]:bg-slate-950 has-[:checked]:text-white">No-GST</span></label></div></div>
                     </section>
-                    <label class="mt-4 block text-sm font-medium">Billing address<textarea name="billing_address" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5">{{ old('billing_address', $invoice?->billing_address ?? $selectedCustomer?->billing_address) }}</textarea></label>
                 </section>
 
                 <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -188,13 +203,41 @@
                 const results = root.querySelector('[data-customer-results]');
                 const selected = root.querySelector('[data-selected-customer]');
                 const customerId = root.querySelector('[data-customer-id]');
+                const profile = root.querySelector('[data-billing-profile]');
+                const profileContext = root.querySelector('[data-billing-profile-context]');
+                const identityFields = root.closest('form').querySelector('[data-billing-identity-fields]');
                 const modal = document.querySelector('[data-customer-modal]');
+                const selectedProfileId = @json(old('billing_profile_id', $invoice?->billing_profile_id));
+                const autoSelectInitialProfile = @json(! $invoice);
+                let currentCustomer = null;
                 let timer;
 
                 const escape = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
+                const applyProfile = (customer, profileId) => {
+                    const identity = (customer?.billing_profiles || []).find((entry) => String(entry.id) === String(profileId));
+                    identityFields.hidden = Boolean(identity);
+                    const values = identity
+                        ? {billing_name: identity.trade_name || identity.legal_name, billing_company: identity.legal_name, billing_email: identity.email, billing_phone: identity.phone, billing_address: identity.billing_address, billing_country: identity.country, customer_tax_number: identity.tax_number}
+                        : customer ? {billing_name: customer.name, billing_company: customer.company_name, billing_email: customer.email, billing_phone: customer.phone, billing_address: customer.billing_address, billing_country: customer.country, customer_tax_number: customer.tax_number} : null;
+                    if (values) Object.entries(values).forEach(([name, value]) => { const field = document.querySelector('[name="' + name + '"]'); if (field) field.value = value || ''; });
+                    profileContext.textContent = identity
+                        ? [identity.trade_name || identity.legal_name, identity.tax_number ? 'GSTIN: ' + identity.tax_number : null, [identity.billing_address, identity.city, identity.state, identity.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || 'Billing identity selected.'
+                        : customer ? 'Use the customer billing details or choose an active identity.' : 'Choose a customer to use one of its active billing identities.';
+                };
                 const fill = (customer, updateBilling = true) => {
+                    currentCustomer = customer;
                     customerId.value = customer?.id || '';
                     selected.classList.toggle('hidden', !customer);
+                    profile.replaceChildren(new Option('Use customer billing details', ''));
+                    const identities = customer?.billing_profiles || [];
+                    identities.forEach((identity) => profile.add(new Option(identity.name + (identity.primary ? ' · Primary' : ''), identity.id)));
+                    let profileId = identities.some((identity) => String(identity.id) === String(customer?.billing_profile_id || selectedProfileId))
+                        ? String(customer?.billing_profile_id || selectedProfileId)
+                        : '';
+                    if (!profileId && identities.length === 1 && (updateBilling || autoSelectInitialProfile)) profileId = String(identities[0].id);
+                    if (!profileId && identities.length > 1 && (updateBilling || autoSelectInitialProfile)) profileId = String(identities.find((identity) => identity.primary)?.id || '');
+                    profile.value = profileId;
+                    identityFields.hidden = Boolean(customer && profileId);
                     if (!customer) return;
                     selected.querySelector('[data-customer-name]').textContent = customer.name || customer.company_name;
                     selected.querySelector('[data-customer-company]').textContent = customer.company_name || '';
@@ -206,8 +249,11 @@
                         const values = {billing_name: customer.name, billing_company: customer.company_name, billing_email: customer.email, billing_phone: customer.phone, billing_address: customer.billing_address, billing_country: customer.country, customer_tax_number: customer.tax_number};
                         Object.entries(values).forEach(([name, value]) => { const field = document.querySelector('[name="' + name + '"]'); if (field) field.value = value || ''; });
                     }
+                    if (profileId) applyProfile(customer, profileId);
+                    else profileContext.textContent = customer ? 'Use the customer billing details or choose an active identity.' : 'Choose a customer to use one of its active billing identities.';
                 };
                 fill(root.dataset.selected ? JSON.parse(root.dataset.selected) : null, false);
+                profile.addEventListener('change', () => applyProfile(currentCustomer, profile.value));
 
                 input.addEventListener('input', () => {
                     clearTimeout(timer);

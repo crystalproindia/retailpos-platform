@@ -17,6 +17,17 @@
                         @if((int) $invoice->amendment_version > 1)<span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-200">Amended · Version {{ $invoice->amendment_version }}</span>@endif
                     </div>
                     <h1 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{{ $invoice->billing_company ?: $invoice->billing_name }}</h1>
+                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        {{ $invoice->billing_name }}
+                        @if($invoice->billing_email) · {{ $invoice->billing_email }}@endif
+                        @if($invoice->billing_phone) · {{ $invoice->billing_phone }}@endif
+                    </p>
+                    @if($invoice->customer_tax_number || $invoice->billing_address)
+                        <p class="mt-1 whitespace-pre-line text-sm text-slate-500 dark:text-slate-400">
+                            @if($invoice->customer_tax_number)GSTIN: {{ $invoice->customer_tax_number }}@endif
+                            @if($invoice->billing_address){{ $invoice->billing_address }}@endif
+                        </p>
+                    @endif
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Due {{ $invoice->due_date?->format('d M Y') ?? 'not set' }} · {{ $invoice->currency }} {{ number_format((float) $invoice->balance_due, 2) }} outstanding</p>
                 </div>
                 <div class="flex flex-wrap gap-2">

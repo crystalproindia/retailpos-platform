@@ -502,6 +502,12 @@ Route::middleware(['auth', 'workforce.account.active'])->group(function (): void
         Route::get('proforma-invoices/{proforma}', [ProformaController::class, 'show'])->middleware('can:crm.proformas.view')->name('proformas.show');
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->middleware('can:crm.quotations.view')->name('quotations.show');
         Route::get('customers', [CrmCustomerController::class, 'index'])->middleware('can:crm.customers.view')->name('customers.index');
+        Route::get('customers/{customer}/billing-profiles/create', [CrmCustomerController::class, 'createBillingProfile'])->middleware('can:crm.customers.update')->name('customers.billing-profiles.create');
+        Route::post('customers/{customer}/billing-profiles', [CrmCustomerController::class, 'storeBillingProfile'])->middleware('can:crm.customers.update')->name('customers.billing-profiles.store');
+        Route::get('customers/{customer}/billing-profiles/{profile}/edit', [CrmCustomerController::class, 'editBillingProfile'])->middleware('can:crm.customers.update')->name('customers.billing-profiles.edit');
+        Route::put('customers/{customer}/billing-profiles/{profile}', [CrmCustomerController::class, 'updateBillingProfile'])->middleware('can:crm.customers.update')->name('customers.billing-profiles.update');
+        Route::post('customers/{customer}/billing-profiles/{profile}/primary', [CrmCustomerController::class, 'primaryBillingProfile'])->middleware('can:crm.customers.update')->name('customers.billing-profiles.primary');
+        Route::post('customers/{customer}/billing-profiles/{profile}/disable', [CrmCustomerController::class, 'disableBillingProfile'])->middleware('can:crm.customers.update')->name('customers.billing-profiles.disable');
         Route::get('customers/{customer}', [CrmCustomerController::class, 'show'])->middleware('can:crm.customers.view')->name('customers.show');
         Route::post('customers/{customer}/portal-users', [CrmCustomerPortalAccessController::class, 'invite'])->middleware('can:crm.customers.portal.manage')->name('customers.portal-users.invite');
         Route::post('customers/{customer}/portal-users/{portalUser}/link', [CrmCustomerPortalAccessController::class, 'refresh'])->middleware('can:crm.customers.portal.manage')->name('customers.portal-users.link');

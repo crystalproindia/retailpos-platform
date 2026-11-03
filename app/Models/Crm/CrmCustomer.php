@@ -51,6 +51,11 @@ class CrmCustomer extends Model
         return $this->hasMany(CrmCustomerContact::class, 'customer_id');
     }
 
+    public function billingProfiles(): HasMany
+    {
+        return $this->hasMany(CrmCustomerBillingProfile::class, 'customer_id')->orderByDesc('is_primary')->orderBy('profile_name');
+    }
+
     public function proformas(): HasMany
     {
         return $this->hasMany(CrmProformaInvoice::class, 'customer_id')->latest('created_at');

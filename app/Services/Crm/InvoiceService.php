@@ -39,6 +39,7 @@ class InvoiceService
         private readonly FinanceBalanceService $financeBalances,
         private readonly CreditLimitService $creditLimits,
         private readonly CrmPaymentNumberService $paymentNumbers,
+        private readonly CustomerBillingProfileService $billingProfiles,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -46,11 +47,12 @@ class InvoiceService
     {
         return DB::transaction(function () use ($user, $data): CrmInvoice {
             $this->usage->assertWithinLimit($user->company, 'monthly_invoices');
+            $data = $this->billingProfiles->applyToInvoice($data, $user);
             $data = $this->customerData($user, $data);
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? null);
             $outlet = $this->outlets->current($user);
             $calculation = $this->calculate($this->profitabilityItems($user, $data['items']), $data['adjustment_total'] ?? '0', $taxMode);
-            $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::INVOICE) + [
+            $invoice = CrmInvoice::create(Arr::only($data, ['quotation_id', 'opportunity_id', 'lead_id', 'customer_id', 'billing_profile_id', 'crm_contact_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country', 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date', 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before']) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? true)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::INVOICE) + [
                 'company_id' => $user->company_id,
                 'branch_id' => $outlet->id,
                 'invoice_number' => $this->numbers->nextInvoiceNumber($user->company_id),
@@ -127,11 +129,12 @@ class InvoiceService
             $invoice = $this->findInvoiceForUpdate($invoice->id, $user);
             $this->ensureDraft($invoice);
             $previousCustomerId = $invoice->customer_id;
+            $data = $this->billingProfiles->applyToInvoice($data, $user);
             $data = $this->customerData($user, $data);
             $taxMode = $this->taxModes->normalize($user->company, $data['tax_mode'] ?? $invoice->tax_mode);
             $calculation = $this->calculate($this->profitabilityItems($user, $data['items']), $data['adjustment_total'] ?? '0', $taxMode);
             $invoice->update(Arr::only($data, [
-                'customer_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
+                'customer_id', 'billing_profile_id', 'billing_name', 'billing_company', 'billing_email', 'billing_phone', 'billing_address', 'billing_country',
                 'customer_tax_number', 'place_of_supply', 'tax_classification', 'currency', 'issue_date', 'due_date',
                 'notes', 'terms_conditions', 'internal_notes', 'do_not_remind_before',
             ]) + $calculation + $this->signatureSnapshot($user->company, (bool) ($data['show_authorized_signature'] ?? $invoice->show_authorized_signature)) + $this->presentations->snapshot($user->company, SalesDocumentPresentationService::INVOICE) + [
@@ -161,6 +164,10 @@ class InvoiceService
         if (empty($data['customer_id'])) {
             $data['customer_id'] = null;
 
+            return $data;
+        }
+
+        if (! empty($data['billing_profile_id'])) {
             return $data;
         }
 

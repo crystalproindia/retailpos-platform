@@ -40,7 +40,7 @@ class CrmCustomerRepository
     public function findForUser(User $user, int $customerId): CrmCustomer
     {
         return $this->queryForUser($user)
-            ->with(['primaryContact', 'contacts', 'lead.status', 'quotation.items', 'activeOnboarding', 'portalUsers', 'serviceRequests.source', 'creator', 'updater', 'auditLogs.user'])
+            ->with(['primaryContact', 'contacts', 'billingProfiles', 'lead.status', 'quotation.items', 'activeOnboarding', 'portalUsers', 'serviceRequests.source', 'creator', 'updater', 'auditLogs.user'])
             ->findOrFail($customerId);
     }
 
@@ -65,7 +65,7 @@ class CrmCustomerRepository
         $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($search)).'%';
 
         return $this->queryForUser($user)
-            ->with('primaryContact')
+            ->with(['primaryContact', 'billingProfiles' => fn ($profiles) => $profiles->where('status', 'active')])
             ->where(function (Builder $query) use ($term): void {
                 $query->where('company_name', 'like', $term)
                     ->orWhere('display_name', 'like', $term)
@@ -96,6 +96,12 @@ class CrmCustomerRepository
     public function businessTypesForUser(User $user): Collection
     {
         return $this->queryForUser($user)->whereNotNull('business_type')->distinct()->orderBy('business_type')->pluck('business_type');
+    }
+
+    /** @return Collection<int, CrmCustomer> */
+    public function availableForInvoice(User $user): Collection
+    {
+        return $this->queryForUser($user)->with(['billingProfiles' => fn ($profiles) => $profiles->where('status', 'active')])->orderBy('company_name')->orderBy('display_name')->get();
     }
 
     private function queryForUser(User $user): Builder

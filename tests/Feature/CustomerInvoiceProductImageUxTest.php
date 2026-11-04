@@ -23,6 +23,37 @@ class CustomerInvoiceProductImageUxTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_new_invoice_form_has_default_notes_and_terms_without_changing_existing_drafts(): void
+    {
+        $manager = $this->user();
+        $defaultNotes = 'Thank you for your business. Please review the invoice details carefully and contact us if you have any questions regarding the products, services, quantities, pricing, or payment information.';
+        $defaultTerms = "1. Payment is due as per the agreed payment terms mentioned on this invoice.\n2. Goods/services once supplied are subject to the seller’s applicable return, replacement, and warranty policy.\n3. Any discrepancy in quantity, price, tax, or billing details should be reported promptly.\n4. Late payments may be subject to applicable charges where agreed.\n5. This invoice is subject to applicable taxes and statutory regulations.";
+
+        $this->actingAs($manager)
+            ->get(route('sales.invoices.create'))
+            ->assertOk()
+            ->assertSee($defaultNotes)
+            ->assertSee('1. Payment is due as per the agreed payment terms mentioned on this invoice.')
+            ->assertSee('5. This invoice is subject to applicable taxes and statutory regulations.');
+
+        $savedNotes = 'Customer-specific note already saved.';
+        $savedTerms = 'Customer-specific terms already saved.';
+        $this->actingAs($manager)
+            ->post(route('sales.invoices.store'), $this->invoicePayload(['notes' => $savedNotes, 'terms_conditions' => $savedTerms]))
+            ->assertRedirect();
+
+        $invoice = CrmInvoice::query()->firstOrFail();
+        $this->assertSame($savedNotes, $invoice->notes);
+        $this->assertSame($savedTerms, $invoice->terms_conditions);
+
+        $this->actingAs($manager)
+            ->get(route('sales.invoices.edit', $invoice))
+            ->assertOk()
+            ->assertSee($savedNotes)
+            ->assertSee($savedTerms)
+            ->assertDontSee($defaultNotes);
+    }
+
     public function test_customer_opens_a_prefilled_invoice_and_cross_tenant_customer_is_rejected(): void
     {
         $manager = $this->user();

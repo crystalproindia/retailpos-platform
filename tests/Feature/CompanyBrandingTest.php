@@ -129,8 +129,9 @@ class CompanyBrandingTest extends TestCase
         $this->assertSame('small', $withoutLogo['branding']['logo_size']);
         foreach (InvoiceTemplateService::KEYS as $key) {
             $templates->update($manager->company, $manager, ['template_key' => $key, 'brand_color' => '#123456', 'copy_label' => 'original', 'orientation' => 'portrait', 'options' => array_replace($templates->defaultOptions(), ['show_logo' => false])]);
-            $markup = view(app(InvoicePdfService::class)->templateView($key), ['invoice' => $invoice->fresh()->load(['company', 'items']), 'render' => $templates->renderData($invoice->fresh()->load(['company', 'items']))])->render();
-            $this->assertStringNotContainsString('data:image/png;base64,', $markup);
+            $render = $templates->renderData($invoice->fresh()->load(['company', 'items']));
+            $markup = view(app(InvoicePdfService::class)->templateView($key), ['invoice' => $invoice->fresh()->load(['company', 'items']), 'render' => $render])->render();
+            $this->assertStringNotContainsString($render['branding']['data_uri'], $markup);
             $this->assertStringContainsString($manager->company->legal_name, html_entity_decode($markup, ENT_QUOTES, 'UTF-8'));
         }
 

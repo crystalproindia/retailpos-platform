@@ -111,6 +111,8 @@
             @endif
         </section>
 
+        @include('invoice-templates.partials.retailpos-upi-qr', ['render' => $invoiceRender])
+
         @if($invoice->status?->isEditable() && $creditLimitExceeded)
             <section class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p class="font-semibold">Credit limit review required</p><p class="mt-1">Limit: {{ $invoice->currency }} {{ number_format((float)$invoice->customer->credit_limit,2) }} · Current net exposure: {{ $invoice->currency }} {{ number_format($financeSummary['net_exposure']/100,2) }} · Projected: {{ $invoice->currency }} {{ number_format(($financeSummary['net_exposure']/100)+(float)$invoice->grand_total,2) }}.</p>@cannot('finance.credit-limits.override')<p class="mt-2">Ask an authorized manager to review this invoice.</p>@endcannot @error('credit_limit')<p class="mt-2 font-semibold">{{ $message }}</p>@enderror @error('credit_limit_override_reason')<p class="mt-2 font-semibold">{{ $message }}</p>@enderror</section>
         @endif

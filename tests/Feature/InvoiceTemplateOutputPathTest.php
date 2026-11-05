@@ -21,6 +21,43 @@ class InvoiceTemplateOutputPathTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_retailpos_upi_qr_uses_saved_balance_and_renders_for_supported_invoice_formats(): void
+    {
+        [$user, $invoice] = $this->invoiceWithItems(1);
+        $invoice->update(['invoice_number' => 'INV / QR & 01', 'grand_total' => 124.5, 'balance_due' => 80.25]);
+
+        $templates = app(InvoiceTemplateService::class);
+        $render = $templates->renderData($invoice->fresh()->load(['company', 'items']), ['paper_format' => 'a4']);
+        parse_str((string) parse_url($render['retailpos_upi_qr_uri'], PHP_URL_QUERY), $query);
+        $this->assertSame('9994015502@okbizaxis', $query['pa']);
+        $this->assertSame('RetailPOS Biz', $query['pn']);
+        $this->assertSame('80.25', $query['am']);
+        $this->assertSame('INR', $query['cu']);
+        $this->assertSame('INV / QR & 01', $query['tn']);
+        $this->assertStringContainsString('tn=INV%20%2F%20QR%20%26%2001', $render['retailpos_upi_qr_uri']);
+        $this->assertStringStartsWith('data:image/png;base64,', $render['retailpos_upi_qr_data_uri']);
+        $qrPdf = app(InvoicePdfService::class)->document($invoice->fresh()->load(['company', 'items']))->output();
+        $this->assertStringStartsWith('%PDF-', $qrPdf);
+        $this->assertStringContainsString('/Subtype /Image', $qrPdf);
+
+        foreach (['a4' => 'structured_gst_grid', 'a5' => 'a5_minimal', 'thermal_80' => 'thermal_80_classic'] as $format => $templateKey) {
+            $formatRender = $templates->renderData($invoice->fresh()->load(['company', 'items']), ['template_key' => $templateKey, 'paper_format' => $format]);
+            $markup = view('invoice-templates.partials.retailpos-upi-qr', ['invoice' => $invoice, 'render' => $formatRender])->render();
+            $this->assertStringContainsString('Scan to Pay', $markup, $format);
+            $this->assertStringContainsString('UPI: 9994015502@okbizaxis', $markup, $format);
+        }
+
+        $thermal58 = $templates->renderData($invoice->fresh()->load(['company', 'items']), ['template_key' => 'thermal_58_mini', 'paper_format' => 'thermal_58']);
+        $this->assertSame('', trim(view('invoice-templates.partials.retailpos-upi-qr', ['invoice' => $invoice, 'render' => $thermal58])->render()));
+
+        $invoice->update(['balance_due' => 0]);
+        $settled = $templates->renderData($invoice->fresh()->load(['company', 'items']));
+        $this->assertNull($settled['retailpos_upi_qr_uri']);
+        $this->assertNull($settled['retailpos_upi_qr_data_uri']);
+        $invoice->update(['balance_due' => 80.25, 'currency' => 'USD']);
+        $this->assertNull($templates->renderData($invoice->fresh()->load(['company', 'items']))['retailpos_upi_qr_uri']);
+    }
+
     public function test_selected_template_is_used_by_sales_print_and_public_pdf_paths_while_sales_download_uses_premium_customer_pdf(): void
     {
         [$user, $invoice] = $this->invoiceWithItems(4);
@@ -36,7 +73,7 @@ class InvoiceTemplateOutputPathTest extends TestCase
 
         $this->actingAs($user)->get(route('sales.invoices.templates.index'))->assertOk()->assertSee('Invoice designs')->assertSee(route('sales.invoices.templates.preview', $invoice), false);
         $this->actingAs($user)->get(route('sales.invoices.templates.preview', $invoice))->assertOk()->assertHeader('content-type', 'application/pdf');
-        $this->actingAs($user)->get(route('sales.invoices.show', $invoice))->assertOk()->assertSee(route('sales.invoices.print', $invoice), false);
+        $this->actingAs($user)->get(route('sales.invoices.show', $invoice))->assertOk()->assertSee(route('sales.invoices.print', $invoice), false)->assertSee('Scan to Pay')->assertSee('9994015502@okbizaxis');
         $this->actingAs($user)->get(route('sales.invoices.print', $invoice))->assertOk()->assertHeader('content-type', 'application/pdf');
         $this->actingAs($user)->get(route('sales.invoices.pdf', $invoice))->assertOk()->assertHeader('content-type', 'application/pdf');
 
@@ -50,6 +87,7 @@ class InvoiceTemplateOutputPathTest extends TestCase
 
         $link = app(PublicInvoiceService::class)->issue($invoice, $user);
         $token = basename((string) parse_url($link->url, PHP_URL_PATH));
+        $this->get(route('invoices.public.show', $token))->assertOk()->assertSee('Scan to Pay')->assertSee('9994015502@okbizaxis');
         $this->get(route('invoices.public.pdf', $token))->assertOk()->assertHeader('content-type', 'application/pdf');
 
         [$otherUser] = $this->invoiceWithItems(1);

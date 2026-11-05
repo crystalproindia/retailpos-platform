@@ -11,6 +11,7 @@ body{color:#111;font:{{ $is58 ? '7px' : '7.8px' }} DejaVu Sans;margin:0}.right{t
 @include('invoice-templates.partials.gst-summary-thermal')
 @if(! $is58)@include('invoice-templates.partials.authorized-signature')@endif
 @if($render['payment_qr_data_uri'])<div class="qr"><img src="{{ $render['payment_qr_data_uri'] }}" alt="Payment QR"><br>Scan to pay {{ number_format((float)$invoice->balance_due,2) }}</div>@endif
+@include('invoice-templates.partials.retailpos-upi-qr')
 <div class="footer">{{ str($invoice->terms_conditions ?: 'Thank you for your business.')->limit($is58 ? 110 : 180) }}<br>Payment: recorded against invoice balance</div>
 @include('invoice-templates.partials.payment-details')
 </body></html>

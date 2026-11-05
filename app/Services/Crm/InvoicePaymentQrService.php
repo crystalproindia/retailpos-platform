@@ -12,6 +12,35 @@ use Endroid\QrCode\Writer\PngWriter;
 
 class InvoicePaymentQrService
 {
+    public const RETAILPOS_UPI_ID = '9994015502@okbizaxis';
+
+    /** @return array{payload:string,data_uri:string}|null */
+    public function retailposUpiForInvoice(CrmInvoice $invoice): ?array
+    {
+        $amount = (float) $invoice->balance_due;
+        if (strtoupper((string) $invoice->currency) !== 'INR' || $amount <= 0 || $invoice->status?->isTerminal()) {
+            return null;
+        }
+
+        $payload = 'upi://pay?'.http_build_query([
+            'pa' => self::RETAILPOS_UPI_ID,
+            'pn' => 'RetailPOS Biz',
+            'am' => number_format($amount, 2, '.', ''),
+            'cu' => 'INR',
+            'tn' => (string) $invoice->invoice_number,
+        ], '', '&', PHP_QUERY_RFC3986);
+        $result = (new PngWriter)->write(new QrCode(
+            data: $payload,
+            encoding: new Encoding('UTF-8'),
+            errorCorrectionLevel: ErrorCorrectionLevel::High,
+            size: 300,
+            margin: 16,
+            roundBlockSizeMode: RoundBlockSizeMode::Margin,
+        ));
+
+        return ['payload' => $payload, 'data_uri' => $result->getDataUri()];
+    }
+
     /** @return array{payload:string,data_uri:string}|null */
     public function forInvoice(CrmInvoice $invoice, InvoiceTemplateSetting $setting): ?array
     {

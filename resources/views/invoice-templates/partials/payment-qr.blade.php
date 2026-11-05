@@ -4,3 +4,4 @@
         <div><strong>Scan to pay</strong><br><span>{{ $invoice->currency }} {{ number_format((float) $invoice->balance_due, 2) }} outstanding</span></div>
     </div>
 @endif
+@include('invoice-templates.partials.retailpos-upi-qr')

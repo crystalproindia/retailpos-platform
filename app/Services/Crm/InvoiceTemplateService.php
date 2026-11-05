@@ -201,6 +201,7 @@ class InvoiceTemplateService
         unset($row);
         $balance = $this->balances->forInvoice($invoice);
         $paymentQr = $this->paymentQr->forInvoice($invoice, $setting);
+        $retailposUpiQr = $this->paymentQr->retailposUpiForInvoice($invoice);
 
         $presentation = $this->presentations->forDocument(
             $invoice,
@@ -223,6 +224,8 @@ class InvoiceTemplateService
             'amount_in_words' => $this->amountInWords->format($invoice->currency, $invoice->grand_total),
             'payment_qr_uri' => $paymentQr['payload'] ?? null,
             'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null,
+            'retailpos_upi_qr_uri' => $retailposUpiQr['payload'] ?? null,
+            'retailpos_upi_qr_data_uri' => $retailposUpiQr['data_uri'] ?? null,
             'branding' => $this->brandingFor($invoice->company, $setting),
             'is_gst' => $invoice->tax_mode !== DocumentTaxModeService::NO_GST,
             'signature' => $this->branding->signatureForPath($invoice->signature_path_snapshot, $invoice->signatory_name_snapshot, $invoice->signatory_designation_snapshot),

@@ -105,6 +105,32 @@
 }
 
 @layer components {
+    .invoice-payment-history {
+        margin-top: 1.25rem;
+        overflow: hidden;
+        border: 1px solid rgb(203 213 225);
+        border-radius: 0.625rem;
+        background: #fff;
+        padding: 1rem;
+        color: rgb(15 23 42);
+        font-size: 0.875rem;
+    }
+
+    .invoice-payment-history h2 { margin: 0 0 0.75rem; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; }
+    .invoice-payment-history table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .invoice-payment-history th, .invoice-payment-history td { border-bottom: 1px solid rgb(226 232 240); padding: 0.5rem; text-align: left; vertical-align: top; }
+    .invoice-payment-history th { background: rgb(248 250 252); color: rgb(71 85 105); font-size: 0.6875rem; text-transform: uppercase; }
+    .invoice-payment-history tfoot td { border-bottom: 0; font-weight: 700; }
+    .invoice-payment-history .payment-history-amount { text-align: right; white-space: nowrap; }
+    .invoice-payment-history .payment-history-wrap { overflow-wrap: anywhere; word-break: break-word; }
+    .invoice-payment-history .payment-history-empty, .invoice-payment-history .payment-history-reconciliation { color: rgb(71 85 105); margin: 0.5rem 0 0; }
+    .invoice-payment-history a { color: #176ad8; font-weight: 600; text-decoration: underline; }
+
+    @media (max-width: 640px) {
+        .invoice-payment-history { padding: 0.75rem; font-size: 0.75rem; }
+        .invoice-payment-history th, .invoice-payment-history td { padding: 0.375rem 0.25rem; }
+    }
+
     [data-global-menu-dialog] > section {
         animation: global-menu-search-enter 160ms ease-out;
     }

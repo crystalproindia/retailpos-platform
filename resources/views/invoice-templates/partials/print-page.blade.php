@@ -18,3 +18,16 @@
 .payment-details td:first-child { color: #64748b; width: 28%; }
 .payment-details-value { overflow-wrap: anywhere; word-break: break-word; }
 .payment-details p { margin: 4px 0 0; }
+.invoice-payment-history { border: 1px solid #cbd5e1; margin-top: 10px; padding: 7px 9px; page-break-inside: avoid; font-size: 8px; line-height: 1.35; }
+.invoice-payment-history h2 { color: #0f172a; font-size: 9px; font-weight: bold; margin: 0 0 5px; }
+.invoice-payment-history table { border-collapse: collapse; table-layout: fixed; width: 100%; }
+.invoice-payment-history th, .invoice-payment-history td { border-bottom: 1px solid #e2e8f0; padding: 3px 4px; text-align: left; vertical-align: top; }
+.invoice-payment-history th { background: #f8fafc; color: #475569; font-size: 7px; text-transform: uppercase; }
+.invoice-payment-history tfoot td { border-bottom: 0; font-weight: bold; padding-top: 5px; }
+.invoice-payment-history .payment-history-amount { text-align: right; white-space: nowrap; }
+.invoice-payment-history .payment-history-wrap { overflow-wrap: anywhere; word-break: break-word; }
+.invoice-payment-history .payment-history-empty, .invoice-payment-history .payment-history-reconciliation { color: #475569; margin: 3px 0 0; }
+.invoice-payment-history.is-thermal { font-size: 7px; margin-top: 6px; padding: 4px; }
+.invoice-payment-history.is-thermal h2 { font-size: 7px; margin-bottom: 3px; }
+.invoice-payment-history.is-thermal th, .invoice-payment-history.is-thermal td { padding: 2px; }
+.invoice-payment-history.is-thermal-58 .payment-history-reconciliation { font-size: 6px; }

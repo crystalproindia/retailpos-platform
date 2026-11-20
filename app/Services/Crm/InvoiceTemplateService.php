@@ -37,6 +37,7 @@ class InvoiceTemplateService
     public function __construct(
         private readonly InvoiceBalancePresentationService $balances,
         private readonly InvoicePaymentQrService $paymentQr,
+        private readonly InvoicePaymentHistoryService $paymentHistory,
         private readonly InvoiceReceivableSummaryService $receivables,
         private readonly InvoiceAmountInWordsService $amountInWords,
         private readonly CompanyBrandingService $branding,
@@ -221,6 +222,7 @@ class InvoiceTemplateService
             'tax_rows' => array_values($rows),
             'balance' => $balance,
             'receivable' => $this->receivables->forInvoice($invoice),
+            'payment_history' => $this->paymentHistory->forInvoice($invoice),
             'amount_in_words' => $this->amountInWords->format($invoice->currency, $invoice->grand_total),
             'payment_qr_uri' => $paymentQr['payload'] ?? null,
             'payment_qr_data_uri' => $paymentQr['data_uri'] ?? null,

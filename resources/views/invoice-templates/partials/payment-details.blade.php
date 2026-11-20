@@ -1,5 +1,8 @@
 @php($details = $render['payment_details'] ?? null)
 @php($paperFormat = $render['setting']->paper_format ?? 'a4')
+@if(isset($render['payment_history']))
+    @include('invoice-templates.partials.payment-history', ['paymentHistory' => $render['payment_history'], 'paperFormat' => $paperFormat])
+@endif
 @if($details)
     <section class="payment-details avoid-break">
         <strong>Payment details</strong>

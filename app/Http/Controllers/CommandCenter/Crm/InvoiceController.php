@@ -17,6 +17,7 @@ use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoiceReminderService;
 use App\Services\Crm\InvoiceReminderSettingsService;
 use App\Services\Crm\InvoiceReceivableSummaryService;
+use App\Services\Crm\InvoicePaymentHistoryService;
 use App\Services\Crm\InvoiceService;
 use App\Services\Crm\InvoiceShareService;
 use App\Services\Crm\InvoiceTemplateService;
@@ -133,13 +134,13 @@ class InvoiceController extends Controller
         return redirect()->route('sales.invoices.show', $record)->with('status', 'Draft invoice updated.');
     }
 
-    public function show(Request $request, InvoiceRepository $invoices, InvoiceService $service, InvoiceReminderSettingsService $reminderSettings, ReceivableService $receivables, InvoiceReceivableSummaryService $receivableSummary, InvoiceTemplateService $templates, int $invoice): View
+    public function show(Request $request, InvoiceRepository $invoices, InvoiceService $service, InvoiceReminderSettingsService $reminderSettings, ReceivableService $receivables, InvoiceReceivableSummaryService $receivableSummary, InvoiceTemplateService $templates, InvoicePaymentHistoryService $paymentHistory, int $invoice): View
     {
         $record = $service->refreshStatus($invoices->find($request->user(), $invoice));
         $setting = $reminderSettings->ensure($request->user()->company);
 
         $record->load(['items.returnItems.crmInvoiceReturn', 'amendments.items', 'amendments.creator', 'returns.items', 'returns.creator', 'payments.recorder', 'quotation', 'lead', 'customer', 'latestInvoiceEmailDelivery', 'invoiceEmailDeliveries', 'reminderEmailDeliveries.createdBy']);
-        return view('command-center.crm.invoices.show', ['invoice' => $record, 'receivable' => $receivableSummary->forInvoice($record), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null, 'invoiceRender' => $templates->renderData($record->loadMissing(['company', 'items']))]);
+        return view('command-center.crm.invoices.show', ['invoice' => $record, 'receivable' => $receivableSummary->forInvoice($record), 'paymentHistory' => $paymentHistory->forInvoice($record), 'reminderRules' => $setting->rules->where('enabled', true), 'financeSummary' => $record->customer ? $receivables->customerSummary($request->user(), $record->customer) : null, 'invoiceRender' => $templates->renderData($record->loadMissing(['company', 'items']))]);
     }
 
     public function issue(Request $request, InvoiceRepository $invoices, InvoiceService $service, int $invoice): RedirectResponse

@@ -14,6 +14,7 @@ use App\Services\Crm\InvoicePdfService;
 use App\Services\Crm\InvoicePaymentHistoryService;
 use App\Services\Crm\InvoiceTemplateService;
 use App\Services\Crm\PublicInvoiceService;
+use App\Support\Invoices\InvoiceTemplateRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -175,6 +176,35 @@ class InvoicePaymentHistoryTest extends TestCase
                 $this->assertStringContainsString('UPI-ADV-100', $markup, $templateKey);
             }
             $this->assertStringStartsWith('%PDF-', $pdf->document($invoice->fresh()->load(['company', 'items']))->output());
+        }
+    }
+
+    public function test_every_registered_invoice_design_includes_payment_history(): void
+    {
+        [$user, $invoice] = $this->invoice();
+        $this->payment($invoice, '20000.00', 'recorded', '2026-11-05', 'upi', 'ALL-DESIGNS-REF');
+        $invoice->update(['amount_paid' => 20000, 'balance_due' => 80000, 'status' => InvoiceStatus::PartiallyPaid]);
+
+        $registry = app(InvoiceTemplateRegistry::class);
+        $templates = app(InvoiceTemplateService::class);
+        $pdf = app(InvoicePdfService::class);
+        foreach ($registry->all() as $templateKey => $definition) {
+            $templates->update($user->company, $user, [
+                'template_key' => $templateKey,
+                'paper_format' => $definition['paper_format'],
+                'brand_color' => '#176ad8',
+                'copy_label' => 'original',
+                'orientation' => 'portrait',
+                'options' => $templates->defaultOptions(),
+            ]);
+
+            $invoice->load(['company', 'items']);
+            $render = $templates->renderData($invoice);
+            $markup = view($pdf->templateView($templateKey), ['invoice' => $invoice, 'render' => $render])->render();
+
+            $this->assertStringContainsString('PAYMENTS RECEIVED', $markup, $templateKey);
+            $this->assertStringContainsString('Total Received', $markup, $templateKey);
+            $this->assertStringContainsString('05 Nov 2026', $markup, $templateKey);
         }
     }
 
